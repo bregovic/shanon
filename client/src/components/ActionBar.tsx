@@ -4,13 +4,13 @@ import { makeStyles, tokens } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
     root: {
-        backgroundColor: '#fff4ce', // Yellow-ish specific tone
+        backgroundColor: tokens.colorNeutralBackground1, // White/Clean
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
         padding: '8px 24px',
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        height: '40px', // Fixed height
+        height: '44px', // Slightly taller
         flexShrink: 0
     }
 });

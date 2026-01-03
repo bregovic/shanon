@@ -14,7 +14,15 @@ import {
 } from '@fluentui/react-components';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { SignOutRegular, SettingsRegular } from '@fluentui/react-icons';
+import {
+    SignOutRegular,
+    SettingsRegular,
+    Home24Regular,
+    DocumentData24Regular,
+    ClipboardTextEdit24Regular,
+    Briefcase24Regular,
+    PeopleTeam24Regular
+} from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
 
 const useStyles = makeStyles({
@@ -24,51 +32,52 @@ const useStyles = makeStyles({
         height: '100vh',
     },
     header: {
-        backgroundColor: tokens.colorBrandBackground, // BLUE BAR
-        color: tokens.colorNeutralForegroundOnBrand,
+        backgroundColor: tokens.colorNeutralBackground1, // WHITE
+        color: tokens.colorNeutralForeground1, // DARK TEXT
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
-        height: '48px',
+        height: '54px', // Slightly taller for icons
         justifyContent: 'space-between',
         flexShrink: 0,
-        boxShadow: tokens.shadow4
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`
     },
     logoSection: {
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        marginRight: '24px'
     },
     navLinks: {
         display: 'flex',
-        gap: '24px',
-        marginLeft: '40px',
+        gap: '8px',
         height: '100%'
     },
     link: {
-        color: 'inherit',
+        color: tokens.colorNeutralForeground2,
         textDecoration: 'none',
         fontSize: '14px',
         fontWeight: '600',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
+        gap: '8px',
+        padding: '0 12px',
         borderBottom: '3px solid transparent',
-        opacity: 0.9,
         transition: 'all 0.2s',
         ':hover': {
-            opacity: 1,
-            borderBottom: '3px solid white'
+            backgroundColor: tokens.colorNeutralBackground2,
+            color: tokens.colorBrandForeground1
         }
     },
     activeLink: {
-        opacity: 1,
-        borderBottom: '3px solid white'
+        color: tokens.colorBrandForeground1,
+        borderBottom: `3px solid ${tokens.colorBrandForeground1}`
     },
     content: {
         flex: 1,
-        overflow: 'hidden', // Prepare for internal scrolling
+        overflow: 'hidden',
         backgroundColor: tokens.colorNeutralBackground2,
         display: 'flex',
         flexDirection: 'column'
@@ -82,15 +91,14 @@ const Layout: React.FC = () => {
     const { user, logout } = useAuth();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
 
-    // Module Definition
+    // Module Definition with Icons
     const modules = [
-        { label: 'Dashboard', path: '/dashboard' },
-        { label: 'DMS', path: '/dms' },
-        { label: 'Projekty', path: '/projects' }, // Placeholder
-        { label: 'CRM', path: '/crm' }, // Placeholder
-        { label: 'Požadavky', path: '/requests' },
+        { label: 'Dashboard', path: '/dashboard', icon: <Home24Regular /> },
+        { label: 'DMS', path: '/dms', icon: <DocumentData24Regular /> },
+        { label: 'Projekty', path: '/projects', icon: <Briefcase24Regular /> },
+        { label: 'CRM', path: '/crm', icon: <PeopleTeam24Regular /> },
+        { label: 'Požadavky', path: '/requests', icon: <ClipboardTextEdit24Regular /> },
     ].sort((a, b) => {
-        // Dashboard always first, others alphabetical
         if (a.path === '/dashboard') return -1;
         if (b.path === '/dashboard') return 1;
         return a.label.localeCompare(b.label);
@@ -100,12 +108,12 @@ const Layout: React.FC = () => {
 
     return (
         <div className={styles.root}>
-            {/* BLUE TOP BAR */}
+            {/* CLEAN WHITE HEADER */}
             <header className={styles.header}>
                 <div style={{ display: 'flex', height: '100%', alignItems: 'center' }}>
                     <div className={styles.logoSection} onClick={() => navigate('/dashboard')}>
-                        <Image src="/logo.png" height={24} fit="contain" style={{ filter: 'brightness(0) invert(1)' }} />
-                        <Text weight="semibold" size={400}>Shanon</Text>
+                        {/* No filter invert - keeping original colors */}
+                        <Image src="/logo.png" height={28} fit="contain" alt="Shanon" />
                     </div>
 
                     <nav className={styles.navLinks}>
@@ -115,6 +123,7 @@ const Layout: React.FC = () => {
                                 className={`${styles.link} ${isActive(mod.path) ? styles.activeLink : ''}`}
                                 onClick={() => navigate(mod.path)}
                             >
+                                <span style={{ fontSize: '20px' }}>{mod.icon}</span>
                                 {mod.label}
                             </div>
                         ))}
@@ -122,14 +131,17 @@ const Layout: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <Text size={200} style={{ opacity: 0.8 }}>{user?.name}</Text>
+                    <div style={{ textAlign: 'right', lineHeight: '1.2' }}>
+                        <Text size={200} block weight="semibold">{user?.name}</Text>
+                        <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>{user?.role}</Text>
+                    </div>
                     <Menu>
                         <MenuTrigger disableButtonEnhancement>
                             <Avatar
                                 color="brand"
                                 initials={user?.initials}
-                                size={28}
-                                style={{ cursor: 'pointer', border: '2px solid rgba(255,255,255,0.2)' }}
+                                size={32}
+                                style={{ cursor: 'pointer' }}
                             />
                         </MenuTrigger>
                         <MenuPopover>
@@ -146,7 +158,6 @@ const Layout: React.FC = () => {
                 </div>
             </header>
 
-            {/* CONTENT AREA (Includes Yellow Bar if page provides it) */}
             <main className={styles.content}>
                 <Outlet />
             </main>
