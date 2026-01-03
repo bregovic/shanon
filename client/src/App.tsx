@@ -2,14 +2,15 @@
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { RouterProvider, createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import Layout from './components/Layout';
-// Removed BalancePage
 import { DashboardPage } from './pages/DashboardPage';
+import { DmsDashboard } from './pages/DmsDashboard';
+import { DmsList } from './pages/DmsList';
 import RequestsPage from './pages/RequestsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SettingsProvider } from './context/SettingsContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { TranslationProvider } from './context/TranslationContext';
+import { TranslationProvider } from './context/TranslationContext'; // Used inside App
 
 const BASE_NAME = import.meta.env.BASE_URL || '/';
 
@@ -39,6 +40,8 @@ const router = createBrowserRouter([
                 children: [
                     { index: true, element: <Navigate to="/dashboard" replace /> },
                     { path: "dashboard", element: <DashboardPage /> },
+                    { path: "dms", element: <DmsDashboard /> },
+                    { path: "dms/list", element: <DmsList /> },
                     { path: "requests", element: <RequestsPage /> },
                 ]
             }

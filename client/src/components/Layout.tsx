@@ -1,129 +1,157 @@
 
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import React from 'react';
 import {
     makeStyles,
     tokens,
+    Image,
     Text,
-    Button,
-    Badge,
-    Image
+    Avatar,
+    Menu,
+    MenuTrigger,
+    MenuList,
+    MenuItem,
+    MenuPopover
 } from '@fluentui/react-components';
-import {
-    Home24Regular,
-    ClipboardTextEdit24Regular,
-    Alert24Regular,
-    Settings24Regular,
-    Emoji24Regular,
-    SignOut24Regular
-} from '@fluentui/react-icons';
-import { FeedbackModal } from './FeedbackModal';
-import { SettingsDialog } from './SettingsDialog';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { SignOutRegular, SettingsRegular } from '@fluentui/react-icons';
+import { SettingsDialog } from './SettingsDialog';
 
 const useStyles = makeStyles({
-    root: { display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', backgroundColor: tokens.colorNeutralBackground2 },
+    root: {
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+    },
     header: {
-        height: '48px', // Lower height for enterprise feel
-        backgroundColor: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', flexShrink: 0, zIndex: 100, borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow2
+        backgroundColor: tokens.colorBrandBackground, // BLUE BAR
+        color: tokens.colorNeutralForegroundOnBrand,
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 16px',
+        height: '48px',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+        boxShadow: tokens.shadow4
     },
-    headerLeftGroup: { display: 'flex', alignItems: 'center', height: '100%', gap: '16px', flex: 1 },
-    logoImage: { height: '24px', objectFit: 'contain', marginRight: '8px' }, // Smaller logo
-    navContainer: { display: 'flex', alignItems: 'center', height: '100%', gap: '4px' },
-    navItem: {
-        padding: '0 12px', height: '100%', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
-        color: tokens.colorNeutralForeground1, borderBottom: '3px solid transparent', whiteSpace: 'nowrap', fontSize: '14px',
-        ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover, color: tokens.colorBrandForeground1 }
+    logoSection: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        cursor: 'pointer'
     },
-    navItemActive: { borderBottom: `3px solid ${tokens.colorBrandBackground}`, fontWeight: 600, color: tokens.colorBrandForeground1 },
-    headerRight: { display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' },
-    userCircle: {
-        width: '28px', height: '28px', borderRadius: '50%', backgroundColor: tokens.colorBrandBackground, color: '#ffffff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginLeft: '8px'
+    navLinks: {
+        display: 'flex',
+        gap: '24px',
+        marginLeft: '40px',
+        height: '100%'
     },
-    body: { display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' },
-    content: { display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden', padding: '0', position: 'relative', width: '100%' },
-    notificationWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
-    badge: { position: 'absolute', top: '0px', right: '0px', zIndex: 1 }
+    link: {
+        color: 'inherit',
+        textDecoration: 'none',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        borderBottom: '3px solid transparent',
+        opacity: 0.9,
+        transition: 'all 0.2s',
+        ':hover': {
+            opacity: 1,
+            borderBottom: '3px solid white'
+        }
+    },
+    activeLink: {
+        opacity: 1,
+        borderBottom: '3px solid white'
+    },
+    content: {
+        flex: 1,
+        overflow: 'hidden', // Prepare for internal scrolling
+        backgroundColor: tokens.colorNeutralBackground2,
+        display: 'flex',
+        flexDirection: 'column'
+    }
 });
 
-const Layout = () => {
+const Layout: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const location = useLocation();
-
-    // Page Title Logic (Minimalist)
-    // / -> Dashboard
-    // /requests -> Requests
-    const path = location.pathname;
-    const selectedValue = path.includes('requests') ? 'requests' : 'dashboard';
-
     const { user, logout } = useAuth();
-    const [feedbackOpen, setFeedbackOpen] = useState(false);
-    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = React.useState(false);
 
-    const NavItem = ({ value, icon, label }: { value: string, icon: any, label: string }) => {
-        const isActive = selectedValue === value;
-        return (
-            <div
-                className={isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem}
-                onClick={() => {
-                    if (value === 'requests') window.dispatchEvent(new CustomEvent('reset-requests-page'));
-                    navigate(value === 'dashboard' ? '/' : value);
-                }}
-            >
-                {icon}
-                <Text>{label}</Text>
-            </div>
-        );
-    };
+    // Module Definition
+    const modules = [
+        { label: 'Dashboard', path: '/dashboard' },
+        { label: 'DMS', path: '/dms' },
+        { label: 'Projekty', path: '/projects' }, // Placeholder
+        { label: 'CRM', path: '/crm' }, // Placeholder
+        { label: 'Požadavky', path: '/requests' },
+    ].sort((a, b) => {
+        // Dashboard always first, others alphabetical
+        if (a.path === '/dashboard') return -1;
+        if (b.path === '/dashboard') return 1;
+        return a.label.localeCompare(b.label);
+    });
+
+    const isActive = (path: string) => location.pathname.startsWith(path);
 
     return (
         <div className={styles.root}>
+            {/* BLUE TOP BAR */}
             <header className={styles.header}>
-                <div className={styles.headerLeftGroup}>
-                    <div onClick={() => navigate('/')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <Image src="/logo.png" className={styles.logoImage} alt="Logo" />
-                        <Text size={400} weight="semibold" style={{ color: tokens.colorNeutralForeground1 }}>Shanon</Text>
+                <div style={{ display: 'flex', height: '100%', alignItems: 'center' }}>
+                    <div className={styles.logoSection} onClick={() => navigate('/dashboard')}>
+                        <Image src="/logo.png" height={24} fit="contain" style={{ filter: 'brightness(0) invert(1)' }} />
+                        <Text weight="semibold" size={400}>Shanon</Text>
                     </div>
 
-                    <div style={{ width: '1px', height: '24px', backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
-
-                    <nav className={styles.navContainer}>
-                        <NavItem value="dashboard" icon={<Home24Regular />} label="Dashboard" />
-
-                        {(user?.role === 'admin' || (!!user?.assigned_tasks_count && user.assigned_tasks_count > 0)) && (
-                            <NavItem value="requests" icon={<ClipboardTextEdit24Regular />} label="Requests" />
-                        )}
+                    <nav className={styles.navLinks}>
+                        {modules.map(mod => (
+                            <div
+                                key={mod.path}
+                                className={`${styles.link} ${isActive(mod.path) ? styles.activeLink : ''}`}
+                                onClick={() => navigate(mod.path)}
+                            >
+                                {mod.label}
+                            </div>
+                        ))}
                     </nav>
+                </div>
 
-                    <div className={styles.headerRight}>
-                        <div className={styles.notificationWrapper}>
-                            <Button appearance="transparent" icon={<Alert24Regular />} onClick={() => { window.dispatchEvent(new CustomEvent('reset-requests-page')); navigate('/requests?mine=1'); }} title="My Tasks" />
-                            {user?.assigned_tasks_count && user.assigned_tasks_count > 0 ? (
-                                <Badge size="small" appearance="filled" color="danger" className={styles.badge}>{user.assigned_tasks_count}</Badge>
-                            ) : null}
-                        </div>
-                        <Button appearance="transparent" icon={<Emoji24Regular />} onClick={() => setFeedbackOpen(true)} title="Feedback" />
-                        <Button appearance="transparent" icon={<Settings24Regular />} onClick={() => setSettingsOpen(true)} title="Settings" />
-
-                        <div className={styles.userCircle} title={user?.name}>
-                            {user ? user.initials : '?'}
-                        </div>
-                        <Button appearance="subtle" icon={<SignOut24Regular />} onClick={() => logout()} style={{ marginLeft: 4 }} title="Logout" />
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Text size={200} style={{ opacity: 0.8 }}>{user?.name}</Text>
+                    <Menu>
+                        <MenuTrigger disableButtonEnhancement>
+                            <Avatar
+                                color="brand"
+                                initials={user?.initials}
+                                size={28}
+                                style={{ cursor: 'pointer', border: '2px solid rgba(255,255,255,0.2)' }}
+                            />
+                        </MenuTrigger>
+                        <MenuPopover>
+                            <MenuList>
+                                <MenuItem icon={<SettingsRegular />} onClick={() => setSettingsOpen(true)}>
+                                    Nastavení
+                                </MenuItem>
+                                <MenuItem icon={<SignOutRegular />} onClick={logout}>
+                                    Odhlásit se
+                                </MenuItem>
+                            </MenuList>
+                        </MenuPopover>
+                    </Menu>
                 </div>
             </header>
 
-            <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} user={user} />
-            <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+            {/* CONTENT AREA (Includes Yellow Bar if page provides it) */}
+            <main className={styles.content}>
+                <Outlet />
+            </main>
 
-            <div className={styles.body}>
-                <main className={styles.content}>
-                    <Outlet />
-                </main>
-            </div>
+            <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
         </div>
     );
 };
