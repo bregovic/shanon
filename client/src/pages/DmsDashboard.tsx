@@ -6,7 +6,6 @@ import {
     Title3,
     Text,
     Card,
-    Button,
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbButton,
@@ -14,7 +13,6 @@ import {
 } from '@fluentui/react-components';
 import {
     DocumentAdd24Regular,
-    ArrowUpload24Regular,
     Folder24Regular,
     Settings24Regular,
     TaskListSquareLtr24Regular,
@@ -89,7 +87,6 @@ export const DmsDashboard: React.FC = () => {
 
     return (
         <div className={styles.root}>
-            {/* YELLOW ACTION BAR */}
             <ActionBar>
                 <Breadcrumb>
                     <BreadcrumbItem>
@@ -100,14 +97,11 @@ export const DmsDashboard: React.FC = () => {
                         <BreadcrumbButton current>DMS</BreadcrumbButton>
                     </BreadcrumbItem>
                 </Breadcrumb>
-                <div style={{ flex: 1 }} />
-                {/* Module Level Actions */}
-                <Button appearance="subtle" icon={<DocumentAdd24Regular />}>Nový dokument</Button>
-                <Button appearance="subtle" icon={<ArrowUpload24Regular />}>Importovat</Button>
+                {/* No buttons here anymore */}
             </ActionBar>
 
             <div className={styles.grid}>
-                {/* 1. FORMULÁŘE (Forms) */}
+                {/* 1. FORMULÁŘE */}
                 <Card className={styles.sectionCard}>
                     <div className={styles.cardHeader}>
                         <FormNew24Regular />
@@ -120,7 +114,7 @@ export const DmsDashboard: React.FC = () => {
                     </div>
                 </Card>
 
-                {/* 2. REPORTY (Reports) */}
+                {/* 2. REPORTY */}
                 <Card className={styles.sectionCard}>
                     <div className={styles.cardHeader}>
                         <DocumentPdf24Regular />
@@ -132,7 +126,7 @@ export const DmsDashboard: React.FC = () => {
                     </div>
                 </Card>
 
-                {/* 3. ÚLOHY (Tasks) */}
+                {/* 3. ÚLOHY */}
                 <Card className={styles.sectionCard}>
                     <div className={styles.cardHeader}>
                         <TaskListSquareLtr24Regular />
@@ -144,7 +138,7 @@ export const DmsDashboard: React.FC = () => {
                     </div>
                 </Card>
 
-                {/* 4. NASTAVENÍ (Settings) */}
+                {/* 4. NASTAVENÍ */}
                 <Card className={styles.sectionCard}>
                     <div className={styles.cardHeader}>
                         <Settings24Regular />

@@ -4,7 +4,6 @@ import {
     makeStyles,
     tokens,
     Image,
-    Text,
     Avatar,
     Menu,
     MenuTrigger,
@@ -32,12 +31,12 @@ const useStyles = makeStyles({
         height: '100vh',
     },
     header: {
-        backgroundColor: tokens.colorNeutralBackground1, // WHITE
-        color: tokens.colorNeutralForeground1, // DARK TEXT
+        backgroundColor: tokens.colorNeutralBackground1,
+        color: tokens.colorNeutralForeground1,
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
-        height: '54px', // Slightly taller for icons
+        height: '54px',
         justifyContent: 'space-between',
         flexShrink: 0,
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`
@@ -91,7 +90,6 @@ const Layout: React.FC = () => {
     const { user, logout } = useAuth();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
 
-    // Module Definition with Icons
     const modules = [
         { label: 'Dashboard', path: '/dashboard', icon: <Home24Regular /> },
         { label: 'DMS', path: '/dms', icon: <DocumentData24Regular /> },
@@ -108,11 +106,9 @@ const Layout: React.FC = () => {
 
     return (
         <div className={styles.root}>
-            {/* CLEAN WHITE HEADER */}
             <header className={styles.header}>
                 <div style={{ display: 'flex', height: '100%', alignItems: 'center' }}>
                     <div className={styles.logoSection} onClick={() => navigate('/dashboard')}>
-                        {/* No filter invert - keeping original colors */}
                         <Image src="/logo.png" height={28} fit="contain" alt="Shanon" />
                     </div>
 
@@ -130,11 +126,7 @@ const Layout: React.FC = () => {
                     </nav>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ textAlign: 'right', lineHeight: '1.2' }}>
-                        <Text size={200} block weight="semibold">{user?.name}</Text>
-                        <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>{user?.role}</Text>
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Menu>
                         <MenuTrigger disableButtonEnhancement>
                             <Avatar
