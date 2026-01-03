@@ -7,8 +7,9 @@ export default defineConfig({
     plugins: [react()],
     base: '/',
     define: {
-        // Fix ReferenceError: __APP_VERSION__ is not defined
+        // Fix ReferenceError: Global constants expected by the app
         __APP_VERSION__: JSON.stringify('1.3.1'),
+        __APP_BUILD_DATE__: JSON.stringify(new Date().toISOString()),
     },
     server: {
         port: 5173,
