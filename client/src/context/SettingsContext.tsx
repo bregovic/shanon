@@ -20,18 +20,17 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Load settings from server on mount
     useEffect(() => {
-        // Adjust URL to match your server path
         const isDev = import.meta.env.DEV;
+        // FIX: Correct API path
         const url = isDev
-            ? 'http://localhost/Webhry/hollyhop/broker/broker%202.0/api-settings.php'
-            : '/investyx/api-settings.php';
+            ? '/api/api-settings.php' // Proxy handles it in dev usually
+            : '/api/api-settings.php';
 
         axios.get(url).then(res => {
             if (res.data && res.data.success && res.data.settings) {
                 if (res.data.settings.language) setLanguageState(res.data.settings.language as Language);
-                // if (res.data.settings.theme) setTheme(res.data.settings.theme);
             }
-        }).catch(err => console.error("Failed to load settings", err));
+        }).catch(err => console.error("Failed to load settings (using defaults)", err));
     }, []);
 
     const setLanguage = (lang: Language) => {
@@ -41,15 +40,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const saveSettings = async () => {
         const isDev = import.meta.env.DEV;
         const url = isDev
-            ? 'http://localhost/Webhry/hollyhop/broker/broker%202.0/api-settings.php'
-            : '/investyx/api-settings.php';
+            ? '/api/api-settings.php'
+            : '/api/api-settings.php';
 
         try {
             await axios.post(url, { language, theme });
             return;
         } catch (e) {
             console.error(e);
-            throw e;
+            // throw e; // Don't crash if settings fail
         }
     };
 
