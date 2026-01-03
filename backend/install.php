@@ -7,50 +7,61 @@ require_once 'cors.php';
 
 header("Content-Type: application/json");
 
-// Security Check (simple for now, remove in prod)
-// if ($_GET['key'] !== 'SecretInstallKey') die('Unauthorized');
-
 try {
     $pdo = DB::connect();
     $messages = [];
 
-    // 1. Run Migrations (Create Tables)
-    // We read the SQL file we created earlier
+    // 1. Run Migrations
     $sqlFile = __DIR__ . '/migrations/001_init_core.sql';
-    if (file_exists($sqlFile)) {
-        $sql = file_get_contents($sqlFile);
-        
-        // Postgres specific: Split by ';' might fail inside procedures, but for DDL it is fine
-        // Better: Execute whole block
+    
+    if (!file_exists($sqlFile)) {
+        throw new Exception("CRITICAL: Migration file not found at: " . $sqlFile); // Stop execution
+    }
+
+    $sql = file_get_contents($sqlFile);
+    if (!$sql) {
+        throw new Exception("CRITICAL: Migration file is empty: " . $sqlFile);
+    }
+    
+    // Execute SQL Schema
+    try {
         $pdo->exec($sql);
-        $messages[] = "Database Schema Imported (Tables Created).";
-    } else {
-        $messages[] = "Migration file not found (Skipped Schema).";
+        $messages[] = "Database Schema Imported Successfully.";
+    } catch (PDOException $e) {
+        // Ignorovat chybu "relation already exists" pokud spoustime podruhe
+        if (strpos($e->getMessage(), 'already exists') !== false) {
+             $messages[] = "Schema already exists (Skipped).";
+        } else {
+             throw $e;
+        }
     }
 
     // 2. Create Super Admin
     $email = 'admin@test.cz';
     $rawPass = 'Venca123';
-    $tenantId = '00000000-0000-0000-0000-000000000000'; // Master Tenant ID
+    $tenantId = '00000000-0000-0000-0000-000000000000'; 
     
-    // Check if exists
+    // Check if table exists (simple check)
+    // Postgres specific check
+    $checkTable = $pdo->query("SELECT to_regclass('public.sys_users')")->fetchColumn();
+    if (!$checkTable) {
+        throw new Exception("Table 'sys_users' was not created even after migration run!");
+    }
+
+    // Check user
     $stmt = $pdo->prepare("SELECT rec_id FROM sys_users WHERE email = ?");
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
         $messages[] = "User $email already exists.";
-        
-        // Update password just in case (Development convenience)
+        // Update to be sure
         $hash = password_hash($rawPass, PASSWORD_DEFAULT);
         $pdo->prepare("UPDATE sys_users SET password_hash = ?, role = 'superadmin' WHERE email = ?")
             ->execute([$hash, $email]);
-        $messages[] = "User $email password and role updated.";
-        
     } else {
-        // Create new
         $hash = password_hash($rawPass, PASSWORD_DEFAULT);
-        $sql = "INSERT INTO sys_users (tenant_id, email, password_hash, full_name, role, is_active) 
-                VALUES (?, ?, ?, ?, 'superadmin', TRUE)";
-        $pdo->prepare($sql)->execute([$tenantId, $email, $hash, 'Super Admin']);
+        $sqlInsert = "INSERT INTO sys_users (tenant_id, email, password_hash, full_name, role, is_active) 
+                      VALUES (?, ?, ?, ?, 'superadmin', TRUE)";
+        $pdo->prepare($sqlInsert)->execute([$tenantId, $email, $hash, 'Super Admin']);
         $messages[] = "User $email created successfully.";
     }
 
@@ -58,5 +69,8 @@ try {
 
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode([
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString()
+    ]);
 }
