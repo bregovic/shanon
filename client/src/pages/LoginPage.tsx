@@ -7,8 +7,7 @@ import {
     Button,
     makeStyles,
     tokens,
-    Title3,
-    Image
+    Image // Title3 removed
 } from '@fluentui/react-components';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -79,8 +78,8 @@ export const LoginPage: React.FC = () => {
         <div className={styles.container}>
             <Card className={styles.card}>
                 <div className={styles.logoContainer}>
-                    <Image src="/logo.png" height={32} fit="contain" alt="Shanon Logo" />
-                    <Title3>Shanon</Title3>
+                    {/* Increased size, removed text */}
+                    <Image src="/logo.png" height={60} fit="contain" alt="Shanon" />
                 </div>
 
                 {msg && <div className={styles.success}>{msg}</div>}
