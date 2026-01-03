@@ -5,17 +5,16 @@ import {
     tokens,
     Image,
     Avatar,
-    Menu,
-    MenuTrigger,
-    MenuList,
-    MenuItem,
-    MenuPopover
+    Button,
+    Tooltip
 } from '@fluentui/react-components';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-    SignOutRegular,
-    SettingsRegular,
+    SignOut24Regular,
+    Settings24Regular,
+    Alert24Regular,
+    Emoji24Regular,
     Home24Regular,
     DocumentData24Regular,
     ClipboardTextEdit24Regular,
@@ -36,7 +35,7 @@ const useStyles = makeStyles({
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
-        height: '54px',
+        height: '56px',
         justifyContent: 'space-between',
         flexShrink: 0,
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`
@@ -126,27 +125,30 @@ const Layout: React.FC = () => {
                     </nav>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Menu>
-                        <MenuTrigger disableButtonEnhancement>
-                            <Avatar
-                                color="brand"
-                                initials={user?.initials}
-                                size={32}
-                                style={{ cursor: 'pointer' }}
-                            />
-                        </MenuTrigger>
-                        <MenuPopover>
-                            <MenuList>
-                                <MenuItem icon={<SettingsRegular />} onClick={() => setSettingsOpen(true)}>
-                                    Nastavení
-                                </MenuItem>
-                                <MenuItem icon={<SignOutRegular />} onClick={logout}>
-                                    Odhlásit se
-                                </MenuItem>
-                            </MenuList>
-                        </MenuPopover>
-                    </Menu>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Tooltip content="Upozornění" relationship="label">
+                        <Button icon={<Alert24Regular />} appearance="subtle" />
+                    </Tooltip>
+
+                    <Tooltip content="Zpětná vazba" relationship="label">
+                        <Button icon={<Emoji24Regular />} appearance="subtle" />
+                    </Tooltip>
+
+                    <Tooltip content="Nastavení" relationship="label">
+                        <Button icon={<Settings24Regular />} appearance="subtle" onClick={() => setSettingsOpen(true)} />
+                    </Tooltip>
+
+                    <div style={{ margin: '0 8px' }}>
+                        <Avatar
+                            color="brand"
+                            initials={user?.initials || 'US'}
+                            size={32}
+                        />
+                    </div>
+
+                    <Tooltip content="Odhlásit" relationship="label">
+                        <Button icon={<SignOut24Regular />} appearance="subtle" onClick={logout} />
+                    </Tooltip>
                 </div>
             </header>
 
