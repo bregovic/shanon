@@ -53,7 +53,7 @@ const formatBytes = (bytes: number) => {
 
 export const DmsList: React.FC = () => {
     const navigate = useNavigate();
-    const { getApiUrl } = useAuth(); // Assuming getApiUrl logic exists or constructing manually
+
     const [docs, setDocs] = useState<DmsDocument[]>([]);
     const [loading, setLoading] = useState(true);
 

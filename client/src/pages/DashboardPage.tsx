@@ -13,7 +13,7 @@ import {
     Add24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+
 
 const useStyles = makeStyles({
     root: {
@@ -54,7 +54,7 @@ const useStyles = makeStyles({
 export const DashboardPage: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
-    const { user } = useAuth();
+
 
     return (
         <div className={styles.root}>
