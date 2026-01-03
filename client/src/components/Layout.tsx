@@ -6,7 +6,8 @@ import {
     tokens,
     Text,
     Button,
-    Badge
+    Badge,
+    Image
 } from '@fluentui/react-components';
 import {
     Home24Regular,
@@ -19,7 +20,6 @@ import {
 import { FeedbackModal } from './FeedbackModal';
 import { SettingsDialog } from './SettingsDialog';
 import { useAuth } from '../context/AuthContext';
-// import { useTranslation } from '../context/TranslationContext'; // Unused now
 
 const useStyles = makeStyles({
     root: { display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', backgroundColor: tokens.colorNeutralBackground2 },
@@ -28,7 +28,7 @@ const useStyles = makeStyles({
         padding: '0 24px', flexShrink: 0, zIndex: 100, borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow2
     },
     headerLeftGroup: { display: 'flex', alignItems: 'center', height: '100%', gap: '24px', flex: 1, overflowX: 'auto', scrollbarWidth: 'none' },
-    // logoImage style removed as unused
+    logoImage: { height: '36px', objectFit: 'contain', marginRight: '12px' },
     navContainer: { display: 'flex', alignItems: 'center', height: '100%', gap: '4px' },
     navItem: {
         padding: '0 12px', height: '100%', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
@@ -51,10 +51,8 @@ const Layout = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const location = useLocation();
-    // const { t } = useTranslation(); // Removed unused var causing build fail
     const path = location.pathname;
 
-    // Simple logic: if path is /dashboard or /, select dashboard.
     const selectedValue = path.includes('requests') ? 'requests' : 'dashboard';
 
     const { user, logout } = useAuth();
@@ -81,16 +79,16 @@ const Layout = () => {
         <div className={styles.root}>
             <header className={styles.header}>
                 <div className={styles.headerLeftGroup}>
-                    <div onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-                        <Text size={500} weight="bold" style={{ color: tokens.colorBrandBackground }}>SHANON</Text>
-                        <Text size={200} style={{ marginLeft: '8px', color: tokens.colorNeutralForeground3 }}>ERP Platform</Text>
+                    <div onClick={() => navigate('/')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        <Image src="/logo.png" className={styles.logoImage} alt="Logo" />
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Text size={400} weight="bold" style={{ color: tokens.colorBrandBackground, lineHeight: '1' }}>SHANON</Text>
+                            <Text size={100} style={{ color: tokens.colorNeutralForeground3, lineHeight: '1' }}>ENTERPRISE</Text>
+                        </div>
                     </div>
 
                     <nav className={styles.navContainer} style={{ marginLeft: '40px' }}>
                         <NavItem value="dashboard" icon={<Home24Regular />} label="Dashboard" />
-
-                        {/* Example Module Placeholder */}
-                        {/* <NavItem value="customers" icon={<BuildingFactory24Regular />} label="Zákazníci" /> */}
 
                         {(user?.role === 'admin' || (!!user?.assigned_tasks_count && user.assigned_tasks_count > 0)) && (
                             <NavItem value="requests" icon={<ClipboardTextEdit24Regular />} label="Správa požadavků" />
