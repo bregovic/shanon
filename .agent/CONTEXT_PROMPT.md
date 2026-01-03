@@ -19,11 +19,16 @@
 *   **No Fluff:** Žádné "Vítejte", "Prosím vyplňte", "Úžasný dashboard".
 *   **Styl:** Profesionální, strohý, čistý ("Enterprise Tech").
 
-## 4. Vývojový Standard (Strict Coding Standards)
+## 4. UI Layout & Navigation (User Rules)
+*   **Dialog Buttons:** [CONFIRM/SAVE] (Left)   [CANCEL] (Right).
+*   **Main Menu:** Dashboard (First) -> Modules sorted Alphabetically.
+*   **Logo:** Always redirects to Dashboard.
+
+## 5. Vývojový Standard (Strict Coding Standards)
 *   ⛔ **No Magic Fallbacks:** Zakázáno `?? 0` nebo random hodnoty.
 *   ⛔ **No Random Data:** Žádné `rand()` nebo `faker`.
 *   🧹 **Dev Helper Registry:** Install skripty musí být chráněné.
 
-## 5. Workflows
+## 6. Workflows
 *   Používej `/process_change_requests` pro čtení úkolů z SQL.
 *   Používej `publish.ps1` pro nasazení.
