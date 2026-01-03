@@ -8,8 +8,7 @@ import {
     makeStyles,
     tokens,
     Title3,
-    Image,
-    Link
+    Image
 } from '@fluentui/react-components';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
