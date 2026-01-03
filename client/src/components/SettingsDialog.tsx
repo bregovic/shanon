@@ -12,11 +12,10 @@ import {
     Label,
     makeStyles,
     Text,
-    tokens,
-    Divider
+    tokens
 } from '@fluentui/react-components';
 import { useTranslation } from '../context/TranslationContext';
-import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { useState } from 'react';
 
 const useStyles = makeStyles({
@@ -31,20 +30,15 @@ const useStyles = makeStyles({
 
 export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) => {
     const styles = useStyles();
-    const { language, setLanguage, t } = useTranslation();
-    const { user } = useAuth();
+    const { t } = useTranslation();
+    const { language, setLanguage, saveSettings } = useSettings();
     const [saving, setSaving] = useState(false);
-
-    const isDev = import.meta.env.DEV;
-    const getApiUrl = (endpoint: string) => isDev ? `http://localhost/Webhry/hollyhop/broker/broker 2.0/${endpoint}` : `/investyx/${endpoint}`;
 
     const handleSave = async () => {
         setSaving(true);
-        // TranslationContext saves immediately on setLanguage, so we just simulate delay or close
-        setTimeout(() => {
-            setSaving(false);
-            onOpenChange(false);
-        }, 500);
+        await saveSettings();
+        setSaving(false);
+        onOpenChange(false);
     };
 
     return (
@@ -58,7 +52,7 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                 Version: <span style={{ fontFamily: 'monospace' }}>{__APP_VERSION__}</span>
                             </Text>
                             <Text size={200} block style={{ color: tokens.colorNeutralForeground4 }}>
-                                Built: {new Date(__APP_BUILD_DATE__).toLocaleString()}
+                                Built: {__APP_BUILD_DATE__}
                             </Text>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -71,17 +65,6 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                 <Option value="en" text="English">English</Option>
                             </Dropdown>
                         </div>
-
-                        {user?.role === 'admin' && (
-                            <>
-                                <Divider style={{ margin: '10px 0' }} />
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                    <Label>Admin Nástroje</Label>
-                                    <Button onClick={() => window.open(getApiUrl('debug-prices.php?ticker=ZM'), '_blank')}>Debug Prices (API)</Button>
-                                    <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>Otevře diagnostiku API v novém okně.</Text>
-                                </div>
-                            </>
-                        )}
                     </DialogContent>
                     <DialogActions>
                         <Button appearance="primary" onClick={handleSave} disabled={saving}>
