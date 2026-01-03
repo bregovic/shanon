@@ -1,8 +1,8 @@
 <?php
 // backend/ajax-logout.php
 require_once 'cors.php';
+require_once 'session_init.php';
 
-session_start();
 session_unset();
 session_destroy();
 
