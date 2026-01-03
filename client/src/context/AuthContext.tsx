@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 type User = {
     id: number;
     username: string;
-    role: 'admin' | 'user';
+    role: 'admin' | 'user' | 'superadmin' | 'developer';
     name: string;
     initials: string;
     assigned_tasks_count?: number;
