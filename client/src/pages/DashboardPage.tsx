@@ -60,11 +60,7 @@ export const DashboardPage: React.FC = () => {
         <div className={styles.root}>
             <div className={styles.header}>
                 <Title3>Dashboard</Title3>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                        {user?.role === 'superadmin' ? 'Super Admin Mode' : 'User Mode'}
-                    </Text>
-                </div>
+
             </div>
 
             <div className={styles.grid}>
