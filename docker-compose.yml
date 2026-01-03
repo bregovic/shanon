@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # --- DATABASE ---
+  db:
+    image: postgres:16-alpine
+    container_name: shanon-db
+    environment:
+      POSTGRES_DB: shanon_db
+      POSTGRES_USER: shanon_user
+      POSTGRES_PASSWORD: shanon_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # --- BACKEND (API) ---
+  api:
+    image: php:8.3-fpm-alpine
+    container_name: shanon-api
+    working_dir: /var/www/html
+    volumes:
+      - ./backend:/var/www/html
+    # Install PGSQL extensions on startup (Development only hack, in prod usage custom Dockerfile)
+    command: >
+      sh -c "apk add --no-cache postgresql-dev && docker-php-ext-install pdo pdo_pgsql && php-fpm"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_NAME: shanon_db
+      DB_USER: shanon_user
+      DB_PASS: shanon_password
+
+  # --- FRONTEND (Dev) ---
+  # Pro vývoj používáme Node server, ne Nginx build.
+  # Pokud chceme simulovat prod, použijeme Nginx.
+  web:
+    image: node:18-alpine
+    container_name: shanon-web
+    working_dir: /app
+    volumes:
+      - ./client:/app
+    command: sh -c "npm install && npm run dev -- --host"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
