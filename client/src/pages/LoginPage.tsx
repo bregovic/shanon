@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
     Card,
@@ -7,6 +8,7 @@ import {
     makeStyles,
     tokens,
     Title3,
+    Image,
     Link
 } from '@fluentui/react-components';
 import { useAuth } from '../context/AuthContext';
@@ -22,7 +24,7 @@ const useStyles = makeStyles({
     },
     card: {
         width: '360px',
-        padding: '24px',
+        padding: '32px 24px',
     },
     field: {
         display: 'flex',
@@ -41,10 +43,13 @@ const useStyles = makeStyles({
         fontSize: '12px',
         textAlign: 'center',
     },
-    footer: {
-        marginTop: '16px',
+    logoContainer: {
         textAlign: 'center',
-        fontSize: '12px',
+        marginBottom: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '8px'
     }
 });
 
@@ -67,24 +72,28 @@ export const LoginPage: React.FC = () => {
         if (success) {
             navigate('/');
         } else {
-            setError('Invalid username or password');
+            setError('Invalid credentials');
         }
     };
 
     return (
         <div className={styles.container}>
             <Card className={styles.card}>
-                <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                    <Title3>Investyx Login</Title3>
+                <div className={styles.logoContainer}>
+                    <Image src="/logo.png" height={32} fit="contain" alt="Shanon Logo" />
+                    <Title3>Shanon</Title3>
                 </div>
+
                 {msg && <div className={styles.success}>{msg}</div>}
+
                 <form onSubmit={handleLogin}>
                     <div className={styles.field}>
-                        <Label htmlFor="username">Username</Label>
+                        <Label htmlFor="username">Email</Label>
                         <Input
                             id="username"
                             value={username}
                             onChange={(_, d) => setUsername(d.value)}
+                            placeholder="user@example.com"
                         />
                     </div>
                     <div className={styles.field}>
@@ -98,12 +107,9 @@ export const LoginPage: React.FC = () => {
                     </div>
                     {error && <div className={styles.error}>{error}</div>}
                     <Button type="submit" appearance="primary" style={{ width: '100%' }}>
-                        Sign In
+                        Login
                     </Button>
                 </form>
-                <div className={styles.footer}>
-                    Don't have an account? <Link onClick={() => navigate('/register')}>Register</Link>
-                </div>
             </Card>
         </div>
     );
