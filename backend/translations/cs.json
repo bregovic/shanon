@@ -1,0 +1,22 @@
+{
+    "app.name": "Shanon",
+    "common.save": "Uložit",
+    "common.cancel": "Zrušit",
+    "common.delete": "Smazat",
+    "common.confirm": "Potvrdit",
+    "common.loading": "Načítám...",
+    "common.error": "Chyba",
+    "common.success": "Úspěch",
+    "settings.title": "Nastavení",
+    "settings.language": "Jazyk",
+    "settings.theme": "Vzhled",
+    "settings.about": "O aplikaci",
+    "login.title": "Přihlášení",
+    "login.email": "Email",
+    "login.password": "Heslo",
+    "login.submit": "Přihlásit se",
+    "login.invalid": "Neplatné údaje",
+    "dashboard.title": "Přehled",
+    "requests.title": "Požadavky",
+    "requests.new": "Nový požadavek"
+}

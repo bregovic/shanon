@@ -1,0 +1,22 @@
+{
+    "app.name": "Shanon",
+    "common.save": "Save",
+    "common.cancel": "Cancel",
+    "common.delete": "Delete",
+    "common.confirm": "Confirm",
+    "common.loading": "Loading...",
+    "common.error": "Error",
+    "common.success": "Success",
+    "settings.title": "Settings",
+    "settings.language": "Language",
+    "settings.theme": "Theme",
+    "settings.about": "About",
+    "login.title": "Login",
+    "login.email": "Email",
+    "login.password": "Password",
+    "login.submit": "Login",
+    "login.invalid": "Invalid credentials",
+    "dashboard.title": "Dashboard",
+    "requests.title": "Change Requests",
+    "requests.new": "New Request"
+}
