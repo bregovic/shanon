@@ -390,7 +390,7 @@ const RequestsPage = () => {
     const loadComments = async (requestId: number) => {
         setLoadingComments(true);
         try {
-            const res = await axios.get(getApiUrl(`api-comments.php?action=list&request_id=${requestId}`));
+            const res = await axios.get(getApiUrl(`api-changerequests.php?action=list_comments&request_id=${requestId}`));
             if (res.data.success) setComments(res.data.data);
         } catch (e) { console.error(e); } finally { setLoadingComments(false); }
     };
@@ -541,7 +541,7 @@ const RequestsPage = () => {
             formData.append('action', 'add');
             formData.append('request_id', String(selectedRequest.id));
             formData.append('comment', newComment);
-            const res = await axios.post(getApiUrl('api-comments.php'), formData);
+            const res = await axios.post(getApiUrl('api-changerequests.php?action=add_comment'), formData);
             if (res.data.success) {
                 setNewComment('');
                 loadComments(selectedRequest.id);

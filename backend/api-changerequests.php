@@ -336,6 +336,15 @@ try {
             $stmtFiles = $pdo->prepare("DELETE FROM sys_change_requests_files WHERE cr_id IN ($ownerSubquery)");
             $stmtFiles->execute($baseParams);
 
+            // 1b. Delete Comments
+            // Ensure table exists just in case (though list/add handles creation)
+            // But for delete, we just try. If table missing, it throws.
+            // Let's assume table exists if we are deleting. Use try catch or just standard execution.
+            try {
+                $stmtComments = $pdo->prepare("DELETE FROM sys_change_comments WHERE cr_id IN ($ownerSubquery)");
+                $stmtComments->execute($baseParams);
+            } catch (Exception $ignore) {}
+
             // 2. Delete History (ref_table_id = TABLE_ID_CR)
             $historyParams = array_merge([TABLE_ID_CR], array_values($ids), [$tenantId]);
             $stmtHistory = $pdo->prepare("DELETE FROM sys_change_history WHERE ref_table_id = ? AND ref_rec_id IN ($ownerSubquery)");
@@ -346,6 +355,57 @@ try {
             $stmtReq->execute($baseParams);
         });
 
+        returnJson(['success' => true]);
+    }
+
+    // === LIST COMMENTS ===
+    if ($action === 'list_comments' && $method === 'GET') {
+        $requestId = $_GET['request_id'] ?? null;
+        if (!$requestId) returnJson(['error' => 'request_id required'], 400);
+
+        // Ensure table exists (Lazy Init)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_change_comments (
+            rec_id SERIAL PRIMARY KEY,
+            cr_id INT NOT NULL,
+            user_id INT NOT NULL,
+            comment TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $stmt = $pdo->prepare("
+            SELECT c.rec_id as id, c.comment, c.created_at, 
+                   u.full_name as username, c.user_id
+            FROM sys_change_comments c
+            LEFT JOIN sys_users u ON c.user_id = u.rec_id
+            WHERE c.cr_id = ?
+            ORDER BY c.created_at ASC
+        ");
+        $stmt->execute([$requestId]);
+        returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
+    }
+
+    // === ADD COMMENT ===
+    if ($action === 'add_comment' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        $requestId = $input['request_id'] ?? $_POST['request_id'] ?? null;
+        $comment = $input['comment'] ?? $_POST['comment'] ?? null;
+
+        if (!$requestId || !$comment) returnJson(['error' => 'Missing data'], 400);
+
+        // Ensure table (in case add is called before list)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_change_comments (
+            rec_id SERIAL PRIMARY KEY,
+            cr_id INT NOT NULL,
+            user_id INT NOT NULL,
+            comment TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $stmt = $pdo->prepare("INSERT INTO sys_change_comments (cr_id, user_id, comment) VALUES (?, ?, ?)");
+        $stmt->execute([$requestId, $userId, $comment]);
+        
+        logChange($pdo, $requestId, 'comment', '', 'Added comment', $userId);
+        
         returnJson(['success' => true]);
     }
 
