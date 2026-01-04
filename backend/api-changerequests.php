@@ -2,23 +2,23 @@
 // backend/api-changerequests.php
 // Shanon Enterprise Change Management API
 
+require_once 'cors.php';
+require_once 'session_init.php';
 require_once 'db.php';
-require_once 'cors.php'; // Add CORS support
+
+header("Content-Type: application/json");
 
 // --- CONFIG ---
 const TABLE_ID_CR = 100; // SysTableId for ChangeRequests
 
-// --- AUTH MOCK ---
-session_start();
-// Pokud neni user logged in, pouzijeme default (pro dev) nebo error
-if (!isset($_SESSION['user_id'])) {
-    // Pro prvotni nasazeni bez loginu povolime cteni (aby to fungovalo hned)
-    // Ale v produkci by to melo byt: http_response_code(401); exit;
+// --- AUTH ---
+if (!isset($_SESSION['loggedin']) || !isset($_SESSION['user'])) {
+    // Allow read for dev, but create requires auth
     $userId = 1; 
-    $tenantId = '00000000-0000-0000-0000-000000000000';
+    $tenantId = '00000000-0000-0000-0000-000000000001';
 } else {
-    $userId = $_SESSION['user_id'];
-    $tenantId = $_SESSION['tenant_id'];
+    $userId = $_SESSION['user']['rec_id'];
+    $tenantId = $_SESSION['user']['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
 }
 
 function returnJson($data, $code = 200) {
