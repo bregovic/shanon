@@ -15,11 +15,7 @@ import {
     BreadcrumbButton,
     BreadcrumbDivider,
     shorthands,
-    tokens,
-    Accordion,
-    AccordionItem,
-    AccordionHeader,
-    AccordionPanel
+    tokens
 } from '@fluentui/react-components';
 import {
     Settings24Regular,
@@ -28,7 +24,9 @@ import {
     ChevronRight16Regular,
     ArrowLeft24Regular,
     ArrowClockwise24Regular,
-    Document24Regular
+    Document24Regular,
+    ChevronDown16Regular,
+    ChevronUp16Regular
 } from '@fluentui/react-icons';
 
 import { ActionBar } from '../components/ActionBar';
@@ -397,9 +395,31 @@ export const SystemConfig: React.FC = () => {
     );
 
 
+    const MenuSection = ({ title, children, defaultOpen }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) => {
+        const [isOpen, setIsOpen] = useState(defaultOpen);
+        return (
+            <div style={{ marginBottom: '4px' }}>
+                <div
+                    onClick={() => setIsOpen(!isOpen)}
+                    style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 4px', cursor: 'pointer',
+                        color: tokens.colorNeutralForeground2,
+                        fontWeight: 600,
+                        userSelect: 'none'
+                    }}
+                >
+                    {title}
+                    {isOpen ? <ChevronUp16Regular /> : <ChevronDown16Regular />}
+                </div>
+                {isOpen && <div className={styles.menuGroup} style={{ paddingLeft: '8px' }}>{children}</div>}
+            </div>
+        );
+    };
+
     const renderDashboard = () => (
         <div className={styles.grid}>
-            {/* 1. FORMULÁŘE & TOOLS - Accordion */}
+            {/* 1. FORMULÁŘE & TOOLS - Custom Accordion */}
             <Card className={styles.card}>
                 <CardHeader
                     header={
@@ -411,63 +431,53 @@ export const SystemConfig: React.FC = () => {
                     description={<Text>{t('system.menu.forms.desc')}</Text>}
                 />
 
-                <Accordion collapsible multiple defaultOpenItems={['admin', 'docs']}>
-                    <AccordionItem value="admin">
-                        <AccordionHeader>{t('system.group.admin')}</AccordionHeader>
-                        <AccordionPanel>
-                            <div className={styles.menuGroup}>
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.diagnostics')}
-                                    onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }}
-                                />
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.sessions')}
-                                    onClick={() => { alert(t('common.working')); }}
-                                />
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.sequences')}
-                                    onClick={() => { alert(t('common.working')); }}
-                                />
-                            </div>
-                        </AccordionPanel>
-                    </AccordionItem>
+                <div>
+                    <MenuSection title={t('system.group.admin')} defaultOpen={true}>
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.diagnostics')}
+                            onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }}
+                        />
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.sessions')}
+                            onClick={() => { alert(t('common.working')); }}
+                        />
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.sequences')}
+                            onClick={() => { alert(t('common.working')); }}
+                        />
+                    </MenuSection>
 
-                    <AccordionItem value="docs">
-                        <AccordionHeader>{t('system.group.docs')}</AccordionHeader>
-                        <AccordionPanel>
-                            <div className={styles.menuGroup}>
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.db_docs')}
-                                    onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }}
-                                />
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.manifest')}
-                                    onClick={() => fetchDoc('manifest', 'system.item.manifest')}
-                                />
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.security')}
-                                    onClick={() => fetchDoc('security', 'system.item.security')}
-                                />
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.history')}
-                                    onClick={() => fetchHistory()}
-                                />
-                                <MenuItem
-                                    icon={null}
-                                    label={t('system.item.help')}
-                                    onClick={() => alert(t('common.working'))}
-                                />
-                            </div>
-                        </AccordionPanel>
-                    </AccordionItem>
-                </Accordion>
+                    <MenuSection title={t('system.group.docs')} defaultOpen={true}>
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.db_docs')}
+                            onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }}
+                        />
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.manifest')}
+                            onClick={() => fetchDoc('manifest', 'system.item.manifest')}
+                        />
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.security')}
+                            onClick={() => fetchDoc('security', 'system.item.security')}
+                        />
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.history')}
+                            onClick={() => fetchHistory()}
+                        />
+                        <MenuItem
+                            icon={null}
+                            label={t('system.item.help')}
+                            onClick={() => alert(t('common.working'))}
+                        />
+                    </MenuSection>
+                </div>
             </Card>
 
 
