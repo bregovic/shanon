@@ -16,6 +16,8 @@ $action = $_GET['action'] ?? 'list';
 $userId = $_SESSION['user']['rec_id'] ?? null;
 
 try {
+    $pdo = DB::connect();
+    
     // ===== LIST DOCUMENTS =====
     if ($action === 'list') {
         $sql = "SELECT d.*, t.name as doc_type_name, u.full_name as uploaded_by_name
