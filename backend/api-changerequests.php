@@ -166,6 +166,116 @@ try {
         returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
     }
 
+    // === GET HISTORY (Audit Log) ===
+    if ($action === 'get_history' && $method === 'GET') {
+        $requestId = $_GET['request_id'] ?? null;
+        if (!$requestId) returnJson(['error' => 'request_id required'], 400);
+        
+        $stmt = $pdo->prepare("
+            SELECT h.rec_id as id, h.field_name as change_type, h.old_value, h.new_value, h.created_at,
+                   u.full_name as username
+            FROM sys_change_history h
+            LEFT JOIN sys_users u ON h.changed_by = u.rec_id
+            WHERE h.ref_table_id = ? AND h.ref_rec_id = ?
+            ORDER BY h.created_at DESC
+        ");
+        $stmt->execute([TABLE_ID_CR, $requestId]);
+        returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
+    }
+
+    // === LIST ATTACHMENTS ===
+    if ($action === 'list_attachments' && $method === 'GET') {
+        $requestId = $_GET['request_id'] ?? null;
+        if (!$requestId) returnJson(['error' => 'request_id required'], 400);
+        
+        $stmt = $pdo->prepare("
+            SELECT rec_id as id, cr_id as request_id, file_name as filename, file_type, file_size as filesize, created_at
+            FROM sys_change_requests_files
+            WHERE cr_id = ?
+            ORDER BY created_at DESC
+        ");
+        $stmt->execute([$requestId]);
+        returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
+    }
+
+    // === ADD ATTACHMENT ===
+    if ($action === 'add_attachment' && $method === 'POST') {
+        $requestId = $_POST['request_id'] ?? null;
+        if (!$requestId) returnJson(['error' => 'request_id required'], 400);
+        
+        // Verify request belongs to tenant
+        $check = $pdo->prepare("SELECT rec_id FROM sys_change_requests WHERE rec_id = ? AND tenant_id = ?");
+        $check->execute([$requestId, $tenantId]);
+        if (!$check->fetch()) returnJson(['error' => 'Not found'], 404);
+        
+        $files = $_FILES['files'] ?? null;
+        if (!$files) returnJson(['error' => 'No files'], 400);
+        
+        $uploaded = [];
+        if (isset($files['name']) && is_array($files['name'])) {
+            for ($i = 0; $i < count($files['name']); $i++) {
+                if ($files['error'][$i] === UPLOAD_ERR_OK) {
+                    $name = $files['name'][$i];
+                    $type = $files['type'][$i];
+                    $tmp = $files['tmp_name'][$i];
+                    $size = $files['size'][$i];
+                    
+                    if ($size > 5 * 1024 * 1024) continue; // 5MB limit
+                    
+                    $content = base64_encode(file_get_contents($tmp));
+                    
+                    $fStmt = $pdo->prepare("INSERT INTO sys_change_requests_files (cr_id, file_name, file_type, file_size, file_data) VALUES (?, ?, ?, ?, ?) RETURNING rec_id");
+                    $fStmt->execute([$requestId, $name, $type, $size, $content]);
+                    $fileId = $fStmt->fetchColumn();
+                    
+                    $uploaded[] = ['id' => $fileId, 'filename' => $name, 'filesize' => $size];
+                }
+            }
+        } elseif (isset($files['name'])) {
+            // Single file
+            if ($files['error'] === UPLOAD_ERR_OK) {
+                $name = $files['name'];
+                $type = $files['type'];
+                $tmp = $files['tmp_name'];
+                $size = $files['size'];
+                
+                if ($size <= 5 * 1024 * 1024) {
+                    $content = base64_encode(file_get_contents($tmp));
+                    
+                    $fStmt = $pdo->prepare("INSERT INTO sys_change_requests_files (cr_id, file_name, file_type, file_size, file_data) VALUES (?, ?, ?, ?, ?) RETURNING rec_id");
+                    $fStmt->execute([$requestId, $name, $type, $size, $content]);
+                    $fileId = $fStmt->fetchColumn();
+                    
+                    $uploaded[] = ['id' => $fileId, 'filename' => $name, 'filesize' => $size];
+                }
+            }
+        }
+        
+        returnJson(['success' => true, 'files' => $uploaded]);
+    }
+
+    // === DOWNLOAD ATTACHMENT ===
+    if ($action === 'download_attachment' && $method === 'GET') {
+        $fileId = $_GET['file_id'] ?? null;
+        if (!$fileId) returnJson(['error' => 'file_id required'], 400);
+        
+        $stmt = $pdo->prepare("
+            SELECT f.file_name, f.file_type, f.file_data
+            FROM sys_change_requests_files f
+            JOIN sys_change_requests cr ON f.cr_id = cr.rec_id
+            WHERE f.rec_id = ? AND cr.tenant_id = ?
+        ");
+        $stmt->execute([$fileId, $tenantId]);
+        $file = $stmt->fetch();
+        
+        if (!$file) returnJson(['error' => 'Not found'], 404);
+        
+        header('Content-Type: ' . $file['file_type']);
+        header('Content-Disposition: attachment; filename="' . $file['file_name'] . '"');
+        echo base64_decode($file['file_data']);
+        exit;
+    }
+
     returnJson(['error' => 'Invalid Action'], 404);
 
 } catch (Exception $e) {
