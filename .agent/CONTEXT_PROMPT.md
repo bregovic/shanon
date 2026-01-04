@@ -34,6 +34,7 @@ Before modifying any part of the system, you MUST read the relevant documentatio
 *   **Languages:** Maintain at least `cs` (Czech) and `en` (English).
 
 ### D. Development History & Reporting
+*   **Identity:** Always perform database actions (comments, history logs) as the `AI Developer` user (email: `ai@shanon.dev`). Do NOT use ID 1 (Super Admin).
 *   **Logging:** Every resolved ticket MUST have an entry in the `development_history` table (via `api-dev-history.php` or direct SQL).
 *   **Signatures:** All automated/agent comments must be signed (e.g., `~ 🤖 Antigravity`).
 *   **Status:** Move tickets from `New` -> `Development` -> `Testing` -> `Done`.
