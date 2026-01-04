@@ -568,7 +568,15 @@ const RequestsPage = () => {
             renderHeaderCell: () => '#',
             renderCell: (item: RequestItem) => item.id,
             compare: (a: RequestItem, b: RequestItem) => a.id - b.id,
-            minWidth: 40
+            minWidth: 50,
+            maxWidth: 60
+        },
+        {
+            columnId: 'subject',
+            renderHeaderCell: () => 'Předmět',
+            renderCell: (item: RequestItem) => (<Text weight="semibold">{item.subject}</Text>),
+            compare: (a: RequestItem, b: RequestItem) => a.subject.localeCompare(b.subject),
+            minWidth: 250
         },
         {
             columnId: 'priority',
@@ -583,14 +591,7 @@ const RequestsPage = () => {
                 const map: any = { high: 3, medium: 2, low: 1 };
                 return (map[a.priority] || 2) - (map[b.priority] || 2);
             },
-            minWidth: 110
-        },
-        {
-            columnId: 'subject',
-            renderHeaderCell: () => 'Předmět',
-            renderCell: (item: RequestItem) => (<Text weight="semibold">{item.subject}</Text>),
-            compare: (a: RequestItem, b: RequestItem) => a.subject.localeCompare(b.subject),
-            minWidth: 300
+            minWidth: 100
         },
         {
             columnId: 'status',
@@ -616,7 +617,7 @@ const RequestsPage = () => {
                 );
             },
             compare: (a: RequestItem, b: RequestItem) => a.status.localeCompare(b.status),
-            minWidth: 150
+            minWidth: 130
         },
         {
             columnId: 'assigned_username',
@@ -631,7 +632,7 @@ const RequestsPage = () => {
                 </div>
             ),
             compare: (a: RequestItem, b: RequestItem) => (a.assigned_username || '').localeCompare(b.assigned_username || ''),
-            minWidth: 150
+            minWidth: 140
         }
     ];
 
