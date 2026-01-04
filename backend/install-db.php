@@ -324,6 +324,17 @@ BEGIN
     AND user_id != v_ai_id
     AND comment NOT LIKE U&'\\2705%'
     AND comment NOT LIKE '%' || U&'\\+01F916' || '%';
+
+    -- 4. Log to Development History
+    INSERT INTO development_history (date, title, category, related_task_id)
+    SELECT CURRENT_DATE, 'Fix: Request UI Bugs (Checkbox & Reactions)', 'bugfix', v_ticket_id
+    WHERE NOT EXISTS (
+        SELECT 1 FROM development_history WHERE related_task_id = v_ticket_id AND title LIKE 'Fix: Request UI%'
+    );
+
+    -- 5. Post Agent Comment
+    INSERT INTO sys_change_comments (cr_id, user_id, comment, created_at)
+    VALUES (v_ticket_id, v_ai_id, '✅ Opraveny nahlášené chyby: Checkbox selekce se resetuje, Reakce mají okamžitou odezvu. ~ 🤖 Antigravity', NOW());
 END $$;"
     ];
 
