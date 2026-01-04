@@ -346,6 +346,12 @@ END $$;",
                 CONSTRAINT fk_comm_react_comm FOREIGN KEY (comment_id) REFERENCES sys_change_comments(rec_id) ON DELETE CASCADE
             );
             CREATE UNIQUE INDEX IF NOT EXISTS idx_comm_react_uniq ON sys_change_comment_reactions(comment_id, user_id, reaction_type);
+        ",
+        '015_ui_standardization_132' => "
+            -- Log UI Standardization to History
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT '2026-01-04', 'UI Standardization (Requests & Dashboard)', 'Refactored Requests Form and Dashboard to meet new UI Standard (Two-Bar Layout, Mobile Scroll, Menu Hierarchy). Fixed variable declaration bugs in RequestsPage.', 'Refactor', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'UI Standardization (Requests & Dashboard)' AND date = '2026-01-04');
         "
     ];
 
