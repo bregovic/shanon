@@ -26,7 +26,39 @@ export const translations = {
         'import.upload_btn': 'Importovat',
         'import.add_btn': 'Přidat další',
         'import.working': 'Pracuji...',
+
+        // System
+        'system.title': 'Konfigurace systému',
+        'system.menu.forms': 'Formuláře',
+        'system.menu.forms.desc': 'Správa systémových nástrojů a dokumentace',
+        'system.menu.reports': 'Reporty',
+        'system.menu.reports.desc': 'Systémové přehledy a statistiky',
+        'system.menu.tasks': 'Úlohy',
+        'system.menu.tasks.desc': 'Dávkové zpracování a periodické úlohy',
+        'system.menu.settings': 'Nastavení',
+        'system.menu.settings.desc': 'Globální konfigurace aplikace',
+
+        'system.group.admin': 'Nástroje administrátora',
+        'system.group.docs': 'Dokumentace',
+
+        'system.item.diagnostics': 'Diagnostika systému',
+        'system.item.sessions': 'Systémové relace',
+        'system.item.sequences': 'Číselné řady',
+        'system.item.db_docs': 'Dokumentace databáze',
+        'system.item.manifest': 'Systémový manifest',
+        'system.item.security': 'Dokumentace zabezpečení',
+        'system.item.history': 'Historie změn',
+        'system.item.help': 'Správa nápovědy',
+        'system.item.update_db': 'Aktualizace databáze (SQL)',
+
+        'system.diag.db_persisted': 'Uloženo v DB',
+        'system.diag.yes': 'ANO',
+        'system.diag.no': 'NE',
+        'system.diag.session_id': 'ID Relace',
+
+        'system.update_db.confirm': 'Opravdu chcete spustit aktualizaci databáze?',
     },
+
     en: {
         'common.save': 'Save',
         'common.cancel': 'Cancel',

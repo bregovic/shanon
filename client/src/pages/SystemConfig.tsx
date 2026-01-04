@@ -157,8 +157,9 @@ export const SystemConfig: React.FC = () => {
 
 
     const handleUpdateDB = async () => {
-        if (!confirm('Opravdu chcete spustit aktualizaci databáze?')) return;
+        if (!confirm(t('system.update_db.confirm'))) return;
         setUpdatingDB(true);
+
         setMigrationResult(null);
         try {
             // Try standard API path first, assuming proxy or correct routing
@@ -211,7 +212,8 @@ export const SystemConfig: React.FC = () => {
     const fetchDoc = async (file: string, title: string) => {
         setLoading(true);
         setActiveView('doc_viewer');
-        setViewTitle(title);
+        setViewTitle(t(title)); // Assuming title passed is translation key, or we translate here? Let's pass key.
+
         try {
             const res = await fetch(`/api/api-system.php?action=get_doc&file=${file}`);
             const json = await res.json();
@@ -396,58 +398,59 @@ export const SystemConfig: React.FC = () => {
 
     const renderDashboard = () => (
         <div className={styles.grid}>
-            {/* 1. FORMULÁŘE */}
+            {/* 1. FORMULÁŘE & TOOLS */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>Formuláře</Title3>}
-                    description={<Text>Správa sytémových dat a číselníků</Text>}
+                    header={<Title3>{t('system.menu.forms')}</Title3>}
+                    description={<Text>{t('system.menu.forms.desc')}</Text>}
                 />
+
                 <div className={styles.menuGroup}>
-                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '8px' }}>Nástroje administrátora</Text>
+                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '8px' }}>{t('system.group.admin')}</Text>
 
                     <MenuItem
                         icon={<Wrench24Regular />}
-                        label="Diagnostika systému"
-                        onClick={() => { setActiveView('diagnostics'); setViewTitle('Diagnostika systému'); }}
+                        label={t('system.item.diagnostics')}
+                        onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }}
                     />
 
                     <MenuItem
                         icon={<AppGeneric24Regular />}
-                        label="Systémové relace"
-                        onClick={() => { alert('Zde bude přehled aktivních relací'); }}
+                        label={t('system.item.sessions')}
+                        onClick={() => { alert(t('common.working')); }}
                     />
                     <MenuItem
                         icon={<Table24Regular />}
-                        label="Číselné řady"
-                        onClick={() => { alert('Správa číselných řad'); }}
+                        label={t('system.item.sequences')}
+                        onClick={() => { alert(t('common.working')); }}
                     />
 
-                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '16px' }}>Dokumentace</Text>
+                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '16px' }}>{t('system.group.docs')}</Text>
 
                     <MenuItem
                         icon={<Database24Regular />}
-                        label="Dokumentace databáze"
-                        onClick={() => { setActiveView('schema'); setViewTitle('Dokumentace databáze'); }}
+                        label={t('system.item.db_docs')}
+                        onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }}
                     />
                     <MenuItem
                         icon={<DocumentData24Regular />}
-                        label="Systémový manifest"
-                        onClick={() => fetchDoc('manifest', 'Systémový manifest')}
+                        label={t('system.item.manifest')}
+                        onClick={() => fetchDoc('manifest', 'system.item.manifest')}
                     />
                     <MenuItem
                         icon={<Shield24Regular />}
-                        label="Dokumentace zabezpečení"
-                        onClick={() => fetchDoc('security', 'Dokumentace zabezpečení')}
+                        label={t('system.item.security')}
+                        onClick={() => fetchDoc('security', 'system.item.security')}
                     />
                     <MenuItem
                         icon={<History24Regular />}
-                        label="Historie změn"
+                        label={t('system.item.history')}
                         onClick={() => fetchHistory()}
                     />
                     <MenuItem
                         icon={<BookQuestionMark24Regular />}
-                        label="Správa nápovědy"
-                        onClick={() => alert('Editor nápovědy (rozpracováno)')}
+                        label={t('system.item.help')}
+                        onClick={() => alert(t('common.working'))}
                     />
                 </div>
             </Card>
@@ -456,19 +459,19 @@ export const SystemConfig: React.FC = () => {
             {/* 2. REPORTY */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>Reporty</Title3>}
-                    description={<Text>Logy a statistiky</Text>}
+                    header={<Title3>{t('system.menu.reports')}</Title3>}
+                    description={<Text>{t('system.menu.reports.desc')}</Text>}
                 />
                 <div className={styles.menuGroup}>
                     <MenuItem
                         icon={<Poll24Regular />}
-                        label="Audit log"
-                        onClick={() => alert('Historie změn')}
+                        label={t('system.item.audit_log')}
+                        onClick={() => alert(t('common.working'))}
                     />
                     <MenuItem
                         icon={<Poll24Regular />}
-                        label="Statistiky výkonu"
-                        onClick={() => alert('Grafy výkonu')}
+                        label={t('system.item.performance_stats')}
+                        onClick={() => alert(t('common.working'))}
                     />
                 </div>
             </Card>
@@ -476,24 +479,24 @@ export const SystemConfig: React.FC = () => {
             {/* 3. ÚLOHY (CRON/JOB) */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>Úlohy</Title3>}
-                    description={<Text>Dávkové zpracování a periodické úlohy</Text>}
+                    header={<Title3>{t('system.menu.tasks')}</Title3>}
+                    description={<Text>{t('system.menu.tasks.desc')}</Text>}
                 />
 
                 <div className={styles.menuGroup}>
                     <MenuItem
                         icon={<TaskListSquareLtr24Regular />}
-                        label="Periodické úlohy (Cron)"
-                        onClick={() => alert('Přehled cron jobů')}
+                        label={t('system.item.cron_jobs')}
+                        onClick={() => alert(t('common.working'))}
                     />
                     <MenuItem
                         icon={<ArrowClockwise24Regular />}
-                        label="Spustit indexaci"
-                        onClick={() => alert('Manuální spuštění indexace')}
+                        label={t('system.item.run_indexing')}
+                        onClick={() => alert(t('common.working'))}
                     />
                     <MenuItem
                         icon={<Database24Regular />}
-                        label="Aktualizace databáze (SQL)"
+                        label={t('system.item.update_db')}
                         onClick={() => handleUpdateDB()}
                     />
                 </div>
