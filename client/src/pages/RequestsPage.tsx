@@ -17,7 +17,6 @@ import {
     Popover,
     PopoverTrigger,
     PopoverSurface,
-    PopoverSurface,
     Badge,
     Breadcrumb,
     BreadcrumbItem,
@@ -50,7 +49,8 @@ import {
     Emoji20Regular,
     ArrowLeft24Regular,
     ChevronDown16Regular,
-    ArrowSwap24Regular
+    ArrowSwap24Regular,
+    ArrowClockwise24Regular
 } from "@fluentui/react-icons";
 import {
     Menu,
