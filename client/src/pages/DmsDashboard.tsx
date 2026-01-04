@@ -12,8 +12,6 @@ import {
     BreadcrumbDivider
 } from '@fluentui/react-components';
 import {
-    DocumentAdd24Regular,
-    Folder24Regular,
     Settings24Regular,
     TaskListSquareLtr24Regular,
     FormNew24Regular,
@@ -71,11 +69,10 @@ const useStyles = makeStyles({
     }
 });
 
-const SectionLink = ({ icon, text, onClick }: { icon: any, text: string, onClick?: () => void }) => {
+const SectionLink = ({ text, onClick }: { text: string, onClick?: () => void }) => {
     const styles = useStyles();
     return (
         <div className={styles.actionLink} onClick={onClick}>
-            <span style={{ color: tokens.colorBrandForeground1 }}>{icon}</span>
             <Text>{text}</Text>
         </div>
     )
@@ -108,9 +105,9 @@ export const DmsDashboard: React.FC = () => {
                         <Title3>Formuláře</Title3>
                     </div>
                     <div className={styles.cardBody}>
-                        <SectionLink icon={<Folder24Regular />} text="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
-                        <SectionLink icon={<DocumentAdd24Regular />} text="Ke schválení" />
-                        <SectionLink icon={<DocumentAdd24Regular />} text="Moje koncepty" />
+                        <SectionLink text="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
+                        <SectionLink text="Ke schválení" />
+                        <SectionLink text="Moje koncepty" />
                     </div>
                 </Card>
 
@@ -121,8 +118,8 @@ export const DmsDashboard: React.FC = () => {
                         <Title3>Reporty</Title3>
                     </div>
                     <div className={styles.cardBody}>
-                        <SectionLink icon={<DocumentPdf24Regular />} text="Statistika nahrávání" />
-                        <SectionLink icon={<DocumentPdf24Regular />} text="Využití úložiště" />
+                        <SectionLink text="Statistika nahrávání" />
+                        <SectionLink text="Využití úložiště" />
                     </div>
                 </Card>
 
@@ -133,8 +130,8 @@ export const DmsDashboard: React.FC = () => {
                         <Title3>Úlohy</Title3>
                     </div>
                     <div className={styles.cardBody}>
-                        <SectionLink icon={<TaskListSquareLtr24Regular />} text="Moje úkoly (0)" />
-                        <SectionLink icon={<TaskListSquareLtr24Regular />} text="Delegované úkoly" />
+                        <SectionLink text="Moje úkoly (0)" />
+                        <SectionLink text="Delegované úkoly" />
                     </div>
                 </Card>
 
@@ -145,9 +142,9 @@ export const DmsDashboard: React.FC = () => {
                         <Title3>Nastavení</Title3>
                     </div>
                     <div className={styles.cardBody}>
-                        <SectionLink icon={<Settings24Regular />} text="Typy dokumentů" />
-                        <SectionLink icon={<Settings24Regular />} text="Číselné řady" />
-                        <SectionLink icon={<Settings24Regular />} text="Přístupová práva" />
+                        <SectionLink text="Typy dokumentů" />
+                        <SectionLink text="Číselné řady" />
+                        <SectionLink text="Přístupová práva" />
                     </div>
                 </Card>
             </div>
