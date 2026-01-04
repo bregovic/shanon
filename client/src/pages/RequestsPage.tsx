@@ -334,9 +334,7 @@ const RequestsPage = () => {
     // Filter by Mine
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
-    const { user } = useAuth();
     const { t } = useTranslation();
-    const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [showOnlyMine, setShowOnlyMine] = useState(searchParams.get('mine') === '1');
 
     // Selection state for grid
