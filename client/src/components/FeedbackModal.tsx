@@ -85,11 +85,13 @@ interface FeedbackModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     user: { name: string, id: number, role: string } | null;
+    onSuccess?: () => void;
 }
 
 // We ignore 'user' prop as we don't need role check anymore here (handled in Layout)
 // keeping it in interface for compatibility but destructuring delicately to avoid unused vars
-export const FeedbackModal = ({ open, onOpenChange }: Omit<FeedbackModalProps, 'user'> & { user?: any }) => {
+export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackModalProps, 'user'> & { user?: any }) => {
+
     const styles = useStyles();
     const [tab, setTab] = useState<'report' | 'history'>('report');
 
@@ -225,6 +227,8 @@ export const FeedbackModal = ({ open, onOpenChange }: Omit<FeedbackModalProps, '
                 setPriority("medium");
                 alert("Požadavek odeslán!");
                 onOpenChange(false);
+                onSuccess?.();
+
             } else {
                 alert("Chyba: " + (res.data.error || 'Neznámá chyba'));
             }

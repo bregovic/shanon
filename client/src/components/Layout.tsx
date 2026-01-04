@@ -21,7 +21,7 @@ import {
     PeopleTeam24Regular
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
-import { SettingsDialog } from './SettingsDialog';
+
 
 
 const useStyles = makeStyles({
