@@ -109,14 +109,14 @@ export const DmsDashboard: React.FC = () => {
             <div className={styles.scrollContainer}>
 
                 {/* Group: FORMULÁŘE */}
-                <div style={{ breakInside: 'avoid', marginBottom: '32px' }}>
-                    <Text weight="semibold" style={{
-                        color: tokens.colorNeutralForeground4,
+                <div className={styles.scrollColumn} style={{ breakInside: 'avoid', marginBottom: '32px' }}>
+                    <Text weight="bold" style={{
+                        color: tokens.colorNeutralForeground2,
                         textTransform: 'uppercase',
-                        fontSize: '11px',
-                        letterSpacing: '1px',
+                        fontSize: '13px',
+                        letterSpacing: '0.5px',
                         display: 'block',
-                        marginBottom: '12px'
+                        marginBottom: '16px'
                     }}>
                         Formuláře
                     </Text>
@@ -134,14 +134,14 @@ export const DmsDashboard: React.FC = () => {
                 </div>
 
                 {/* Group: ÚLOHY */}
-                <div style={{ breakInside: 'avoid', marginBottom: '32px' }}>
-                    <Text weight="semibold" style={{
-                        color: tokens.colorNeutralForeground4,
+                <div className={styles.scrollColumn} style={{ breakInside: 'avoid', marginBottom: '32px' }}>
+                    <Text weight="bold" style={{
+                        color: tokens.colorNeutralForeground2,
                         textTransform: 'uppercase',
-                        fontSize: '11px',
-                        letterSpacing: '1px',
+                        fontSize: '13px',
+                        letterSpacing: '0.5px',
                         display: 'block',
-                        marginBottom: '12px'
+                        marginBottom: '16px'
                     }}>
                         Úlohy
                     </Text>
@@ -153,14 +153,14 @@ export const DmsDashboard: React.FC = () => {
                 </div>
 
                 {/* Group: NASTAVENÍ */}
-                <div style={{ breakInside: 'avoid', marginBottom: '32px' }}>
-                    <Text weight="semibold" style={{
-                        color: tokens.colorNeutralForeground4,
+                <div className={styles.scrollColumn} style={{ breakInside: 'avoid', marginBottom: '32px' }}>
+                    <Text weight="bold" style={{
+                        color: tokens.colorNeutralForeground2,
                         textTransform: 'uppercase',
-                        fontSize: '11px',
-                        letterSpacing: '1px',
+                        fontSize: '13px',
+                        letterSpacing: '0.5px',
                         display: 'block',
-                        marginBottom: '12px'
+                        marginBottom: '16px'
                     }}>
                         Nastavení
                     </Text>
