@@ -1,56 +1,37 @@
 <?php
-// api-translations.php
-// Vrací JSON s překlady pro daný jazyk
+// backend/api-translations.php
+// Simple translation loader from JSON files
 
-header('Content-Type: application/json; charset=utf-8');
+require_once 'cors.php';
 
-// 1. Konfigurace a DB
-$envPaths = [
-    __DIR__ . '/env.local.php',
-    __DIR__ . '/../env.local.php',
-    $_SERVER['DOCUMENT_ROOT'] . '/env.local.php',
-    __DIR__ . '/../../env.local.php',
-    __DIR__ . '/php/env.local.php',
-    __DIR__ . '/env.php',
-    __DIR__ . '/../env.php',
-    __DIR__ . '/../../env.php',
-    $_SERVER['DOCUMENT_ROOT'] . '/env.php'
-];
+header("Content-Type: application/json");
 
-foreach ($envPaths as $path) {
-    if (file_exists($path)) {
-        require_once $path;
-        break;
-    }
-}
-
-// Zjistíme jazyk z GET parametru, nebo session, nebo default 'cs'
 $lang = $_GET['lang'] ?? 'cs';
 if (!in_array($lang, ['cs', 'en'])) {
     $lang = 'cs';
 }
 
-try {
-    $pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME.";charset=utf8", DB_USER, DB_PASS, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
+$jsonFile = __DIR__ . '/translations/' . $lang . '.json';
 
-    // Vybereme překlady pro daný jazyk z nové struktury
-    $stmt = $pdo->prepare("SELECT label_key, translation FROM translations WHERE language = ?");
-    $stmt->execute([$lang]);
+if (file_exists($jsonFile)) {
+    $content = file_get_contents($jsonFile);
+    $translations = json_decode($content, true);
     
-    $result = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $result[$row['label_key']] = $row['translation'];
+    if ($translations !== null) {
+        echo json_encode([
+            'success' => true,
+            'lang' => $lang,
+            'translations' => $translations
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid JSON format'
+        ]);
     }
-
+} else {
     echo json_encode([
-        'success' => true,
-        'lang' => $lang,
-        'translations' => $result
+        'success' => false,
+        'message' => 'Translation file not found: ' . $lang
     ]);
-
-} catch (PDOException $e) {
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
-?>
