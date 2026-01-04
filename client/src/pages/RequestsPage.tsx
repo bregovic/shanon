@@ -784,7 +784,6 @@ const RequestsPage = () => {
                                                             check: '✅', cross: '❌', smile: '😊', heart: '❤️',
                                                             sad: '😢', angry: '😡', laugh: '😂', star: '⭐'
                                                         };
-                                                        const isActive = c.user_reactions.includes(type);
                                                         return (
                                                             <Button
                                                                 key={type}
