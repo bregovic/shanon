@@ -57,3 +57,9 @@
     *   Ticket `In Progress` = Folder provided to external agent.
     *   Ticket `Review` = Result returned to `Deployment` folder.
     *   Ticket `Done` = Code merged into main codebase.
+
+## 9. Number Series (Identification)
+**Rule:** Use Centralized Number Series.
+*   **Table**: `sys_number_series`.
+*   **Mechanism**: Modules should request next specific number via System Service (Backend helper), not implement own counters.
+*   **Format**: Support masks like `INV-{YYYY}-{00000}`.

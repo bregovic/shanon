@@ -142,11 +142,42 @@ try {
                 file_name VARCHAR(255) NOT NULL,
                 file_type VARCHAR(100),
                 file_size INT,
-                file_data TEXT, -- Base64 encoded content
+                file_data TEXT, 
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_cr_files_cr_id ON sys_change_requests_files(cr_id);
             CREATE INDEX IF NOT EXISTS idx_cr_tenant ON sys_change_requests(tenant_id);
+        ",
+        '006_sys_number_series' => "
+            -- Create Global Number Series Table
+            CREATE TABLE IF NOT EXISTS sys_number_series (
+                rec_id SERIAL PRIMARY KEY,
+                code VARCHAR(50) NOT NULL UNIQUE, 
+                name VARCHAR(100) NOT NULL,
+                format_mask VARCHAR(50) NOT NULL, 
+                last_number INT DEFAULT 0,
+                reset_period VARCHAR(20) DEFAULT 'never', 
+                is_active BOOLEAN DEFAULT TRUE,
+                tenant_id UUID,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Migrate legacy DMS series if they exist (Best Effort)
+            DO $$
+            BEGIN
+               IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'dms_number_series') THEN
+                   -- Attempt to copy data assuming compatible structure
+                   BEGIN
+                       INSERT INTO sys_number_series (code, name, format_mask, last_number, is_active)
+                       SELECT code, name, format, current_number, is_active 
+                       FROM dms_number_series
+                       ON CONFLICT (code) DO NOTHING;
+                   EXCEPTION WHEN OTHERS THEN
+                       -- Ignore migration errors if columns don't match exactly
+                       NULL;
+                   END;
+               END IF;
+            END $$;
         "
     ];
 
