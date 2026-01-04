@@ -85,4 +85,4 @@ Registry for temporary features and hacks.
 
 ## Migrations
 Migrations are handled by `install-db.php`.
-Current HEAD: `011_sys_technical_debt` (registry for temp features)
+Current HEAD: `012_history_catchup` (log missing history)

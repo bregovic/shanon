@@ -26,7 +26,8 @@ import {
     Dismiss16Regular,
     Screenshot24Regular,
     ChevronRight24Regular,
-    ChevronDown24Regular
+    ChevronDown24Regular,
+    Search24Regular
 } from "@fluentui/react-icons";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -122,6 +123,7 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
     const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+    const [searchQuery, setSearchQuery] = useState("");
 
     const toggleDay = (day: string) => {
         setExpandedDays(prev => {
@@ -131,6 +133,16 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
             return next;
         });
     };
+
+    // Filter Logic
+    const filteredHistory = historyData.map(month => ({
+        ...month,
+        items: month.items.filter(item =>
+            !searchQuery.trim() ||
+            item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        )
+    })).filter(month => month.items.length > 0);
 
     // Helper for API ID
     const isDev = import.meta.env.DEV;
@@ -352,10 +364,19 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                             </div>
                         ) : tab === 'history' ? (
                             // History View
-                            <div style={{ flex: 1 }}>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <Input
+                                        contentBefore={<Search24Regular />}
+                                        placeholder="Hledat v historii změn..."
+                                        value={searchQuery}
+                                        onChange={(_e, d) => setSearchQuery(d.value)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
                                 {loadingHistory ? <Spinner label="Načítám historii..." /> : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                        {historyData.map(month => {
+                                        {filteredHistory.map(month => {
                                             // Group by day
                                             const days: Record<string, HistoryItem[]> = {};
                                             month.items.forEach(item => {

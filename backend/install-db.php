@@ -299,7 +299,8 @@ try {
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Roles Consolidation' AND date = '2026-01-04');
         ",
         '010_sys_change_comments' => null,
-        '011_sys_technical_debt' => null
+        '011_sys_technical_debt' => null,
+        '012_history_catchup' => null
     ];
 
 
