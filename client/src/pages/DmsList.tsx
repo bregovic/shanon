@@ -27,7 +27,6 @@ interface DmsDocument {
 export const DmsList: React.FC = () => {
     const navigate = useNavigate();
     const [documents, setDocuments] = useState<DmsDocument[]>([]);
-    const [docTypes, setDocTypes] = useState<{ value: string; label: string }[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -38,13 +37,6 @@ export const DmsList: React.FC = () => {
                 const docsJson = await docsRes.json();
                 if (docsJson.success) {
                     setDocuments(docsJson.data || []);
-
-                    // Extract unique doc types for filter
-                    const types = new Set<string>();
-                    docsJson.data?.forEach((d: DmsDocument) => {
-                        if (d.doc_type_name) types.add(d.doc_type_name);
-                    });
-                    setDocTypes(Array.from(types).map(t => ({ value: t, label: t })));
                 }
             } catch (e) {
                 console.error(e);
@@ -75,8 +67,7 @@ export const DmsList: React.FC = () => {
             key: 'doc_type_name',
             label: 'Typ',
             sortable: true,
-            filterable: true,
-            filterOptions: docTypes
+            filterable: true
         },
         {
             key: 'file_size_bytes',
@@ -94,12 +85,6 @@ export const DmsList: React.FC = () => {
             label: 'OCR Stav',
             sortable: true,
             filterable: true,
-            filterOptions: [
-                { value: 'pending', label: 'Čeká' },
-                { value: 'completed', label: 'Dokončeno' },
-                { value: 'skipped', label: 'Přeskočeno' },
-                { value: 'failed', label: 'Chyba' }
-            ],
             render: (item) => {
                 const colors: Record<string, 'warning' | 'success' | 'informative' | 'danger'> = {
                     pending: 'warning',
@@ -151,7 +136,6 @@ export const DmsList: React.FC = () => {
                     columns={columns}
                     loading={loading}
                     pageSize={20}
-                    searchPlaceholder="Hledat dokumenty..."
                     emptyMessage="Žádné dokumenty"
                     onRowClick={(doc) => console.log('Open document:', doc.rec_id)}
                 />

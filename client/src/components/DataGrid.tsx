@@ -14,35 +14,65 @@ import {
     Text,
     Spinner,
     Badge,
-    tokens,
-    makeStyles
+    Popover,
+    PopoverSurface,
+    PopoverTrigger,
+    Divider,
+    makeStyles,
+    shorthands
 } from '@fluentui/react-components';
 import {
-    Search24Regular,
     Filter24Regular,
-    ArrowUp24Regular,
-    ArrowDown24Regular,
+    Filter24Filled,
+    ArrowSortUp24Regular,
+    ArrowSortDown24Regular,
     ChevronLeft24Regular,
     ChevronRight24Regular,
-    Dismiss16Regular
+    Delete24Regular,
+    Checkmark24Regular,
+    bundleIcon
 } from '@fluentui/react-icons';
 
+const FilterIcon = bundleIcon(Filter24Filled, Filter24Regular);
+
 const useStyles = makeStyles({
-    toolbar: {
+    tableContainer: {
+        overflowX: 'auto',
+    },
+    headerCellContent: {
         display: 'flex',
-        gap: '12px',
         alignItems: 'center',
-        marginBottom: '16px',
-        flexWrap: 'wrap'
+        justifyContent: 'space-between',
+        width: '100%',
+        cursor: 'pointer',
+        padding: '4px 8px',
+        ':hover': {
+            backgroundColor: 'rgba(0,0,0,0.05)'
+        }
     },
-    searchBox: {
-        minWidth: '250px',
-        flex: '0 1 300px'
+    filterTrigger: {
+        marginLeft: '8px',
+        opacity: 0.5,
+        ':hover': { opacity: 1 },
+        '&.active': { opacity: 1, color: '#0078d4' }
     },
-    filterGroup: {
+    popoverContent: {
         display: 'flex',
+        flexDirection: 'column',
         gap: '8px',
-        alignItems: 'center'
+        minWidth: '250px',
+        padding: '12px'
+    },
+    filterSection: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+    },
+    footerLayout: {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: '8px',
+        marginTop: '8px'
     },
     pagination: {
         display: 'flex',
@@ -50,7 +80,7 @@ const useStyles = makeStyles({
         alignItems: 'center',
         marginTop: '16px',
         padding: '12px 0',
-        borderTop: `1px solid ${tokens.colorNeutralStroke2}`
+        borderTop: '1px solid #e0e0e0'
     },
     paginationInfo: {
         display: 'flex',
@@ -62,50 +92,33 @@ const useStyles = makeStyles({
         alignItems: 'center',
         gap: '8px'
     },
-    activeFilters: {
+    menuItem: {
         display: 'flex',
+        alignItems: 'center',
         gap: '8px',
-        flexWrap: 'wrap',
-        marginBottom: '12px'
-    },
-    filterBadge: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px',
-        cursor: 'pointer'
-    },
-    sortableHeader: {
+        padding: '8px',
         cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px',
-        ':hover': {
-            color: tokens.colorBrandForeground1
-        }
-    },
-    emptyState: {
-        textAlign: 'center',
-        padding: '40px',
-        color: tokens.colorNeutralForeground4
+        borderRadius: '4px',
+        ':hover': { backgroundColor: 'rgba(0,0,0,0.05)' }
     }
 });
 
-// Column definition type
+// Column definition
 export interface DataGridColumn<T> {
     key: keyof T | string;
     label: string;
     width?: string;
     sortable?: boolean;
     filterable?: boolean;
-    filterOptions?: { value: string; label: string }[];
+    // For D365 style, we might use different filter types (text, number, date)
+    dataType?: 'text' | 'number' | 'date' | 'boolean';
     render?: (item: T) => React.ReactNode;
 }
 
-// Filter definition
-export interface ActiveFilter {
-    key: string;
+// Filter State Model
+interface ColumnFilter {
+    operator: string;
     value: string;
-    label: string;
 }
 
 interface DataGridProps<T> {
@@ -113,11 +126,8 @@ interface DataGridProps<T> {
     columns: DataGridColumn<T>[];
     loading?: boolean;
     pageSize?: number;
-    searchPlaceholder?: string;
-    onRowClick?: (item: T) => void;
     emptyMessage?: string;
-    showSearch?: boolean;
-    showFilters?: boolean;
+    onRowClick?: (item: T) => void;
     showPagination?: boolean;
 }
 
@@ -126,216 +136,216 @@ export function DataGrid<T extends { [key: string]: any }>({
     columns,
     loading = false,
     pageSize = 20,
-    searchPlaceholder = 'Hledat...',
-    onRowClick,
     emptyMessage = 'Žádné záznamy',
-    showSearch = true,
-    showFilters = true,
+    onRowClick,
     showPagination = true
 }: DataGridProps<T>) {
     const styles = useStyles();
 
     // State
-    const [searchQuery, setSearchQuery] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [sortColumn, setSortColumn] = useState<string | null>(null);
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-    const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([]);
+    const [page, setPage] = useState(1);
+    const [sort, setSort] = useState<{ key: string, dir: 'asc' | 'desc' } | null>(null);
+    const [filters, setFilters] = useState<Record<string, ColumnFilter>>({});
 
-    // Filter dropdown state
-    const [filterColumn, setFilterColumn] = useState<string | null>(null);
+    // Popover State (controlled to allow closing on apply)
+    const [openPopover, setOpenPopover] = useState<string | null>(null);
 
-    // Get filterable columns
-    const filterableColumns = columns.filter(c => c.filterable && c.filterOptions);
-
-    // Apply search and filters
+    // Apply Logic
     const filteredData = useMemo(() => {
         let result = [...data];
 
-        // Apply search
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            result = result.filter(item =>
-                columns.some(col => {
-                    const value = item[col.key as keyof T];
-                    return value && String(value).toLowerCase().includes(query);
-                })
-            );
-        }
+        // 1. Filter
+        Object.entries(filters).forEach(([key, filter]) => {
+            if (!filter.value && filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty') return;
 
-        // Apply filters
-        activeFilters.forEach(filter => {
             result = result.filter(item => {
-                const value = item[filter.key as keyof T];
-                return String(value) === filter.value;
+                const val = item[key];
+                const strVal = String(val ?? '').toLowerCase();
+                const filterVal = filter.value.toLowerCase();
+
+                switch (filter.operator) {
+                    case 'contains': return strVal.includes(filterVal);
+                    case 'not_contains': return !strVal.includes(filterVal);
+                    case 'starts_with': return strVal.startsWith(filterVal);
+                    case 'is_exactly': return strVal === filterVal;
+                    case 'is_empty': return !val || val === '';
+                    case 'is_not_empty': return val && val !== '';
+                    default: return true;
+                }
             });
         });
 
-        // Apply sorting
-        if (sortColumn) {
+        // 2. Sort
+        if (sort) {
             result.sort((a, b) => {
-                const aVal = a[sortColumn as keyof T];
-                const bVal = b[sortColumn as keyof T];
+                const valA = a[sort.key];
+                const valB = b[sort.key];
 
-                if (aVal == null) return 1;
-                if (bVal == null) return -1;
+                if (valA == null) return 1;
+                if (valB == null) return -1;
 
-                const comparison = String(aVal).localeCompare(String(bVal), 'cs', { numeric: true });
-                return sortDirection === 'asc' ? comparison : -comparison;
+                const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true });
+                return sort.dir === 'asc' ? cmp : -cmp;
             });
         }
 
         return result;
-    }, [data, searchQuery, activeFilters, sortColumn, sortDirection, columns]);
+    }, [data, filters, sort]);
 
-    // Pagination
+    // Pagination Logic
     const totalPages = Math.ceil(filteredData.length / pageSize);
     const paginatedData = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
+        const start = (page - 1) * pageSize;
         return filteredData.slice(start, start + pageSize);
-    }, [filteredData, currentPage, pageSize]);
+    }, [filteredData, page, pageSize]);
 
-    // Reset page when filters change
-    React.useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery, activeFilters]);
-
-    // Handle sort
-    const handleSort = (columnKey: string) => {
-        if (sortColumn === columnKey) {
-            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortColumn(columnKey);
-            setSortDirection('asc');
-        }
+    // Handlers
+    const handleSort = (key: string, dir: 'asc' | 'desc') => {
+        setSort({ key, dir });
+        setOpenPopover(null);
     };
 
-    // Handle filter add
-    const handleAddFilter = (columnKey: string, value: string, label: string) => {
-        // Remove existing filter for same column
-        setActiveFilters(prev => [
-            ...prev.filter(f => f.key !== columnKey),
-            { key: columnKey, value, label }
-        ]);
-        setFilterColumn(null);
+    const handleApplyFilter = (key: string, operator: string, value: string) => {
+        setFilters(prev => ({
+            ...prev,
+            [key]: { operator, value }
+        }));
+        setPage(1); // Reset page
+        setOpenPopover(null);
     };
 
-    // Handle filter remove
-    const handleRemoveFilter = (key: string) => {
-        setActiveFilters(prev => prev.filter(f => f.key !== key));
+    const handleClearFilter = (key: string) => {
+        const newFilters = { ...filters };
+        delete newFilters[key];
+        setFilters(newFilters);
+        setPage(1);
+        setOpenPopover(null);
     };
 
     if (loading) {
         return (
-            <Card style={{ padding: '40px', textAlign: 'center' }}>
+            <div style={{ padding: '40px', textAlign: 'center' }}>
                 <Spinner label="Načítám data..." />
-            </Card>
+            </div>
         );
     }
 
-    return (
-        <div>
-            {/* Toolbar */}
-            {(showSearch || showFilters) && (
-                <div className={styles.toolbar}>
-                    {showSearch && (
-                        <Input
-                            className={styles.searchBox}
-                            contentBefore={<Search24Regular />}
-                            placeholder={searchPlaceholder}
-                            value={searchQuery}
-                            onChange={(_, d) => setSearchQuery(d.value)}
-                        />
-                    )}
+    // --- Header Filter Component (Internal) ---
+    const HeaderFilter = ({ column }: { column: DataGridColumn<T> }) => {
+        const colKey = String(column.key);
+        const isActive = !!filters[colKey];
+        const [tempOp, setTempOp] = useState(filters[colKey]?.operator || 'contains');
+        const [tempVal, setTempVal] = useState(filters[colKey]?.value || '');
 
-                    {showFilters && filterableColumns.length > 0 && (
-                        <div className={styles.filterGroup}>
-                            <Filter24Regular />
-                            <Dropdown
-                                placeholder="Filtrovat podle..."
-                                value={filterColumn || ''}
-                                onOptionSelect={(_, d) => setFilterColumn(d.optionValue || null)}
-                            >
-                                {filterableColumns.map(col => (
-                                    <Option key={String(col.key)} value={String(col.key)}>
-                                        {col.label}
-                                    </Option>
-                                ))}
-                            </Dropdown>
-
-                            {filterColumn && (
-                                <Dropdown
-                                    placeholder="Vyberte hodnotu..."
-                                    onOptionSelect={(_, d) => {
-                                        const col = filterableColumns.find(c => String(c.key) === filterColumn);
-                                        const opt = col?.filterOptions?.find(o => o.value === d.optionValue);
-                                        if (opt) {
-                                            handleAddFilter(filterColumn, opt.value, `${col?.label}: ${opt.label}`);
-                                        }
-                                    }}
-                                >
-                                    {filterableColumns
-                                        .find(c => String(c.key) === filterColumn)
-                                        ?.filterOptions?.map(opt => (
-                                            <Option key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                            </Option>
-                                        ))}
-                                </Dropdown>
+        return (
+            <Popover
+                open={openPopover === colKey}
+                onOpenChange={(_, d) => setOpenPopover(d.open ? colKey : null)}
+                trapFocus
+            >
+                <PopoverTrigger disableButtonEnhancement>
+                    <div className={styles.headerCellContent}>
+                        <span onClick={(e) => {
+                            // If just clicking header, toggle sort
+                            if (column.sortable) {
+                                const currentDir = sort?.key === colKey ? sort.dir : null;
+                                const nextDir = currentDir === 'asc' ? 'desc' : 'asc';
+                                handleSort(colKey, nextDir);
+                            }
+                        }}>
+                            {column.label}
+                            {sort?.key === colKey && (
+                                sort.dir === 'asc' ? <ArrowSortUp24Regular style={{ height: 12 }} /> : <ArrowSortDown24Regular style={{ height: 12 }} />
                             )}
-                        </div>
+                        </span>
+
+                        {(column.filterable !== false) && (
+                            <div
+                                className={`${styles.filterTrigger} ${isActive ? 'active' : ''}`}
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent sort
+                                    // Popover trigger handles open
+                                }}
+                            >
+                                <FilterIcon style={{ fontSize: 16 }} />
+                            </div>
+                        )}
+                    </div>
+                </PopoverTrigger>
+                <PopoverSurface className={styles.popoverContent}>
+                    {/* Sort Options */}
+                    {column.sortable && (
+                        <>
+                            <div className={styles.menuItem} onClick={() => handleSort(colKey, 'asc')}>
+                                <ArrowSortUp24Regular /> Seřadit A až Z
+                            </div>
+                            <div className={styles.menuItem} onClick={() => handleSort(colKey, 'desc')}>
+                                <ArrowSortDown24Regular /> Seřadit Z až A
+                            </div>
+                            <Divider />
+                        </>
                     )}
-                </div>
-            )}
 
-            {/* Active Filters */}
-            {activeFilters.length > 0 && (
-                <div className={styles.activeFilters}>
-                    {activeFilters.map(filter => (
-                        <Badge
-                            key={filter.key}
-                            appearance="outline"
-                            className={styles.filterBadge}
-                            onClick={() => handleRemoveFilter(filter.key)}
+                    {/* Filter Form */}
+                    <div className={styles.filterSection}>
+                        <Text weight="semibold">{column.label}</Text>
+
+                        <Dropdown
+                            value={
+                                tempOp === 'contains' ? 'Obsahuje' :
+                                    tempOp === 'is_exactly' ? 'Je přesně' :
+                                        tempOp === 'starts_with' ? 'Začíná na' :
+                                            tempOp === 'not_contains' ? 'Neobsahuje' :
+                                                tempOp === 'is_empty' ? 'Je prázdné' : 'Není prázdné'
+                            }
+                            selectedOptions={[tempOp]}
+                            onOptionSelect={(_, d) => setTempOp(d.optionValue || 'contains')}
                         >
-                            {filter.label}
-                            <Dismiss16Regular />
-                        </Badge>
-                    ))}
-                    <Button
-                        size="small"
-                        appearance="subtle"
-                        onClick={() => setActiveFilters([])}
-                    >
-                        Zrušit vše
-                    </Button>
-                </div>
-            )}
+                            <Option value="contains">Obsahuje</Option>
+                            <Option value="is_exactly">Je přesně</Option>
+                            <Option value="starts_with">Začíná na</Option>
+                            <Option value="not_contains">Neobsahuje</Option>
+                            <Option value="is_empty">Je prázdné</Option>
+                            <Option value="is_not_empty">Není prázdné</Option>
+                        </Dropdown>
 
-            {/* Table */}
+                        {tempOp !== 'is_empty' && tempOp !== 'is_not_empty' && (
+                            <Input
+                                placeholder="Hodnota..."
+                                value={tempVal}
+                                onChange={(_, d) => setTempVal(d.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleApplyFilter(colKey, tempOp, tempVal);
+                                }}
+                            />
+                        )}
+                    </div>
+
+                    <div className={styles.footerLayout}>
+                        <Button appearance="secondary" onClick={() => handleClearFilter(colKey)} icon={<Delete24Regular />}>
+                            Vymazat
+                        </Button>
+                        <Button
+                            appearance="primary"
+                            onClick={() => handleApplyFilter(colKey, tempOp, tempVal)}
+                            icon={<Checkmark24Regular />}
+                        >
+                            Použít
+                        </Button>
+                    </div>
+                </PopoverSurface>
+            </Popover>
+        );
+    };
+
+    return (
+        <div className={styles.tableContainer}>
             <Table aria-label="Data Grid">
                 <TableHeader>
                     <TableRow>
-                        {columns.map(col => (
-                            <TableHeaderCell
-                                key={String(col.key)}
-                                style={{ width: col.width }}
-                            >
-                                {col.sortable ? (
-                                    <div
-                                        className={styles.sortableHeader}
-                                        onClick={() => handleSort(String(col.key))}
-                                    >
-                                        {col.label}
-                                        {sortColumn === col.key && (
-                                            sortDirection === 'asc'
-                                                ? <ArrowUp24Regular style={{ fontSize: '12px' }} />
-                                                : <ArrowDown24Regular style={{ fontSize: '12px' }} />
-                                        )}
-                                    </div>
-                                ) : (
-                                    col.label
-                                )}
+                        {columns.map((col, idx) => (
+                            <TableHeaderCell key={idx} style={{ width: col.width }}>
+                                <HeaderFilter column={col} />
                             </TableHeaderCell>
                         ))}
                     </TableRow>
@@ -343,10 +353,8 @@ export function DataGrid<T extends { [key: string]: any }>({
                 <TableBody>
                     {paginatedData.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={columns.length}>
-                                <div className={styles.emptyState}>
-                                    <Text>{emptyMessage}</Text>
-                                </div>
+                            <TableCell colSpan={columns.length} style={{ textAlign: 'center', padding: '40px' }}>
+                                <Text style={{ color: '#605e5c' }}>{emptyMessage}</Text>
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -356,12 +364,9 @@ export function DataGrid<T extends { [key: string]: any }>({
                                 onClick={() => onRowClick?.(item)}
                                 style={{ cursor: onRowClick ? 'pointer' : 'default' }}
                             >
-                                {columns.map(col => (
-                                    <TableCell key={String(col.key)}>
-                                        {col.render
-                                            ? col.render(item)
-                                            : String(item[col.key as keyof T] ?? '-')
-                                        }
+                                {columns.map((col, cIdx) => (
+                                    <TableCell key={cIdx}>
+                                        {col.render ? col.render(item) : String(item[col.key] ?? '')}
                                     </TableCell>
                                 ))}
                             </TableRow>
@@ -370,39 +375,26 @@ export function DataGrid<T extends { [key: string]: any }>({
                 </TableBody>
             </Table>
 
-            {/* Pagination */}
             {showPagination && filteredData.length > pageSize && (
                 <div className={styles.pagination}>
                     <div className={styles.paginationInfo}>
                         <Text>
-                            Zobrazeno {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filteredData.length)} z {filteredData.length}
+                            Zobrazeno {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, filteredData.length)} z {filteredData.length}
                         </Text>
-                        <Dropdown
-                            value={`${pageSize}`}
-                            style={{ minWidth: '100px' }}
-                        >
-                            <Option value="10">10 / stránka</Option>
-                            <Option value="20">20 / stránka</Option>
-                            <Option value="50">50 / stránka</Option>
-                            <Option value="100">100 / stránka</Option>
-                        </Dropdown>
                     </div>
-
                     <div className={styles.paginationButtons}>
                         <Button
                             icon={<ChevronLeft24Regular />}
                             appearance="subtle"
-                            disabled={currentPage === 1}
-                            onClick={() => setCurrentPage(p => p - 1)}
+                            disabled={page === 1}
+                            onClick={() => setPage(p => p - 1)}
                         />
-                        <Text>
-                            Stránka {currentPage} z {totalPages}
-                        </Text>
+                        <Text>Strana {page} z {totalPages}</Text>
                         <Button
                             icon={<ChevronRight24Regular />}
                             appearance="subtle"
-                            disabled={currentPage === totalPages}
-                            onClick={() => setCurrentPage(p => p + 1)}
+                            disabled={page === totalPages}
+                            onClick={() => setPage(p => p + 1)}
                         />
                     </div>
                 </div>
