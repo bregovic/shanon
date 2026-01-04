@@ -44,8 +44,6 @@ try {
 
     // === LIST REQUESTS ===
     if ($action === 'list' && $method === 'GET') {
-        $isAdmin = true; // Todo: Check role
-        
         // Select with aliases for Frontend compatibility
         $sql = "SELECT cr.rec_id as id, cr.subject, cr.description, cr.priority, cr.status, cr.created_at, 
                        u.full_name as username, 
@@ -85,8 +83,8 @@ try {
             // 2. Handle Attachments
             if (isset($_FILES['attachments'])) {
                 $files = $_FILES['attachments'];
-                // Normalize $_FILES structure if needed (checking if multiple)
-                if (is_array($files['name'])) {
+                // Normalize $_FILES structure if needed
+                if (isset($files['name']) && is_array($files['name'])) {
                     for ($i = 0; $i < count($files['name']); $i++) {
                         if ($files['error'][$i] === UPLOAD_ERR_OK) {
                             $name = $files['name'][$i];
@@ -108,6 +106,19 @@ try {
             
             returnJson(['success' => true, 'id' => $recId]);
         });
+    }
+
+    // === UPLOAD CONTENT IMAGE (For Rich Text Editor) ===
+    if ($action === 'upload_content_image' && $method === 'POST') {
+        $file = $_FILES['image'] ?? $_FILES['file'] ?? null;
+        
+        if ($file && $file['error'] === UPLOAD_ERR_OK) {
+             $type = $file['type'];
+             $data = base64_encode(file_get_contents($file['tmp_name']));
+             $url = "data:$type;base64,$data";
+             returnJson(['url' => $url]);
+        }
+        returnJson(['error' => 'No file uploaded'], 400);
     }
 
     // === UPDATE REQUEST ===
