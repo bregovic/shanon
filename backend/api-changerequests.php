@@ -60,10 +60,18 @@ try {
                 LEFT JOIN sys_users au ON cr.assigned_to = au.rec_id
                 WHERE cr.tenant_id = :tid";
         
+        $view = $_GET['view'] ?? 'mine'; // Default to mine if not specified (frontend sends view=all for all)
+        if ($view !== 'all') {
+            $sql .= " AND (cr.created_by = :uid OR cr.assigned_to = :uid)";
+        }
+        
         $sql .= " ORDER BY cr.created_at DESC";
         
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':tid', $tenantId);
+        if ($view !== 'all') {
+            $stmt->bindValue(':uid', $userId);
+        }
         
         $stmt->execute();
         returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
