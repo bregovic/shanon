@@ -8,24 +8,25 @@ import {
     Spinner,
     Button,
     makeStyles,
-    TabList,
-    Tab,
     Title2,
-    Divider
-} from '@fluentui/react-components';
-import type {
-    SelectTabData,
-    TabValue,
-    SelectTabEvent
+    Divider,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbButton,
+    BreadcrumbDivider,
+    shorthands,
+    tokens
 } from '@fluentui/react-components';
 import {
     ArrowClockwise24Regular,
-    AppGeneric24Regular,
     Settings24Regular,
     Poll24Regular,
     Database24Regular,
     Table24Regular,
-    TaskListSquareLtr24Regular
+    TaskListSquareLtr24Regular,
+    Wrench24Regular,
+    ChevronRight16Regular,
+    ArrowLeft24Regular
 } from '@fluentui/react-icons';
 import { ActionBar } from '../components/ActionBar';
 import { useTranslation } from '../context/TranslationContext';
@@ -50,7 +51,8 @@ const useStyles = makeStyles({
         gap: '24px'
     },
     card: {
-        height: '100%'
+        height: '100%',
+        ...shorthands.padding('20px')
     },
     row: {
         display: 'flex',
@@ -66,11 +68,6 @@ const useStyles = makeStyles({
     value: {
         fontFamily: 'monospace'
     },
-    tabs: {
-        padding: '0 16px',
-        borderBottom: '1px solid #e0e0e0',
-        backgroundColor: '#fff'
-    },
     schemaTable: {
         marginTop: '10px',
         marginBottom: '20px'
@@ -82,6 +79,32 @@ const useStyles = makeStyles({
         padding: '4px 0',
         borderBottom: '1px solid #eee',
         fontSize: '13px'
+    },
+    menuGroup: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+    },
+    menuItem: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px 16px',
+        borderRadius: tokens.borderRadiusMedium,
+        cursor: 'pointer',
+        backgroundColor: tokens.colorNeutralBackground1,
+        border: `1px solid ${tokens.colorNeutralStroke2}`,
+        transition: 'all 0.2s',
+        ':hover': {
+            backgroundColor: tokens.colorNeutralBackground1Hover,
+            borderColor: tokens.colorBrandStroke1,
+            color: tokens.colorBrandForeground1
+        }
+    },
+    menuItemContent: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px'
     }
 });
 
@@ -109,7 +132,11 @@ interface SystemData {
 export const SystemConfig: React.FC = () => {
     const styles = useStyles();
     const { t } = useTranslation();
-    const [selectedTab, setSelectedTab] = useState<TabValue>('dashboard');
+
+    // View State: null = Dashboard, string = specific detail view
+    const [activeView, setActiveView] = useState<string | null>(null);
+    const [viewTitle, setViewTitle] = useState<string>("");
+
     const [data, setData] = useState<SystemData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -133,12 +160,11 @@ export const SystemConfig: React.FC = () => {
     };
 
     useEffect(() => {
+        // Only fetch if needed (e.g. for dashboard widgets or first load)
+        // But here we mainly use it for Diagnostics detail.
+        // We can fetch it on mount anyway for potential dashboard widgets.
         fetchData();
     }, []);
-
-    const onTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
-        setSelectedTab(data.value);
-    };
 
     // --- RENDERERS ---
 
@@ -191,7 +217,6 @@ export const SystemConfig: React.FC = () => {
         );
     };
 
-    // --- SCHEMA RENDERER ---
     const renderSchema = () => {
         const schema = [
             {
@@ -249,45 +274,143 @@ export const SystemConfig: React.FC = () => {
         );
     };
 
-    const renderPlaceholder = (title: string, desc: string) => (
-        <div style={{ textAlign: 'center', padding: '80px', color: '#888' }}>
-            <Title3 block>{title}</Title3>
-            <Text>{desc}</Text>
+    const MenuItem = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick?: () => void }) => (
+        <div className={styles.menuItem} onClick={onClick}>
+            <div className={styles.menuItemContent}>
+                {icon}
+                <Text weight="medium">{label}</Text>
+            </div>
+            <ChevronRight16Regular style={{ color: tokens.colorNeutralForeground3 }} />
+        </div>
+    );
+
+    const renderDashboard = () => (
+        <div className={styles.grid}>
+            {/* 1. FORMULÁŘE */}
+            <Card className={styles.card}>
+                <CardHeader
+                    header={<Title3>Formuláře</Title3>}
+                    description={<Text>Správa sytémových dat a číselníků</Text>}
+                />
+                <div className={styles.menuGroup}>
+                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '8px' }}>Nástroje administrátora</Text>
+
+                    <MenuItem
+                        icon={<Wrench24Regular />}
+                        label="Diagnostika systému"
+                        onClick={() => { setActiveView('diagnostics'); setViewTitle('Diagnostika systému'); }}
+                    />
+
+                    <MenuItem
+                        icon={<Database24Regular />}
+                        label="Server a databáze"
+                        onClick={() => { setActiveView('schema'); setViewTitle('Server a databáze'); }}
+                    />
+
+                    <MenuItem
+                        icon={<AppGeneric24Regular />}
+                        label="Systémové relace"
+                        onClick={() => { alert('Zde bude přehled aktivních relací'); }}
+                    />
+
+                    <MenuItem
+                        icon={<Table24Regular />}
+                        label="Číselné řady"
+                        onClick={() => { alert('Správa číselných řad'); }}
+                    />
+                </div>
+            </Card>
+
+            {/* 2. REPORTY */}
+            <Card className={styles.card}>
+                <CardHeader
+                    header={<Title3>Reporty</Title3>}
+                    description={<Text>Logy a statistiky</Text>}
+                />
+                <div className={styles.menuGroup}>
+                    <MenuItem
+                        icon={<Poll24Regular />}
+                        label="Audit log"
+                        onClick={() => alert('Historie změn')}
+                    />
+                    <MenuItem
+                        icon={<Poll24Regular />}
+                        label="Statistiky výkonu"
+                        onClick={() => alert('Grafy výkonu')}
+                    />
+                </div>
+            </Card>
+
+            {/* 3. ÚLOHY (CRON/JOB) */}
+            <Card className={styles.card}>
+                <CardHeader
+                    header={<Title3>Systémové úlohy</Title3>}
+                    description={<Text>Dávkové zpracování a periodické úlohy</Text>}
+                />
+                <div className={styles.menuGroup}>
+                    <MenuItem
+                        icon={<TaskListSquareLtr24Regular />}
+                        label="Periodické úlohy (Cron)"
+                        onClick={() => alert('Přehled cron jobů')}
+                    />
+                    <MenuItem
+                        icon={<ArrowClockwise24Regular />}
+                        label="Spustit indexaci"
+                        onClick={() => alert('Manuální spuštění indexace')}
+                    />
+                </div>
+            </Card>
+
+            {/* 4. NASTAVENÍ */}
+            <Card className={styles.card}>
+                <CardHeader
+                    header={<Title3>Nastavení</Title3>}
+                    description={<Text>Konfigurace serveru</Text>}
+                />
+                <div className={styles.menuGroup}>
+                    <MenuItem
+                        icon={<Settings24Regular />}
+                        label="Globální parametry"
+                        onClick={() => alert('Settings')}
+                    />
+                </div>
+            </Card>
         </div>
     );
 
     return (
         <div className={styles.root}>
             <ActionBar>
-                <Title3>{t('system.title')}</Title3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {activeView && (
+                        <Button icon={<ArrowLeft24Regular />} appearance="subtle" onClick={() => { setActiveView(null); setViewTitle(""); }} />
+                    )}
+                    <Breadcrumb>
+                        <BreadcrumbItem>
+                            <BreadcrumbButton onClick={() => { setActiveView(null); setViewTitle(""); }}>Moduly</BreadcrumbButton>
+                        </BreadcrumbItem>
+                        <BreadcrumbDivider />
+                        <BreadcrumbItem>
+                            <BreadcrumbButton onClick={() => { setActiveView(null); setViewTitle(""); }}>Systém</BreadcrumbButton>
+                        </BreadcrumbItem>
+                        {activeView && (
+                            <>
+                                <BreadcrumbDivider />
+                                <BreadcrumbItem>
+                                    <Text weight="semibold">{viewTitle}</Text>
+                                </BreadcrumbItem>
+                            </>
+                        )}
+                    </Breadcrumb>
+                </div>
                 <div style={{ flex: 1 }} />
-                <Button icon={<ArrowClockwise24Regular />} onClick={fetchData}>{t('system.refresh')}</Button>
+                <Button icon={<ArrowClockwise24Regular />} onClick={fetchData}>Obnovit</Button>
             </ActionBar>
 
-            {/* NEW STANDARD DASHBOARD TABS */}
-            <div className={styles.tabs}>
-                <TabList selectedValue={selectedTab} onTabSelect={onTabSelect}>
-                    <Tab id="dashboard" icon={<AppGeneric24Regular />} value="dashboard">{t('Dashboard')}</Tab>
-                    <Tab id="forms" icon={<Table24Regular />} value="forms">{t('Forms & Data')}</Tab>
-                    <Tab id="tasks" icon={<TaskListSquareLtr24Regular />} value="tasks">{t('Tasks')}</Tab>
-                    <Tab id="reports" icon={<Poll24Regular />} value="reports">{t('Reports')}</Tab>
-                    <Tab id="schema" icon={<Database24Regular />} value="schema">{t('Database')}</Tab>
-                    <Tab id="settings" icon={<Settings24Regular />} value="settings">{t('Settings')}</Tab>
-                </TabList>
-            </div>
-
             <div className={styles.container}>
-                {selectedTab === 'dashboard' && renderDiagnostics()}
-
-                {selectedTab === 'forms' && renderPlaceholder(t('Forms & Data'), 'Manage Number Series, Dropdowns, and Global Enums.')}
-
-                {selectedTab === 'tasks' && renderPlaceholder(t('Tasks'), 'Scheduled Cron Jobs and Batch Processes.')}
-
-                {selectedTab === 'reports' && renderPlaceholder(t('Reports'), 'System Logs, Audit Trails, and Analytics.')}
-
-                {selectedTab === 'schema' && renderSchema()}
-
-                {selectedTab === 'settings' && renderPlaceholder(t('Settings'), 'Low-level PHP & Server Configuration.')}
+                {!activeView && renderDashboard()}
+                {activeView === 'diagnostics' && renderDiagnostics()}
+                {activeView === 'schema' && renderSchema()}
             </div>
         </div>
     );
