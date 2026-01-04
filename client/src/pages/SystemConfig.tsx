@@ -112,6 +112,32 @@ const useStyles = makeStyles({
         display: 'flex',
         alignItems: 'center',
         gap: '12px'
+    },
+    // New Mobile Scroll Layout Styles
+    scrollContainer: {
+        display: 'flex',
+        gap: '32px',
+        flexWrap: 'wrap',
+        alignItems: 'flex-start',
+        '@media (max-width: 800px)': {
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            paddingBottom: '20px', // Space for scrollbar
+            scrollSnapType: 'x mandatory',
+            gap: '16px',
+            scrollPadding: '24px' // Padding for snap alignment
+        }
+    },
+    scrollColumn: {
+        flex: '1 1 300px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0px',
+        '@media (max-width: 800px)': {
+            flex: '0 0 85vw', // Take most of width but show hint of next column
+            scrollSnapAlign: 'start',
+            minWidth: 'auto'
+        }
     }
 });
 
@@ -457,11 +483,11 @@ export const SystemConfig: React.FC = () => {
                 <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>Collapse all</Button>
             </div>
 
-            {/* 3-Column Layout (Responsive Flex) */}
-            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '32px', alignItems: 'flex-start' }}>
+            {/* 3-Column Layout (Responsive Flex with Mobile Scroll) */}
+            <div className={styles.scrollContainer}>
 
                 {/* Column 1 */}
-                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                <div className={styles.scrollColumn}>
                     {/* 1. ADMIN TOOLS */}
                     <MenuSection id="admin" title={t('system.group.admin')} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
                         <MenuItem icon={null} label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
@@ -480,7 +506,7 @@ export const SystemConfig: React.FC = () => {
                 </div>
 
                 {/* Column 2 */}
-                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                <div className={styles.scrollColumn}>
                     {/* 4. REPORTS */}
                     <MenuSection id="reports" title={t('system.menu.reports')} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
                         <MenuItem icon={null} label={t('system.item.audit_log')} onClick={() => alert(t('common.working'))} />
@@ -496,7 +522,7 @@ export const SystemConfig: React.FC = () => {
                 </div>
 
                 {/* Column 3 */}
-                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                <div className={styles.scrollColumn}>
                     {/* 3. SECURITY */}
                     <MenuSection id="security" title="Zabezpečení" isOpen={expandedSections.has('security')} onToggle={toggleSection}>
                         <MenuItem icon={<Shield24Regular />} label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
