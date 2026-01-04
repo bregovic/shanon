@@ -24,8 +24,18 @@
     - **Layout:** Obsah začíná ihned pod hlavičkou/drobečky, bez zbytečného toolbaru v těle stránky.
   - **Breadcrumbs (Drobečková navigace):**
     - **Lokalizace:** Všechny texty v drobečcích musí používat `t()` (např. `t('modules.requests')`). Žádné hardcoded stringy!
-    - **Hierarchie:** Moduly (`t('common.modules')`) -> Modul (`t('modules.name')`) -> Detail/Sekce.
-    - **Interakce:** Nadřazené prvky musí být kliknutelné (odkazy).
+  - **Transactional Form Standard (Best Practice):**
+    - **Structure:**
+      1. **Top Sub-Bar (Action Bar):**
+         - *Left:* Breadcrumbs (Form Name).
+         - *Right:*
+           - **Action Lookup (Menu):** Vždy obsahuje "Nový", "Upravit", "Smazat".
+           - **Refresh (Icon):** Soft refresh (zachová filtry).
+           - **Attachments (Icon):** Správa příloh.
+           - **Export/Import (Icon):** Data transfer.
+      2. **Filter Bar:** Vyšší lišta pod Action Barem pro specifické filtry.
+      3. **Grid/Content:** Samotná data.
+    - **Mobile:** Všechny části (Action Bar, Filter Bar, Grid) musí být **samostatně horizontálně posuvné** (`overflow-x: auto`), aby nedocházelo k rozbití layoutu.
 
 ## 3. Workflow
 - Před nasazením "špinavého" řešení (hotfix) je nutné vytvořit záznam v `sys_technical_debt`.

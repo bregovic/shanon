@@ -48,7 +48,9 @@ import {
     Save24Regular,
     Dismiss24Regular,
     Emoji20Regular,
-    ArrowLeft24Regular
+    ArrowLeft24Regular,
+    ChevronDown16Regular,
+    ArrowSwap24Regular
 } from "@fluentui/react-icons";
 import {
     Menu,
@@ -188,13 +190,15 @@ const useStyles = makeStyles({
     filterBar: {
         display: 'flex',
         gap: '16px',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap', // Prevent wrapping for mobile scrolling
         alignItems: 'center',
-        padding: '16px',
+        padding: '16px 24px', // Taller/Higher as requested
         backgroundColor: tokens.colorNeutralBackground1,
-        borderRadius: tokens.borderRadiusMedium,
-        boxShadow: tokens.shadow2,
-        border: `1px solid ${tokens.colorNeutralStroke2}`
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, // Consistent with bars
+        overflowX: 'auto', // Independent scrolling
+        width: '100%',
+        boxSizing: 'border-box',
+        flexShrink: 0
     },
     imgToolbar: {
         display: 'flex',
@@ -1104,33 +1108,47 @@ const RequestsPage = () => {
                 </Breadcrumb>
                 <div style={{ flex: 1 }} />
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <Button icon={<Add24Regular />} appearance="primary" onClick={() => setFeedbackOpen(true)}>Nový</Button>
-                    <Button
-                        icon={<Edit24Regular />}
-                        appearance="subtle"
-                        disabled={selectedItems.size !== 1}
-                        onClick={() => {
-                            if (selectedItems.size === 1) {
-                                const id = Array.from(selectedItems)[0];
-                                const item = requests.find((r: RequestItem) => r.id === id);
-                                if (item) setSelectedRequest(item);
-                            }
-                        }}
-                    >Upravit</Button>
-                    <Button
-                        icon={<Delete20Regular />}
-                        appearance="subtle"
-                        disabled={selectedItems.size === 0}
-                        onClick={handleDeleteRequests}
-                    >Smazat</Button>
-                    <Divider vertical style={{ height: '20px', margin: '0 4px' }} />
-                    <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests}>Obnovit</Button>
+
+                    {/* Action Lookup */}
+                    <Menu>
+                        <MenuTrigger disableButtonEnhancement>
+                            <Button appearance="outline" iconAfter={<ChevronDown16Regular />}>Akce</Button>
+                        </MenuTrigger>
+                        <MenuPopover>
+                            <MenuList>
+                                <MenuItem icon={<Add24Regular />} onClick={() => setFeedbackOpen(true)}>Nový</MenuItem>
+                                <MenuItem
+                                    icon={<Edit24Regular />}
+                                    disabled={selectedItems.size !== 1}
+                                    onClick={() => {
+                                        if (selectedItems.size === 1) {
+                                            const id = Array.from(selectedItems)[0];
+                                            const item = requests.find((r: RequestItem) => r.id === id);
+                                            if (item) setSelectedRequest(item);
+                                        }
+                                    }}
+                                >Upravit</MenuItem>
+                                <MenuItem
+                                    icon={<Delete20Regular />}
+                                    disabled={selectedItems.size === 0}
+                                    onClick={handleDeleteRequests}
+                                >Smazat</MenuItem>
+                            </MenuList>
+                        </MenuPopover>
+                    </Menu>
+
+                    <Divider vertical style={{ height: '20px', margin: '0 8px' }} />
+
+                    {/* Standard Icons */}
+                    <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests} title="Obnovit" />
+                    <Button icon={<Attach24Regular />} appearance="subtle" title="Přílohy" />
+                    <Button icon={<ArrowSwap24Regular />} appearance="subtle" title="Export/Import" />
                 </div>
             </ActionBar>
             <PageContent noScroll>
                 <div className={styles.root}>
                     <div className={styles.filterBar}>
-                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', width: '100%' }}>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <Switch
                                     label="Jen moje"

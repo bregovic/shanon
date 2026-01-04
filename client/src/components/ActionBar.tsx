@@ -11,7 +11,13 @@ const useStyles = makeStyles({
         alignItems: 'center',
         gap: '12px',
         height: '44px', // Slightly taller
-        flexShrink: 0
+        flexShrink: 0,
+        overflowX: 'auto', // Mobile: Independent scrolling
+        scrollbarWidth: 'none',
+        '::-webkit-scrollbar': { display: 'none' },
+        touchAction: 'pan-x',
+        '-webkit-overflow-scrolling': 'touch',
+        whiteSpace: 'nowrap'
     }
 });
 
