@@ -18,8 +18,7 @@ import {
     Home24Regular,
 
     DocumentData24Regular,
-    ClipboardTextEdit24Regular,
-    Settings24Regular
+    ClipboardTextEdit24Regular
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
 import { FeedbackModal } from './FeedbackModal';

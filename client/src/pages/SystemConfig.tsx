@@ -386,15 +386,20 @@ export const SystemConfig: React.FC = () => {
         );
     };
 
-    const MenuItem = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick?: () => void }) => (
-        <div className={styles.menuItem} onClick={onClick}>
+    const MenuItem = ({ icon, label, onClick, disabled }: { icon: React.ReactNode, label: string, onClick?: () => void, disabled?: boolean }) => (
+        <div
+            className={styles.menuItem}
+            onClick={disabled ? undefined : onClick}
+            style={disabled ? { opacity: 0.6, cursor: 'default', pointerEvents: 'none' } : {}}
+        >
             <div className={styles.menuItemContent}>
                 {icon}
                 <Text weight="medium">{label}</Text>
             </div>
-            <ChevronRight16Regular style={{ color: tokens.colorNeutralForeground3 }} />
+            {disabled ? <Spinner size="extra-small" /> : <ChevronRight16Regular style={{ color: tokens.colorNeutralForeground3 }} />}
         </div>
     );
+
 
     const renderDashboard = () => (
         <div className={styles.grid}>
