@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-    Title1,
     Title3,
     Card,
     CardHeader,
@@ -8,15 +7,10 @@ import {
     Badge,
     Spinner,
     Button,
-    makeStyles,
-    shorthands // Re-introducing shorthands carefully if used, or using longhand
+    makeStyles
 } from '@fluentui/react-components';
 import {
-    ArrowClockwise24Regular,
-    Database24Regular,
-    Server24Regular,
-    shieldCheckmark24Regular,
-    Warning24Regular
+    ArrowClockwise24Regular
 } from '@fluentui/react-icons';
 import { ActionBar } from '../components/ActionBar';
 
