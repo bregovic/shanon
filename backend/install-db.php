@@ -109,6 +109,44 @@ try {
                     END IF;
                 END LOOP;
             END $$;
+        ",
+        '004_dev_history' => "
+            CREATE TABLE IF NOT EXISTS development_history (
+                id SERIAL PRIMARY KEY,
+                date DATE NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT,
+                category VARCHAR(50) DEFAULT 'feature',
+                related_task_id INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_dev_hist_date ON development_history(date);
+        ",
+        '005_cr_enhancements' => "
+            CREATE TABLE IF NOT EXISTS sys_change_requests (
+                rec_id SERIAL PRIMARY KEY,
+                tenant_id UUID,
+                subject VARCHAR(200),
+                description TEXT,
+                priority VARCHAR(20),
+                status VARCHAR(20),
+                assigned_to INT,
+                created_by INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS sys_change_requests_files (
+                rec_id SERIAL PRIMARY KEY,
+                cr_id INT NOT NULL, 
+                file_name VARCHAR(255) NOT NULL,
+                file_type VARCHAR(100),
+                file_size INT,
+                file_data TEXT, -- Base64 encoded content
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_cr_files_cr_id ON sys_change_requests_files(cr_id);
+            CREATE INDEX IF NOT EXISTS idx_cr_tenant ON sys_change_requests(tenant_id);
         "
     ];
 

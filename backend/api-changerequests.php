@@ -13,7 +13,7 @@ const TABLE_ID_CR = 100; // SysTableId for ChangeRequests
 
 // --- AUTH ---
 if (!isset($_SESSION['loggedin']) || !isset($_SESSION['user'])) {
-    // Allow read for dev, but create requires auth
+    // Basic fallback for dev (should be stricter in prod)
     $userId = 1; 
     $tenantId = '00000000-0000-0000-0000-000000000001';
 } else {
@@ -49,19 +49,17 @@ try {
         // Select with aliases for Frontend compatibility
         $sql = "SELECT cr.rec_id as id, cr.subject, cr.description, cr.priority, cr.status, cr.created_at, 
                        u.full_name as username, 
-                       au.full_name as assigned_username, cr.assigned_to
+                       au.full_name as assigned_username, cr.assigned_to,
+                       (SELECT COUNT(*) FROM sys_change_requests_files f WHERE f.cr_id = cr.rec_id) as attachment_count
                 FROM sys_change_requests cr
                 LEFT JOIN sys_users u ON cr.created_by = u.rec_id
                 LEFT JOIN sys_users au ON cr.assigned_to = au.rec_id
                 WHERE cr.tenant_id = :tid";
-                
-        // if (!$isAdmin) $sql .= " AND cr.created_by = :uid";
         
         $sql .= " ORDER BY cr.created_at DESC";
         
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':tid', $tenantId);
-        // if (!$isAdmin) $stmt->bindValue(':uid', $userId);
         
         $stmt->execute();
         returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
@@ -75,12 +73,38 @@ try {
         
         if (!$subject) returnJson(['error' => 'Subject is required'], 400);
         
+        // Transaction to ensure CR and Files are saved together
         DB::transaction(function($pdo) use ($subject, $desc, $priority, $userId, $tenantId) {
+            // 1. Insert CR
             $stmt = $pdo->prepare("INSERT INTO sys_change_requests (tenant_id, subject, description, priority, created_by, status) VALUES (?, ?, ?, ?, ?, 'New') RETURNING rec_id");
             $stmt->execute([$tenantId, $subject, $desc, $priority, $userId]);
             $recId = $stmt->fetchColumn();
             
             logChange($pdo, $recId, 'status', '', 'New', $userId);
+            
+            // 2. Handle Attachments
+            if (isset($_FILES['attachments'])) {
+                $files = $_FILES['attachments'];
+                // Normalize $_FILES structure if needed (checking if multiple)
+                if (is_array($files['name'])) {
+                    for ($i = 0; $i < count($files['name']); $i++) {
+                        if ($files['error'][$i] === UPLOAD_ERR_OK) {
+                            $name = $files['name'][$i];
+                            $type = $files['type'][$i];
+                            $tmp = $files['tmp_name'][$i];
+                            $size = $files['size'][$i];
+                            
+                            // Limit 5MB per file
+                            if ($size > 5 * 1024 * 1024) continue;
+                            
+                            $content = base64_encode(file_get_contents($tmp));
+                            
+                            $fStmt = $pdo->prepare("INSERT INTO sys_change_requests_files (cr_id, file_name, file_type, file_size, file_data) VALUES (?, ?, ?, ?, ?)");
+                            $fStmt->execute([$recId, $name, $type, $size, $content]);
+                        }
+                    }
+                }
+            }
             
             returnJson(['success' => true, 'id' => $recId]);
         });
@@ -107,12 +131,6 @@ try {
              if (isset($input['assigned_to'])) {
                  $pdo->prepare("UPDATE sys_change_requests SET assigned_to = ? WHERE rec_id = ?")->execute([$input['assigned_to'], $recId]);
                  logChange($pdo, $recId, 'assigned_to', $curr['assigned_to'], $input['assigned_to'], $userId);
-             }
-             if (isset($input['description'])) {
-                 $pdo->prepare("UPDATE sys_change_requests SET description = ? WHERE rec_id = ?")->execute([$input['description'], $recId]);
-             }
-              if (isset($input['subject'])) {
-                 $pdo->prepare("UPDATE sys_change_requests SET subject = ? WHERE rec_id = ?")->execute([$input['subject'], $recId]);
              }
              
              // Return updated username for assignee
