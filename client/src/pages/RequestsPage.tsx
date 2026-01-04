@@ -192,8 +192,8 @@ const useStyles = makeStyles({
         gap: '16px',
         flexWrap: 'nowrap', // Prevent wrapping for mobile scrolling
         alignItems: 'center',
-        padding: '16px 24px', // Taller/Higher as requested
-        backgroundColor: tokens.colorNeutralBackground1,
+        padding: '8px 24px', // Reduced padding for tighter look
+        backgroundColor: tokens.colorNeutralBackground2, // Subtle Gray
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, // Consistent with bars
         overflowX: 'auto', // Independent scrolling
         width: '100%',
