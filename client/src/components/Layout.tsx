@@ -128,8 +128,8 @@ const Layout: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Tooltip content="Upozornění" relationship="label">
-                        <Button icon={<Alert24Regular />} appearance="subtle" />
+                    <Tooltip content="Moje požadavky" relationship="label">
+                        <Button icon={<Alert24Regular />} appearance="subtle" onClick={() => navigate('/requests?mine=1')} />
                     </Tooltip>
 
                     <Tooltip content="Zpětná vazba" relationship="label">
