@@ -299,9 +299,32 @@ try {
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Roles Consolidation' AND date = '2026-01-04');
         ",
         '010_sys_change_comments' => null,
-        '011_sys_technical_debt' => null,
         '012_history_catchup' => null,
-        '013_ai_identity_fix' => null
+        '013_ai_identity_fix' => "
+DO $$
+DECLARE
+    v_ai_id INT;
+    v_ticket_id INT := 7;
+BEGIN
+    SELECT rec_id INTO v_ai_id FROM sys_users WHERE email = 'ai@shanon.dev';
+    
+    IF v_ai_id IS NULL THEN
+        INSERT INTO sys_users (tenant_id, full_name, email, password_hash, role, created_at)
+        VALUES ('00000000-0000-0000-0000-000000000001', 'AI Developer', 'ai@shanon.dev', 'DISABLED', 'admin', NOW())
+        RETURNING rec_id INTO v_ai_id;
+    END IF;
+
+    UPDATE sys_change_comments 
+    SET user_id = v_ai_id 
+    WHERE comment LIKE '%' || U&'\\+01F916' || '%' AND user_id != v_ai_id;
+
+    UPDATE sys_change_comments
+    SET comment = U&'\\2705 ' || comment
+    WHERE cr_id = v_ticket_id
+    AND user_id != v_ai_id
+    AND comment NOT LIKE U&'\\2705%'
+    AND comment NOT LIKE '%' || U&'\\+01F916' || '%';
+END $$;"
     ];
 
 
