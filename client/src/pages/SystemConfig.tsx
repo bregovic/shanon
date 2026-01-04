@@ -18,9 +18,7 @@ import {
     tokens,
     MessageBar,
     MessageBarTitle,
-    MessageBarBody,
-    MessageBarIntent,
-    ScrollablePane
+    MessageBarBody
 } from '@fluentui/react-components';
 import {
     Settings24Regular,
