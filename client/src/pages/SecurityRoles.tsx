@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
     Title2,
     Title3,
@@ -315,7 +315,7 @@ export default function SecurityRoles() {
                             <Input
                                 placeholder="Kód nové role"
                                 value={newRoleCode}
-                                onChange={(e, d) => setNewRoleCode(d.value)}
+                                onChange={(_, d) => setNewRoleCode(d.value)}
                                 style={{ flex: 1 }}
                             />
                             <Button icon={<Add24Regular />} onClick={handleCreateRole} />
@@ -354,7 +354,7 @@ export default function SecurityRoles() {
                                 placeholder="Hledat objekty..."
                                 contentBefore={<Search24Regular />}
                                 value={searchQuery}
-                                onChange={(e, d) => setSearchQuery(d.value)}
+                                onChange={(_, d) => setSearchQuery(d.value)}
                             />
 
                             {Object.entries(groupedObjects).map(([type, objs]) => (
