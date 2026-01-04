@@ -22,6 +22,7 @@ import {
     PeopleTeam24Regular
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
+import { FeedbackModal } from './FeedbackModal';
 
 const useStyles = makeStyles({
     root: {
@@ -88,6 +89,7 @@ const Layout: React.FC = () => {
     const location = useLocation();
     const { user, logout } = useAuth();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
+    const [feedbackOpen, setFeedbackOpen] = React.useState(false);
 
     const modules = [
         { label: 'Dashboard', path: '/dashboard', icon: <Home24Regular /> },
@@ -131,7 +133,7 @@ const Layout: React.FC = () => {
                     </Tooltip>
 
                     <Tooltip content="Zpětná vazba" relationship="label">
-                        <Button icon={<Emoji24Regular />} appearance="subtle" />
+                        <Button icon={<Emoji24Regular />} appearance="subtle" onClick={() => setFeedbackOpen(true)} />
                     </Tooltip>
 
                     <Tooltip content="Nastavení" relationship="label">
@@ -157,6 +159,7 @@ const Layout: React.FC = () => {
             </main>
 
             <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+            <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} user={user} />
         </div>
     );
 };
