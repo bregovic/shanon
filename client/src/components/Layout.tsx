@@ -97,6 +97,7 @@ const Layout: React.FC = () => {
         { label: 'Projekty', path: '/projects', icon: <Briefcase24Regular /> },
         { label: 'CRM', path: '/crm', icon: <PeopleTeam24Regular /> },
         { label: 'Požadavky', path: '/requests', icon: <ClipboardTextEdit24Regular /> },
+        { label: 'Systém', path: '/system', icon: <Settings24Regular /> },
     ].sort((a, b) => {
         if (a.path === '/dashboard') return -1;
         if (b.path === '/dashboard') return 1;

@@ -8,11 +8,12 @@ import { DmsList } from './pages/DmsList';
 import { DmsImport } from './pages/DmsImport';
 import { DmsSettings } from './pages/DmsSettings';
 import RequestsPage from './pages/RequestsPage';
+import { SystemConfig } from './pages/SystemConfig';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SettingsProvider } from './context/SettingsContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { TranslationProvider } from './context/TranslationContext'; // Used inside App
+import { TranslationProvider } from './context/TranslationContext';
 
 const BASE_NAME = import.meta.env.BASE_URL || '/';
 
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
                     { path: "dms/import", element: <DmsImport /> },
                     { path: "dms/settings", element: <DmsSettings /> },
                     { path: "requests", element: <RequestsPage /> },
+                    { path: "system", element: <SystemConfig /> },
                 ]
             }
         ]
