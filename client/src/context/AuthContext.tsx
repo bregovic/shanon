@@ -12,27 +12,32 @@ type User = {
 
 type AuthContextType = {
     user: User | null;
+    permissions: Record<string, number>;
     isLoading: boolean;
     login: (username: string, pass: string) => Promise<boolean>;
     logout: () => void;
+    hasPermission: (objectId: string, minLevel?: number) => boolean;
 };
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
+    permissions: {},
     isLoading: true,
     login: async () => false,
     logout: () => { },
+    hasPermission: () => false,
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [permissions, setPermissions] = useState<Record<string, number>>({});
     const [isLoading, setIsLoading] = useState(true);
 
     // FIX: Set correct API path for Shanon (Nginx maps /api -> Backend)
     const API_BASE = import.meta.env.DEV
-        ? 'http://localhost:8000/api' // Assuming local dev proxy or backend port
+        ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
         : '/api';
 
     useEffect(() => {
@@ -50,6 +55,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
+    const hasPermission = (objectId: string, minLevel: number = 1): boolean => {
+        // Super Admin Bypass (optional, better to rely on DB mapping if possible, but safe here)
+        if (user?.role === 'superadmin' || user?.role === 'admin') return true;
+
+        const level = permissions[objectId] || 0;
+        return level >= minLevel;
+    };
+
     const checkAuth = async () => {
         try {
             const res = await fetch(`${API_BASE}/ajax-get-user.php`, {
@@ -65,11 +78,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     initials: data.user.initials || '?',
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
                 });
+                setPermissions(data.permissions || {});
             } else {
                 setUser(null);
+                setPermissions({});
             }
         } catch (e) {
             setUser(null);
+            setPermissions({});
         } finally {
             setIsLoading(false);
         }
@@ -94,6 +110,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     initials: data.user.initials,
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
                 });
+                setPermissions(data.permissions || {}); // Assuming login might return permissions too, or we re-fetch
+                // If login doesn't return permissions, call checkAuth immediately
+                if (!data.permissions) {
+                    checkAuth();
+                }
                 return true;
             }
             return false;
@@ -107,10 +128,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Simple client logout. Server logout is usually stateless or handles own session destroy.
         fetch(`${API_BASE}/ajax-logout.php`);
         setUser(null);
+        setPermissions({});
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+        <AuthContext.Provider value={{ user, permissions, isLoading, login, logout, hasPermission }}>
+
             {children}
         </AuthContext.Provider>
     );

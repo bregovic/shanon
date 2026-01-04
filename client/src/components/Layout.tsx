@@ -90,22 +90,32 @@ const Layout: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, logout } = useAuth();
+    const { user, logout, hasPermission } = useAuth();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
     const [feedbackOpen, setFeedbackOpen] = React.useState(false);
 
-
     const modules = [
-        { label: 'Dashboard', path: '/dashboard', icon: <Home24Regular /> },
-        { label: 'DMS', path: '/dms', icon: <DocumentData24Regular /> },
-        { label: 'Projekty', path: '/projects', icon: <Briefcase24Regular /> },
-        { label: 'CRM', path: '/crm', icon: <PeopleTeam24Regular /> },
-        { label: 'Požadavky', path: '/requests', icon: <ClipboardTextEdit24Regular /> },
-        { label: 'Systém', path: '/system', icon: <Settings24Regular /> },
+        { label: 'Dashboard', path: '/dashboard', icon: <Home24Regular />, securityId: 'mod_dashboard' },
+        { label: 'DMS', path: '/dms', icon: <DocumentData24Regular />, securityId: 'mod_dms' },
+        { label: 'Projekty', path: '/projects', icon: <Briefcase24Regular />, securityId: 'mod_projects' },
+        { label: 'CRM', path: '/crm', icon: <PeopleTeam24Regular />, securityId: 'mod_crm' },
+        { label: 'Požadavky', path: '/requests', icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests' },
+        { label: 'Systém', path: '/system', icon: <Settings24Regular />, securityId: 'mod_system' },
     ].sort((a, b) => {
         if (a.path === '/dashboard') return -1;
         if (b.path === '/dashboard') return 1;
         return a.label.localeCompare(b.label);
+    });
+
+    // Filter modules based on permissions
+    // If securityId is present, check permission. If not, assume public.
+    // Specially allow Dashboard if user has basic login, though strictly it is a module.
+    // Fallback: If hasPermission returns false but user is admin (handled inside hasPermission), they see it.
+    const visibleModules = modules.filter(m => {
+        if (!m.securityId) return true;
+        // Temporary: Force Dashboard visible for all logged users since we missed seeding GUEST permissions for it
+        if (m.securityId === 'mod_dashboard') return true;
+        return hasPermission(m.securityId, 1);
     });
 
     const isActive = (path: string) => location.pathname.startsWith(path);
@@ -119,7 +129,7 @@ const Layout: React.FC = () => {
                     </div>
 
                     <nav className={styles.navLinks}>
-                        {modules.map(mod => (
+                        {visibleModules.map(mod => (
                             <div
                                 key={mod.path}
                                 className={`${styles.link} ${isActive(mod.path) ? styles.activeLink : ''}`}
@@ -130,6 +140,7 @@ const Layout: React.FC = () => {
                             </div>
                         ))}
                     </nav>
+
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
