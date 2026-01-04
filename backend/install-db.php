@@ -58,26 +58,20 @@ try {
                 metadata JSONB DEFAULT '{}'
             );
         ",
-        // FIX: Ensure columns exist (Schema Evolution)
         '002a_dms_schema_ensure_columns' => "
             DO $$ 
             BEGIN 
                 -- Ensure 'code' exists (Legacy column)
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='code') THEN 
                     ALTER TABLE dms_doc_types ADD COLUMN code VARCHAR(50);
-                    -- If we had type_code, maybe copy it? unlikely to have data yet
                 END IF;
 
                 -- Ensure 'icon' exists
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='icon') THEN 
                     ALTER TABLE dms_doc_types ADD COLUMN icon VARCHAR(50);
                 END IF;
-
-                -- If 'type_code' exists (from previous partial run), we can leave it or ignore it. 
-                -- We will strictly use 'code' from now on.
             END $$;
         ",
-        // Setup Constraints if missing (Separate step to avoid transaction issues inside DO block if simpler)
         '002b_dms_constraints' => "
              DO $$ 
              BEGIN
@@ -87,16 +81,34 @@ try {
                 END IF;
              END $$;
         ",
-        '003_dms_setup_data' => "
-            -- Initial Data for DMS using 'code'
-            INSERT INTO dms_doc_types (code, name, icon) VALUES 
-            ('INV_IN', 'Faktura přijatá', 'Document24Regular'),
-            ('INV_OUT', 'Faktura vydaná', 'Document24Regular'),
-            ('CONTRACT', 'Smlouva', 'Document24Regular'),
-            ('OTHER', 'Ostatní', 'Document24Regular')
-            ON CONFLICT (code) DO UPDATE SET 
-                name = EXCLUDED.name,
-                icon = EXCLUDED.icon;
+        // FIX: Smart Data Seeding (Handle name conflicts)
+        '003_dms_setup_data_smart' => "
+            DO $$
+            DECLARE
+                r RECORD;
+            BEGIN
+                -- Define data to sync
+                FOR r IN SELECT * FROM (VALUES 
+                    ('INV_IN', 'Faktura přijatá', 'Document24Regular'),
+                    ('INV_OUT', 'Faktura vydaná', 'Document24Regular'),
+                    ('CONTRACT', 'Smlouva', 'Document24Regular'),
+                    ('OTHER', 'Ostatní', 'Document24Regular')
+                ) AS t(code, name, icon)
+                LOOP
+                    -- 1. Try to find by CODE first
+                    IF EXISTS (SELECT 1 FROM dms_doc_types WHERE code = r.code) THEN
+                        UPDATE dms_doc_types SET name = r.name, icon = r.icon WHERE code = r.code;
+                    
+                    -- 2. Try to find by NAME (if code didn't match)
+                    ELSIF EXISTS (SELECT 1 FROM dms_doc_types WHERE name = r.name) THEN
+                        UPDATE dms_doc_types SET code = r.code, icon = r.icon WHERE name = r.name;
+                        
+                    -- 3. Insert new
+                    ELSE
+                        INSERT INTO dms_doc_types (code, name, icon) VALUES (r.code, r.name, r.icon);
+                    END IF;
+                END LOOP;
+            END $$;
         "
     ];
 
