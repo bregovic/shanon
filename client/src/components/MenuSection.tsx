@@ -36,7 +36,7 @@ const useStyles = makeStyles({
     }
 });
 
-export const MenuItem = ({ icon, label, onClick, disabled }: { icon: React.ReactNode, label: string, onClick?: () => void, disabled?: boolean }) => {
+export const MenuItem = ({ icon, label, onClick, disabled }: { icon?: React.ReactNode, label: string, onClick?: () => void, disabled?: boolean }) => {
     const styles = useStyles();
     return (
         <div
@@ -45,7 +45,7 @@ export const MenuItem = ({ icon, label, onClick, disabled }: { icon: React.React
             style={disabled ? { opacity: 0.6, cursor: 'default', pointerEvents: 'none' } : {}}
         >
             <div className={styles.menuItemContent}>
-                {icon}
+                {icon && icon}
                 <Text weight="medium">{label}</Text>
             </div>
             {disabled ? <Spinner size="extra-small" /> : <ChevronRight16Regular style={{ color: tokens.colorNeutralForeground3 }} />}
@@ -53,7 +53,7 @@ export const MenuItem = ({ icon, label, onClick, disabled }: { icon: React.React
     );
 };
 
-export const MenuSection = ({ id, title, children, isOpen, onToggle }: { id: string, title: string, children: React.ReactNode, isOpen: boolean, onToggle: (id: string) => void }) => {
+export const MenuSection = ({ id, title, icon, children, isOpen, onToggle }: { id: string, title: string, icon?: React.ReactNode, children: React.ReactNode, isOpen: boolean, onToggle: (id: string) => void }) => {
     return (
         <div style={{ marginBottom: '16px', breakInside: 'avoid' }}>
             <div
@@ -66,7 +66,10 @@ export const MenuSection = ({ id, title, children, isOpen, onToggle }: { id: str
                     userSelect: 'none'
                 }}
             >
-                <Text weight="semibold" style={{ fontSize: '15px', color: tokens.colorNeutralForeground1 }}>{title}</Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {icon && <span style={{ color: tokens.colorBrandForeground1 }}>{icon}</span>}
+                    <Text weight="semibold" style={{ fontSize: '15px', color: tokens.colorNeutralForeground1 }}>{title}</Text>
+                </div>
                 {isOpen ? <ChevronUp16Regular style={{ color: tokens.colorNeutralForeground3 }} /> : <ChevronDown16Regular style={{ color: tokens.colorNeutralForeground3 }} />}
             </div>
             {isOpen && (

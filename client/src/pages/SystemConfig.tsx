@@ -29,7 +29,11 @@ import {
     ArrowClockwise24Regular,
     ChevronDown16Regular,
     ChevronUp16Regular,
-    Shield24Regular
+    Shield24Regular,
+    Document24Regular,
+    DocumentPdf24Regular,
+    TaskListSquareLtr24Regular,
+    Server24Regular
 } from '@fluentui/react-icons';
 
 import { ActionBar } from '../components/ActionBar';
@@ -411,50 +415,51 @@ export const SystemConfig: React.FC = () => {
             <div className={styles.scrollContainer}>
 
                 {/* Column 1 */}
+                {/* Column 1 */}
                 <div className={styles.scrollColumn}>
                     {/* 1. ADMIN TOOLS */}
-                    <MenuSection id="admin" title={t('system.group.admin')} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
-                        <MenuItem icon={null} label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
-                        <MenuItem icon={null} label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem icon={null} label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
+                    <MenuSection id="admin" title={t('system.group.admin')} icon={<Server24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
+                        <MenuItem label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
+                        <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
                     </MenuSection>
 
                     {/* 2. DOCS */}
-                    <MenuSection id="docs" title={t('system.group.docs')} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
-                        <MenuItem icon={null} label={t('system.item.db_docs')} onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }} />
-                        <MenuItem icon={null} label={t('system.item.manifest')} onClick={() => fetchDoc('manifest', 'system.item.manifest')} />
-                        <MenuItem icon={null} label={t('system.item.security')} onClick={() => fetchDoc('security', 'system.item.security')} />
-                        <MenuItem icon={null} label={t('system.item.history')} onClick={() => fetchHistory()} />
-                        <MenuItem icon={null} label={t('system.item.help')} onClick={() => alert(t('common.working'))} />
+                    <MenuSection id="docs" title={t('system.group.docs')} icon={<Document24Regular />} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
+                        <MenuItem label={t('system.item.db_docs')} onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }} />
+                        <MenuItem label={t('system.item.manifest')} onClick={() => fetchDoc('manifest', 'system.item.manifest')} />
+                        <MenuItem label={t('system.item.security')} onClick={() => fetchDoc('security', 'system.item.security')} />
+                        <MenuItem label={t('system.item.history')} onClick={() => fetchHistory()} />
+                        <MenuItem label={t('system.item.help')} onClick={() => alert(t('common.working'))} />
                     </MenuSection>
                 </div>
 
                 {/* Column 2 */}
                 <div className={styles.scrollColumn}>
                     {/* 4. REPORTS */}
-                    <MenuSection id="reports" title={t('system.menu.reports')} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
-                        <MenuItem icon={null} label={t('system.item.audit_log')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem icon={null} label={t('system.item.performance_stats')} onClick={() => alert(t('common.working'))} />
+                    <MenuSection id="reports" title={t('system.menu.reports')} icon={<DocumentPdf24Regular />} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
+                        <MenuItem label={t('system.item.audit_log')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label={t('system.item.performance_stats')} onClick={() => alert(t('common.working'))} />
                     </MenuSection>
 
                     {/* 5. TASKS */}
-                    <MenuSection id="tasks" title={t('system.menu.tasks')} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
-                        <MenuItem icon={null} label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem icon={null} label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem icon={null} label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
+                    <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
+                        <MenuItem label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
                     </MenuSection>
                 </div>
 
                 {/* Column 3 */}
                 <div className={styles.scrollColumn}>
                     {/* 3. SECURITY */}
-                    <MenuSection id="security" title={t('system.group.security')} isOpen={expandedSections.has('security')} onToggle={toggleSection}>
-                        <MenuItem icon={<Shield24Regular />} label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
+                    <MenuSection id="security" title={t('system.group.security')} icon={<Shield24Regular />} isOpen={expandedSections.has('security')} onToggle={toggleSection}>
+                        <MenuItem label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
                     </MenuSection>
 
                     {/* 6. SETTINGS */}
-                    <MenuSection id="settings" title={t('system.menu.settings')} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem icon={null} label={t('system.item.global_params')} onClick={() => alert('Settings')} />
+                    <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
+                        <MenuItem label={t('system.item.global_params')} onClick={() => alert('Settings')} />
                     </MenuSection>
                 </div>
 

@@ -109,33 +109,33 @@ export const DmsDashboard: React.FC = () => {
 
                 {/* Column 1 */}
                 <div className={styles.scrollColumn}>
-                    <MenuSection id="forms" title={t('system.menu.forms')} isOpen={expandedSections.has('forms')} onToggle={toggleSection}>
-                        <MenuItem icon={<FormNew24Regular />} label="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
-                        <MenuItem icon={<FormNew24Regular />} label="Ke schválení" />
-                        <MenuItem icon={<FormNew24Regular />} label="Moje koncepty" />
+                    <MenuSection id="forms" title={t('system.menu.forms')} icon={<FormNew24Regular />} isOpen={expandedSections.has('forms')} onToggle={toggleSection}>
+                        <MenuItem label="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
+                        <MenuItem label="Ke schválení" />
+                        <MenuItem label="Moje koncepty" />
                     </MenuSection>
 
-                    <MenuSection id="reports" title={t('system.menu.reports')} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
-                        <MenuItem icon={<DocumentPdf24Regular />} label="Statistika nahrávání" />
-                        <MenuItem icon={<DocumentPdf24Regular />} label="Využití úložiště" />
+                    <MenuSection id="reports" title={t('system.menu.reports')} icon={<DocumentPdf24Regular />} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
+                        <MenuItem label="Statistika nahrávání" />
+                        <MenuItem label="Využití úložiště" />
                     </MenuSection>
                 </div>
 
                 {/* Column 2 */}
                 <div className={styles.scrollColumn}>
-                    <MenuSection id="tasks" title={t('system.menu.tasks')} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
-                        <MenuItem icon={<TaskListSquareLtr24Regular />} label="Moje úkoly (0)" />
-                        <MenuItem icon={<TaskListSquareLtr24Regular />} label="Delegované úkoly" />
+                    <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
+                        <MenuItem label="Moje úkoly (0)" />
+                        <MenuItem label="Delegované úkoly" />
                     </MenuSection>
                 </div>
 
                 {/* Column 3 */}
                 <div className={styles.scrollColumn}>
-                    <MenuSection id="settings" title={t('system.menu.settings')} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem icon={<Settings24Regular />} label="Typy dokumentů" onClick={() => navigate('/dms/settings')} />
-                        <MenuItem icon={<Settings24Regular />} label="Číselné řady" onClick={() => navigate('/dms/settings')} />
-                        <MenuItem icon={<Settings24Regular />} label="Atributy" onClick={() => navigate('/dms/settings')} />
-                        <MenuItem icon={<Settings24Regular />} label="Úložiště" onClick={() => navigate('/dms/settings')} />
+                    <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
+                        <MenuItem label="Typy dokumentů" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem label="Číselné řady" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem label="Atributy" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem label="Úložiště" onClick={() => navigate('/dms/settings')} />
                     </MenuSection>
                 </div>
 
