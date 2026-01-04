@@ -33,7 +33,7 @@ import {
     Document24Regular,
     DocumentPdf24Regular,
     TaskListSquareLtr24Regular,
-    Server24Regular
+    Desktop24Regular
 } from '@fluentui/react-icons';
 
 import { ActionBar } from '../components/ActionBar';
@@ -418,7 +418,7 @@ export const SystemConfig: React.FC = () => {
                 {/* Column 1 */}
                 <div className={styles.scrollColumn}>
                     {/* 1. ADMIN TOOLS */}
-                    <MenuSection id="admin" title={t('system.group.admin')} icon={<Server24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
+                    <MenuSection id="admin" title={t('system.group.admin')} icon={<Desktop24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
