@@ -142,9 +142,10 @@ export const DmsDashboard: React.FC = () => {
                         <Title3>Nastavení</Title3>
                     </div>
                     <div className={styles.cardBody}>
-                        <SectionLink text="Typy dokumentů" />
-                        <SectionLink text="Číselné řady" />
-                        <SectionLink text="Přístupová práva" />
+                        <SectionLink text="Typy dokumentů" onClick={() => navigate('/dms/settings')} />
+                        <SectionLink text="Číselné řady" onClick={() => navigate('/dms/settings')} />
+                        <SectionLink text="Atributy" onClick={() => navigate('/dms/settings')} />
+                        <SectionLink text="Úložiště" onClick={() => navigate('/dms/settings')} />
                     </div>
                 </Card>
             </div>
