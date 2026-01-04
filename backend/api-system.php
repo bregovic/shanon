@@ -6,6 +6,9 @@ require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
 
+// PERFORMANCE FIX: Close session lock immediately after start, as we only read or debug.
+session_write_close();
+
 header('Content-Type: application/json');
 
 // Security Bypass for debugging with token
@@ -13,8 +16,8 @@ $debugToken = $_GET['token'] ?? '';
 $isDebugAuth = ($debugToken === 'shanon2026install');
 
 // Standard Auth Check
+// Accessing $_SESSION is safe even after session_write_close()
 if (!$isDebugAuth && (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true)) {
-    // Return detailed info on WHY unauthorized for debugging purposes (if safe) or just generic
     http_response_code(401);
     echo json_encode([
         'success' => false, 
@@ -39,8 +42,8 @@ try {
         $sessionId = session_id();
         $sessionInDb = false;
         $sessionDataLen = 0;
-        $dbData = null;
         
+        // We re-query DB manually to check persistence
         $stmt = $pdo->prepare("SELECT data FROM sys_sessions WHERE id = :id");
         $stmt->execute([':id' => $sessionId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -48,7 +51,6 @@ try {
         if ($row) {
             $sessionInDb = true;
             $sessionDataLen = strlen($row['data']);
-            $dbData = $row['data'];
         }
 
         // 2. Cookie Params
@@ -59,7 +61,7 @@ try {
             'overview' => [
                 'php_version' => phpversion(),
                 'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
-                'db_status' => 'Connected to ' . $pdo->getAttribute(PDO::ATTR_DRIVER_NAME),
+                'db_status' => 'Connected',
                 'server_time' => date('Y-m-d H:i:s'),
             ],
             'session' => [
@@ -69,7 +71,6 @@ try {
                 'handler' => ini_get('session.save_handler'),
                 'persisted_in_db' => $sessionInDb,
                 'data_length' => $sessionDataLen,
-                'session_vars' => $_SESSION, // Careful exposing this, but useful for debug
                 'cookie_params' => $cookieParams,
             ],
             'request' => [
