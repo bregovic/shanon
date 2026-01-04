@@ -7,7 +7,6 @@ import {
     Spinner
 } from '@fluentui/react-components';
 import {
-    ChevronRight16Regular,
     ChevronDown16Regular,
     ChevronUp16Regular
 } from '@fluentui/react-icons';
@@ -48,7 +47,7 @@ export const MenuItem = ({ icon, label, onClick, disabled }: { icon?: React.Reac
                 {icon && icon}
                 <Text weight="medium">{label}</Text>
             </div>
-            {disabled ? <Spinner size="extra-small" /> : <ChevronRight16Regular style={{ color: tokens.colorNeutralForeground3 }} />}
+            {disabled && <Spinner size="extra-small" />}
         </div>
     );
 };
