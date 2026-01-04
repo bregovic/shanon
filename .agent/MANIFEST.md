@@ -36,3 +36,15 @@
 *   **Definition**: A "Task" (Úloha) represents an executable unit of work (e.g., "Process Pending Emails", "OCR Scan Batch").
 *   **Execution**: Designed to be triggered periodically (Cron) or manually by Admin.
 *   **Structure**: Should separate the *definition* of the task from its *execution history*.
+
+## 7. Localization & Labels
+**Rule:** NO hardcoded strings. Maximize label reuse.
+*   **Mechanism**: Use `useTranslation()` context on frontend and `api-translations.php` on backend.
+*   **Reuse Strategy**: 
+    *   ALWAYS check `common.*` keys first. Do not create duplicates (e.g., do not add `btn.save` if `common.save` exists).
+    *   Use **Global Enums/LOVs** for statuses and boolean logic. Examples:
+        *   `status.active`, `status.inactive`, `status.pending`
+        *   `bool.yes`, `bool.no`
+        *   `action.confirm`, `action.cancel`
+*   **Completeness**: When adding a new feature, updated both `cs.json` and `en.json`.
+*   **Default**: Default language is English.
