@@ -253,7 +253,8 @@ try {
             SELECT '2026-01-04', 'RBAC Security Module', 'Implementace správy rolí zabezpečení (sys_security_roles, sys_security_permissions) s UI pro konfiguraci přístupů k systémovým objektům.', 'Feature', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'RBAC Security Module' AND date = '2026-01-04');
         ",
-        '009_consolidate_roles' => "
+        '009_consolidate_roles',
+    '010_sys_change_comments' => "
             -- Migrate existing users with 'admin' or 'superadmin' role to ADMIN role in sys_user_roles
             INSERT INTO sys_user_roles (user_id, role_id)
             SELECT u.rec_id, r.rec_id

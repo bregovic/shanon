@@ -59,6 +59,24 @@ User-to-role assignments.
 - `user_id`: Reference to user
 - `role_id`: FK to `sys_security_roles`
 
+## Change Requests (Helpdesk)
+
+### `sys_change_requests`
+Primary table for tracking issues and feature requests.
+- `rec_id` (PK)
+- `tenant_id`: Multi-tenancy isolation
+- `subject`: Ticket title
+- `status`: `New`, `Pending`, `Testing`, `Done`
+- `priority`: `low`, `medium`, `high`
+- `assigned_to`: User ID
+
+### `sys_change_comments`
+Discussion threads for requests.
+- `rec_id` (PK)
+- `cr_id`: FK to `sys_change_requests`
+- `user_id`: FK to `sys_users`
+- `comment`: Text content
+
 ## Migrations
 Migrations are handled by `install-db.php`.
-Current HEAD: `009_consolidate_roles` (deprecated sys_roles, unified to sys_security_roles)
+Current HEAD: `010_sys_change_comments` (added comments table)

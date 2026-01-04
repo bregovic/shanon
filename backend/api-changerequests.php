@@ -363,14 +363,7 @@ try {
         $requestId = $_GET['request_id'] ?? null;
         if (!$requestId) returnJson(['error' => 'request_id required'], 400);
 
-        // Ensure table exists (Lazy Init)
-        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_change_comments (
-            rec_id SERIAL PRIMARY KEY,
-            cr_id INT NOT NULL,
-            user_id INT NOT NULL,
-            comment TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
+        // Table created via migration 010_sys_change_comments
 
         $stmt = $pdo->prepare("
             SELECT c.rec_id as id, c.comment, c.created_at, 
@@ -392,14 +385,7 @@ try {
 
         if (!$requestId || !$comment) returnJson(['error' => 'Missing data'], 400);
 
-        // Ensure table (in case add is called before list)
-        $pdo->exec("CREATE TABLE IF NOT EXISTS sys_change_comments (
-            rec_id SERIAL PRIMARY KEY,
-            cr_id INT NOT NULL,
-            user_id INT NOT NULL,
-            comment TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
+        // Table created via migration 010_sys_change_comments
 
         $stmt = $pdo->prepare("INSERT INTO sys_change_comments (cr_id, user_id, comment) VALUES (?, ?, ?)");
         $stmt->execute([$requestId, $userId, $comment]);
