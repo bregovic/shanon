@@ -15,24 +15,20 @@ import {
     BreadcrumbButton,
     BreadcrumbDivider,
     shorthands,
-    tokens
+    tokens,
+    Accordion,
+    AccordionItem,
+    AccordionHeader,
+    AccordionPanel
 } from '@fluentui/react-components';
 import {
-    ArrowClockwise24Regular,
-    AppGeneric24Regular,
     Settings24Regular,
-
     Poll24Regular,
-    Database24Regular,
-    Table24Regular,
     TaskListSquareLtr24Regular,
-    Wrench24Regular,
     ChevronRight16Regular,
     ArrowLeft24Regular,
-    Document24Regular,
-    Shield24Regular,
-    History24Regular,
-    BookQuestionMark24Regular
+    ArrowClockwise24Regular,
+    Document24Regular
 } from '@fluentui/react-icons';
 
 import { ActionBar } from '../components/ActionBar';
@@ -403,79 +399,97 @@ export const SystemConfig: React.FC = () => {
 
     const renderDashboard = () => (
         <div className={styles.grid}>
-            {/* 1. FORMULÁŘE & TOOLS */}
+            {/* 1. FORMULÁŘE & TOOLS - Accordion */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>{t('system.menu.forms')}</Title3>}
+                    header={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Document24Regular />
+                            <Title3>{t('system.menu.forms')}</Title3>
+                        </div>
+                    }
                     description={<Text>{t('system.menu.forms.desc')}</Text>}
                 />
 
-                <div className={styles.menuGroup}>
-                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '8px' }}>{t('system.group.admin')}</Text>
+                <Accordion collapsible multiple defaultOpenItems={['admin', 'docs']}>
+                    <AccordionItem value="admin">
+                        <AccordionHeader>{t('system.group.admin')}</AccordionHeader>
+                        <AccordionPanel>
+                            <div className={styles.menuGroup}>
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.diagnostics')}
+                                    onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }}
+                                />
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.sessions')}
+                                    onClick={() => { alert(t('common.working')); }}
+                                />
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.sequences')}
+                                    onClick={() => { alert(t('common.working')); }}
+                                />
+                            </div>
+                        </AccordionPanel>
+                    </AccordionItem>
 
-                    <MenuItem
-                        icon={<Wrench24Regular />}
-                        label={t('system.item.diagnostics')}
-                        onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }}
-                    />
-
-                    <MenuItem
-                        icon={<AppGeneric24Regular />}
-                        label={t('system.item.sessions')}
-                        onClick={() => { alert(t('common.working')); }}
-                    />
-                    <MenuItem
-                        icon={<Table24Regular />}
-                        label={t('system.item.sequences')}
-                        onClick={() => { alert(t('common.working')); }}
-                    />
-
-                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '16px' }}>{t('system.group.docs')}</Text>
-
-                    <MenuItem
-                        icon={<Database24Regular />}
-                        label={t('system.item.db_docs')}
-                        onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }}
-                    />
-                    <MenuItem
-                        icon={<Document24Regular />}
-                        label={t('system.item.manifest')}
-                        onClick={() => fetchDoc('manifest', 'system.item.manifest')}
-                    />
-
-                    <MenuItem
-                        icon={<Shield24Regular />}
-                        label={t('system.item.security')}
-                        onClick={() => fetchDoc('security', 'system.item.security')}
-                    />
-                    <MenuItem
-                        icon={<History24Regular />}
-                        label={t('system.item.history')}
-                        onClick={() => fetchHistory()}
-                    />
-                    <MenuItem
-                        icon={<BookQuestionMark24Regular />}
-                        label={t('system.item.help')}
-                        onClick={() => alert(t('common.working'))}
-                    />
-                </div>
+                    <AccordionItem value="docs">
+                        <AccordionHeader>{t('system.group.docs')}</AccordionHeader>
+                        <AccordionPanel>
+                            <div className={styles.menuGroup}>
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.db_docs')}
+                                    onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }}
+                                />
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.manifest')}
+                                    onClick={() => fetchDoc('manifest', 'system.item.manifest')}
+                                />
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.security')}
+                                    onClick={() => fetchDoc('security', 'system.item.security')}
+                                />
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.history')}
+                                    onClick={() => fetchHistory()}
+                                />
+                                <MenuItem
+                                    icon={null}
+                                    label={t('system.item.help')}
+                                    onClick={() => alert(t('common.working'))}
+                                />
+                            </div>
+                        </AccordionPanel>
+                    </AccordionItem>
+                </Accordion>
             </Card>
 
 
             {/* 2. REPORTY */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>{t('system.menu.reports')}</Title3>}
+                    header={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Poll24Regular />
+                            <Title3>{t('system.menu.reports')}</Title3>
+                        </div>
+                    }
                     description={<Text>{t('system.menu.reports.desc')}</Text>}
                 />
                 <div className={styles.menuGroup}>
                     <MenuItem
-                        icon={<Poll24Regular />}
+                        icon={null}
                         label={t('system.item.audit_log')}
                         onClick={() => alert(t('common.working'))}
                     />
                     <MenuItem
-                        icon={<Poll24Regular />}
+                        icon={null}
                         label={t('system.item.performance_stats')}
                         onClick={() => alert(t('common.working'))}
                     />
@@ -485,23 +499,28 @@ export const SystemConfig: React.FC = () => {
             {/* 3. ÚLOHY (CRON/JOB) */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>{t('system.menu.tasks')}</Title3>}
+                    header={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <TaskListSquareLtr24Regular />
+                            <Title3>{t('system.menu.tasks')}</Title3>
+                        </div>
+                    }
                     description={<Text>{t('system.menu.tasks.desc')}</Text>}
                 />
 
                 <div className={styles.menuGroup}>
                     <MenuItem
-                        icon={<TaskListSquareLtr24Regular />}
+                        icon={null}
                         label={t('system.item.cron_jobs')}
                         onClick={() => alert(t('common.working'))}
                     />
                     <MenuItem
-                        icon={<ArrowClockwise24Regular />}
+                        icon={null}
                         label={t('system.item.run_indexing')}
                         onClick={() => alert(t('common.working'))}
                     />
                     <MenuItem
-                        icon={<Database24Regular />}
+                        icon={null}
                         label={t('system.item.update_db')}
                         onClick={() => handleUpdateDB()}
                         disabled={updatingDB}
@@ -532,13 +551,18 @@ export const SystemConfig: React.FC = () => {
             {/* 4. NASTAVENÍ */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>Nastavení</Title3>}
-                    description={<Text>Konfigurace serveru</Text>}
+                    header={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Settings24Regular />
+                            <Title3>{t('system.menu.settings')}</Title3>
+                        </div>
+                    }
+                    description={<Text>{t('system.menu.settings.desc')}</Text>}
                 />
                 <div className={styles.menuGroup}>
                     <MenuItem
-                        icon={<Settings24Regular />}
-                        label="Globální parametry"
+                        icon={null}
+                        label={t('system.item.global_params')}
                         onClick={() => alert('Settings')}
                     />
                 </div>
