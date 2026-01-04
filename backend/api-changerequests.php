@@ -44,7 +44,6 @@ try {
 
     // === LIST REQUESTS ===
     if ($action === 'list' && $method === 'GET') {
-        // Select with aliases for Frontend compatibility
         $sql = "SELECT cr.rec_id as id, cr.subject, cr.description, cr.priority, cr.status, cr.created_at, 
                        u.full_name as username, 
                        au.full_name as assigned_username, cr.assigned_to,
@@ -71,8 +70,8 @@ try {
         
         if (!$subject) returnJson(['error' => 'Subject is required'], 400);
         
-        // Transaction to ensure CR and Files are saved together
-        DB::transaction(function($pdo) use ($subject, $desc, $priority, $userId, $tenantId) {
+        // FIX: Capture result, do NOT returnJson inside transaction
+        $result = DB::transaction(function($pdo) use ($subject, $desc, $priority, $userId, $tenantId) {
             // 1. Insert CR
             $stmt = $pdo->prepare("INSERT INTO sys_change_requests (tenant_id, subject, description, priority, created_by, status) VALUES (?, ?, ?, ?, ?, 'New') RETURNING rec_id");
             $stmt->execute([$tenantId, $subject, $desc, $priority, $userId]);
@@ -83,7 +82,6 @@ try {
             // 2. Handle Attachments
             if (isset($_FILES['attachments'])) {
                 $files = $_FILES['attachments'];
-                // Normalize $_FILES structure if needed
                 if (isset($files['name']) && is_array($files['name'])) {
                     for ($i = 0; $i < count($files['name']); $i++) {
                         if ($files['error'][$i] === UPLOAD_ERR_OK) {
@@ -103,12 +101,15 @@ try {
                     }
                 }
             }
-            
-            returnJson(['success' => true, 'id' => $recId]);
+            // Return data to bubble up
+            return ['success' => true, 'id' => $recId];
         });
+
+        // Send response AFTER commit
+        returnJson($result);
     }
 
-    // === UPLOAD CONTENT IMAGE (For Rich Text Editor) ===
+    // === UPLOAD CONTENT IMAGE ===
     if ($action === 'upload_content_image' && $method === 'POST') {
         $file = $_FILES['image'] ?? $_FILES['file'] ?? null;
         
@@ -134,7 +135,7 @@ try {
         $curr = $currStmt->fetch();
         if (!$curr) returnJson(['error' => 'Not found'], 404);
         
-        DB::transaction(function($pdo) use ($input, $curr, $userId, $recId) {
+        $result = DB::transaction(function($pdo) use ($input, $curr, $userId, $recId) {
              if (isset($input['status']) && $input['status'] !== $curr['status']) {
                  $pdo->prepare("UPDATE sys_change_requests SET status = ? WHERE rec_id = ?")->execute([$input['status'], $recId]);
                  logChange($pdo, $recId, 'status', $curr['status'], $input['status'], $userId);
@@ -152,11 +153,13 @@ try {
                  $assignedName = $uStmt->fetchColumn();
              }
 
-             returnJson(['success' => true, 'assigned_username' => $assignedName]);
+             return ['success' => true, 'assigned_username' => $assignedName];
         });
+
+        returnJson($result);
     }
     
-    // === LIST USERS (For Assignee Dropdown) ===
+    // === LIST USERS ===
     if ($action === 'list_users') {
         $stmt = $pdo->prepare("SELECT rec_id as id, full_name as username FROM sys_users WHERE tenant_id = ? ORDER BY full_name");
         $stmt->execute([$tenantId]);
