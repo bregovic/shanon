@@ -525,17 +525,17 @@ const RequestsPage = () => {
         setComments(prev => prev.map(c => {
             if (c.id !== commentId) return c;
 
-            const wasActive = c.user_reactions.includes(type);
+            const currentReactions = c.user_reactions || [];
+            const wasActive = currentReactions.includes(type);
             const newUserReactions = wasActive
-                ? c.user_reactions.filter(r => r !== type)
-                : [...c.user_reactions, type];
+                ? currentReactions.filter(r => r !== type)
+                : [...currentReactions, type];
 
             // Fake update count for immediate feedback
-            const newReactions = { ...c.reactions };
+            const newReactions = { ...(c.reactions || {}) };
             if (!newReactions[type]) newReactions[type] = [];
 
             // We just need ensures the length > 0 if we added it, or length - 1 if removed.
-            // Since we display length, let's try to be roughly correct without user ID
             if (!wasActive) {
                 newReactions[type] = [...newReactions[type], 0]; // Add dummy ID
             } else {
@@ -777,7 +777,8 @@ const RequestsPage = () => {
 
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                                                     {Object.entries(c.reactions || {}).map(([type, userIds]) => {
-                                                        const isActive = c.user_reactions.includes(type);
+                                                        const currentReactions = c.user_reactions || [];
+                                                        const isActive = currentReactions.includes(type);
                                                         // Show if someone reacted OR if I just reacted (optimistic)
                                                         if (userIds.length === 0 && !isActive) return null;
                                                         const emojiMap: any = {
