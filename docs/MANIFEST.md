@@ -38,7 +38,7 @@
            - **Export/Import (Icon):** Data transfer.
       2. **Filter Bar:** Nižší lišta hned pod Action Barem pro specifické filtry.
          - **Vzhled:** Šedé pozadí (`colorNeutralBackground2`), menší padding (`8px 24px`), těsně přiléhá.
-         - **Zarovnání:** Obsah (Inputy, Tlačítka) zarovnán na STŘED (`justifyContent: 'center'`).
+         - **Zarovnání:** Obsah zarovnán VLEVO, vertikálně na střed (`alignItems: 'center'`).
       3. **Grid/Content:** Samotná data.
     - **Mobile:** Všechny části (Action Bar, Filter Bar, Grid) musí být **samostatně horizontálně posuvné** (`overflow-x: auto`), aby nedocházelo k rozbití layoutu.
 

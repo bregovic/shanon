@@ -35,7 +35,6 @@ const useStyles = makeStyles({
         gap: '16px',
         flexWrap: 'nowrap',
         alignItems: 'center',
-        justifyContent: 'center',
         padding: '8px 24px',
         backgroundColor: tokens.colorNeutralBackground2,
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
