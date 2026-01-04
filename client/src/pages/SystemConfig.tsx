@@ -471,14 +471,6 @@ export const SystemConfig: React.FC = () => {
 
     const renderDashboard = () => (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Toolbar */}
-            <div style={{
-                display: 'flex', gap: '16px', marginBottom: '24px',
-            }}>
-                <Button appearance="subtle" icon={<ChevronDown16Regular />} onClick={expandAll}>{t('system.expand_all')}</Button>
-                <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>{t('system.collapse_all')}</Button>
-            </div>
-
             {/* 3-Column Layout (Responsive Flex with Mobile Scroll) */}
             <div className={styles.scrollContainer}>
 
@@ -596,6 +588,13 @@ export const SystemConfig: React.FC = () => {
                     </Breadcrumb>
                 </div>
                 <div style={{ flex: 1 }} />
+                {!activeView && (
+                    <div style={{ display: 'flex', gap: '8px', marginRight: '16px' }}>
+                        <Button appearance="subtle" icon={<ChevronDown16Regular />} onClick={expandAll}>{t('system.expand_all')}</Button>
+                        <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>{t('system.collapse_all')}</Button>
+                        <Divider vertical style={{ height: '20px', margin: 'auto 0' }} />
+                    </div>
+                )}
                 <Button icon={<ArrowClockwise24Regular />} onClick={fetchData}>Obnovit</Button>
             </ActionBar>
 
