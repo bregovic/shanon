@@ -13,7 +13,11 @@
 - **Frontend:**
   - Fluent UI v9 komponenty.
   - Žádné inline styly pokud existuje systémové řešení.
-  - **Mobile First & Responsivita:** Všechny UI layouty musí být optimalizovány pro mobilní zařízení (breakpointy, single-column fallback). Dashboardy a gridy musí podporovat horizontální scroll nebo stackování na malých displejích.
+  - **Mobile First & Responsivita:** 
+    - Všechny UI layouty musí být optimalizovány pro mobilní zařízení.
+    - **Header & Navigace:** Na mobilu preferujeme "Unified Horizontal Scroll" (celý řádek s logem i akcemi se posouvá) před skrýváním prvků.
+    - **Dashboardy & Sloupce:** Používat `scroll-snap` a horizontální posun pro sekce, místo nekonečného vertikálního stackování.
+    - **Žádné skákání:** Layout musí být stabilní při expanzi/kolapsu sekcí.
 
 ## 3. Workflow
 - Před nasazením "špinavého" řešení (hotfix) je nutné vytvořit záznam v `sys_technical_debt`.
