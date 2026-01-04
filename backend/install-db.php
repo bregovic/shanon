@@ -239,7 +239,7 @@ try {
             FROM sys_security_roles r, sys_security_objects o
             WHERE r.code = 'ADMIN'
             ON CONFLICT (role_id, object_id) DO UPDATE SET access_level = 3;
-        ),
+        ",
         '008_history_20260104' => "
             INSERT INTO development_history (date, title, description, category, created_at) 
             SELECT '2026-01-04', 'System Config Refactoring', 'Implementace custom MenuSection, odstranění závislosti na Accordion, optimalizace načítání.', 'Refactor', NOW()
