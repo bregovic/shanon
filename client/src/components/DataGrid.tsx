@@ -10,10 +10,8 @@ import {
     Input,
     Dropdown,
     Option,
-    Card,
     Text,
     Spinner,
-    Badge,
     Popover,
     PopoverSurface,
     PopoverTrigger,
@@ -109,7 +107,6 @@ export interface DataGridColumn<T> {
     width?: string;
     sortable?: boolean;
     filterable?: boolean;
-    // For D365 style, we might use different filter types (text, number, date)
     dataType?: 'text' | 'number' | 'date' | 'boolean';
     render?: (item: T) => React.ReactNode;
 }
