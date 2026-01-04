@@ -19,7 +19,9 @@ import {
 } from '@fluentui/react-components';
 import {
     ArrowClockwise24Regular,
+    AppGeneric24Regular,
     Settings24Regular,
+
     Poll24Regular,
     Database24Regular,
     Table24Regular,
@@ -97,7 +99,8 @@ const useStyles = makeStyles({
         transition: 'all 0.2s',
         ':hover': {
             backgroundColor: tokens.colorNeutralBackground1Hover,
-            borderColor: tokens.colorBrandStroke1,
+            ...shorthands.borderColor(tokens.colorBrandStroke1),
+
             color: tokens.colorBrandForeground1
         }
     },
