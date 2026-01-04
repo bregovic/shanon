@@ -158,43 +158,29 @@ export const SystemConfig: React.FC = () => {
     const handleUpdateDB = async () => {
         if (!confirm(t('system.update_db.confirm'))) return;
         setUpdatingDB(true);
-
         setMigrationResult(null);
+
         try {
-            // Try standard API path first, assuming proxy or correct routing
-            // Note: install-db.php is in backend/ root, whilst api-* scripts might be mapped differently.
-            // Based on file structure, if /api/ maps to backend/, then /api/install-db.php should work.
             const res = await fetch('/api/install-db.php?token=shanon2026install');
-            if (res.status === 404) {
-                // Fallback for dev environment without proxy
-                window.open('http://localhost/Webhry/hollyhop/broker/shanon/backend/install-db.php?token=shanon2026install', '_blank');
-                setMigrationResult({ message: 'Script opened in new window (Dev Mode)' });
-                return;
-            }
-            const json = await res.json();
-            setMigrationResult(json);
-            if (json.success) {
-                fetchData(); // Refresh diagnostics
-            }
-        } catch (e: any) {
-            setMigrationResult({ success: false, error: e.message || 'Network error' });
+            // Store text first to handle both success JSON and PHP error HTML
             const text = await res.text();
+
             try {
                 const data = JSON.parse(text);
                 setMigrationResult(data);
                 if (data.success) {
-                    fetchData(); // Refresh diagnostics
+                    fetchData(); // Refresh diagnostics if successful
                 }
-            } catch (e) {
-                console.error("Invalid JSON:", text);
+            } catch (jsonError) {
+                console.error("Invalid JSON from install-db.php:", text);
                 setMigrationResult({
                     success: false,
-                    error: "Server returned invalid response (PHP Error?)",
-                    details: [text.substring(0, 500)]
+                    error: "Invalid Server Response (PHP Error?)",
+                    details: [text.substring(0, 800)] // Show snippet of raw output
                 });
             }
-        } catch (error) {
-            setMigrationResult({ success: false, error: String(error) });
+        } catch (networkError: any) {
+            setMigrationResult({ success: false, error: networkError.message || 'Network error' });
         } finally {
             setUpdatingDB(false);
         }
