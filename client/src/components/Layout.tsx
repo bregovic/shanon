@@ -53,7 +53,15 @@ const useStyles = makeStyles({
     navLinks: {
         display: 'flex',
         gap: '8px',
-        height: '100%'
+        height: '100%',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        minWidth: 0,
+        paddingRight: '16px', // Add some breathing room
+        '::-webkit-scrollbar': {
+            display: 'none'
+        },
+        scrollbarWidth: 'none'
     },
     link: {
         color: tokens.colorNeutralForeground2,
@@ -122,7 +130,7 @@ const Layout: React.FC = () => {
     return (
         <div className={styles.root}>
             <header className={styles.header}>
-                <div style={{ display: 'flex', height: '100%', alignItems: 'center' }}>
+                <div style={{ display: 'flex', height: '100%', alignItems: 'center', flex: 1, minWidth: 0, overflow: 'hidden' }}>
                     <div className={styles.logoSection} onClick={() => navigate('/dashboard')}>
                         <Image src="/logo.png" height={28} fit="contain" alt="Shanon" />
                     </div>
@@ -133,6 +141,7 @@ const Layout: React.FC = () => {
                                 key={mod.path}
                                 className={`${styles.link} ${isActive(mod.path) ? styles.activeLink : ''}`}
                                 onClick={() => navigate(mod.path)}
+                                style={{ whiteSpace: 'nowrap' }}
                             >
                                 <span style={{ fontSize: '20px' }}>{mod.icon}</span>
                                 {mod.label}
@@ -142,7 +151,7 @@ const Layout: React.FC = () => {
 
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, paddingLeft: '8px', backgroundColor: tokens.colorNeutralBackground1, zIndex: 1, boxShadow: `-5px 0 10px -5px ${tokens.colorNeutralShadowAmbient}` }}>
                     <Tooltip content="Upozornění" relationship="label">
                         <Button icon={<Alert24Regular />} appearance="subtle" />
                     </Tooltip>
