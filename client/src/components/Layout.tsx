@@ -19,8 +19,7 @@ import {
 
     DocumentData24Regular,
     ClipboardTextEdit24Regular,
-    Briefcase24Regular,
-    PeopleTeam24Regular
+    Settings24Regular
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
 import { FeedbackModal } from './FeedbackModal';

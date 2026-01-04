@@ -433,10 +433,11 @@ export const SystemConfig: React.FC = () => {
                         onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }}
                     />
                     <MenuItem
-                        icon={<DocumentData24Regular />}
+                        icon={<Document24Regular />}
                         label={t('system.item.manifest')}
                         onClick={() => fetchDoc('manifest', 'system.item.manifest')}
                     />
+
                     <MenuItem
                         icon={<Shield24Regular />}
                         label={t('system.item.security')}
@@ -498,6 +499,7 @@ export const SystemConfig: React.FC = () => {
                         icon={<Database24Regular />}
                         label={t('system.item.update_db')}
                         onClick={() => handleUpdateDB()}
+                        disabled={updatingDB}
                     />
                 </div>
             </Card>
