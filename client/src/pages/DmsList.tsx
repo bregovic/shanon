@@ -6,13 +6,13 @@ import {
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbButton,
-    BreadcrumbDivider,
-    tokens
+    BreadcrumbDivider
 } from '@fluentui/react-components';
 import { Add24Regular, ArrowLeft24Regular } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { ActionBar } from '../components/ActionBar';
-import { DataGrid, DataGridColumn } from '../components/DataGrid';
+import { DataGrid } from '../components/DataGrid';
+import type { DataGridColumn } from '../components/DataGrid';
 
 interface DmsDocument {
     rec_id: number;
