@@ -18,8 +18,7 @@ import {
     PopoverSurface,
     PopoverTrigger,
     Divider,
-    makeStyles,
-    shorthands
+    makeStyles
 } from '@fluentui/react-components';
 import {
     Filter24Regular,
@@ -245,7 +244,7 @@ export function DataGrid<T extends { [key: string]: any }>({
             >
                 <PopoverTrigger disableButtonEnhancement>
                     <div className={styles.headerCellContent}>
-                        <span onClick={(e) => {
+                        <span onClick={() => {
                             // If just clicking header, toggle sort
                             if (column.sortable) {
                                 const currentDir = sort?.key === colKey ? sort.dir : null;
