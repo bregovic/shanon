@@ -202,7 +202,7 @@ export const DmsImport: React.FC = () => {
                     <Field label="Název dokumentu">
                         <Input
                             value={displayName}
-                            onChange={(e, data) => setDisplayName(data.value)}
+                            onChange={(_, data) => setDisplayName(data.value)}
                             placeholder="Zadejte název..."
                         />
                     </Field>
@@ -211,7 +211,7 @@ export const DmsImport: React.FC = () => {
                         <Dropdown
                             placeholder="Vyberte typ..."
                             value={docTypes.find(t => t.rec_id.toString() === selectedType)?.name || ''}
-                            onOptionSelect={(e, data) => setSelectedType(data.optionValue || '')}
+                            onOptionSelect={(_, data) => setSelectedType(data.optionValue || '')}
                         >
                             {docTypes.map(type => (
                                 <Option key={type.rec_id} value={type.rec_id.toString()}>
@@ -223,7 +223,7 @@ export const DmsImport: React.FC = () => {
 
                     <Checkbox
                         checked={enableOcr}
-                        onChange={(e, data) => setEnableOcr(!!data.checked)}
+                        onChange={(_, data) => setEnableOcr(!!data.checked)}
                         label="Provést OCR (rozpoznání textu)"
                     />
                 </div>
