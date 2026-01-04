@@ -1,17 +1,19 @@
 <?php
 // backend/install-dms.php
-// Run DMS migrations
+// Run DMS migrations with secret token auth
 
 require_once 'cors.php';
-require_once 'session_init.php';
 require_once 'db.php';
 
 header("Content-Type: application/json");
 
-// Simple auth check
-if (!isset($_SESSION['loggedin'])) {
+// Use secret token instead of session (for direct URL access)
+$token = $_GET['token'] ?? '';
+$expectedToken = 'shanon2026install';
+
+if ($token !== $expectedToken) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Unauthorized - please login first']);
+    echo json_encode(['success' => false, 'error' => 'Invalid token. Use: ?token=shanon2026install']);
     exit;
 }
 
@@ -51,7 +53,7 @@ try {
         'success' => true,
         'message' => 'DMS migrations completed',
         'results' => $results
-    ]);
+    ], JSON_PRETTY_PRINT);
     
 } catch (Exception $e) {
     http_response_code(500);
