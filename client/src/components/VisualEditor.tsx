@@ -163,8 +163,8 @@ export const VisualEditor = ({
                     formData.append('image', blob);
                     try {
                         const res = await axios.post(getApiUrl('api-changerequests.php?action=upload_content_image'), formData);
-                        if (res.data.success) {
-                            const imgUrl = getApiUrl(res.data.url);
+                        if (res.data.url) {
+                            const imgUrl = res.data.url;
                             document.execCommand('insertHTML', false, `<img src="${imgUrl}" style="max-width: 50%; display: block; cursor: pointer;" />`);
                             handleInput();
                         }
