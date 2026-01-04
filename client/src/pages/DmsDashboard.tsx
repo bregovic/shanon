@@ -84,11 +84,11 @@ export const DmsDashboard: React.FC = () => {
             <ActionBar>
                 <Breadcrumb>
                     <BreadcrumbItem>
-                        <BreadcrumbButton>Moduly</BreadcrumbButton>
+                        <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
                     </BreadcrumbItem>
                     <BreadcrumbDivider />
                     <BreadcrumbItem>
-                        <BreadcrumbButton current>DMS</BreadcrumbButton>
+                        <BreadcrumbButton current>{t('modules.dms')}</BreadcrumbButton>
                     </BreadcrumbItem>
                 </Breadcrumb>
 

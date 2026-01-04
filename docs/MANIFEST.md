@@ -22,6 +22,10 @@
     - **Akční lišta (ActionBar):** Globální akce (Refresh, Expand/Collapse) musí být v `ActionBar` (vpravo).
     - **Expand/Collapse:** Pokud má modul sekce, tlačítka "Expand all" a "Collapse all" jsou v Action Baru nalevo od "Obnovit" jako `appearance="subtle"`.
     - **Layout:** Obsah začíná ihned pod hlavičkou/drobečky, bez zbytečného toolbaru v těle stránky.
+  - **Breadcrumbs (Drobečková navigace):**
+    - **Lokalizace:** Všechny texty v drobečcích musí používat `t()` (např. `t('modules.requests')`). Žádné hardcoded stringy!
+    - **Hierarchie:** Moduly (`t('common.modules')`) -> Modul (`t('modules.name')`) -> Detail/Sekce.
+    - **Interakce:** Nadřazené prvky musí být kliknutelné (odkazy).
 
 ## 3. Workflow
 - Před nasazením "špinavého" řešení (hotfix) je nutné vytvořit záznam v `sys_technical_debt`.

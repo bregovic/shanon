@@ -17,13 +17,21 @@ import {
     Popover,
     PopoverTrigger,
     PopoverSurface,
-    Badge
+    PopoverSurface,
+    Badge,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbButton,
+    BreadcrumbDivider,
+    Divider
 } from "@fluentui/react-components";
 import { Filter24Regular, ArrowUp24Regular, ArrowDown24Regular, Subtract24Regular, Add24Regular } from "@fluentui/react-icons";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "../context/TranslationContext";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { useState, useEffect, type SyntheticEvent } from "react";
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { ActionBar } from "../components/ActionBar";
 import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
 import type { SelectionItemId, OnSelectionChangeData } from '@fluentui/react-components';
@@ -321,6 +329,10 @@ const RequestsPage = () => {
 
     // Filter by Mine
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const { user } = useAuth();
+    const { t } = useTranslation();
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [showOnlyMine, setShowOnlyMine] = useState(searchParams.get('mine') === '1');
 
     // Selection state for grid
@@ -724,56 +736,69 @@ const RequestsPage = () => {
     if (selectedRequest) {
         return (
             <PageLayout>
-                <PageHeader>
-                    <div className={styles.detailHeader} style={{ width: '100%' }}>
-                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                            <Button icon={<ArrowLeft24Regular />} appearance="subtle" onClick={() => {
+                <ActionBar>
+                    <Breadcrumb>
+                        <BreadcrumbItem>
+                            <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
+                        </BreadcrumbItem>
+                        <BreadcrumbDivider />
+                        <BreadcrumbItem>
+                            <BreadcrumbButton onClick={() => {
                                 setSelectedRequest(null);
-                                setSelectedItems(new Set()); // Clear grid selection on back
-                            }}>Zpět</Button>
-                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <span className={styles.detailId}>#{selectedRequest.id}</span>
-                                {isEditingSubject ? (
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        <input
-                                            value={subjectEditValue}
-                                            onChange={(e) => setSubjectEditValue(e.target.value)}
-                                            style={{
-                                                fontSize: '24px',
-                                                fontWeight: '600',
-                                                padding: '4px 8px',
-                                                border: `1px solid ${tokens.colorBrandStroke1}`,
-                                                borderRadius: '4px',
-                                                backgroundColor: tokens.colorNeutralBackground1,
-                                                color: tokens.colorNeutralForeground1,
-                                                minWidth: '400px'
-                                            }}
-                                            autoFocus
-                                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveSubject(); }}
-                                        />
-                                        <Button icon={<Save24Regular />} appearance="primary" onClick={handleSaveSubject} />
-                                        <Button icon={<Dismiss24Regular />} appearance="subtle" onClick={() => setIsEditingSubject(false)} />
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span className={styles.detailTitle}>{selectedRequest.subject}</span>
-                                        <Button
-                                            icon={<Edit24Regular />}
-                                            appearance="subtle"
-                                            size="small"
-                                            onClick={() => {
-                                                setSubjectEditValue(selectedRequest.subject);
-                                                setIsEditingSubject(true);
-                                            }}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </PageHeader>
+                                setSelectedItems(new Set());
+                            }}>{t('modules.requests')}</BreadcrumbButton>
+                        </BreadcrumbItem>
+                        <BreadcrumbDivider />
+                        <BreadcrumbItem>
+                            <BreadcrumbButton current>{`#${selectedRequest.id}`}</BreadcrumbButton>
+                        </BreadcrumbItem>
+                    </Breadcrumb>
+                    <div style={{ flex: 1 }} />
+                    <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(selectedRequest.id)}>Obnovit</Button>
+                </ActionBar>
 
                 <PageContent>
+                    {/* Detail Header / Title Area */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span className={styles.detailId}>#{selectedRequest.id}</span>
+                            {isEditingSubject ? (
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <input
+                                        value={subjectEditValue}
+                                        onChange={(e) => setSubjectEditValue(e.target.value)}
+                                        style={{
+                                            fontSize: '24px',
+                                            fontWeight: '600',
+                                            padding: '4px 8px',
+                                            border: `1px solid ${tokens.colorBrandStroke1}`,
+                                            borderRadius: '4px',
+                                            backgroundColor: tokens.colorNeutralBackground1,
+                                            color: tokens.colorNeutralForeground1,
+                                            minWidth: '400px'
+                                        }}
+                                        autoFocus
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveSubject(); }}
+                                    />
+                                    <Button icon={<Save24Regular />} appearance="primary" onClick={handleSaveSubject} />
+                                    <Button icon={<Dismiss24Regular />} appearance="subtle" onClick={() => setIsEditingSubject(false)} />
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span className={styles.detailTitle}>{selectedRequest.subject}</span>
+                                    <Button
+                                        icon={<Edit24Regular />}
+                                        appearance="subtle"
+                                        size="small"
+                                        onClick={() => {
+                                            setSubjectEditValue(selectedRequest.subject);
+                                            setIsEditingSubject(true);
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     <div className={styles.detailLayout}>
                         <div className={styles.mainColumn}>
                             <div className={styles.card}>
@@ -1067,34 +1092,41 @@ const RequestsPage = () => {
 
     return (
         <PageLayout>
-            <PageHeader>
-                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                    <Text size={500} weight="bold">Správa požadavků</Text>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <Button icon={<Add24Regular />} appearance="primary" onClick={() => setFeedbackOpen(true)}>Nový</Button>
-                        <Button
-                            icon={<Edit24Regular />}
-                            appearance="subtle"
-                            disabled={selectedItems.size !== 1}
-                            onClick={() => {
-                                if (selectedItems.size === 1) {
-                                    const id = Array.from(selectedItems)[0];
-                                    const item = requests.find((r: RequestItem) => r.id === id);
-                                    if (item) setSelectedRequest(item);
-                                }
-                            }}
-                        >Upravit</Button>
-                        <Button
-                            icon={<Delete20Regular />}
-                            appearance="subtle"
-                            disabled={selectedItems.size === 0}
-                            onClick={handleDeleteRequests}
-                        >Smazat</Button>
-                        <div style={{ width: '1px', height: '24px', backgroundColor: tokens.colorNeutralStroke1, margin: '0 8px' }} />
-                        <Button appearance="subtle" onClick={loadRequests}>Obnovit</Button>
-                    </div>
+            <ActionBar>
+                <Breadcrumb>
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    <BreadcrumbDivider />
+                    <BreadcrumbItem>
+                        <BreadcrumbButton current>{t('modules.requests')}</BreadcrumbButton>
+                    </BreadcrumbItem>
+                </Breadcrumb>
+                <div style={{ flex: 1 }} />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Button icon={<Add24Regular />} appearance="primary" onClick={() => setFeedbackOpen(true)}>Nový</Button>
+                    <Button
+                        icon={<Edit24Regular />}
+                        appearance="subtle"
+                        disabled={selectedItems.size !== 1}
+                        onClick={() => {
+                            if (selectedItems.size === 1) {
+                                const id = Array.from(selectedItems)[0];
+                                const item = requests.find((r: RequestItem) => r.id === id);
+                                if (item) setSelectedRequest(item);
+                            }
+                        }}
+                    >Upravit</Button>
+                    <Button
+                        icon={<Delete20Regular />}
+                        appearance="subtle"
+                        disabled={selectedItems.size === 0}
+                        onClick={handleDeleteRequests}
+                    >Smazat</Button>
+                    <Divider vertical style={{ height: '20px', margin: '0 4px' }} />
+                    <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests}>Obnovit</Button>
                 </div>
-            </PageHeader>
+            </ActionBar>
             <PageContent noScroll>
                 <div className={styles.root}>
                     <div className={styles.filterBar}>

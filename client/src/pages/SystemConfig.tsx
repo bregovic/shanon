@@ -507,11 +507,11 @@ export const SystemConfig: React.FC = () => {
                     )}
                     <Breadcrumb>
                         <BreadcrumbItem>
-                            <BreadcrumbButton onClick={() => { setActiveView(null); setViewTitle(""); }}>Moduly</BreadcrumbButton>
+                            <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
                         </BreadcrumbItem>
                         <BreadcrumbDivider />
                         <BreadcrumbItem>
-                            <BreadcrumbButton onClick={() => { setActiveView(null); setViewTitle(""); }}>Systém</BreadcrumbButton>
+                            <BreadcrumbButton onClick={() => { setActiveView(null); setViewTitle(""); }}>{t('modules.system')}</BreadcrumbButton>
                         </BreadcrumbItem>
                         {activeView && (
                             <>

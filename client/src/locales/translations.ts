@@ -10,6 +10,7 @@ export const translations = {
         'common.loading': 'Načítám...',
         'common.error': 'Chyba',
         'common.success': 'Úspěch',
+        'common.modules': 'Moduly',
 
         // Modules
         'modules.dashboard': 'Dashboard',
@@ -99,6 +100,7 @@ export const translations = {
         'common.loading': 'Loading...',
         'common.error': 'Error',
         'common.success': 'Success',
+        'common.modules': 'Modules',
 
         // Modules
         'modules.dashboard': 'Dashboard',
