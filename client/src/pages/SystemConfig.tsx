@@ -10,8 +10,11 @@ import {
     makeStyles,
     TabList,
     Tab,
+} from '@fluentui/react-components';
+import type {
     SelectTabData,
-    TabValue
+    TabValue,
+    SelectTabEvent
 } from '@fluentui/react-components';
 import {
     ArrowClockwise24Regular,
@@ -117,7 +120,8 @@ export const SystemConfig: React.FC = () => {
         fetchData();
     }, []);
 
-    const onTabSelect = (_event: SelectTabData, data: SelectTabData) => {
+    // FIX: Typed event correctly
+    const onTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
         setSelectedTab(data.value);
     };
 
