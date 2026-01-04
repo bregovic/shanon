@@ -146,6 +146,19 @@ try {
                  logChange($pdo, $recId, 'assigned_to', $curr['assigned_to'], $input['assigned_to'], $userId);
              }
              
+             if (isset($input['subject']) && $input['subject'] !== $curr['subject']) {
+                 $pdo->prepare("UPDATE sys_change_requests SET subject = ? WHERE rec_id = ?")->execute([$input['subject'], $recId]);
+                 logChange($pdo, $recId, 'subject', $curr['subject'], $input['subject'], $userId);
+             }
+             if (isset($input['description']) && $input['description'] !== $curr['description']) {
+                 $pdo->prepare("UPDATE sys_change_requests SET description = ? WHERE rec_id = ?")->execute([$input['description'], $recId]);
+                 logChange($pdo, $recId, 'description', $curr['description'], $input['description'], $userId);
+             }
+             if (isset($input['priority']) && $input['priority'] !== $curr['priority']) {
+                 $pdo->prepare("UPDATE sys_change_requests SET priority = ? WHERE rec_id = ?")->execute([$input['priority'], $recId]);
+                 logChange($pdo, $recId, 'priority', $curr['priority'], $input['priority'], $userId);
+             }
+
              // Return updated username for assignee
              $assignedName = null;
              if (isset($input['assigned_to'])) {
