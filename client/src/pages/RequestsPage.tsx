@@ -742,7 +742,7 @@ const RequestsPage = () => {
                                                 {renderContent(c.comment)}
 
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                                                    {Object.entries(c.reactions).map(([type, userIds]) => {
+                                                    {Object.entries(c.reactions || {}).map(([type, userIds]) => {
                                                         if (userIds.length === 0) return null;
                                                         const emojiMap: any = {
                                                             check: '✅', cross: '❌', smile: '😊', heart: '❤️',
