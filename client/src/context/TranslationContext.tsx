@@ -27,7 +27,9 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 const res = await fetch(`/api/api-translations.php?lang=${language}`);
                 if (res.ok) {
                     const data = await res.json();
-                    setTranslations(data);
+                    if (data.success && data.translations) {
+                        setTranslations(data.translations);
+                    }
                 }
             } catch (e) {
                 console.error("Failed to load translations", e);
