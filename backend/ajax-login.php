@@ -2,8 +2,11 @@
 // backend/ajax-login.php
 // Enterprise Secure Login
 
+// Krok 1: Inicializace session přes náš handler.
+// DŮLEŽITÉ: Musí být jako první, před hlavičkami a výstupem.
+require_once 'cors.php';
+require_once 'session_init.php'; 
 require_once 'db.php';
-require_once 'cors.php'; // Use centralized CORS logic
 
 header("Content-Type: application/json");
 
@@ -13,16 +16,6 @@ function returnJson($data, $code = 200) {
     echo json_encode($data);
     exit;
 }
-
-// Start Session Bezpečně
-session_set_cookie_params([
-    'lifetime' => 86400,
-    'path' => '/',
-    'secure' => true, 
-    'httponly' => true,
-    'samesite' => 'Lax'
-]);
-session_start();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $email = trim($input['username'] ?? ''); 
@@ -35,7 +28,7 @@ if (!$email || !$pass) {
 try {
     $pdo = DB::connect();
 
-    // 1. Rate Limiting
+    // 1. Rate Limiting (Anti-bruteforce)
     usleep(random_int(100000, 300000));
 
     // 2. Fetch User
@@ -46,8 +39,12 @@ try {
     // 3. Verify Password
     if ($user && password_verify($pass, $user['password_hash'])) {
         
+        // Regenerace ID pro bezpečnost (prevence session fixation)
+        // Pozor: U custom handlerů může být nutné zavolat session_write_close() před regenerací, 
+        // ale PHP 7.4+ to zvládá dobře.
         session_regenerate_id(true);
         
+        // Naplnění session dat
         $_SESSION['loggedin'] = true;
         $_SESSION['user_id'] = $user['rec_id'];
         $_SESSION['tenant_id'] = $user['tenant_id'];
@@ -62,20 +59,12 @@ try {
         // Audit Last Login
         $pdo->prepare("UPDATE sys_users SET last_login = NOW() WHERE rec_id = ?")->execute([$user['rec_id']]);
 
+        // Explicitní uložení session pro jistotu
+        session_write_close();
+
         returnJson(['success' => true, 'redirect' => '/', 'user' => $_SESSION['user']]);
     } else {
-        // --- DEBUG START (Remove in Prod) ---
-        // Vracime info proc to nejde
-        $debug = [];
-        if (!$user) {
-            $debug['reason'] = 'User not found in Postgres DB';
-        } else {
-            $debug['reason'] = 'Password hash mismatch';
-            // $debug['db_hash'] = substr($user['password_hash'], 0, 10) . '...';
-        }
-        // --- DEBUG END ---
-
-        returnJson(['error' => 'Invalid credentials', 'debug' => $debug], 401);
+        returnJson(['error' => 'Invalid credentials'], 401);
     }
 
 } catch (Exception $e) {
