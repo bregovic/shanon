@@ -18,8 +18,12 @@ if (!isset($_SESSION['loggedin']) || !isset($_SESSION['user'])) {
     $userId = 1; 
     $tenantId = '00000000-0000-0000-0000-000000000001';
 } else {
-    $userId = $_SESSION['user']['rec_id'];
-    $tenantId = $_SESSION['user']['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+    $userId = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? null;
+    $tenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+    
+    if (!$userId) {
+        returnJson(['error' => 'User session invalid'], 401);
+    }
 }
 
 function returnJson($data, $code = 200) {
