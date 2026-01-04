@@ -8,16 +8,17 @@ import {
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbButton,
-    BreadcrumbDivider
+    BreadcrumbDivider,
+    Text
 } from '@fluentui/react-components';
 import {
     Settings24Regular,
     TaskListSquareLtr24Regular,
-    FormNew24Regular,
     DocumentPdf24Regular,
     ChevronDown16Regular,
     ChevronUp16Regular,
-    ArrowClockwise24Regular
+    ArrowClockwise24Regular,
+    Document24Regular
 } from '@fluentui/react-icons';
 import { ActionBar } from '../components/ActionBar';
 import { useNavigate } from 'react-router-dom';
@@ -107,35 +108,68 @@ export const DmsDashboard: React.FC = () => {
             {/* 3-Column Layout */}
             <div className={styles.scrollContainer}>
 
-                {/* Column 1 */}
-                <div className={styles.scrollColumn}>
-                    <MenuSection id="forms" title={t('system.menu.forms')} icon={<FormNew24Regular />} isOpen={expandedSections.has('forms')} onToggle={toggleSection}>
+                {/* Group: FORMULÁŘE */}
+                <div style={{ breakInside: 'avoid', marginBottom: '32px' }}>
+                    <Text weight="semibold" style={{
+                        color: tokens.colorNeutralForeground4,
+                        textTransform: 'uppercase',
+                        fontSize: '11px',
+                        letterSpacing: '1px',
+                        display: 'block',
+                        marginBottom: '12px'
+                    }}>
+                        Formuláře
+                    </Text>
+
+                    <MenuSection id="documents" title="Dokumenty" icon={<Document24Regular />} isOpen={expandedSections.has('documents')} onToggle={toggleSection}>
                         <MenuItem label="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
-                        <MenuItem label="Ke schválení" />
-                        <MenuItem label="Moje koncepty" />
+                        <MenuItem label="Ke schválení" onClick={() => { }} />
+                        <MenuItem label="Moje koncepty" onClick={() => { }} />
                     </MenuSection>
 
                     <MenuSection id="reports" title={t('system.menu.reports')} icon={<DocumentPdf24Regular />} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
-                        <MenuItem label="Statistika nahrávání" />
-                        <MenuItem label="Využití úložiště" />
+                        <MenuItem label="Statistika nahrávání" onClick={() => { }} />
+                        <MenuItem label="Využití úložiště" onClick={() => { }} />
                     </MenuSection>
                 </div>
 
-                {/* Column 2 */}
-                <div className={styles.scrollColumn}>
+                {/* Group: ÚLOHY */}
+                <div style={{ breakInside: 'avoid', marginBottom: '32px' }}>
+                    <Text weight="semibold" style={{
+                        color: tokens.colorNeutralForeground4,
+                        textTransform: 'uppercase',
+                        fontSize: '11px',
+                        letterSpacing: '1px',
+                        display: 'block',
+                        marginBottom: '12px'
+                    }}>
+                        Úlohy
+                    </Text>
+
                     <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
-                        <MenuItem label="Moje úkoly (0)" />
-                        <MenuItem label="Delegované úkoly" />
+                        <MenuItem label="Moje úkoly (0)" onClick={() => { }} />
+                        <MenuItem label="Delegované úkoly" onClick={() => { }} />
                     </MenuSection>
                 </div>
 
-                {/* Column 3 */}
-                <div className={styles.scrollColumn}>
+                {/* Group: NASTAVENÍ */}
+                <div style={{ breakInside: 'avoid', marginBottom: '32px' }}>
+                    <Text weight="semibold" style={{
+                        color: tokens.colorNeutralForeground4,
+                        textTransform: 'uppercase',
+                        fontSize: '11px',
+                        letterSpacing: '1px',
+                        display: 'block',
+                        marginBottom: '12px'
+                    }}>
+                        Nastavení
+                    </Text>
+
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label="Typy dokumentů" onClick={() => navigate('/dms/settings')} />
-                        <MenuItem label="Číselné řady" onClick={() => navigate('/dms/settings')} />
-                        <MenuItem label="Atributy" onClick={() => navigate('/dms/settings')} />
-                        <MenuItem label="Úložiště" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem label="Číselné řady" onClick={() => { }} />
+                        <MenuItem label="Atributy" onClick={() => { }} />
+                        <MenuItem label="Úložiště" onClick={() => { }} />
                     </MenuSection>
                 </div>
 
