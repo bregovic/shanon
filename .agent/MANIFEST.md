@@ -41,10 +41,19 @@
 **Rule:** NO hardcoded strings. Maximize label reuse.
 *   **Mechanism**: Use `useTranslation()` context on frontend and `api-translations.php` on backend.
 *   **Reuse Strategy**: 
-    *   ALWAYS check `common.*` keys first. Do not create duplicates (e.g., do not add `btn.save` if `common.save` exists).
-    *   Use **Global Enums/LOVs** for statuses and boolean logic. Examples:
-        *   `status.active`, `status.inactive`, `status.pending`
-        *   `bool.yes`, `bool.no`
-        *   `action.confirm`, `action.cancel`
+    *   ALWAYS check `common.*` keys first.
+    *   Use Global Enums/LOVs (`status.active`, `bool.yes`).
 *   **Completeness**: When adding a new feature, updated both `cs.json` and `en.json`.
 *   **Default**: Default language is English.
+
+## 8. External Development Workflow
+**Rule:** All external tasks must be tracked via internal "Requests" (Požadavky) module.
+*   **Process**:
+    1.  Create Ticket in "Requests" (Category: Development).
+    2.  Lead Agent creates folder in `External Development/For Development`.
+    3.  **Naming Convention**: Folder MUST start with Ticket ID (e.g., `REQ-105_DMS_OCR`).
+    4.  The Ticket ID binds the digital record to the physical file package.
+*   **Synchronization**:
+    *   Ticket `In Progress` = Folder provided to external agent.
+    *   Ticket `Review` = Result returned to `Deployment` folder.
+    *   Ticket `Done` = Code merged into main codebase.
