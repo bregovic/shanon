@@ -574,17 +574,6 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                         key={rowId}
                         style={{
                             ...(isVirtualized ? { height: `${ROW_HEIGHT}px` } : {}),
-                            cursor: onRowClick ? 'pointer' : undefined
-                        }}
-                        onClick={(e: React.MouseEvent) => {
-                            // Prevent row click if clicking on selection checkbox or if default prevented
-                            if (e.defaultPrevented) return;
-                            const target = e.target as HTMLElement;
-                            // Check if click is within selection cell or is a checkbox
-                            if (target.closest('[role="checkbox"]') || target.closest('.fui-DataGridSelectionCell')) {
-                                return;
-                            }
-                            onRowClick?.(item);
                         }}
                     >
                         {({ item: col, columnId, renderCell }: any) => {
@@ -595,8 +584,10 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                                     style={{
                                         textAlign: extCol?.align || 'left',
                                         justifyContent: extCol?.align === 'right' ? 'flex-end' : (extCol?.align === 'center' ? 'center' : 'flex-start'),
-                                        minWidth: extCol?.minWidth ? `${extCol.minWidth}px` : undefined
+                                        minWidth: extCol?.minWidth ? `${extCol.minWidth}px` : undefined,
+                                        cursor: onRowClick ? 'pointer' : undefined
                                     }}
+                                    onClick={() => onRowClick?.(item)}
                                     className={styles.cell}
                                 >
                                     {renderCell(item)}
@@ -646,15 +637,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                             {({ item, rowId }) => (
                                 <DataGridRow<T>
                                     key={rowId}
-                                    style={{ cursor: onRowClick ? 'pointer' : undefined }}
-                                    onClick={(e: React.MouseEvent) => {
-                                        if (e.defaultPrevented) return;
-                                        const target = e.target as HTMLElement;
-                                        if (target.closest('[role="checkbox"]') || target.closest('.fui-DataGridSelectionCell')) {
-                                            return;
-                                        }
-                                        onRowClick?.(item);
-                                    }}
+                                    style={{ cursor: undefined }}
                                 >
                                     {({ item: col, columnId, renderCell }: any) => {
                                         const colDef = col || columns.find(c => c.columnId === columnId);
@@ -664,8 +647,10 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                                                 style={{
                                                     textAlign: extCol?.align || 'left',
                                                     justifyContent: extCol?.align === 'right' ? 'flex-end' : (extCol?.align === 'center' ? 'center' : 'flex-start'),
-                                                    minWidth: extCol?.minWidth ? `${extCol.minWidth}px` : undefined
+                                                    minWidth: extCol?.minWidth ? `${extCol.minWidth}px` : undefined,
+                                                    cursor: onRowClick ? 'pointer' : undefined
                                                 }}
+                                                onClick={() => onRowClick?.(item)}
                                                 className={styles.cell}
                                             >
                                                 {renderCell(item)}
