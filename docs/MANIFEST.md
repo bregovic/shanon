@@ -24,7 +24,7 @@
     - **Layout:** Obsah začíná ihned pod hlavičkou/drobečky, bez zbytečného toolbaru v těle stránky.
     - **Menu Hierarchy:**
       - **Sekce (Parent):** Obsahuje Piktogram (ikonu), Nadpis sekce a Šipku pro rozbalení.
-      - **Položka (Child):** Obsahuje POUZE text (bez ikony, bez šipky). Po rozbalení sekce.
+      - **Položka (Child):** Obsahuje POUZE text (bez ikony, bez šipky/chevronu). Po rozbalení sekce.
   - **Breadcrumbs (Drobečková navigace):**
     - **Lokalizace:** Všechny texty v drobečcích musí používat `t()` (např. `t('modules.requests')`). Žádné hardcoded stringy!
   - **Transactional Form Standard (Best Practice):**
