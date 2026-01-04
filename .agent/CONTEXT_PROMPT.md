@@ -1,34 +1,55 @@
+# SHANON SYSTEM: MASTER CONTEXT & PROTOCOLS
+> **CRITICAL INSTRUCTION:** This is the Single Source of Truth for the Shanon Project. All Agents must adhere to the rules and documentation linked herein. Deviations are creating Technical Debt.
 
-# SHANON ARCHITECT - CONTEXT PROMPT
-> **Role:** You are the Lead Architect and Developer for Project Shanon (Enterprise ERP).
-> **Goal:** Build a robust, metadata-driven system with Minimalist UI.
+## 1. DOCUMENTATION INDEX (Knowledge Base)
+Before modifying any part of the system, you MUST read the relevant documentation:
 
-## 1. Technologický Stack (Strict)
-*   **Backend:** PHP 8.3 (Strict types), PostgreSQL 16 (Enterprise features).
-*   **Frontend:** React 18 (Vite), Fluent UI v9.
-*   **Deploy:** Docker (Multi-stage), Railway.
+*   📘 **Process & Workflow:** `docs/AGENT_WORKFLOW.md`
+    *   *Rules for:* Ticket Lifecycle, Signature protocol, Development History logging, Comment marking.
+*   💾 **Database & Objects:** `.agent/DATABASE.md`
+    *   *Rules for:* Schema structure, Migration flow (`install-db.php`), Tenant isolation.
+*   🔒 **Security & RBAC:** `.agent/SECURITY.md`
+    *   *Rules for:* Roles, Permissions, Auth tokens, Visibility rules.
+*   🏗️ **Code & Frameworks:** `.agent/MANIFEST.md`
+    *   *Rules for:* Tech stack (Fluent UI v9, PHP), Directory structure, Naming conventions.
+*   ✅ **Checklists (SOP):** `.agent/SOP.md`
+    *   *Use for:* Self-validation before finalizing any task.
 
-## 2. Architektonická Pravidla
-1.  **Metadata First:** Formy generované z DB definic.
-2.  **Transakce:** Vše v DB transakcích.
-3.  **Security:** `tenant_id` vždy v WHERE.
+---
 
-## 3. UI & Text Standards (Strict Minimalist)
-*   **Naming:** Používej pouze "Shanon". Žádné "ERP Platform", "System", atd.
-*   **Labels:** Stručné, funkční (např. "Login", "Requests", "Save").
-*   **No Fluff:** Žádné "Vítejte", "Prosím vyplňte", "Úžasný dashboard".
-*   **Styl:** Profesionální, strohý, čistý ("Enterprise Tech").
+## 2. CORE PROTOCOLS (Strict)
 
-## 4. UI Layout & Navigation (User Rules)
-*   **Dialog Buttons:** [CONFIRM/SAVE] (Left)   [CANCEL] (Right).
-*   **Main Menu:** Dashboard (First) -> Modules sorted Alphabetically.
-*   **Logo:** Always redirects to Dashboard.
+### A. Database Management
+*   **Migrations:** NEVER create tables on the fly. ALWAYS use `backend/migrations/XXX_name.sql` and register in `backend/install-db.php`.
+*   **Documentation:** Immediately update `.agent/DATABASE.md` after any schema change.
+*   **Isolation:** EVERY query must include `WHERE tenant_id = :tid` (unless strictly System Global).
 
-## 5. Vývojový Standard (Strict Coding Standards)
-*   ⛔ **No Magic Fallbacks:** Zakázáno `?? 0` nebo random hodnoty.
-*   ⛔ **No Random Data:** Žádné `rand()` nebo `faker`.
-*   🧹 **Dev Helper Registry:** Install skripty musí být chráněné.
+### B. Security & Access
+*   **Session:** Use `session_init.php` (DB-backed sessions).
+*   **RBAC:** Check permissions against the User Role defined in `SECURITY.md` before rendering UI elements.
 
-## 6. Workflows
-*   Používej `/process_change_requests` pro čtení úkolů z SQL.
-*   Používej `publish.ps1` pro nasazení.
+### C. Localization & Labels
+*   **No Hardcoding:** All visible text must go through `useTranslation()` (Frontend) or `api-translations.php` (Backend).
+*   **Format:** Use keys like `common.save`, `module.requests.title`.
+*   **Languages:** Maintain at least `cs` (Czech) and `en` (English).
+
+### D. Development History & Reporting
+*   **Logging:** Every resolved ticket MUST have an entry in the `development_history` table (via `api-dev-history.php` or direct SQL).
+*   **Signatures:** All automated/agent comments must be signed (e.g., `~ 🤖 Antigravity`).
+*   **Status:** Move tickets from `New` -> `Development` -> `Testing` -> `Done`.
+
+### E. Working Files System (External Development)
+*   **Structure:** `External Development/For Development/[TICKET_ID]_[DESCRIPTION]/`
+*   **Logic:**
+    *   Physical files are bound to Digital Tickets via ID (e.g., `#7`).
+    *   **Input:** Files placed in folder -> Developer works.
+    *   **Output:** Developer commits code -> Ticket updated -> Deployment.
+
+---
+
+## 3. TECH STACK SUMMARY
+*   **Frontend:** React 18, TypeScript, **Fluent UI v9** (Strict Design System).
+*   **Backend:** PHP 8.3, PostgreSQL 16 (via PDO), Stateless REST API rules.
+*   **Environment:** Railway (Dockerized).
+
+> **FINAL CHECK:** Have you signed your comment? Have you updated the status? Have you logged the history? If not, do it now.
