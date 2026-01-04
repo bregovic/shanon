@@ -13,16 +13,16 @@ import { useAuth } from '../context/AuthContext';
 import {
     SignOut24Regular,
     Settings24Regular,
-    Alert24Regular,
-    Emoji24Regular,
     Home24Regular,
+
     DocumentData24Regular,
     ClipboardTextEdit24Regular,
     Briefcase24Regular,
     PeopleTeam24Regular
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
-import { FeedbackModal } from './FeedbackModal';
+import { SettingsDialog } from './SettingsDialog';
+
 
 const useStyles = makeStyles({
     root: {
@@ -89,7 +89,7 @@ const Layout: React.FC = () => {
     const location = useLocation();
     const { user, logout } = useAuth();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
-    const [feedbackOpen, setFeedbackOpen] = React.useState(false);
+
 
     const modules = [
         { label: 'Dashboard', path: '/dashboard', icon: <Home24Regular /> },
@@ -129,14 +129,6 @@ const Layout: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Tooltip content="Moje požadavky" relationship="label">
-                        <Button icon={<Alert24Regular />} appearance="subtle" onClick={() => navigate('/requests?mine=1')} />
-                    </Tooltip>
-
-                    <Tooltip content="Zpětná vazba" relationship="label">
-                        <Button icon={<Emoji24Regular />} appearance="subtle" onClick={() => setFeedbackOpen(true)} />
-                    </Tooltip>
-
                     <Tooltip content="Nastavení" relationship="label">
                         <Button icon={<Settings24Regular />} appearance="subtle" onClick={() => setSettingsOpen(true)} />
                     </Tooltip>
@@ -160,7 +152,7 @@ const Layout: React.FC = () => {
             </main>
 
             <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-            <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} user={user} />
+
         </div>
     );
 };

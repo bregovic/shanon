@@ -18,7 +18,9 @@ import {
     PopoverSurface,
     Badge
 } from "@fluentui/react-components";
-import { Filter24Regular, ArrowUp24Regular, ArrowDown24Regular, Subtract24Regular } from "@fluentui/react-icons";
+import { Filter24Regular, ArrowUp24Regular, ArrowDown24Regular, Subtract24Regular, Add24Regular } from "@fluentui/react-icons";
+import { useAuth } from "../context/AuthContext";
+import { FeedbackModal } from "../components/FeedbackModal";
 import { useState, useEffect } from "react";
 import { useSearchParams } from 'react-router-dom';
 import axios from "axios";
@@ -300,8 +302,11 @@ const RequestsPage = () => {
     // Filter
     const allStatuses = ['New', 'New feature', 'Analysis', 'Development', 'Back to development', 'Testing', 'Testing AI', 'Done', 'Duplicity', 'Canceled'];
     // Exclude: 'Back to development', 'New feature', 'Testing AI' (as per user request)
+    // Disabled filter for debugging/fix
     const defaultActiveStatuses = ['New', 'Analysis', 'Development', 'Testing'];
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>(defaultActiveStatuses);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const { user } = useAuth();
 
     // Comments
     const [comments, setComments] = useState<CommentItem[]>([]);
@@ -956,7 +961,10 @@ const RequestsPage = () => {
             <PageHeader>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                     <Text size={500} weight="bold">Správa požadavků</Text>
-                    <Button appearance="subtle" onClick={loadRequests}>Obnovit</Button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button icon={<Add24Regular />} appearance="primary" onClick={() => setFeedbackOpen(true)}>Nový požadavek</Button>
+                        <Button appearance="subtle" onClick={loadRequests}>Obnovit</Button>
+                    </div>
                 </div>
             </PageHeader>
             <PageContent noScroll>
@@ -1006,7 +1014,8 @@ const RequestsPage = () => {
                         <div style={{ minWidth: '1000px', height: '100%' }}>
                             {loadingRequests ? <Spinner /> : (
                                 <SmartDataGrid
-                                    items={requests.filter(r => selectedStatuses.includes(r.status))}
+                                    // Remove filter for now to debug empty list issue
+                                    items={requests}
                                     columns={columns}
                                     getRowId={(i) => i.id}
                                     onRowClick={setSelectedRequest}
@@ -1016,6 +1025,7 @@ const RequestsPage = () => {
                     </div>
                 </div>
             </PageContent>
+            <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} user={user} onSuccess={() => { loadRequests(); setFeedbackOpen(false); }} />
         </PageLayout >
     );
 };
