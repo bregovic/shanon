@@ -61,4 +61,4 @@ User-to-role assignments.
 
 ## Migrations
 Migrations are handled by `install-db.php`.
-Current HEAD: `008_history_20260104` (includes RBAC Security)
+Current HEAD: `009_consolidate_roles` (deprecated sys_roles, unified to sys_security_roles)

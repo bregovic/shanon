@@ -252,6 +252,51 @@ try {
             INSERT INTO development_history (date, title, description, category, created_at) 
             SELECT '2026-01-04', 'RBAC Security Module', 'Implementace správy rolí zabezpečení (sys_security_roles, sys_security_permissions) s UI pro konfiguraci přístupů k systémovým objektům.', 'Feature', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'RBAC Security Module' AND date = '2026-01-04');
+        ",
+        '009_consolidate_roles' => "
+            -- Migrate existing users with 'admin' or 'superadmin' role to ADMIN role in sys_user_roles
+            INSERT INTO sys_user_roles (user_id, role_id)
+            SELECT u.rec_id, r.rec_id
+            FROM sys_users u
+            CROSS JOIN sys_security_roles r
+            WHERE r.code = 'ADMIN' AND (u.role = 'admin' OR u.role = 'superadmin')
+            ON CONFLICT DO NOTHING;
+            
+            -- Migrate existing users with 'manager' role to MANAGER role
+            INSERT INTO sys_user_roles (user_id, role_id)
+            SELECT u.rec_id, r.rec_id
+            FROM sys_users u
+            CROSS JOIN sys_security_roles r
+            WHERE r.code = 'MANAGER' AND u.role = 'manager'
+            ON CONFLICT DO NOTHING;
+            
+            -- Migrate remaining users to USER role
+            INSERT INTO sys_user_roles (user_id, role_id)
+            SELECT u.rec_id, r.rec_id
+            FROM sys_users u
+            CROSS JOIN sys_security_roles r
+            WHERE r.code = 'USER' AND u.role IN ('user', 'developer')
+            ON CONFLICT DO NOTHING;
+            
+            -- Ensure all users have at least USER role
+            INSERT INTO sys_user_roles (user_id, role_id)
+            SELECT u.rec_id, r.rec_id
+            FROM sys_users u
+            CROSS JOIN sys_security_roles r
+            WHERE r.code = 'USER'
+            AND NOT EXISTS (SELECT 1 FROM sys_user_roles ur WHERE ur.user_id = u.rec_id)
+            ON CONFLICT DO NOTHING;
+            
+            -- Drop the legacy role column from sys_users (keep for backup comment)
+            -- ALTER TABLE sys_users DROP COLUMN IF EXISTS role;
+            
+            -- Drop the old sys_roles table
+            DROP TABLE IF EXISTS sys_roles CASCADE;
+            
+            -- Log this migration
+            INSERT INTO development_history (date, title, description, category, created_at) 
+            SELECT '2026-01-04', 'Roles Consolidation', 'Sjednocení tabulek rolí: migrace uživatelů ze sys_users.role do sys_user_roles, odstranění staré sys_roles tabulky.', 'Refactor', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Roles Consolidation' AND date = '2026-01-04');
         "
     ];
 
