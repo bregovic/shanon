@@ -457,47 +457,56 @@ export const SystemConfig: React.FC = () => {
                 <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>Collapse all</Button>
             </div>
 
-            {/* Masonry Layout via CSS Columns */}
-            <div style={{ columnCount: 3, columnGap: '32px', flex: 1 }}>
+            {/* 3-Column Layout (Responsive Flex) */}
+            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '32px', alignItems: 'flex-start' }}>
 
-                {/* 1. ADMIN TOOLS */}
-                <MenuSection id="admin" title={t('system.group.admin')} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
-                    <MenuItem icon={null} label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
-                    <MenuItem icon={null} label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
-                    <MenuItem icon={null} label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
-                </MenuSection>
+                {/* Column 1 */}
+                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                    {/* 1. ADMIN TOOLS */}
+                    <MenuSection id="admin" title={t('system.group.admin')} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
+                        <MenuItem icon={null} label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
+                        <MenuItem icon={null} label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem icon={null} label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
+                    </MenuSection>
 
-                {/* 2. DOCS */}
-                <MenuSection id="docs" title={t('system.group.docs')} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
-                    <MenuItem icon={null} label={t('system.item.db_docs')} onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }} />
-                    <MenuItem icon={null} label={t('system.item.manifest')} onClick={() => fetchDoc('manifest', 'system.item.manifest')} />
-                    <MenuItem icon={null} label={t('system.item.security')} onClick={() => fetchDoc('security', 'system.item.security')} />
-                    <MenuItem icon={null} label={t('system.item.history')} onClick={() => fetchHistory()} />
-                    <MenuItem icon={null} label={t('system.item.help')} onClick={() => alert(t('common.working'))} />
-                </MenuSection>
+                    {/* 2. DOCS */}
+                    <MenuSection id="docs" title={t('system.group.docs')} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
+                        <MenuItem icon={null} label={t('system.item.db_docs')} onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }} />
+                        <MenuItem icon={null} label={t('system.item.manifest')} onClick={() => fetchDoc('manifest', 'system.item.manifest')} />
+                        <MenuItem icon={null} label={t('system.item.security')} onClick={() => fetchDoc('security', 'system.item.security')} />
+                        <MenuItem icon={null} label={t('system.item.history')} onClick={() => fetchHistory()} />
+                        <MenuItem icon={null} label={t('system.item.help')} onClick={() => alert(t('common.working'))} />
+                    </MenuSection>
+                </div>
 
-                {/* 3. SECURITY */}
-                <MenuSection id="security" title="Zabezpečení" isOpen={expandedSections.has('security')} onToggle={toggleSection}>
-                    <MenuItem icon={<Shield24Regular />} label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
-                </MenuSection>
+                {/* Column 2 */}
+                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                    {/* 4. REPORTS */}
+                    <MenuSection id="reports" title={t('system.menu.reports')} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
+                        <MenuItem icon={null} label={t('system.item.audit_log')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem icon={null} label={t('system.item.performance_stats')} onClick={() => alert(t('common.working'))} />
+                    </MenuSection>
 
-                {/* 4. REPORTS */}
-                <MenuSection id="reports" title={t('system.menu.reports')} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
-                    <MenuItem icon={null} label={t('system.item.audit_log')} onClick={() => alert(t('common.working'))} />
-                    <MenuItem icon={null} label={t('system.item.performance_stats')} onClick={() => alert(t('common.working'))} />
-                </MenuSection>
+                    {/* 5. TASKS */}
+                    <MenuSection id="tasks" title={t('system.menu.tasks')} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
+                        <MenuItem icon={null} label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem icon={null} label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem icon={null} label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
+                    </MenuSection>
+                </div>
 
-                {/* 5. TASKS */}
-                <MenuSection id="tasks" title={t('system.menu.tasks')} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
-                    <MenuItem icon={null} label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
-                    <MenuItem icon={null} label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
-                    <MenuItem icon={null} label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
-                </MenuSection>
+                {/* Column 3 */}
+                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                    {/* 3. SECURITY */}
+                    <MenuSection id="security" title="Zabezpečení" isOpen={expandedSections.has('security')} onToggle={toggleSection}>
+                        <MenuItem icon={<Shield24Regular />} label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
+                    </MenuSection>
 
-                {/* 6. SETTINGS */}
-                <MenuSection id="settings" title={t('system.menu.settings')} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                    <MenuItem icon={null} label={t('system.item.global_params')} onClick={() => alert('Settings')} />
-                </MenuSection>
+                    {/* 6. SETTINGS */}
+                    <MenuSection id="settings" title={t('system.menu.settings')} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
+                        <MenuItem icon={null} label={t('system.item.global_params')} onClick={() => alert('Settings')} />
+                    </MenuSection>
+                </div>
 
             </div>
 
