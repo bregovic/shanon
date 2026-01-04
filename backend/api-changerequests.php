@@ -276,6 +276,40 @@ try {
         exit;
     }
 
+    // === DELETE REQUEST ===
+    if ($action === 'delete_request' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $ids = $input['ids'] ?? [];
+        if (!is_array($ids)) $ids = [$ids];
+        $ids = array_filter($ids, function($id) { return is_numeric($id); });
+
+        if (empty($ids)) returnJson(['error' => 'No IDs provided'], 400);
+
+        // Transaction
+        DB::transaction(function($pdo) use ($ids, $tenantId) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            
+            // Valid Request IDs owned by tenant (subquery logic)
+            $ownerSubquery = "SELECT rec_id FROM sys_change_requests WHERE rec_id IN ($placeholders) AND tenant_id = ?";
+            $baseParams = array_merge(array_values($ids), [$tenantId]);
+            
+            // 1. Delete Files
+            $stmtFiles = $pdo->prepare("DELETE FROM sys_change_requests_files WHERE cr_id IN ($ownerSubquery)");
+            $stmtFiles->execute($baseParams);
+
+            // 2. Delete History (ref_table_id = TABLE_ID_CR)
+            $historyParams = array_merge([TABLE_ID_CR], array_values($ids), [$tenantId]);
+            $stmtHistory = $pdo->prepare("DELETE FROM sys_change_history WHERE ref_table_id = ? AND ref_rec_id IN ($ownerSubquery)");
+            $stmtHistory->execute($historyParams);
+
+            // 3. Delete Requests
+            $stmtReq = $pdo->prepare("DELETE FROM sys_change_requests WHERE rec_id IN ($placeholders) AND tenant_id = ?");
+            $stmtReq->execute($baseParams);
+        });
+
+        returnJson(['success' => true]);
+    }
+
     returnJson(['error' => 'Invalid Action'], 404);
 
 } catch (Exception $e) {
