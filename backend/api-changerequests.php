@@ -172,12 +172,12 @@ try {
         if (!$requestId) returnJson(['error' => 'request_id required'], 400);
         
         $stmt = $pdo->prepare("
-            SELECT h.rec_id as id, h.field_name as change_type, h.old_value, h.new_value, h.created_at,
+            SELECT h.rec_id as id, h.field_name as change_type, h.old_value, h.new_value, h.changed_at as created_at,
                    u.full_name as username
             FROM sys_change_history h
             LEFT JOIN sys_users u ON h.changed_by = u.rec_id
             WHERE h.ref_table_id = ? AND h.ref_rec_id = ?
-            ORDER BY h.created_at DESC
+            ORDER BY h.changed_at DESC
         ");
         $stmt->execute([TABLE_ID_CR, $requestId]);
         returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
@@ -189,10 +189,10 @@ try {
         if (!$requestId) returnJson(['error' => 'request_id required'], 400);
         
         $stmt = $pdo->prepare("
-            SELECT rec_id as id, cr_id as request_id, file_name as filename, file_type, file_size as filesize, created_at
+            SELECT rec_id as id, cr_id as request_id, file_name as filename, file_type, file_size as filesize, uploaded_at as created_at
             FROM sys_change_requests_files
             WHERE cr_id = ?
-            ORDER BY created_at DESC
+            ORDER BY uploaded_at DESC
         ");
         $stmt->execute([$requestId]);
         returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
