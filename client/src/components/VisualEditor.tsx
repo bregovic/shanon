@@ -124,7 +124,16 @@ export const VisualEditor = ({
 
     useEffect(() => {
         if (editorRef.current) {
-            if (editorRef.current.innerHTML === '' && initialContent) {
+            const currentHtml = editorRef.current.innerHTML;
+            const isEmpty = currentHtml === '' || currentHtml === '<br>';
+
+            // External reset (value cleared from parent, e.g. after submit)
+            if (!initialContent && !isEmpty) {
+                editorRef.current.innerHTML = '';
+                setShowPlaceholder(true);
+            }
+            // External init (first load or edit mode start)
+            else if (initialContent && isEmpty) {
                 editorRef.current.innerHTML = initialContent;
                 setShowPlaceholder(false);
             }
