@@ -103,3 +103,41 @@ Configuration of document categories.
 *   `refactor` (Code cleanup, no logic change)
 *   `improvement` (UX/Performance enhancement)
 *   `deploy` (System update)
+
+---
+
+## 5. Security Governance (RBAC)
+
+### `sys_security_objects`
+Registry of all securable system elements (Modules, Forms, Actions).
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `rec_id` | SERIAL (PK) | No | ID |
+| `identifier` | VARCHAR(100) | No | Unique technical ID (e.g., `mod_crm`) |
+| `type` | VARCHAR(20) | No | `module`, `form`, `action` |
+| `display_name` | VARCHAR(100) | No | Readable name |
+| `description` | TEXT | Yes | Usage details |
+
+### `sys_security_roles`
+Definition of system roles.
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `rec_id` | SERIAL (PK) | Role ID |
+| `code` | VARCHAR(50) | Unique Code (e.g., `ADMIN`, `MANAGER`) |
+| `description` | TEXT | Details |
+
+### `sys_security_permissions`
+Mapping of Access Levels.
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `role_id` | INT (FK) | Reference to Role |
+| `object_id` | INT (FK) | Reference to Object |
+| `access_level` | INT | `0`=None, `1`=View, `2`=Edit, `3`=Full |
+
+### `sys_user_roles`
+Assignment of roles to users (Migration target from JSON).
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `user_id` | INT (FK) | Reference to User |
+| `role_id` | INT (FK) | Reference to Role |
+

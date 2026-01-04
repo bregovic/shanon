@@ -68,3 +68,10 @@
 **Rule:** Maintain schema documentation in `.agent/DATABASE.md`.
 *   **Source of Truth:** The `DATABASE.md` file reflects the current production schema.
 *   **Updates:** When `install-db.php` is modified, update `DATABASE.md` immediately.
+
+## 11. Security Governance (RBAC)
+**Rule:** Strict adherence to Role-Based Access Control define in `.agent/SECURITY.md`.
+*   **Source of Truth:** `.agent/SECURITY.md` defines all Roles, Security Identifiers (Modules, Forms, Actions), and Access Levels.
+*   **Registry Check:** Before creating any new UI element or Module, verify or register its `identifier` in `SECURITY.md`.
+*   **Context:** AI Assistants must check permissions logic when generating UI components.
+

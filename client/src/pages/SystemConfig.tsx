@@ -144,6 +144,38 @@ export const SystemConfig: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // DB Update State
+    const [updatingDB, setUpdatingDB] = useState(false);
+    const [migrationResult, setMigrationResult] = useState<any>(null);
+
+    const handleUpdateDB = async () => {
+        if (!confirm('Opravdu chcete spustit aktualizaci databáze?')) return;
+        setUpdatingDB(true);
+        setMigrationResult(null);
+        try {
+            // Try standard API path first, assuming proxy or correct routing
+            // Note: install-db.php is in backend/ root, whilst api-* scripts might be mapped differently.
+            // Based on file structure, if /api/ maps to backend/, then /api/install-db.php should work.
+            const res = await fetch('/api/install-db.php?token=shanon2026install');
+            if (res.status === 404) {
+                // Fallback for dev environment without proxy
+                window.open('http://localhost/Webhry/hollyhop/broker/shanon/backend/install-db.php?token=shanon2026install', '_blank');
+                setMigrationResult({ message: 'Script opened in new window (Dev Mode)' });
+                return;
+            }
+            const json = await res.json();
+            setMigrationResult(json);
+            if (json.success) {
+                fetchData(); // Refresh diagnostics
+            }
+        } catch (e: any) {
+            setMigrationResult({ success: false, error: e.message || 'Network error' });
+        } finally {
+            setUpdatingDB(false);
+        }
+    };
+
+
     const fetchData = async () => {
         setLoading(true);
         setError(null);
@@ -361,8 +393,33 @@ export const SystemConfig: React.FC = () => {
                         label="Spustit indexaci"
                         onClick={() => alert('Manuální spuštění indexace')}
                     />
+                    <MenuItem
+                        icon={<Database24Regular />}
+                        label="Aktualizace databáze (SQL)"
+                        onClick={() => handleUpdateDB()}
+                    />
                 </div>
             </Card>
+
+            {/* MIGRATION RESULT MODAL */}
+            {migrationResult && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                }}>
+                    <Card style={{ maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto', padding: '24px' }}>
+                        <Title3>Výsledek aktualizace</Title3>
+                        <Divider style={{ margin: '12px 0' }} />
+                        <pre style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f4f4f4', padding: '10px', borderRadius: '4px', fontSize: '12px' }}>
+                            {JSON.stringify(migrationResult, null, 2)}
+                        </pre>
+                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button onClick={() => setMigrationResult(null)}>Zavřít</Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
 
             {/* 4. NASTAVENÍ */}
             <Card className={styles.card}>

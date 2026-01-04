@@ -9,7 +9,8 @@ header('Access-Control-Allow-Origin: *');
 require_once 'db.php';
 
 // Security Check
-$token = $_GET['token'] ?? '';
+$token = $_GET['token'] ?? $argv[1] ?? '';
+
 if ($token !== 'shanon2026install') {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
@@ -179,7 +180,69 @@ try {
                END IF;
             END $$;
         "
+        ],
+        '007_rbac_security' => "
+            -- 1. Security Objects Registry
+            CREATE TABLE IF NOT EXISTS sys_security_objects (
+                rec_id SERIAL PRIMARY KEY,
+                identifier VARCHAR(100) NOT NULL UNIQUE,
+                type VARCHAR(20) NOT NULL, -- module, form, action
+                display_name VARCHAR(100) NOT NULL,
+                description TEXT
+            );
+
+            -- 2. Roles Definition
+            CREATE TABLE IF NOT EXISTS sys_security_roles (
+                rec_id SERIAL PRIMARY KEY,
+                code VARCHAR(50) NOT NULL UNIQUE,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- 3. Permissions Mapping (Role <-> Object)
+            CREATE TABLE IF NOT EXISTS sys_security_permissions (
+                rec_id SERIAL PRIMARY KEY,
+                role_id INT REFERENCES sys_security_roles(rec_id) ON DELETE CASCADE,
+                object_id INT REFERENCES sys_security_objects(rec_id) ON DELETE CASCADE,
+                access_level INT DEFAULT 0, -- 0=none, 1=view, 2=edit, 3=full
+                UNIQUE(role_id, object_id)
+            );
+
+            -- 4. User Roles Assignment (Direct Relational)
+            CREATE TABLE IF NOT EXISTS sys_user_roles (
+                user_id INT NOT NULL, 
+                role_id INT REFERENCES sys_security_roles(rec_id) ON DELETE CASCADE,
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(user_id, role_id)
+            );
+
+            -- SEED: Default Roles
+            INSERT INTO sys_security_roles (code, description) VALUES 
+            ('ADMIN', 'Full System Access'),
+            ('MANAGER', 'Team Manager'),
+            ('USER', 'Standard User'),
+            ('GUEST', 'Read Only')
+            ON CONFLICT (code) DO NOTHING;
+
+            -- SEED: Basic Modules Objects
+            INSERT INTO sys_security_objects (identifier, type, display_name) VALUES
+            ('mod_dashboard', 'module', 'Dashboard'),
+            ('mod_crm', 'module', 'CRM'),
+            ('mod_dms', 'module', 'DMS'),
+            ('mod_requests', 'module', 'Požadavky'),
+            ('mod_projects', 'module', 'Projekty'),
+            ('mod_system', 'module', 'Systém')
+            ON CONFLICT (identifier) DO NOTHING;
+
+            -- SEED: Admin Permissions (Full Access to known objects)
+            INSERT INTO sys_security_permissions (role_id, object_id, access_level)
+            SELECT r.rec_id, o.rec_id, 3 
+            FROM sys_security_roles r, sys_security_objects o
+            WHERE r.code = 'ADMIN'
+            ON CONFLICT (role_id, object_id) DO UPDATE SET access_level = 3;
+        "
     ];
+
 
     // --- EXECUTION ---
     
