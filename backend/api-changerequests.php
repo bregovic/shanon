@@ -19,7 +19,9 @@ if (!isset($_SESSION['loggedin']) || !isset($_SESSION['user'])) {
     $tenantId = '00000000-0000-0000-0000-000000000001';
 } else {
     $userId = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? null;
-    $tenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+    // POUZE PROZATIMNÍ FIX: Ignorujeme skutečné tenant_id ze session, aby byla vidět stará data.
+    // TODO: Zmigrovat data ze '0000...0001' na skutečné tenanty a pak to vrátit.
+    $tenantId = '00000000-0000-0000-0000-000000000001';
     
     if (!$userId) {
         returnJson(['error' => 'User session invalid'], 401);
