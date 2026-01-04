@@ -49,8 +49,8 @@ import {
     Emoji20Regular,
     ArrowLeft24Regular,
     ChevronDown16Regular,
-    ArrowSwap24Regular,
-    ArrowClockwise24Regular
+    ArrowClockwise24Regular,
+    Share24Regular
 } from "@fluentui/react-icons";
 import {
     Menu,
@@ -1142,7 +1142,7 @@ const RequestsPage = () => {
                     {/* Standard Icons */}
                     <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests} title="Obnovit" />
                     <Button icon={<Attach24Regular />} appearance="subtle" title="Přílohy" />
-                    <Button icon={<ArrowSwap24Regular />} appearance="subtle" title="Export/Import" />
+                    <Button icon={<Share24Regular />} appearance="subtle" title="Export/Import" />
                 </div>
             </ActionBar>
             <PageContent noScroll>
