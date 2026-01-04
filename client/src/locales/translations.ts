@@ -68,6 +68,24 @@ export const translations = {
         'system.item.global_params': 'Globální parametry',
 
         'system.update_db.confirm': 'Opravdu chcete spustit aktualizaci databáze?',
+
+        // Security
+        'security.title': 'Správa rolí zabezpečení',
+        'security.roles': 'Role',
+        'security.permissions': 'Oprávnění',
+        'security.permissions_for': 'Oprávnění pro roli',
+        'security.select_role': 'Vyberte roli',
+        'security.new_role': 'Kód nové role',
+        'security.save': 'Uložit',
+        'security.saving': 'Ukládám...',
+        'security.saved': 'Oprávnění byla uložena',
+        'security.search': 'Hledat objekty...',
+        'security.access.none': 'Žádný',
+        'security.access.view': 'Zobrazit',
+        'security.access.edit': 'Upravit',
+        'security.access.full': 'Plný',
+        'security.group.security': 'Zabezpečení',
+        'security.item.roles': 'Správa rolí',
     },
 
     en: {
@@ -144,5 +162,23 @@ export const translations = {
 
 
         'system.update_db.confirm': 'Are you sure you want to run the database update?',
+
+        // Security
+        'security.title': 'Security Roles Management',
+        'security.roles': 'Roles',
+        'security.permissions': 'Permissions',
+        'security.permissions_for': 'Permissions for role',
+        'security.select_role': 'Select a role',
+        'security.new_role': 'New role code',
+        'security.save': 'Save',
+        'security.saving': 'Saving...',
+        'security.saved': 'Permissions saved',
+        'security.search': 'Search objects...',
+        'security.access.none': 'None',
+        'security.access.view': 'View',
+        'security.access.edit': 'Edit',
+        'security.access.full': 'Full',
+        'security.group.security': 'Security',
+        'security.item.roles': 'Manage Roles',
     }
 };

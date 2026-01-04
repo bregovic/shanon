@@ -38,16 +38,27 @@ Categorization for documents.
 ## Security & RBAC
 
 ### `sys_security_roles`
-- `ADMIN`, `MANAGER`, `USER`, `GUEST`
+Role definitions for access control.
+- `code`: Unique role identifier (`ADMIN`, `MANAGER`, `USER`, `GUEST`)
+- `description`: Human-readable description
+
+### `sys_security_objects`
+Registry of securable objects (modules, forms, actions).
+- `identifier`: System identifier (e.g., `mod_dms`, `form_security_roles`)
+- `type`: Object type (`module`, `form`, `action`)
+- `display_name`: User-facing name
 
 ### `sys_security_permissions`
-Mapping between Roles and Objects (`sys_security_objects`).
-Access Levels:
-- 0: None
-- 1: View
-- 2: Edit
-- 3: Full
+Mapping between Roles and Objects.
+- `role_id`: FK to `sys_security_roles`
+- `object_id`: FK to `sys_security_objects`
+- `access_level`: 0=None, 1=View, 2=Edit, 3=Full
+
+### `sys_user_roles`
+User-to-role assignments.
+- `user_id`: Reference to user
+- `role_id`: FK to `sys_security_roles`
 
 ## Migrations
 Migrations are handled by `install-db.php`.
-Current HEAD: `008_history_20260104`
+Current HEAD: `008_history_20260104` (includes RBAC Security)

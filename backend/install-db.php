@@ -248,6 +248,10 @@ try {
             INSERT INTO development_history (date, title, description, category, created_at) 
             SELECT '2026-01-04', 'Localization Fixes', 'Doplnění chybějících překladů pro System a navigační moduly (Dashboard, DMS, Požadavky).', 'Bugfix', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Localization Fixes' AND date = '2026-01-04');
+
+            INSERT INTO development_history (date, title, description, category, created_at) 
+            SELECT '2026-01-04', 'RBAC Security Module', 'Implementace správy rolí zabezpečení (sys_security_roles, sys_security_permissions) s UI pro konfiguraci přístupů k systémovým objektům.', 'Feature', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'RBAC Security Module' AND date = '2026-01-04');
         "
     ];
 

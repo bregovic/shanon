@@ -22,7 +22,7 @@ import {
     Save24Regular,
     Search24Regular
 } from '@fluentui/react-icons';
-// import { useTranslation } from '../context/TranslationContext';
+import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
     container: {
@@ -115,16 +115,17 @@ interface SecurityObject {
 
 // Permission interface moved to hook if needed
 
-const ACCESS_LEVELS = [
-    { value: 0, label: 'Žádný', color: 'subtle' as const },
-    { value: 1, label: 'Zobrazit', color: 'informative' as const },
-    { value: 2, label: 'Upravit', color: 'warning' as const },
-    { value: 3, label: 'Plný', color: 'success' as const },
+// These will be translated in the component
+const ACCESS_LEVEL_KEYS = [
+    { value: 0, key: 'security.access.none', color: 'subtle' as const },
+    { value: 1, key: 'security.access.view', color: 'informative' as const },
+    { value: 2, key: 'security.access.edit', color: 'warning' as const },
+    { value: 3, key: 'security.access.full', color: 'success' as const },
 ];
 
 export default function SecurityRoles() {
     const styles = useStyles();
-    // const { t } = useTranslation();
+    const { t } = useTranslation();
 
     const [roles, setRoles] = useState<Role[]>([]);
     const [objects, setObjects] = useState<SecurityObject[]>([]);
@@ -367,7 +368,7 @@ export default function SecurityRoles() {
                                                     {obj.identifier}
                                                 </Text>
                                                 <div className={styles.accessLevelRow}>
-                                                    {ACCESS_LEVELS.map(level => (
+                                                    {ACCESS_LEVEL_KEYS.map(level => (
                                                         <Button
                                                             key={level.value}
                                                             className={styles.accessButton}
@@ -375,7 +376,7 @@ export default function SecurityRoles() {
                                                             appearance={permissions[obj.rec_id] === level.value ? 'primary' : 'subtle'}
                                                             onClick={() => handleSetAccessLevel(obj.rec_id, level.value)}
                                                         >
-                                                            {level.label}
+                                                            {t(level.key)}
                                                         </Button>
                                                     ))}
                                                 </div>
