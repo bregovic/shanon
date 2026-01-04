@@ -404,158 +404,104 @@ export const SystemConfig: React.FC = () => {
     );
 
 
-    const MenuSection = ({ title, children, defaultOpen }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) => {
-        const [isOpen, setIsOpen] = useState(defaultOpen);
+    // === D365 DASHBOARD REDESIGN ===
+
+    // Controlled MenuSection for Expand/Collapse All
+    const MenuSection = ({ id, title, children, isOpen, onToggle }: { id: string, title: string, children: React.ReactNode, isOpen: boolean, onToggle: (id: string) => void }) => {
         return (
-            <div style={{ marginBottom: '4px' }}>
+            <div style={{ marginBottom: '16px', breakInside: 'avoid' }}>
                 <div
-                    onClick={() => setIsOpen(!isOpen)}
+                    onClick={() => onToggle(id)}
                     style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '8px 4px', cursor: 'pointer',
-                        color: tokens.colorNeutralForeground2,
-                        fontWeight: 600,
+                        padding: '8px 0', cursor: 'pointer',
+                        borderBottom: `2px solid ${tokens.colorNeutralStroke2}`,
+                        marginBottom: '8px',
                         userSelect: 'none'
                     }}
                 >
-                    {title}
-                    {isOpen ? <ChevronUp16Regular /> : <ChevronDown16Regular />}
+                    <Text weight="semibold" style={{ fontSize: '15px', color: tokens.colorNeutralForeground1 }}>{title}</Text>
+                    {isOpen ? <ChevronUp16Regular style={{ color: tokens.colorNeutralForeground3 }} /> : <ChevronDown16Regular style={{ color: tokens.colorNeutralForeground3 }} />}
                 </div>
-                {isOpen && <div className={styles.menuGroup} style={{ paddingLeft: '8px' }}>{children}</div>}
+                {isOpen && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {children}
+                    </div>
+                )}
             </div>
         );
     };
 
+    // System Groups Definition
+    const SECTION_IDS = ['admin', 'docs', 'security', 'reports', 'tasks', 'settings'];
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(SECTION_IDS));
+
+    const toggleSection = (id: string) => {
+        const next = new Set(expandedSections);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setExpandedSections(next);
+    };
+
+    const expandAll = () => setExpandedSections(new Set(SECTION_IDS));
+    const collapseAll = () => setExpandedSections(new Set());
+
     const renderDashboard = () => (
-        <div className={styles.grid}>
-            {/* 1. FORMULÁŘE & TOOLS - Custom Accordion */}
-            <Card className={styles.card}>
-                <CardHeader
-                    header={
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Document24Regular />
-                            <Title3>{t('system.menu.forms')}</Title3>
-                        </div>
-                    }
-                    description={<Text>{t('system.menu.forms.desc')}</Text>}
-                />
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Toolbar */}
+            <div style={{
+                display: 'flex', gap: '16px', marginBottom: '24px',
+                paddingBottom: '12px', borderBottom: `1px solid ${tokens.colorNeutralStrokeDivider}`
+            }}>
+                <Button appearance="subtle" icon={<ChevronDown16Regular />} onClick={expandAll}>Expand all</Button>
+                <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>Collapse all</Button>
+            </div>
 
-                <div>
-                    <MenuSection title={t('system.group.admin')} defaultOpen={true}>
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.diagnostics')}
-                            onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }}
-                        />
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.sessions')}
-                            onClick={() => { alert(t('common.working')); }}
-                        />
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.sequences')}
-                            onClick={() => { alert(t('common.working')); }}
-                        />
-                    </MenuSection>
+            {/* Masonry Layout via CSS Columns */}
+            <div style={{ columnCount: 3, columnGap: '32px', flex: 1 }}>
 
-                    <MenuSection title={t('system.group.docs')} defaultOpen={true}>
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.db_docs')}
-                            onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }}
-                        />
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.manifest')}
-                            onClick={() => fetchDoc('manifest', 'system.item.manifest')}
-                        />
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.security')}
-                            onClick={() => fetchDoc('security', 'system.item.security')}
-                        />
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.history')}
-                            onClick={() => fetchHistory()}
-                        />
-                        <MenuItem
-                            icon={null}
-                            label={t('system.item.help')}
-                            onClick={() => alert(t('common.working'))}
-                        />
-                    </MenuSection>
+                {/* 1. ADMIN TOOLS */}
+                <MenuSection id="admin" title={t('system.group.admin')} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
+                    <MenuItem icon={null} label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
+                    <MenuItem icon={null} label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
+                    <MenuItem icon={null} label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
+                </MenuSection>
 
-                    <MenuSection title="Zabezpečení" defaultOpen={true}>
-                        <MenuItem
-                            icon={<Shield24Regular />}
-                            label="Správa rolí"
-                            onClick={() => navigate('/system/security-roles')}
-                        />
-                    </MenuSection>
-                </div>
-            </Card>
+                {/* 2. DOCS */}
+                <MenuSection id="docs" title={t('system.group.docs')} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
+                    <MenuItem icon={null} label={t('system.item.db_docs')} onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }} />
+                    <MenuItem icon={null} label={t('system.item.manifest')} onClick={() => fetchDoc('manifest', 'system.item.manifest')} />
+                    <MenuItem icon={null} label={t('system.item.security')} onClick={() => fetchDoc('security', 'system.item.security')} />
+                    <MenuItem icon={null} label={t('system.item.history')} onClick={() => fetchHistory()} />
+                    <MenuItem icon={null} label={t('system.item.help')} onClick={() => alert(t('common.working'))} />
+                </MenuSection>
 
+                {/* 3. SECURITY */}
+                <MenuSection id="security" title="Zabezpečení" isOpen={expandedSections.has('security')} onToggle={toggleSection}>
+                    <MenuItem icon={<Shield24Regular />} label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
+                </MenuSection>
 
-            {/* 2. REPORTY */}
-            <Card className={styles.card}>
-                <CardHeader
-                    header={
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Poll24Regular />
-                            <Title3>{t('system.menu.reports')}</Title3>
-                        </div>
-                    }
-                    description={<Text>{t('system.menu.reports.desc')}</Text>}
-                />
-                <div className={styles.menuGroup}>
-                    <MenuItem
-                        icon={null}
-                        label={t('system.item.audit_log')}
-                        onClick={() => alert(t('common.working'))}
-                    />
-                    <MenuItem
-                        icon={null}
-                        label={t('system.item.performance_stats')}
-                        onClick={() => alert(t('common.working'))}
-                    />
-                </div>
-            </Card>
+                {/* 4. REPORTS */}
+                <MenuSection id="reports" title={t('system.menu.reports')} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
+                    <MenuItem icon={null} label={t('system.item.audit_log')} onClick={() => alert(t('common.working'))} />
+                    <MenuItem icon={null} label={t('system.item.performance_stats')} onClick={() => alert(t('common.working'))} />
+                </MenuSection>
 
-            {/* 3. ÚLOHY (CRON/JOB) */}
-            <Card className={styles.card}>
-                <CardHeader
-                    header={
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <TaskListSquareLtr24Regular />
-                            <Title3>{t('system.menu.tasks')}</Title3>
-                        </div>
-                    }
-                    description={<Text>{t('system.menu.tasks.desc')}</Text>}
-                />
+                {/* 5. TASKS */}
+                <MenuSection id="tasks" title={t('system.menu.tasks')} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
+                    <MenuItem icon={null} label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
+                    <MenuItem icon={null} label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
+                    <MenuItem icon={null} label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
+                </MenuSection>
 
-                <div className={styles.menuGroup}>
-                    <MenuItem
-                        icon={null}
-                        label={t('system.item.cron_jobs')}
-                        onClick={() => alert(t('common.working'))}
-                    />
-                    <MenuItem
-                        icon={null}
-                        label={t('system.item.run_indexing')}
-                        onClick={() => alert(t('common.working'))}
-                    />
-                    <MenuItem
-                        icon={null}
-                        label={t('system.item.update_db')}
-                        onClick={() => handleUpdateDB()}
-                        disabled={updatingDB}
-                    />
-                </div>
-            </Card>
+                {/* 6. SETTINGS */}
+                <MenuSection id="settings" title={t('system.menu.settings')} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
+                    <MenuItem icon={null} label={t('system.item.global_params')} onClick={() => alert('Settings')} />
+                </MenuSection>
 
-            {/* MIGRATION RESULT MODAL */}
+            </div>
+
+            {/* MIGRATION RESULT MODAL (Keep generic) */}
             {migrationResult && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -572,7 +518,6 @@ export const SystemConfig: React.FC = () => {
                                     {migrationResult.message || migrationResult.error}
                                 </MessageBarBody>
                             </MessageBar>
-
                             {migrationResult.details && (
                                 <div style={{ marginTop: '16px', backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px' }}>
                                     <Text weight="semibold">Detaily:</Text>
@@ -585,34 +530,12 @@ export const SystemConfig: React.FC = () => {
                                 </div>
                             )}
                         </div>
-
                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <Button appearance="primary" onClick={() => setMigrationResult(null)}>Zavřít</Button>
                         </div>
                     </Card>
                 </div>
             )}
-
-
-            {/* 4. NASTAVENÍ */}
-            <Card className={styles.card}>
-                <CardHeader
-                    header={
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Settings24Regular />
-                            <Title3>{t('system.menu.settings')}</Title3>
-                        </div>
-                    }
-                    description={<Text>{t('system.menu.settings.desc')}</Text>}
-                />
-                <div className={styles.menuGroup}>
-                    <MenuItem
-                        icon={null}
-                        label={t('system.item.global_params')}
-                        onClick={() => alert('Settings')}
-                    />
-                </div>
-            </Card>
         </div>
     );
 
