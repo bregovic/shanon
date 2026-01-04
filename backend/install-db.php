@@ -33,10 +33,9 @@ try {
             CREATE INDEX IF NOT EXISTS idx_sessions_access ON sys_sessions (access);
         ",
         '002_dms_core' => "
-            -- DMS Core Tables
+            -- DMS Core Tables (Basic Structure)
             CREATE TABLE IF NOT EXISTS dms_doc_types (
                 rec_id SERIAL PRIMARY KEY,
-                type_code VARCHAR(50) NOT NULL UNIQUE,
                 name VARCHAR(100) NOT NULL,
                 number_series_id INT,
                 is_active BOOLEAN DEFAULT TRUE,
@@ -57,6 +56,16 @@ try {
                 ocr_content TEXT,
                 metadata JSONB DEFAULT '{}'
             );
+        ",
+        // FIX: Ensure type_code column exists (Schema Evolution)
+        '002a_dms_schema_fix_type_code' => "
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='type_code') THEN 
+                    ALTER TABLE dms_doc_types ADD COLUMN type_code VARCHAR(50);
+                    ALTER TABLE dms_doc_types ADD CONSTRAINT dms_doc_types_type_code_unique UNIQUE (type_code);
+                END IF;
+            END $$;
         ",
         '003_dms_setup_data' => "
             -- Initial Data for DMS
