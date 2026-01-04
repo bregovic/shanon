@@ -189,8 +189,9 @@ try {
     
     // === LIST USERS ===
     if ($action === 'list_users') {
-        $stmt = $pdo->prepare("SELECT rec_id as id, full_name as username FROM sys_users WHERE tenant_id = ? ORDER BY full_name");
-        $stmt->execute([$tenantId]);
+        // Show users in core tenant OR current user (so they can assign to themselves even if tenancy differs)
+        $stmt = $pdo->prepare("SELECT rec_id as id, full_name as username FROM sys_users WHERE tenant_id = ? OR rec_id = ? ORDER BY full_name");
+        $stmt->execute([$tenantId, $userId]);
         returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
     }
 
