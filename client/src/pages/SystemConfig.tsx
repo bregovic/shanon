@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Title3,
     Card,
@@ -29,7 +30,8 @@ import {
     ArrowClockwise24Regular,
     Document24Regular,
     ChevronDown16Regular,
-    ChevronUp16Regular
+    ChevronUp16Regular,
+    Shield24Regular
 } from '@fluentui/react-icons';
 
 import { ActionBar } from '../components/ActionBar';
@@ -136,6 +138,7 @@ interface SystemData {
 
 export const SystemConfig: React.FC = () => {
     const styles = useStyles();
+    const navigate = useNavigate();
     const { t } = useTranslation();
 
     // View State: null = Dashboard, string = specific detail view
@@ -481,6 +484,14 @@ export const SystemConfig: React.FC = () => {
                             icon={null}
                             label={t('system.item.help')}
                             onClick={() => alert(t('common.working'))}
+                        />
+                    </MenuSection>
+
+                    <MenuSection title="Zabezpečení" defaultOpen={true}>
+                        <MenuItem
+                            icon={<Shield24Regular />}
+                            label="Správa rolí"
+                            onClick={() => navigate('/system/security-roles')}
                         />
                     </MenuSection>
                 </div>
