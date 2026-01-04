@@ -316,6 +316,8 @@ const RequestsPage = () => {
     const [auditLog, setAuditLog] = useState<AuditLogItem[]>([]);
     const [newComment, setNewComment] = useState('');
     const [sendingComment, setSendingComment] = useState(false);
+    const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+    const [editCommentValue, setEditCommentValue] = useState('');
 
     // Filter by Mine
     const [searchParams, setSearchParams] = useSearchParams();
@@ -570,10 +572,35 @@ const RequestsPage = () => {
         }));
 
         try {
-            await axios.post(getApiUrl('api-comments.php?action=toggle_reaction'), { comment_id: commentId, type });
+            await axios.post(getApiUrl('api-changerequests.php?action=toggle_reaction'), { comment_id: commentId, type });
             // Reload to get real state (sync)
             if (selectedRequest) loadComments(selectedRequest.id);
         } catch (e) { console.error(e); }
+    };
+
+    const handleEditComment = (comment: CommentItem) => {
+        setEditCommentValue(comment.comment);
+        setEditingCommentId(comment.id);
+    };
+
+    const handleSaveComment = async () => {
+        if (!editingCommentId) return;
+        try {
+            await axios.post(getApiUrl('api-changerequests.php?action=update_comment'), {
+                id: editingCommentId,
+                comment: editCommentValue
+            });
+            setEditingCommentId(null);
+            if (selectedRequest) loadComments(selectedRequest.id);
+        } catch (e) { alert('Chyba při ukládání'); }
+    };
+
+    const handleDeleteComment = async (id: number) => {
+        if (!confirm('Smazat komentář?')) return;
+        try {
+            await axios.post(getApiUrl('api-changerequests.php?action=delete_comment'), { id });
+            if (selectedRequest) loadComments(selectedRequest.id);
+        } catch (e) { alert('Chyba při mazání'); }
     };
 
     const updateLocalRequest = (id: number, changes: Partial<RequestItem>) => {
@@ -791,9 +818,27 @@ const RequestsPage = () => {
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <Text weight="semibold">{c.username}</Text>
-                                                    <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>{new Date(c.created_at).toLocaleString('cs-CZ')}</Text>
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>{new Date(c.created_at).toLocaleString('cs-CZ')}</Text>
+                                                        {user?.id === c.user_id && (
+                                                            <>
+                                                                <Button icon={<Edit24Regular />} size="small" appearance="subtle" onClick={() => handleEditComment(c)} />
+                                                                <Button icon={<Delete20Regular />} size="small" appearance="subtle" onClick={() => handleDeleteComment(c.id)} />
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                {renderContent(c.comment)}
+                                                {editingCommentId === c.id ? (
+                                                    <div style={{ marginTop: 8 }}>
+                                                        <VisualEditor initialContent={editCommentValue} onChange={setEditCommentValue} getApiUrl={getApiUrl} />
+                                                        <div style={{ display: 'flex', gap: '8px', marginTop: 8 }}>
+                                                            <Button appearance="primary" size="small" onClick={handleSaveComment}>Uložit</Button>
+                                                            <Button appearance="subtle" size="small" onClick={() => setEditingCommentId(null)}>Zrušit</Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    renderContent(c.comment)
+                                                )}
 
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                                                     {Object.entries(c.reactions || {}).map(([type, userIds]) => {

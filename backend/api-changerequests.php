@@ -377,18 +377,106 @@ try {
         $requestId = $_GET['request_id'] ?? null;
         if (!$requestId) returnJson(['error' => 'request_id required'], 400);
 
-        // Table created via migration 010_sys_change_comments
-
         $stmt = $pdo->prepare("
             SELECT c.rec_id as id, c.comment, c.created_at, 
-                   u.full_name as username, c.user_id
+                   u.full_name as username, c.user_id,
+                   (
+                       SELECT json_object_agg(reaction_type, user_ids)
+                       FROM (
+                           SELECT reaction_type, json_agg(user_id) as user_ids
+                           FROM sys_change_comment_reactions
+                           WHERE comment_id = c.rec_id
+                           GROUP BY reaction_type
+                       ) sub
+                   ) as reactions_json,
+                   (
+                       SELECT json_agg(reaction_type)
+                       FROM sys_change_comment_reactions
+                       WHERE comment_id = c.rec_id AND user_id = :uid
+                   ) as user_reactions_json
             FROM sys_change_comments c
             LEFT JOIN sys_users u ON c.user_id = u.rec_id
-            WHERE c.cr_id = ?
+            WHERE c.cr_id = :rid
             ORDER BY c.created_at ASC
         ");
-        $stmt->execute([$requestId]);
-        returnJson(['success' => true, 'data' => $stmt->fetchAll()]);
+        $stmt->bindValue(':rid', $requestId);
+        $stmt->bindValue(':uid', $userId);
+        $stmt->execute();
+        
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Decode JSON columns manually (PDO returns strings)
+        foreach ($data as &$row) {
+            $row['reactions'] = $row['reactions_json'] ? json_decode($row['reactions_json'], true) : [];
+            $row['user_reactions'] = $row['user_reactions_json'] ? json_decode($row['user_reactions_json'], true) : [];
+            unset($row['reactions_json']);
+            unset($row['user_reactions_json']);
+        }
+
+        returnJson(['success' => true, 'data' => $data]);
+    }
+
+    // === TOGGLE REACTION ===
+    if ($action === 'toggle_reaction' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        $commentId = $input['comment_id'] ?? null;
+        $type = $input['type'] ?? null;
+        
+        if (!$commentId || !$type) returnJson(['error' => 'Missing data'], 400);
+
+        // Check if exists
+        $stmt = $pdo->prepare("SELECT rec_id FROM sys_change_comment_reactions WHERE comment_id = ? AND user_id = ? AND reaction_type = ?");
+        $stmt->execute([$commentId, $userId, $type]);
+        $existing = $stmt->fetchColumn();
+
+        if ($existing) {
+            $pdo->prepare("DELETE FROM sys_change_comment_reactions WHERE rec_id = ?")->execute([$existing]);
+        } else {
+            $pdo->prepare("INSERT INTO sys_change_comment_reactions (comment_id, user_id, reaction_type) VALUES (?, ?, ?)")
+                ->execute([$commentId, $userId, $type]);
+        }
+        returnJson(['success' => true]);
+    }
+
+    // === UPDATE COMMENT ===
+    if ($action === 'update_comment' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        $id = $input['id'] ?? null;
+        $text = $input['comment'] ?? null;
+        
+        if (!$id || !$text) returnJson(['error' => 'Missing data'], 400);
+
+        // Access check
+        $stmt = $pdo->prepare("SELECT user_id FROM sys_change_comments WHERE rec_id = ?");
+        $stmt->execute([$id]);
+        $owner = $stmt->fetchColumn();
+        
+        if ($owner != $userId) returnJson(['error' => 'Unauthorized'], 403);
+        
+        $pdo->prepare("UPDATE sys_change_comments SET comment = ? WHERE rec_id = ?")->execute([$text, $id]);
+        returnJson(['success' => true]);
+    }
+
+    // === DELETE COMMENT ===
+    if ($action === 'delete_comment' && $method === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        $id = $input['id'] ?? null;
+        
+        if (!$id) returnJson(['error' => 'Missing data'], 400);
+        
+        // Access check
+        $stmt = $pdo->prepare("SELECT user_id FROM sys_change_comments WHERE rec_id = ?");
+        $stmt->execute([$id]);
+        $owner = $stmt->fetchColumn();
+        
+        // Allow if owner OR current user is admin (role check simplified)
+        // Assume userId 1 or 'admin' role. But simpler is just owner for now.
+        // Or if user is the AI Agent (which is ID v_ai_id).
+        
+        if ($owner != $userId) returnJson(['error' => 'Unauthorized'], 403);
+        
+        $pdo->prepare("DELETE FROM sys_change_comments WHERE rec_id = ?")->execute([$id]);
+        returnJson(['success' => true]);
     }
 
     // === ADD COMMENT ===
