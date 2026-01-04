@@ -1,5 +1,5 @@
 
-import { useState, useMemo, useEffect, useRef, type SyntheticEvent } from 'react';
+import React, { useState, useMemo, useEffect, useRef, type SyntheticEvent } from 'react';
 import type {
     TableColumnDefinition,
     TableColumnId,
@@ -576,7 +576,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                             ...(isVirtualized ? { height: `${ROW_HEIGHT}px` } : {}),
                             cursor: onRowClick ? 'pointer' : undefined
                         }}
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent) => {
                             // Prevent row click if clicking on selection checkbox or if default prevented
                             if (e.defaultPrevented) return;
                             const target = e.target as HTMLElement;
@@ -647,7 +647,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                                 <DataGridRow<T>
                                     key={rowId}
                                     style={{ cursor: onRowClick ? 'pointer' : undefined }}
-                                    onClick={(e) => {
+                                    onClick={(e: React.MouseEvent) => {
                                         if (e.defaultPrevented) return;
                                         const target = e.target as HTMLElement;
                                         if (target.closest('[role="checkbox"]') || target.closest('.fui-DataGridSelectionCell')) {
