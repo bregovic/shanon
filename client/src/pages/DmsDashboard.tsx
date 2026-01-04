@@ -67,7 +67,7 @@ export const DmsDashboard: React.FC = () => {
     const { t } = useTranslation();
 
     // Sections for DMS
-    const SECTION_IDS = ['forms', 'reports', 'tasks', 'settings'];
+    const SECTION_IDS = ['documents', 'reports', 'tasks', 'settings'];
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(SECTION_IDS));
 
     const toggleSection = (id: string) => {
