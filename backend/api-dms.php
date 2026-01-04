@@ -127,6 +127,157 @@ try {
         exit;
     }
 
+
+    // =============================================
+    // SETUP ENDPOINTS
+    // =============================================
+
+    // ===== NUMBER SERIES: LIST =====
+    if ($action === 'number_series') {
+        $sql = "SELECT * FROM dms_number_series WHERE tenant_id = :tid ORDER BY name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':tid' => '00000000-0000-0000-0000-000000000001']);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    // ===== NUMBER SERIES: CREATE =====
+    if ($action === 'number_series_create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        
+        $sql = "INSERT INTO dms_number_series 
+                (tenant_id, code, name, prefix, suffix, number_length, is_default, is_active, created_by)
+                VALUES (:tid, :code, :name, :prefix, :suffix, :len, :def, true, :by)
+                RETURNING rec_id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':tid' => '00000000-0000-0000-0000-000000000001',
+            ':code' => strtoupper($input['code'] ?? 'NEW'),
+            ':name' => $input['name'] ?? 'Nová řada',
+            ':prefix' => $input['prefix'] ?? '',
+            ':suffix' => $input['suffix'] ?? '',
+            ':len' => (int)($input['number_length'] ?? 5),
+            ':def' => ($input['is_default'] ?? false) ? 'true' : 'false',
+            ':by' => $userId
+        ]);
+        $newId = $stmt->fetchColumn();
+        echo json_encode(['success' => true, 'id' => $newId]);
+        exit;
+    }
+
+    // ===== NUMBER SERIES: UPDATE =====
+    if ($action === 'number_series_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        $id = (int)($input['id'] ?? 0);
+        if (!$id) throw new Exception('ID is required');
+
+        $sql = "UPDATE dms_number_series SET 
+                code = :code, name = :name, prefix = :prefix, suffix = :suffix, 
+                number_length = :len, is_default = :def, is_active = :active
+                WHERE rec_id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':id' => $id,
+            ':code' => strtoupper($input['code'] ?? ''),
+            ':name' => $input['name'] ?? '',
+            ':prefix' => $input['prefix'] ?? '',
+            ':suffix' => $input['suffix'] ?? '',
+            ':len' => (int)($input['number_length'] ?? 5),
+            ':def' => ($input['is_default'] ?? false) ? 'true' : 'false',
+            ':active' => ($input['is_active'] ?? true) ? 'true' : 'false'
+        ]);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    // ===== DOC TYPES: LIST (extended) =====
+    if ($action === 'doc_types') {
+        $sql = "SELECT dt.*, ns.name as number_series_name 
+                FROM dms_doc_types dt
+                LEFT JOIN dms_number_series ns ON dt.number_series_id = ns.rec_id
+                ORDER BY dt.name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    // ===== DOC TYPES: CREATE =====
+    if ($action === 'doc_type_create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        
+        $sql = "INSERT INTO dms_doc_types 
+                (tenant_id, code, name, description, number_series_id, is_active)
+                VALUES (:tid, :code, :name, :desc, :ns_id, true)
+                RETURNING rec_id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':tid' => '00000000-0000-0000-0000-000000000001',
+            ':code' => strtoupper($input['code'] ?? 'NEW'),
+            ':name' => $input['name'] ?? 'Nový typ',
+            ':desc' => $input['description'] ?? '',
+            ':ns_id' => !empty($input['number_series_id']) ? (int)$input['number_series_id'] : null
+        ]);
+        $newId = $stmt->fetchColumn();
+        echo json_encode(['success' => true, 'id' => $newId]);
+        exit;
+    }
+
+    // ===== DOC TYPES: UPDATE =====
+    if ($action === 'doc_type_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        $id = (int)($input['id'] ?? 0);
+        if (!$id) throw new Exception('ID is required');
+
+        $sql = "UPDATE dms_doc_types SET 
+                code = :code, name = :name, description = :desc, 
+                number_series_id = :ns_id, is_active = :active
+                WHERE rec_id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':id' => $id,
+            ':code' => strtoupper($input['code'] ?? ''),
+            ':name' => $input['name'] ?? '',
+            ':desc' => $input['description'] ?? '',
+            ':ns_id' => !empty($input['number_series_id']) ? (int)$input['number_series_id'] : null,
+            ':active' => ($input['is_active'] ?? true) ? 'true' : 'false'
+        ]);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    // ===== ATTRIBUTES: LIST =====
+    if ($action === 'attributes') {
+        $sql = "SELECT * FROM dms_attributes WHERE tenant_id = :tid ORDER BY name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':tid' => '00000000-0000-0000-0000-000000000001']);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    // ===== ATTRIBUTES: CREATE =====
+    if ($action === 'attribute_create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        
+        $sql = "INSERT INTO dms_attributes 
+                (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                VALUES (:tid, :name, :type, :req, :search, :default, :help)
+                RETURNING rec_id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':tid' => '00000000-0000-0000-0000-000000000001',
+            ':name' => $input['name'] ?? 'Nový atribut',
+            ':type' => $input['data_type'] ?? 'text',
+            ':req' => ($input['is_required'] ?? false) ? 'true' : 'false',
+            ':search' => ($input['is_searchable'] ?? true) ? 'true' : 'false',
+            ':default' => $input['default_value'] ?? '',
+            ':help' => $input['help_text'] ?? ''
+        ]);
+        $newId = $stmt->fetchColumn();
+        echo json_encode(['success' => true, 'id' => $newId]);
+        exit;
+    }
+
     // ===== UNKNOWN ACTION =====
     echo json_encode(['success' => false, 'error' => 'Unknown action']);
 
