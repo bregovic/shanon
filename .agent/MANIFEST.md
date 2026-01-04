@@ -24,3 +24,15 @@
 *   **Backend**: Pure PHP API (`/api/`).
 *   **Frontend**: Vite + React + TypeScript.
 *   **Deploy**: Railway (Dockerized).
+
+## 5. System Configuration Modules
+**Rule:** Administration modules must be structured for high scalability.
+*   **Layout**: Use Tab/Section based layouts (e.g., `TabList`) to categorize functionality (Diagnostics, Settings, Logs).
+*   **Diagnostics**: All critical sub-systems (DB, Session, Mail) must have a visual health check.
+*   **Debug**: Debug tools must be secured or token-protected.
+
+## 6. Automation & Tasks
+**Rule:** Tasks are treated as System Functions (Batch Jobs), not just To-Do items.
+*   **Definition**: A "Task" (Úloha) represents an executable unit of work (e.g., "Process Pending Emails", "OCR Scan Batch").
+*   **Execution**: Designed to be triggered periodically (Cron) or manually by Admin.
+*   **Structure**: Should separate the *definition* of the task from its *execution history*.
