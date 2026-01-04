@@ -300,7 +300,8 @@ try {
         ",
         '010_sys_change_comments' => null,
         '011_sys_technical_debt' => null,
-        '012_history_catchup' => null
+        '012_history_catchup' => null,
+        '013_ai_identity_fix' => null
     ];
 
 

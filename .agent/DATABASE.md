@@ -10,7 +10,6 @@ Central user registry (Identity).
 | :--- | :--- | :--- | :--- |
 | `rec_id` | SERIAL (PK) | No | Unique User ID |
 | `tenant_id` | UUID | No | Multi-tenancy isolation key |
-| `username` | VARCHAR(50) | No | Login identifier |
 | `full_name` | VARCHAR(100)| No | Display name |
 | `email` | VARCHAR(100)| Yes | Notification address |
 | `roles` | JSON | No | Array of roles e.g. `["admin", "dms_user"]` |
