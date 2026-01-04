@@ -8,15 +8,26 @@ require_once 'db.php';
 
 header('Content-Type: application/json');
 
-// Security: Only logged-in admins can access system config
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+// Security Bypass for debugging with token
+$debugToken = $_GET['token'] ?? '';
+$isDebugAuth = ($debugToken === 'shanon2026install');
+
+// Standard Auth Check
+if (!$isDebugAuth && (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true)) {
+    // Return detailed info on WHY unauthorized for debugging purposes (if safe) or just generic
     http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    echo json_encode([
+        'success' => false, 
+        'error' => 'Unauthorized',
+        'debug_hint' => [
+            'session_id' => session_id(),
+            'has_cookie' => isset($_COOKIE[session_name()]),
+            'cookie_name' => session_name(),
+            'session_data_exists' => !empty($_SESSION)
+        ]
+    ]);
     exit;
 }
-
-// In future: Check for admin role
-// if (($_SESSION['user']['role'] ?? '') !== 'admin') { ... }
 
 $action = $_GET['action'] ?? 'diagnostics';
 
@@ -28,6 +39,7 @@ try {
         $sessionId = session_id();
         $sessionInDb = false;
         $sessionDataLen = 0;
+        $dbData = null;
         
         $stmt = $pdo->prepare("SELECT data FROM sys_sessions WHERE id = :id");
         $stmt->execute([':id' => $sessionId]);
@@ -36,6 +48,7 @@ try {
         if ($row) {
             $sessionInDb = true;
             $sessionDataLen = strlen($row['data']);
+            $dbData = $row['data'];
         }
 
         // 2. Cookie Params
@@ -46,19 +59,21 @@ try {
             'overview' => [
                 'php_version' => phpversion(),
                 'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
-                'db_status' => 'Connected',
+                'db_status' => 'Connected to ' . $pdo->getAttribute(PDO::ATTR_DRIVER_NAME),
                 'server_time' => date('Y-m-d H:i:s'),
             ],
             'session' => [
+                'status' => session_status(),
                 'id' => $sessionId,
-                'handler' => ini_get('session.save_handler'), // Should be 'user' for custom handler
+                'cookie_received' => $_COOKIE[session_name()] ?? 'NOT_RECEIVED',
+                'handler' => ini_get('session.save_handler'),
                 'persisted_in_db' => $sessionInDb,
                 'data_length' => $sessionDataLen,
+                'session_vars' => $_SESSION, // Careful exposing this, but useful for debug
                 'cookie_params' => $cookieParams,
-                'current_user' => $_SESSION['user'] ?? 'Unknown'
             ],
             'request' => [
-                'is_https' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+                'is_https' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
                 'remote_addr' => $_SERVER['REMOTE_ADDR']
             ]
         ];
