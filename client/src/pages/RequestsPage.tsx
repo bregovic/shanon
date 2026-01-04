@@ -342,6 +342,7 @@ const RequestsPage = () => {
         // Listen for reset events from menu
         const handleReset = () => {
             setSelectedRequest(null);
+            setSelectedItems(new Set());
             const mine = new URLSearchParams(window.location.search).get('mine') === '1';
             setShowOnlyMine(mine);
         };
@@ -519,8 +520,37 @@ const RequestsPage = () => {
     };
 
     const handleToggleReaction = async (commentId: number, type: string) => {
+        // Optimistic UI Update
+        setComments(prev => prev.map(c => {
+            if (c.id !== commentId) return c;
+
+            const wasActive = c.user_reactions.includes(type);
+            const newUserReactions = wasActive
+                ? c.user_reactions.filter(r => r !== type)
+                : [...c.user_reactions, type];
+
+            // Fake update count for immediate feedback
+            const newReactions = { ...c.reactions };
+            if (!newReactions[type]) newReactions[type] = [];
+
+            // We just need ensures the length > 0 if we added it, or length - 1 if removed.
+            // Since we display length, let's try to be roughly correct without user ID
+            if (!wasActive) {
+                newReactions[type] = [...newReactions[type], 0]; // Add dummy ID
+            } else {
+                newReactions[type] = newReactions[type].slice(0, -1);
+            }
+
+            return {
+                ...c,
+                user_reactions: newUserReactions,
+                reactions: newReactions
+            };
+        }));
+
         try {
             await axios.post(getApiUrl('api-comments.php?action=toggle_reaction'), { comment_id: commentId, type });
+            // Reload to get real state (sync)
             if (selectedRequest) loadComments(selectedRequest.id);
         } catch (e) { console.error(e); }
     };
@@ -649,7 +679,10 @@ const RequestsPage = () => {
                 <PageHeader>
                     <div className={styles.detailHeader} style={{ width: '100%' }}>
                         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                            <Button icon={<ArrowLeft24Regular />} appearance="subtle" onClick={() => setSelectedRequest(null)}>Zpět</Button>
+                            <Button icon={<ArrowLeft24Regular />} appearance="subtle" onClick={() => {
+                                setSelectedRequest(null);
+                                setSelectedItems(new Set()); // Clear grid selection on back
+                            }}>Zpět</Button>
                             <div style={{ display: 'flex', alignItems: 'center' }}>
                                 <span className={styles.detailId}>#{selectedRequest.id}</span>
                                 {isEditingSubject ? (
@@ -743,7 +776,9 @@ const RequestsPage = () => {
 
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                                                     {Object.entries(c.reactions || {}).map(([type, userIds]) => {
-                                                        if (userIds.length === 0) return null;
+                                                        const isActive = c.user_reactions.includes(type);
+                                                        // Show if someone reacted OR if I just reacted (optimistic)
+                                                        if (userIds.length === 0 && !isActive) return null;
                                                         const emojiMap: any = {
                                                             check: '✅', cross: '❌', smile: '😊', heart: '❤️',
                                                             sad: '😢', angry: '😡', laugh: '😂', star: '⭐'
