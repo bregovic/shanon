@@ -576,7 +576,16 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                             ...(isVirtualized ? { height: `${ROW_HEIGHT}px` } : {}),
                             cursor: onRowClick ? 'pointer' : undefined
                         }}
-                        onClick={() => onRowClick?.(item)}
+                        onClick={(e) => {
+                            // Prevent row click if clicking on selection checkbox or if default prevented
+                            if (e.defaultPrevented) return;
+                            const target = e.target as HTMLElement;
+                            // Check if click is within selection cell or is a checkbox
+                            if (target.closest('[role="checkbox"]') || target.closest('.fui-DataGridSelectionCell')) {
+                                return;
+                            }
+                            onRowClick?.(item);
+                        }}
                     >
                         {({ item: col, columnId, renderCell }: any) => {
                             const colDef = col || columns.find(c => c.columnId === columnId);
@@ -638,7 +647,14 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                                 <DataGridRow<T>
                                     key={rowId}
                                     style={{ cursor: onRowClick ? 'pointer' : undefined }}
-                                    onClick={() => onRowClick?.(item)}
+                                    onClick={(e) => {
+                                        if (e.defaultPrevented) return;
+                                        const target = e.target as HTMLElement;
+                                        if (target.closest('[role="checkbox"]') || target.closest('.fui-DataGridSelectionCell')) {
+                                            return;
+                                        }
+                                        onRowClick?.(item);
+                                    }}
                                 >
                                     {({ item: col, columnId, renderCell }: any) => {
                                         const colDef = col || columns.find(c => c.columnId === columnId);

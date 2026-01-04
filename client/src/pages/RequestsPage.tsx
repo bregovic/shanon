@@ -970,6 +970,7 @@ const RequestsPage = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                     <Text size={500} weight="bold">Správa požadavků</Text>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <Button icon={<Add24Regular />} appearance="primary" onClick={() => setFeedbackOpen(true)}>Nový</Button>
                         <Button
                             icon={<Edit24Regular />}
                             appearance="subtle"
@@ -992,7 +993,6 @@ const RequestsPage = () => {
                             }}
                         >Smazat</Button>
                         <div style={{ width: '1px', height: '24px', backgroundColor: tokens.colorNeutralStroke1, margin: '0 8px' }} />
-                        <Button icon={<Add24Regular />} appearance="primary" onClick={() => setFeedbackOpen(true)}>Nový požadavek</Button>
                         <Button appearance="subtle" onClick={loadRequests}>Obnovit</Button>
                     </div>
                 </div>
