@@ -5,6 +5,7 @@
 require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
+require_once 'ImageOptimizer.php';
 
 header("Content-Type: application/json");
 
@@ -220,7 +221,13 @@ try {
                     $tmp = $files['tmp_name'][$i];
                     $size = $files['size'][$i];
                     
-                    if ($size > 5 * 1024 * 1024) continue; // 5MB limit
+                    if ($size > 15 * 1024 * 1024) continue; // 15MB upload limit (will be optimized)
+
+                    // Optimize Image
+                    ImageOptimizer::optimize($tmp, $tmp, 80, 1920, 1920);
+                    clearstatcache();
+                    $size = filesize($tmp);
+
                     
                     $content = base64_encode(file_get_contents($tmp));
                     
@@ -274,6 +281,25 @@ try {
         header('Content-Disposition: attachment; filename="' . $file['file_name'] . '"');
         echo base64_decode($file['file_data']);
         exit;
+    }
+
+    // === DELETE ATTACHMENT ===
+    if ($action === 'delete_attachment' && $method === 'POST') {
+        // Support JSON body AND FormData, key 'file_id' OR 'id'
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        $fileId = $input['file_id'] ?? $input['id'] ?? $_POST['file_id'] ?? $_POST['id'] ?? null;
+        
+        if (!$fileId) returnJson(['error' => 'file_id required'], 400);
+
+        // Secure Delete: Check if file belongs to a request owned by tenant
+        $stmt = $pdo->prepare("DELETE FROM sys_change_requests_files WHERE rec_id = ? AND cr_id IN (SELECT rec_id FROM sys_change_requests WHERE tenant_id = ?)");
+        $stmt->execute([$fileId, $tenantId]);
+        
+        if ($stmt->rowCount() > 0) {
+            returnJson(['success' => true]);
+        } else {
+            returnJson(['error' => 'Not found or access denied'], 404);
+        }
     }
 
     // === DELETE REQUEST ===
