@@ -23,12 +23,9 @@ import {
 } from '@fluentui/react-components';
 import {
     Settings24Regular,
-    Poll24Regular,
-    TaskListSquareLtr24Regular,
     ChevronRight16Regular,
     ArrowLeft24Regular,
     ArrowClockwise24Regular,
-    Document24Regular,
     ChevronDown16Regular,
     ChevronUp16Regular,
     Shield24Regular
@@ -477,10 +474,9 @@ export const SystemConfig: React.FC = () => {
             {/* Toolbar */}
             <div style={{
                 display: 'flex', gap: '16px', marginBottom: '24px',
-                paddingBottom: '12px', borderBottom: `1px solid ${tokens.colorNeutralStrokeDivider}`
             }}>
-                <Button appearance="subtle" icon={<ChevronDown16Regular />} onClick={expandAll}>Expand all</Button>
-                <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>Collapse all</Button>
+                <Button appearance="subtle" icon={<ChevronDown16Regular />} onClick={expandAll}>{t('system.expand_all')}</Button>
+                <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>{t('system.collapse_all')}</Button>
             </div>
 
             {/* 3-Column Layout (Responsive Flex with Mobile Scroll) */}
@@ -524,7 +520,7 @@ export const SystemConfig: React.FC = () => {
                 {/* Column 3 */}
                 <div className={styles.scrollColumn}>
                     {/* 3. SECURITY */}
-                    <MenuSection id="security" title="Zabezpečení" isOpen={expandedSections.has('security')} onToggle={toggleSection}>
+                    <MenuSection id="security" title={t('system.group.security')} isOpen={expandedSections.has('security')} onToggle={toggleSection}>
                         <MenuItem icon={<Shield24Regular />} label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
                     </MenuSection>
 

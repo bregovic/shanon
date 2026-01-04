@@ -68,9 +68,13 @@ export const translations = {
         'system.item.global_params': 'Globální parametry',
 
         'system.update_db.confirm': 'Opravdu chcete spustit aktualizaci databáze?',
+        'system.expand_all': 'Rozbalit vše',
+        'system.collapse_all': 'Sbalit vše',
+        'system.group.security': 'Zabezpečení',
 
         // Security
-        'security.title': 'Správa rolí zabezpečení',
+
+        // Security
         'security.roles': 'Role',
         'security.permissions': 'Oprávnění',
         'security.permissions_for': 'Oprávnění pro roli',
@@ -162,9 +166,13 @@ export const translations = {
 
 
         'system.update_db.confirm': 'Are you sure you want to run the database update?',
+        'system.expand_all': 'Expand All',
+        'system.collapse_all': 'Collapse All',
+        'system.group.security': 'Security',
 
         // Security
-        'security.title': 'Security Roles Management',
+
+        // Security
         'security.roles': 'Roles',
         'security.permissions': 'Permissions',
         'security.permissions_for': 'Permissions for role',
