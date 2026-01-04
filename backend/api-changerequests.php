@@ -397,7 +397,7 @@ try {
 
     returnJson(['error' => 'Invalid Action'], 404);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     error_log($e->getMessage());
     returnJson(['error' => 'Server Error: ' . $e->getMessage()], 500);
 }
