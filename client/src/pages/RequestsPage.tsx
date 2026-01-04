@@ -446,10 +446,10 @@ const RequestsPage = () => {
 
             // Handle multiple files if possible (backend supports it now)
             Array.from(targetFiles).forEach(file => {
-                formData.append('attachments[]', file);
+                formData.append('files[]', file);
             });
 
-            const res = await axios.post(getApiUrl('api-changerequests.php?action=upload_attachment'), formData, {
+            const res = await axios.post(getApiUrl('api-changerequests.php?action=add_attachment'), formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
