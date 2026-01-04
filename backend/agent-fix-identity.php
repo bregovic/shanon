@@ -2,7 +2,6 @@
 require_once 'cors.php';
 require_once 'db.php';
 
-// Script to establish AI Developer identity and cleanup comments
 try {
     $pdo = DB::connect();
 
@@ -16,9 +15,9 @@ try {
 
     if (!$aiId) {
         echo "Creating AI User...\n";
-        // Assuming tenant_id '000...01' exists and is default
-        $sql = "INSERT INTO sys_users (tenant_id, username, full_name, email, password_hash, role, created_at)
-                VALUES ('00000000-0000-0000-0000-000000000001', 'ai_dev', 'AI Developer', ?, 'DISABLED', 'admin', NOW())
+        // REMOVED 'username' column as it does not exist in schema. Using full_name.
+        $sql = "INSERT INTO sys_users (tenant_id, full_name, email, password_hash, role, created_at)
+                VALUES ('00000000-0000-0000-0000-000000000001', 'AI Developer', ?, 'DISABLED', 'admin', NOW())
                 RETURNING rec_id";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$aiEmail]);
@@ -29,7 +28,6 @@ try {
     }
 
     // 2. Assign Agent Comments to AI User
-    // Updates comments signed with '🤖' that are currently assigned to someone else (e.g. Super Admin)
     $sql = "UPDATE sys_change_comments 
             SET user_id = ? 
             WHERE comment LIKE '%🤖%' AND user_id != ?";
@@ -39,7 +37,6 @@ try {
     echo "Reassigned $count agent comments to AI Developer.\n";
 
     // 3. Mark User Comments as Resolved
-    // Finds comments on ticket #7 that are NOT from AI, NOT signed by bot, and NOT yet marked.
     $sql = "SELECT rec_id, comment FROM sys_change_comments 
             WHERE cr_id = ? 
             AND user_id != ? 
