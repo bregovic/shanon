@@ -190,8 +190,9 @@ const useStyles = makeStyles({
     filterBar: {
         display: 'flex',
         gap: '16px',
-        flexWrap: 'nowrap', // Prevent wrapping for mobile scrolling
+        flexWrap: 'nowrap',
         alignItems: 'center',
+        justifyContent: 'center', // Centered content per user request
         padding: '8px 24px', // Reduced padding for tighter look
         backgroundColor: tokens.colorNeutralBackground2, // Subtle Gray
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, // Consistent with bars

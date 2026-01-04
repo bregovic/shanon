@@ -8,7 +8,7 @@ export default defineConfig({
     base: '/',
     define: {
         // Fix ReferenceError: Global constants expected by the app
-        __APP_VERSION__: JSON.stringify('1.3.7'),
+        __APP_VERSION__: JSON.stringify('1.3.8'),
         __APP_BUILD_DATE__: JSON.stringify(new Date().toISOString()),
     },
     server: {

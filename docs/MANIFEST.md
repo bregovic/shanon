@@ -36,7 +36,9 @@
            - **Refresh (Icon):** Soft refresh (zachová filtry).
            - **Attachments (Icon):** Správa příloh.
            - **Export/Import (Icon):** Data transfer.
-      2. **Filter Bar:** Vyšší lišta pod Action Barem pro specifické filtry.
+      2. **Filter Bar:** Nižší lišta hned pod Action Barem pro specifické filtry.
+         - **Vzhled:** Šedé pozadí (`colorNeutralBackground2`), menší padding (`8px 24px`), těsně přiléhá.
+         - **Zarovnání:** Obsah (Inputy, Tlačítka) zarovnán na STŘED (`justifyContent: 'center'`).
       3. **Grid/Content:** Samotná data.
     - **Mobile:** Všechny části (Action Bar, Filter Bar, Grid) musí být **samostatně horizontálně posuvné** (`overflow-x: auto`), aby nedocházelo k rozbití layoutu.
 
