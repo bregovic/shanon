@@ -24,8 +24,6 @@ import {
 import {
     Attach24Regular,
     Dismiss16Regular,
-    Attach24Regular,
-    Dismiss16Regular,
     Screenshot24Regular,
     ChevronRight24Regular,
     ChevronDown24Regular

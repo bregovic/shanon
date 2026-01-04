@@ -253,9 +253,7 @@ try {
             SELECT '2026-01-04', 'RBAC Security Module', 'Implementace správy rolí zabezpečení (sys_security_roles, sys_security_permissions) s UI pro konfiguraci přístupů k systémovým objektům.', 'Feature', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'RBAC Security Module' AND date = '2026-01-04');
         ",
-        '009_consolidate_roles',
-    '010_sys_change_comments',
-    '011_sys_technical_debt' => "
+        '009_consolidate_roles' => "
             -- Migrate existing users with 'admin' or 'superadmin' role to ADMIN role in sys_user_roles
             INSERT INTO sys_user_roles (user_id, role_id)
             SELECT u.rec_id, r.rec_id
@@ -299,14 +297,33 @@ try {
             INSERT INTO development_history (date, title, description, category, created_at) 
             SELECT '2026-01-04', 'Roles Consolidation', 'Sjednocení tabulek rolí: migrace uživatelů ze sys_users.role do sys_user_roles, odstranění staré sys_roles tabulky.', 'Refactor', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Roles Consolidation' AND date = '2026-01-04');
-        "
+        ",
+        '010_sys_change_comments' => null,
+        '011_sys_technical_debt' => null
     ];
 
 
     // --- EXECUTION ---
     
     foreach ($migrations as $name => $sql) {
+        // Handle numeric keys or missing SQL (file loading)
+        if (is_int($name)) {
+            $name = $sql;
+            $sql = null;
+        }
+
+        if (!$sql) {
+             $path = __DIR__ . '/migrations/' . $name . '.sql';
+             if (file_exists($path)) {
+                 $sql = file_get_contents($path);
+             } else {
+                 $messages[] = "Migration '$name': Skipped (File not found at $path)";
+                 continue;
+             }
+        }
+
         try {
+            // Exec migration
             $pdo->exec($sql);
             $messages[] = "Migration '$name': OK";
         } catch (Exception $e) {
