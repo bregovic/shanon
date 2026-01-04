@@ -254,7 +254,8 @@ try {
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'RBAC Security Module' AND date = '2026-01-04');
         ",
         '009_consolidate_roles',
-    '010_sys_change_comments' => "
+    '010_sys_change_comments',
+    '011_sys_technical_debt' => "
             -- Migrate existing users with 'admin' or 'superadmin' role to ADMIN role in sys_user_roles
             INSERT INTO sys_user_roles (user_id, role_id)
             SELECT u.rec_id, r.rec_id

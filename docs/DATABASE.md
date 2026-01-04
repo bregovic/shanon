@@ -77,6 +77,12 @@ Discussion threads for requests.
 - `user_id`: FK to `sys_users`
 - `comment`: Text content
 
+### `sys_technical_debt`
+Registry for temporary features and hacks.
+- `feature_code`: Unique ID
+- `description`: Why it exists
+- `status`: Active/Resolved
+
 ## Migrations
 Migrations are handled by `install-db.php`.
-Current HEAD: `010_sys_change_comments` (added comments table)
+Current HEAD: `011_sys_technical_debt` (registry for temp features)
