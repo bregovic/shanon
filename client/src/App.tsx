@@ -8,6 +8,7 @@ import { DmsList } from './pages/DmsList';
 import { DmsImport } from './pages/DmsImport';
 import { DmsSettings } from './pages/DmsSettings';
 import RequestsPage from './pages/RequestsPage';
+import SecurityRoles from './pages/SecurityRoles';
 import { SystemConfig } from './pages/SystemConfig';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -49,6 +50,7 @@ const router = createBrowserRouter([
                     { path: "dms/settings", element: <DmsSettings /> },
                     { path: "requests", element: <RequestsPage /> },
                     { path: "system", element: <SystemConfig /> },
+                    { path: "system/security-roles", element: <SecurityRoles /> },
                 ]
             }
         ]
