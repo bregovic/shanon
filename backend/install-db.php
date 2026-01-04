@@ -179,8 +179,7 @@ try {
                    END;
                END IF;
             END $$;
-        "
-        ],
+        ",
         '007_rbac_security' => "
             -- 1. Security Objects Registry
             CREATE TABLE IF NOT EXISTS sys_security_objects (

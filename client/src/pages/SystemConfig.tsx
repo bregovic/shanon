@@ -15,7 +15,12 @@ import {
     BreadcrumbButton,
     BreadcrumbDivider,
     shorthands,
-    tokens
+    tokens,
+    MessageBar,
+    MessageBarTitle,
+    MessageBarBody,
+    MessageBarIntent,
+    ScrollablePane
 } from '@fluentui/react-components';
 import {
     Settings24Regular,
@@ -173,6 +178,23 @@ export const SystemConfig: React.FC = () => {
             }
         } catch (e: any) {
             setMigrationResult({ success: false, error: e.message || 'Network error' });
+            const text = await res.text();
+            try {
+                const data = JSON.parse(text);
+                setMigrationResult(data);
+                if (data.success) {
+                    fetchData(); // Refresh diagnostics
+                }
+            } catch (e) {
+                console.error("Invalid JSON:", text);
+                setMigrationResult({
+                    success: false,
+                    error: "Server returned invalid response (PHP Error?)",
+                    details: [text.substring(0, 500)]
+                });
+            }
+        } catch (error) {
+            setMigrationResult({ success: false, error: String(error) });
         } finally {
             setUpdatingDB(false);
         }
@@ -544,14 +566,33 @@ export const SystemConfig: React.FC = () => {
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                     backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
                 }}>
-                    <Card style={{ maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto', padding: '24px' }}>
+                    <Card style={{ maxWidth: '600px', width: '90%', maxHeight: '80vh', padding: '24px', display: 'flex', flexDirection: 'column' }}>
                         <Title3>Výsledek aktualizace</Title3>
                         <Divider style={{ margin: '12px 0' }} />
-                        <pre style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f4f4f4', padding: '10px', borderRadius: '4px', fontSize: '12px' }}>
-                            {JSON.stringify(migrationResult, null, 2)}
-                        </pre>
-                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-                            <Button onClick={() => setMigrationResult(null)}>Zavřít</Button>
+
+                        <div style={{ overflowY: 'auto', flex: 1, marginBottom: '16px' }}>
+                            <MessageBar intent={migrationResult.success ? 'success' : 'error'}>
+                                <MessageBarBody>
+                                    <MessageBarTitle>{migrationResult.success ? 'Úspěch' : 'Chyba'}</MessageBarTitle>
+                                    {migrationResult.message || migrationResult.error}
+                                </MessageBarBody>
+                            </MessageBar>
+
+                            {migrationResult.details && (
+                                <div style={{ marginTop: '16px', backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px' }}>
+                                    <Text weight="semibold">Detaily:</Text>
+                                    <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '12px' }}>
+                                        {Array.isArray(migrationResult.details)
+                                            ? migrationResult.details.map((msg: string, i: number) => <li key={i}>{msg}</li>)
+                                            : <li>{String(migrationResult.details)}</li>
+                                        }
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button appearance="primary" onClick={() => setMigrationResult(null)}>Zavřít</Button>
                         </div>
                     </Card>
                 </div>
