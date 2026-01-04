@@ -10,6 +10,7 @@ import {
 } from '@fluentui/react-components';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/TranslationContext';
 import {
     SignOut24Regular,
     Settings24Regular,
@@ -89,14 +90,15 @@ const Layout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, logout, hasPermission } = useAuth();
+    const { t } = useTranslation();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
     const [feedbackOpen, setFeedbackOpen] = React.useState(false);
 
     const modules = [
-        { label: 'Dashboard', path: '/dashboard', icon: <Home24Regular />, securityId: 'mod_dashboard' },
-        { label: 'DMS', path: '/dms', icon: <DocumentData24Regular />, securityId: 'mod_dms' },
-        { label: 'Požadavky', path: '/requests', icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests' },
-        { label: 'Systém', path: '/system', icon: <Settings24Regular />, securityId: 'mod_system' },
+        { label: t('modules.dashboard'), path: '/dashboard', icon: <Home24Regular />, securityId: 'mod_dashboard' },
+        { label: t('modules.dms'), path: '/dms', icon: <DocumentData24Regular />, securityId: 'mod_dms' },
+        { label: t('modules.requests'), path: '/requests', icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests' },
+        { label: t('modules.system'), path: '/system', icon: <Settings24Regular />, securityId: 'mod_system' },
     ].sort((a, b) => {
 
         if (a.path === '/dashboard') return -1;

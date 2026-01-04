@@ -12,6 +12,9 @@ const TranslationContext = createContext<TranslationContextType>({
     isLoading: false,
 });
 
+import { translations as localTranslations } from '../locales/translations';
+import type { Language } from '../locales/translations';
+
 export const useTranslation = () => useContext(TranslationContext);
 
 export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -22,17 +25,26 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     useEffect(() => {
         const loadTranslations = async () => {
             setIsLoading(true);
+
+            // 1. Load Local Translations FIRST
+            const currentLang = (language as Language) || 'cs';
+            const local = localTranslations[currentLang] || localTranslations['cs'];
+
+            // Set local immediately so UI doesn't flicker or show keys
+            setTranslations(local);
+
             try {
-                // FIX: Correct API Path
+                // 2. Fetch Server Translations (Optional Override)
                 const res = await fetch(`/api/api-translations.php?lang=${language}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && data.translations) {
-                        setTranslations(data.translations);
+                        // Merge server translations over local
+                        setTranslations(prev => ({ ...prev, ...data.translations }));
                     }
                 }
             } catch (e) {
-                console.error("Failed to load translations", e);
+                console.error("Failed to load server translations, using local only", e);
             } finally {
                 setIsLoading(false);
             }

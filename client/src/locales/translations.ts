@@ -3,13 +3,19 @@ export type Language = 'cs' | 'en';
 
 export const translations = {
     cs: {
-        // Obco
+        // Common
         'common.save': 'Uložit',
         'common.cancel': 'Zrušit',
         'common.close': 'Zavřít',
         'common.loading': 'Načítám...',
         'common.error': 'Chyba',
         'common.success': 'Úspěch',
+
+        // Modules
+        'modules.dashboard': 'Dashboard',
+        'modules.dms': 'DMS',
+        'modules.requests': 'Požadavky',
+        'modules.system': 'Systém',
 
         // Settings
         'settings.title': 'Nastavení uživatele',
@@ -71,6 +77,12 @@ export const translations = {
         'common.loading': 'Loading...',
         'common.error': 'Error',
         'common.success': 'Success',
+
+        // Modules
+        'modules.dashboard': 'Dashboard',
+        'modules.dms': 'DMS',
+        'modules.requests': 'Requests',
+        'modules.system': 'System',
 
         'settings.title': 'User Settings',
         'settings.language': 'Language',
