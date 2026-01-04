@@ -63,3 +63,8 @@
 *   **Table**: `sys_number_series`.
 *   **Mechanism**: Modules should request next specific number via System Service (Backend helper), not implement own counters.
 *   **Format**: Support masks like `INV-{YYYY}-{00000}`.
+
+## 10. Documentation
+**Rule:** Maintain schema documentation in `.agent/DATABASE.md`.
+*   **Source of Truth:** The `DATABASE.md` file reflects the current production schema.
+*   **Updates:** When `install-db.php` is modified, update `DATABASE.md` immediately.

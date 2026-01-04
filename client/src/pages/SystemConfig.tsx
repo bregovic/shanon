@@ -10,6 +10,8 @@ import {
     makeStyles,
     TabList,
     Tab,
+    Title2,
+    Divider
 } from '@fluentui/react-components';
 import type {
     SelectTabData,
@@ -18,10 +20,12 @@ import type {
 } from '@fluentui/react-components';
 import {
     ArrowClockwise24Regular,
-    Stethoscope24Regular,
+    AppGeneric24Regular,
     Settings24Regular,
-    Notepad24Regular,
-    Broom24Regular
+    Poll24Regular,
+    Database24Regular,
+    Table24Regular,
+    TaskListSquareLtr24Regular
 } from '@fluentui/react-icons';
 import { ActionBar } from '../components/ActionBar';
 import { useTranslation } from '../context/TranslationContext';
@@ -66,6 +70,18 @@ const useStyles = makeStyles({
         padding: '0 16px',
         borderBottom: '1px solid #e0e0e0',
         backgroundColor: '#fff'
+    },
+    schemaTable: {
+        marginTop: '10px',
+        marginBottom: '20px'
+    },
+    schemaCol: {
+        display: 'grid',
+        gridTemplateColumns: '150px 100px 1fr',
+        gap: '10px',
+        padding: '4px 0',
+        borderBottom: '1px solid #eee',
+        fontSize: '13px'
     }
 });
 
@@ -93,7 +109,7 @@ interface SystemData {
 export const SystemConfig: React.FC = () => {
     const styles = useStyles();
     const { t } = useTranslation();
-    const [selectedTab, setSelectedTab] = useState<TabValue>('diagnostics');
+    const [selectedTab, setSelectedTab] = useState<TabValue>('dashboard');
     const [data, setData] = useState<SystemData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -120,10 +136,11 @@ export const SystemConfig: React.FC = () => {
         fetchData();
     }, []);
 
-    // FIX: Typed event correctly
     const onTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
         setSelectedTab(data.value);
     };
+
+    // --- RENDERERS ---
 
     const StatusRow = ({ label, value, status }: { label: string, value: any, status?: 'success' | 'danger' | 'warning' }) => (
         <div className={styles.row}>
@@ -136,8 +153,6 @@ export const SystemConfig: React.FC = () => {
         </div>
     );
 
-    // --- Content Renderers ---
-
     const renderDiagnostics = () => {
         if (loading && !data) return <div style={{ padding: '40px', textAlign: 'center' }}><Spinner label={t('common.loading')} /></div>;
         if (error) return <div style={{ padding: '24px' }}><Text style={{ color: 'red' }}>{error}</Text></div>;
@@ -147,7 +162,6 @@ export const SystemConfig: React.FC = () => {
 
         return (
             <div className={styles.grid}>
-                {/* Session Status */}
                 <Card className={styles.card}>
                     <CardHeader header={<Text weight="semibold">{t('system.session_diag')}</Text>} />
                     <div>
@@ -158,13 +172,9 @@ export const SystemConfig: React.FC = () => {
                         />
                         <StatusRow label="system.session_id" value={data?.session.id ? (data.session.id.substring(0, 10) + '...') : ''} />
                         <StatusRow label="system.db_handler" value={data?.session.handler} />
-                        <StatusRow label="system.data_size" value={`${data?.session.data_length} bytes`} />
-                        <StatusRow label="system.cookie_secure" value={data?.session.cookie_params.secure ? t('system.yes') : t('system.no')} />
-                        <StatusRow label="system.cookie_samesite" value={data?.session.cookie_params.samesite} />
                     </div>
                 </Card>
 
-                {/* Database & Server */}
                 <Card className={styles.card}>
                     <CardHeader header={<Text weight="semibold">{t('system.server_db')}</Text>} />
                     <div>
@@ -174,28 +184,75 @@ export const SystemConfig: React.FC = () => {
                             status={isConnected ? 'success' : 'danger'}
                         />
                         <StatusRow label="system.php_version" value={data?.overview.php_version} />
-                        <StatusRow label="system.https" value={data?.request.is_https ? t('system.active') : t('system.inactive')} />
                         <StatusRow label="system.server_time" value={data?.overview.server_time} />
-                    </div>
-                </Card>
-
-                {/* Current User */}
-                <Card className={styles.card}>
-                    <CardHeader header={<Text weight="semibold">{t('system.current_user')}</Text>} />
-                    <div>
-                        <StatusRow label="system.user_name" value={data?.session.current_user?.full_name || '-'} />
-                        <StatusRow label="system.user_email" value={data?.session.current_user?.email || '-'} />
-                        <StatusRow label="system.user_role" value={data?.session.current_user?.role || '-'} />
                     </div>
                 </Card>
             </div>
         );
     };
 
-    const renderPlaceholder = (titleKey: string) => (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
-            <Text size={500} block>{t(titleKey)}</Text>
-            <Text>{t('system.section_preparing')}</Text>
+    // --- SCHEMA RENDERER ---
+    const renderSchema = () => {
+        const schema = [
+            {
+                category: "1. System Core",
+                tables: [
+                    { name: "sys_users", cols: [["rec_id", "PK"], ["tenant_id", "UUID"], ["username", "VARCHAR"], ["roles", "JSON"]] },
+                    { name: "sys_sessions", cols: [["id", "PK"], ["data", "TEXT"], ["access", "INT"]] },
+                    { name: "sys_number_series", cols: [["code", "VARCHAR (Unique)"], ["format", "VARCHAR"], ["last_n", "INT"]] },
+                ]
+            },
+            {
+                category: "2. Change Management",
+                tables: [
+                    { name: "sys_change_requests", cols: [["rec_id", "PK"], ["subject", "VARCHAR"], ["status", "ENUM"], ["priority", "ENUM"]] },
+                    { name: "sys_change_requests_files", cols: [["rec_id", "PK"], ["cr_id", "FK"], ["file_data", "TEXT"]] },
+                    { name: "development_history", cols: [["id", "PK"], ["date", "DATE"], ["category", "ENUM"], ["related_task", "FK"]] },
+                ]
+            },
+            {
+                category: "3. Document Management",
+                tables: [
+                    { name: "dms_documents", cols: [["rec_id", "PK"], ["display_name", "VARCHAR"], ["ocr_status", "ENUM"], ["metadata", "JSONB"]] },
+                    { name: "dms_doc_types", cols: [["code", "PK/Unique"], ["icon", "VARCHAR"]] }
+                ]
+            }
+        ];
+
+        return (
+            <div>
+                <Title2 style={{ marginBottom: '20px' }}>Database Schema Documentation</Title2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                    {schema.map(cat => (
+                        <div key={cat.category}>
+                            <Title3>{cat.category}</Title3>
+                            <Divider style={{ margin: '10px 0' }} />
+                            <div className={styles.grid}>
+                                {cat.tables.map(t => (
+                                    <Card key={t.name} className={styles.card}>
+                                        <CardHeader header={<Text weight="bold" font="monospace">{t.name}</Text>} />
+                                        <div className={styles.schemaTable}>
+                                            {t.cols.map((col, i) => (
+                                                <div key={i} className={styles.schemaCol}>
+                                                    <Text weight="semibold">{col[0]}</Text>
+                                                    <Text style={{ color: '#0078d4' }}>{col[1]}</Text>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderPlaceholder = (title: string, desc: string) => (
+        <div style={{ textAlign: 'center', padding: '80px', color: '#888' }}>
+            <Title3 block>{title}</Title3>
+            <Text>{desc}</Text>
         </div>
     );
 
@@ -207,22 +264,30 @@ export const SystemConfig: React.FC = () => {
                 <Button icon={<ArrowClockwise24Regular />} onClick={fetchData}>{t('system.refresh')}</Button>
             </ActionBar>
 
-            {/* Navigation Tabs */}
+            {/* NEW STANDARD DASHBOARD TABS */}
             <div className={styles.tabs}>
                 <TabList selectedValue={selectedTab} onTabSelect={onTabSelect}>
-                    <Tab id="diagnostics" icon={<Stethoscope24Regular />} value="diagnostics">{t('system.diagnostics')}</Tab>
-                    <Tab id="settings" icon={<Settings24Regular />} value="settings">{t('system.settings')}</Tab>
-                    <Tab id="logs" icon={<Notepad24Regular />} value="logs">{t('system.logs')}</Tab>
-                    <Tab id="maintenance" icon={<Broom24Regular />} value="maintenance">{t('system.maintenance')}</Tab>
+                    <Tab id="dashboard" icon={<AppGeneric24Regular />} value="dashboard">{t('Dashboard')}</Tab>
+                    <Tab id="forms" icon={<Table24Regular />} value="forms">{t('Forms & Data')}</Tab>
+                    <Tab id="tasks" icon={<TaskListSquareLtr24Regular />} value="tasks">{t('Tasks')}</Tab>
+                    <Tab id="reports" icon={<Poll24Regular />} value="reports">{t('Reports')}</Tab>
+                    <Tab id="schema" icon={<Database24Regular />} value="schema">{t('Database')}</Tab>
+                    <Tab id="settings" icon={<Settings24Regular />} value="settings">{t('Settings')}</Tab>
                 </TabList>
             </div>
 
-            {/* Content Area */}
             <div className={styles.container}>
-                {selectedTab === 'diagnostics' && renderDiagnostics()}
-                {selectedTab === 'settings' && renderPlaceholder('app.name')} {/* Placeholder */}
-                {selectedTab === 'logs' && renderPlaceholder('system.logs')}
-                {selectedTab === 'maintenance' && renderPlaceholder('system.maintenance')}
+                {selectedTab === 'dashboard' && renderDiagnostics()}
+
+                {selectedTab === 'forms' && renderPlaceholder(t('Forms & Data'), 'Manage Number Series, Dropdowns, and Global Enums.')}
+
+                {selectedTab === 'tasks' && renderPlaceholder(t('Tasks'), 'Scheduled Cron Jobs and Batch Processes.')}
+
+                {selectedTab === 'reports' && renderPlaceholder(t('Reports'), 'System Logs, Audit Trails, and Analytics.')}
+
+                {selectedTab === 'schema' && renderSchema()}
+
+                {selectedTab === 'settings' && renderPlaceholder(t('Settings'), 'Low-level PHP & Server Configuration.')}
             </div>
         </div>
     );

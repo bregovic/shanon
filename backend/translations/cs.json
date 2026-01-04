@@ -79,5 +79,11 @@
     "system.inactive": "Neaktivní",
     "system.yes": "Ano",
     "system.no": "Ne",
-    "system.section_preparing": "Sekce se připravuje"
+    "system.section_preparing": "Sekce se připravuje",
+    "Dashboard": "Přehled",
+    "Forms & Data": "Formuláře a Data",
+    "Tasks": "Úlohy",
+    "Reports": "Reporty",
+    "Database": "Databáze",
+    "Settings": "Nastavení"
 }

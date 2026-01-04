@@ -79,5 +79,11 @@
     "system.inactive": "Inactive",
     "system.yes": "Yes",
     "system.no": "No",
-    "system.section_preparing": "Section is being prepared"
+    "system.section_preparing": "Section is being prepared",
+    "Dashboard": "Dashboard",
+    "Forms & Data": "Forms & Data",
+    "Tasks": "Tasks",
+    "Reports": "Reports",
+    "Database": "Database",
+    "Settings": "Settings"
 }
