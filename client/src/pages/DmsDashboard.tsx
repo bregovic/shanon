@@ -1,11 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
     makeStyles,
     tokens,
-    Title3,
-    Text,
-    Card,
+    Button,
+    Divider,
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbButton,
@@ -15,10 +14,15 @@ import {
     Settings24Regular,
     TaskListSquareLtr24Regular,
     FormNew24Regular,
-    DocumentPdf24Regular
+    DocumentPdf24Regular,
+    ChevronDown16Regular,
+    ChevronUp16Regular,
+    ArrowClockwise24Regular
 } from '@fluentui/react-icons';
 import { ActionBar } from '../components/ActionBar';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../context/TranslationContext';
+import { MenuSection, MenuItem } from '../components/MenuSection';
 
 const useStyles = makeStyles({
     root: {
@@ -27,60 +31,53 @@ const useStyles = makeStyles({
         height: '100%',
         backgroundColor: tokens.colorNeutralBackground2
     },
-    grid: {
+    // Mobile Scroll Layout Styles (Shared Standard)
+    scrollContainer: {
+        display: 'flex',
+        gap: '32px',
+        flexWrap: 'wrap',
+        alignItems: 'flex-start',
         padding: '24px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '24px',
-        maxWidth: '1200px'
+        '@media (max-width: 800px)': {
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            paddingBottom: '20px', // Space for scrollbar
+            scrollSnapType: 'x mandatory',
+            gap: '16px',
+            scrollPadding: '24px' // Padding for snap alignment
+        }
     },
-    sectionCard: {
-        padding: '0',
+    scrollColumn: {
+        flex: '1 1 300px',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%'
-    },
-    cardHeader: {
-        padding: '16px',
-        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        backgroundColor: tokens.colorNeutralBackground1
-    },
-    cardBody: {
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        backgroundColor: tokens.colorNeutralBackground1,
-        flex: 1
-    },
-    actionLink: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        padding: '8px',
-        cursor: 'pointer',
-        borderRadius: '4px',
-        ':hover': {
-            backgroundColor: tokens.colorNeutralBackground2
+        gap: '0px',
+        '@media (max-width: 800px)': {
+            flex: '0 0 85vw', // Take most of width but show hint of next column
+            scrollSnapAlign: 'start',
+            minWidth: 'auto'
         }
     }
 });
 
-const SectionLink = ({ text, onClick }: { text: string, onClick?: () => void }) => {
-    const styles = useStyles();
-    return (
-        <div className={styles.actionLink} onClick={onClick}>
-            <Text>{text}</Text>
-        </div>
-    )
-}
-
 export const DmsDashboard: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
+    const { t } = useTranslation();
+
+    // Sections for DMS
+    const SECTION_IDS = ['forms', 'reports', 'tasks', 'settings'];
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(SECTION_IDS));
+
+    const toggleSection = (id: string) => {
+        const next = new Set(expandedSections);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setExpandedSections(next);
+    };
+
+    const expandAll = () => setExpandedSections(new Set(SECTION_IDS));
+    const collapseAll = () => setExpandedSections(new Set());
 
     return (
         <div className={styles.root}>
@@ -94,60 +91,54 @@ export const DmsDashboard: React.FC = () => {
                         <BreadcrumbButton current>DMS</BreadcrumbButton>
                     </BreadcrumbItem>
                 </Breadcrumb>
-                {/* No buttons here anymore */}
+
+                <div style={{ flex: 1 }} />
+
+                {/* Standard Toolbar Actions */}
+                <div style={{ display: 'flex', gap: '8px', marginRight: '16px' }}>
+                    <Button appearance="subtle" icon={<ChevronDown16Regular />} onClick={expandAll}>{t('system.expand_all')}</Button>
+                    <Button appearance="subtle" icon={<ChevronUp16Regular />} onClick={collapseAll}>{t('system.collapse_all')}</Button>
+                    <Divider vertical style={{ height: '20px', margin: 'auto 0' }} />
+                </div>
+
+                <Button icon={<ArrowClockwise24Regular />} onClick={() => {/* refresh logic if any */ }}>Obnovit</Button>
             </ActionBar>
 
-            <div className={styles.grid}>
-                {/* 1. FORMULÁŘE */}
-                <Card className={styles.sectionCard}>
-                    <div className={styles.cardHeader}>
-                        <FormNew24Regular />
-                        <Title3>Formuláře</Title3>
-                    </div>
-                    <div className={styles.cardBody}>
-                        <SectionLink text="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
-                        <SectionLink text="Ke schválení" />
-                        <SectionLink text="Moje koncepty" />
-                    </div>
-                </Card>
+            {/* 3-Column Layout */}
+            <div className={styles.scrollContainer}>
 
-                {/* 2. REPORTY */}
-                <Card className={styles.sectionCard}>
-                    <div className={styles.cardHeader}>
-                        <DocumentPdf24Regular />
-                        <Title3>Reporty</Title3>
-                    </div>
-                    <div className={styles.cardBody}>
-                        <SectionLink text="Statistika nahrávání" />
-                        <SectionLink text="Využití úložiště" />
-                    </div>
-                </Card>
+                {/* Column 1 */}
+                <div className={styles.scrollColumn}>
+                    <MenuSection id="forms" title={t('system.menu.forms')} isOpen={expandedSections.has('forms')} onToggle={toggleSection}>
+                        <MenuItem icon={<FormNew24Regular />} label="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
+                        <MenuItem icon={<FormNew24Regular />} label="Ke schválení" />
+                        <MenuItem icon={<FormNew24Regular />} label="Moje koncepty" />
+                    </MenuSection>
 
-                {/* 3. ÚLOHY */}
-                <Card className={styles.sectionCard}>
-                    <div className={styles.cardHeader}>
-                        <TaskListSquareLtr24Regular />
-                        <Title3>Úlohy</Title3>
-                    </div>
-                    <div className={styles.cardBody}>
-                        <SectionLink text="Moje úkoly (0)" />
-                        <SectionLink text="Delegované úkoly" />
-                    </div>
-                </Card>
+                    <MenuSection id="reports" title={t('system.menu.reports')} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
+                        <MenuItem icon={<DocumentPdf24Regular />} label="Statistika nahrávání" />
+                        <MenuItem icon={<DocumentPdf24Regular />} label="Využití úložiště" />
+                    </MenuSection>
+                </div>
 
-                {/* 4. NASTAVENÍ */}
-                <Card className={styles.sectionCard}>
-                    <div className={styles.cardHeader}>
-                        <Settings24Regular />
-                        <Title3>Nastavení</Title3>
-                    </div>
-                    <div className={styles.cardBody}>
-                        <SectionLink text="Typy dokumentů" onClick={() => navigate('/dms/settings')} />
-                        <SectionLink text="Číselné řady" onClick={() => navigate('/dms/settings')} />
-                        <SectionLink text="Atributy" onClick={() => navigate('/dms/settings')} />
-                        <SectionLink text="Úložiště" onClick={() => navigate('/dms/settings')} />
-                    </div>
-                </Card>
+                {/* Column 2 */}
+                <div className={styles.scrollColumn}>
+                    <MenuSection id="tasks" title={t('system.menu.tasks')} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
+                        <MenuItem icon={<TaskListSquareLtr24Regular />} label="Moje úkoly (0)" />
+                        <MenuItem icon={<TaskListSquareLtr24Regular />} label="Delegované úkoly" />
+                    </MenuSection>
+                </div>
+
+                {/* Column 3 */}
+                <div className={styles.scrollColumn}>
+                    <MenuSection id="settings" title={t('system.menu.settings')} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
+                        <MenuItem icon={<Settings24Regular />} label="Typy dokumentů" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem icon={<Settings24Regular />} label="Číselné řady" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem icon={<Settings24Regular />} label="Atributy" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem icon={<Settings24Regular />} label="Úložiště" onClick={() => navigate('/dms/settings')} />
+                    </MenuSection>
+                </div>
+
             </div>
         </div>
     );
