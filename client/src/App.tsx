@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { DmsDashboard } from './pages/DmsDashboard';
 import { DmsList } from './pages/DmsList';
 import { DmsImport } from './pages/DmsImport';
+import { DmsSettings } from './pages/DmsSettings';
 import RequestsPage from './pages/RequestsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
                     { path: "dms", element: <DmsDashboard /> },
                     { path: "dms/list", element: <DmsList /> },
                     { path: "dms/import", element: <DmsImport /> },
+                    { path: "dms/settings", element: <DmsSettings /> },
                     { path: "requests", element: <RequestsPage /> },
                 ]
             }
