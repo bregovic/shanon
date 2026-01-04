@@ -351,6 +351,26 @@ const RequestsPage = () => {
         return () => window.removeEventListener('reset-requests-page', handleReset);
     }, [showOnlyMine]);
 
+    const handleDeleteRequests = async () => {
+        if (selectedItems.size === 0) return;
+        if (!confirm(`Opravdu smazat ${selectedItems.size} položek?`)) return;
+
+        setLoadingRequests(true);
+        try {
+            await axios.post(getApiUrl('api-changerequests.php?action=delete_request'), {
+                ids: Array.from(selectedItems)
+            });
+            setSelectedItems(new Set());
+            setSelectedRequest(null);
+            loadRequests();
+        } catch (e) {
+            console.error(e);
+            alert('Chyba při mazání requestů');
+        } finally {
+            setLoadingRequests(false);
+        }
+    };
+
     useEffect(() => {
         const mine = searchParams.get('mine') === '1';
         if (mine !== showOnlyMine) setShowOnlyMine(mine);
@@ -1023,10 +1043,7 @@ const RequestsPage = () => {
                             icon={<Delete20Regular />}
                             appearance="subtle"
                             disabled={selectedItems.size === 0}
-                            onClick={() => {
-                                // TODO: Implement delete confirmation dialog
-                                alert(`Smazat ${selectedItems.size} položek? (Funkce ještě není implementována)`);
-                            }}
+                            onClick={handleDeleteRequests}
                         >Smazat</Button>
                         <div style={{ width: '1px', height: '24px', backgroundColor: tokens.colorNeutralStroke1, margin: '0 8px' }} />
                         <Button appearance="subtle" onClick={loadRequests}>Obnovit</Button>
