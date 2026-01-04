@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
 import { DmsDashboard } from './pages/DmsDashboard';
 import { DmsList } from './pages/DmsList';
+import { DmsImport } from './pages/DmsImport';
 import RequestsPage from './pages/RequestsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
                     { path: "dashboard", element: <DashboardPage /> },
                     { path: "dms", element: <DmsDashboard /> },
                     { path: "dms/list", element: <DmsList /> },
+                    { path: "dms/import", element: <DmsImport /> },
                     { path: "requests", element: <RequestsPage /> },
                 ]
             }
