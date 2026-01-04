@@ -1,18 +1,61 @@
 import React, { useEffect, useState } from 'react';
 import {
+    makeStyles,
+    tokens,
     Button,
-    Title3,
-    Badge,
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbButton,
-    BreadcrumbDivider
+    BreadcrumbDivider,
+    Input,
+    Badge
 } from '@fluentui/react-components';
-import { Add24Regular, ArrowLeft24Regular } from '@fluentui/react-icons';
+import {
+    Add24Regular,
+    ArrowLeft24Regular,
+    ArrowClockwise24Regular,
+    Search24Regular,
+    Filter24Regular
+} from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { ActionBar } from '../components/ActionBar';
 import { DataGrid } from '../components/DataGrid';
 import type { DataGridColumn } from '../components/DataGrid';
+import { useTranslation } from '../context/TranslationContext'; // Assuming context exists or use hardcoded for now if uncertain
+
+const useStyles = makeStyles({
+    root: {
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        backgroundColor: tokens.colorNeutralBackground2
+    },
+    filterBar: {
+        display: 'flex',
+        gap: '16px',
+        flexWrap: 'nowrap',
+        alignItems: 'center',
+        padding: '12px 24px',
+        backgroundColor: tokens.colorNeutralBackground1,
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+        overflowX: 'auto',
+        width: '100%',
+        boxSizing: 'border-box',
+        flexShrink: 0
+    },
+    content: {
+        flex: 1,
+        overflow: 'hidden', // DataGrid handles its own scroll usually, or we wrap it
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '24px'
+    },
+    searchContainer: {
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center'
+    }
+});
 
 interface DmsDocument {
     rec_id: number;
@@ -25,25 +68,29 @@ interface DmsDocument {
 }
 
 export const DmsList: React.FC = () => {
+    const styles = useStyles();
     const navigate = useNavigate();
     const [documents, setDocuments] = useState<DmsDocument[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchText, setSearchText] = useState('');
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Fetch documents
+            const docsRes = await fetch('/api/api-dms.php?action=list');
+            const docsJson = await docsRes.json();
+            if (docsJson.success) {
+                setDocuments(docsJson.data || []);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch documents
-                const docsRes = await fetch('/api/api-dms.php?action=list');
-                const docsJson = await docsRes.json();
-                if (docsJson.success) {
-                    setDocuments(docsJson.data || []);
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchData();
     }, []);
 
@@ -54,6 +101,17 @@ export const DmsList: React.FC = () => {
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
+
+    // Filter logic
+    const filteredDocs = documents.filter(doc => {
+        if (!searchText) return true;
+        const low = searchText.toLowerCase();
+        return (
+            doc.display_name?.toLowerCase().includes(low) ||
+            doc.doc_type_name?.toLowerCase().includes(low) ||
+            doc.uploaded_by_name?.toLowerCase().includes(low)
+        );
+    });
 
     // Column definitions
     const columns: DataGridColumn<DmsDocument>[] = [
@@ -108,31 +166,48 @@ export const DmsList: React.FC = () => {
     ];
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className={styles.root}>
             <ActionBar>
-                <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
-                    Zpět
-                </Button>
-                <Breadcrumb>
-                    <BreadcrumbItem>
-                        <BreadcrumbButton onClick={() => navigate('/dms')}>DMS</BreadcrumbButton>
-                    </BreadcrumbItem>
-                    <BreadcrumbDivider />
-                    <BreadcrumbItem>
-                        <BreadcrumbButton current>Všechny dokumenty</BreadcrumbButton>
-                    </BreadcrumbItem>
-                </Breadcrumb>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
+                        Zpět
+                    </Button>
+                    <Breadcrumb>
+                        <BreadcrumbItem>
+                            <BreadcrumbButton onClick={() => navigate('/dms')}>DMS</BreadcrumbButton>
+                        </BreadcrumbItem>
+                        <BreadcrumbDivider />
+                        <BreadcrumbItem>
+                            <BreadcrumbButton current>Všechny dokumenty</BreadcrumbButton>
+                        </BreadcrumbItem>
+                    </Breadcrumb>
+                </div>
                 <div style={{ flex: 1 }} />
+                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData}>
+                    Obnovit
+                </Button>
                 <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate('/dms/import')}>
                     Nový dokument
                 </Button>
             </ActionBar>
 
-            <div style={{ padding: '24px', flex: 1, overflow: 'auto' }}>
-                <Title3 style={{ marginBottom: '16px' }}>Všechny dokumenty</Title3>
+            {/* Filter Bar Standard */}
+            <div className={styles.filterBar}>
+                <Input
+                    contentBefore={<Search24Regular />}
+                    placeholder="Hledat dokumenty..."
+                    value={searchText}
+                    onChange={(_e, data) => setSearchText(data.value)}
+                    style={{ minWidth: '300px' }}
+                />
+                <Button appearance="subtle" icon={<Filter24Regular />}>
+                    Filtry
+                </Button>
+            </div>
 
+            <div className={styles.content}>
                 <DataGrid
-                    data={documents}
+                    data={filteredDocs}
                     columns={columns}
                     loading={loading}
                     pageSize={20}
