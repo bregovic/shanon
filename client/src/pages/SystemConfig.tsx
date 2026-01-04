@@ -28,8 +28,13 @@ import {
     TaskListSquareLtr24Regular,
     Wrench24Regular,
     ChevronRight16Regular,
-    ArrowLeft24Regular
+    ArrowLeft24Regular,
+    Document24Regular,
+    Shield24Regular,
+    History24Regular,
+    BookQuestionMark24Regular
 } from '@fluentui/react-icons';
+
 import { ActionBar } from '../components/ActionBar';
 import { useTranslation } from '../context/TranslationContext';
 
@@ -147,6 +152,9 @@ export const SystemConfig: React.FC = () => {
     // DB Update State
     const [updatingDB, setUpdatingDB] = useState(false);
     const [migrationResult, setMigrationResult] = useState<any>(null);
+    const [docContent, setDocContent] = useState<string>('');
+    const [historyData, setHistoryData] = useState<any>(null);
+
 
     const handleUpdateDB = async () => {
         if (!confirm('Opravdu chcete spustit aktualizaci databáze?')) return;
@@ -200,8 +208,75 @@ export const SystemConfig: React.FC = () => {
         // We can fetch it on mount anyway for potential dashboard widgets.
         fetchData();
     }, []);
+    const fetchDoc = async (file: string, title: string) => {
+        setLoading(true);
+        setActiveView('doc_viewer');
+        setViewTitle(title);
+        try {
+            const res = await fetch(`/api/api-system.php?action=get_doc&file=${file}`);
+            const json = await res.json();
+            if (json.success) setDocContent(json.content);
+            else setDocContent('Error loading document: ' + (json.error || 'Unknown'));
+        } catch (e: any) { setDocContent('Network Error: ' + e.message); }
+        setLoading(false);
+    };
+
+    const fetchHistory = async () => {
+        setLoading(true);
+        setActiveView('history_viewer');
+        setViewTitle('Historie změn');
+        try {
+            const res = await fetch(`/api/api-system.php?action=history`);
+            const json = await res.json();
+            if (json.success) setHistoryData(json);
+        } catch (e) { setError('Network Error'); }
+        setLoading(false);
+    };
 
     // --- RENDERERS ---
+
+    const renderDocView = () => (
+        <Card className={styles.card} style={{ height: 'calc(100vh - 200px)' }}>
+            <CardHeader header={<Title3>{viewTitle}</Title3>} />
+            <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', backgroundColor: '#f9f9f9', padding: '16px', borderRadius: '4px', overflow: 'auto', flex: 1 }}>
+                {docContent}
+            </div>
+        </Card>
+    );
+
+    const renderHistoryView = () => (
+        <div className={styles.grid}>
+            <Card className={styles.card}>
+                <CardHeader header={<Title3>Development History</Title3>} />
+                <div style={{ maxHeight: '600px', overflow: 'auto' }}>
+                    {historyData?.history?.map((h: any) => (
+                        <div key={h.id} style={{ borderBottom: '1px solid #eee', padding: '12px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Text weight="bold">{h.date}</Text>
+                                <Badge appearance="tint">{h.category}</Badge>
+                            </div>
+                            <Text weight="semibold" style={{ display: 'block', margin: '4px 0' }}>{h.title}</Text>
+                            <Text style={{ color: tokens.colorNeutralForeground2 }}>{h.description}</Text>
+                        </div>
+                    ))}
+                </div>
+            </Card>
+            <Card className={styles.card}>
+                <CardHeader header={<Title3>Recent Requests</Title3>} />
+                <div style={{ maxHeight: '600px', overflow: 'auto' }}>
+                    {historyData?.requests?.map((r: any) => (
+                        <div key={r.rec_id} style={{ borderBottom: '1px solid #eee', padding: '8px 0' }}>
+                            <Text>#{r.rec_id} {r.subject}</Text>
+                            <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                                <Badge size="extra-small" appearance="outline">{r.status}</Badge> priority: {r.priority}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Card>
+        </div>
+    );
+
 
     const StatusRow = ({ label, value, status }: { label: string, value: any, status?: 'success' | 'danger' | 'warning' }) => (
         <div className={styles.row}>
@@ -337,24 +412,46 @@ export const SystemConfig: React.FC = () => {
                     />
 
                     <MenuItem
-                        icon={<Database24Regular />}
-                        label="Server a databáze"
-                        onClick={() => { setActiveView('schema'); setViewTitle('Server a databáze'); }}
-                    />
-
-                    <MenuItem
                         icon={<AppGeneric24Regular />}
                         label="Systémové relace"
                         onClick={() => { alert('Zde bude přehled aktivních relací'); }}
                     />
-
                     <MenuItem
                         icon={<Table24Regular />}
                         label="Číselné řady"
                         onClick={() => { alert('Správa číselných řad'); }}
                     />
+
+                    <Text weight="semibold" style={{ color: tokens.colorNeutralForeground4, marginTop: '16px' }}>Dokumentace</Text>
+
+                    <MenuItem
+                        icon={<Database24Regular />}
+                        label="Dokumentace databáze"
+                        onClick={() => { setActiveView('schema'); setViewTitle('Dokumentace databáze'); }}
+                    />
+                    <MenuItem
+                        icon={<DocumentData24Regular />}
+                        label="Systémový manifest"
+                        onClick={() => fetchDoc('manifest', 'Systémový manifest')}
+                    />
+                    <MenuItem
+                        icon={<Shield24Regular />}
+                        label="Dokumentace zabezpečení"
+                        onClick={() => fetchDoc('security', 'Dokumentace zabezpečení')}
+                    />
+                    <MenuItem
+                        icon={<History24Regular />}
+                        label="Historie změn"
+                        onClick={() => fetchHistory()}
+                    />
+                    <MenuItem
+                        icon={<BookQuestionMark24Regular />}
+                        label="Správa nápovědy"
+                        onClick={() => alert('Editor nápovědy (rozpracováno)')}
+                    />
                 </div>
             </Card>
+
 
             {/* 2. REPORTY */}
             <Card className={styles.card}>
@@ -379,9 +476,10 @@ export const SystemConfig: React.FC = () => {
             {/* 3. ÚLOHY (CRON/JOB) */}
             <Card className={styles.card}>
                 <CardHeader
-                    header={<Title3>Systémové úlohy</Title3>}
+                    header={<Title3>Úlohy</Title3>}
                     description={<Text>Dávkové zpracování a periodické úlohy</Text>}
                 />
+
                 <div className={styles.menuGroup}>
                     <MenuItem
                         icon={<TaskListSquareLtr24Regular />}
@@ -471,7 +569,10 @@ export const SystemConfig: React.FC = () => {
                 {!activeView && renderDashboard()}
                 {activeView === 'diagnostics' && renderDiagnostics()}
                 {activeView === 'schema' && renderSchema()}
+                {activeView === 'doc_viewer' && renderDocView()}
+                {activeView === 'history_viewer' && renderHistoryView()}
             </div>
         </div>
     );
 };
+```

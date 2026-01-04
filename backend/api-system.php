@@ -80,9 +80,36 @@ try {
         ];
 
         echo json_encode(['success' => true, 'data' => $diagnostics]);
+    } elseif ($action === 'get_doc') {
+        $file = $_GET['file'] ?? '';
+        $map = [
+            'manifest' => __DIR__ . '/../.agent/MANIFEST.md',
+            'security' => __DIR__ . '/../.agent/SECURITY.md',
+            'database' => __DIR__ . '/../.agent/DATABASE.md'
+        ];
+
+        if (!isset($map[$file]) || !file_exists($map[$file])) {
+            throw new Exception("Document not found or access denied.");
+        }
+
+        $content = file_get_contents($map[$file]);
+        echo json_encode(['success' => true, 'content' => $content]);
+
+    } elseif ($action === 'history') {
+        // Fetch Development History
+        $stmt = $pdo->query("SELECT * FROM development_history ORDER BY date DESC, id DESC LIMIT 50");
+        $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch recent CRs
+        $stmt2 = $pdo->query("SELECT * FROM sys_change_requests ORDER BY created_at DESC LIMIT 20");
+        $requests = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'history' => $history, 'requests' => $requests]);
+
     } else {
         throw new Exception("Unknown action: $action");
     }
+
 
 } catch (Exception $e) {
     http_response_code(500);
