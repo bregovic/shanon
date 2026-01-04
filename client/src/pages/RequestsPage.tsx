@@ -21,10 +21,11 @@ import {
 import { Filter24Regular, ArrowUp24Regular, ArrowDown24Regular, Subtract24Regular, Add24Regular } from "@fluentui/react-icons";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackModal } from "../components/FeedbackModal";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type SyntheticEvent } from "react";
 import { useSearchParams } from 'react-router-dom';
 import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
+import type { SelectionItemId, OnSelectionChangeData } from '@fluentui/react-components';
 import { PageLayout, PageContent, PageHeader } from "../components/PageLayout";
 import { VisualEditor } from "../components/VisualEditor";
 import {
@@ -318,6 +319,12 @@ const RequestsPage = () => {
     // Filter by Mine
     const [searchParams, setSearchParams] = useSearchParams();
     const [showOnlyMine, setShowOnlyMine] = useState(searchParams.get('mine') === '1');
+
+    // Selection state for grid
+    const [selectedItems, setSelectedItems] = useState<Set<SelectionItemId>>(new Set());
+    const handleSelectionChange = (_e: SyntheticEvent, data: OnSelectionChangeData) => {
+        setSelectedItems(data.selectedItems);
+    };
 
     // Lightbox
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -962,7 +969,29 @@ const RequestsPage = () => {
             <PageHeader>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                     <Text size={500} weight="bold">Správa požadavků</Text>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <Button
+                            icon={<Edit24Regular />}
+                            appearance="subtle"
+                            disabled={selectedItems.size !== 1}
+                            onClick={() => {
+                                if (selectedItems.size === 1) {
+                                    const id = Array.from(selectedItems)[0];
+                                    const item = requests.find((r: RequestItem) => r.id === id);
+                                    if (item) setSelectedRequest(item);
+                                }
+                            }}
+                        >Upravit</Button>
+                        <Button
+                            icon={<Delete20Regular />}
+                            appearance="subtle"
+                            disabled={selectedItems.size === 0}
+                            onClick={() => {
+                                // TODO: Implement delete confirmation dialog
+                                alert(`Smazat ${selectedItems.size} položek? (Funkce ještě není implementována)`);
+                            }}
+                        >Smazat</Button>
+                        <div style={{ width: '1px', height: '24px', backgroundColor: tokens.colorNeutralStroke1, margin: '0 8px' }} />
                         <Button icon={<Add24Regular />} appearance="primary" onClick={() => setFeedbackOpen(true)}>Nový požadavek</Button>
                         <Button appearance="subtle" onClick={loadRequests}>Obnovit</Button>
                     </div>
@@ -1015,11 +1044,12 @@ const RequestsPage = () => {
                         <div style={{ minWidth: '1000px', height: '100%' }}>
                             {loadingRequests ? <Spinner /> : (
                                 <SmartDataGrid
-                                    // Remove filter for now to debug empty list issue
                                     items={requests}
                                     columns={columns}
-                                    getRowId={(i) => i.id}
+                                    getRowId={(i: RequestItem) => i.id}
                                     onRowClick={setSelectedRequest}
+                                    selectedItems={selectedItems}
+                                    onSelectionChange={handleSelectionChange}
                                 />
                             )}
                         </div>
