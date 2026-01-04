@@ -24,7 +24,11 @@ import {
 import {
     Attach24Regular,
     Dismiss16Regular,
-    Screenshot24Regular
+    Attach24Regular,
+    Dismiss16Regular,
+    Screenshot24Regular,
+    ChevronRight24Regular,
+    ChevronDown24Regular
 } from "@fluentui/react-icons";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -119,6 +123,16 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
     const [historyData, setHistoryData] = useState<HistoryMonth[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+    const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+
+    const toggleDay = (day: string) => {
+        setExpandedDays(prev => {
+            const next = new Set(prev);
+            if (next.has(day)) next.delete(day);
+            else next.add(day);
+            return next;
+        });
+    };
 
     // Helper for API ID
     const isDev = import.meta.env.DEV;
@@ -343,51 +357,117 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                             <div style={{ flex: 1 }}>
                                 {loadingHistory ? <Spinner label="Načítám historii..." /> : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                        {historyData.map(month => (
-                                            <div key={month.month}>
-                                                <Text weight="bold" size={500} style={{ marginBottom: '10px', display: 'block', borderBottom: `2px solid ${tokens.colorBrandBackground}`, paddingBottom: '5px' }}>
-                                                    📅 {month.month}
-                                                </Text>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '10px' }}>
-                                                    {month.items.map(item => (
-                                                        <Card key={item.id} style={{ padding: '10px', cursor: 'pointer' }} onClick={() => {
-                                                            setExpandedItems(prev => {
-                                                                const next = new Set(prev);
-                                                                if (next.has(item.id)) next.delete(item.id);
-                                                                else next.add(item.id);
-                                                                return next;
-                                                            });
-                                                        }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                <Text size={200} style={{ color: tokens.colorNeutralForeground3, minWidth: '70px' }}>
-                                                                    {new Date(item.date).toLocaleDateString('cs-CZ')}
-                                                                </Text>
-                                                                <Badge
-                                                                    appearance="filled"
-                                                                    color={item.category === 'feature' ? 'success' :
-                                                                        item.category === 'bugfix' ? 'danger' :
-                                                                            item.category === 'improvement' ? 'informative' :
-                                                                                item.category === 'refactor' ? 'warning' : 'brand'}
-                                                                    style={{ minWidth: '85px', textAlign: 'center' }}
-                                                                >
-                                                                    {item.category === 'feature' ? '✨ Feature' :
-                                                                        item.category === 'bugfix' ? '🐛 Bugfix' :
-                                                                            item.category === 'improvement' ? '📈 Improve' :
-                                                                                item.category === 'refactor' ? '🔧 Refactor' : '🚀 Deploy'}
-                                                                </Badge>
-                                                                <Text weight="semibold" style={{ flex: 1 }}>{item.title}</Text>
-                                                                {item.task_id && <Badge appearance="outline" size="small">Task #{item.task_id}</Badge>}
-                                                            </div>
-                                                            {expandedItems.has(item.id) && item.description && (
-                                                                <Text size={200} style={{ marginTop: '8px', color: tokens.colorNeutralForeground2, display: 'block', marginLeft: '80px' }}>
-                                                                    {item.description}
-                                                                </Text>
-                                                            )}
-                                                        </Card>
-                                                    ))}
+                                        {historyData.map(month => {
+                                            // Group by day
+                                            const days: Record<string, HistoryItem[]> = {};
+                                            month.items.forEach(item => {
+                                                const d = new Date(item.date).toLocaleDateString('cs-CZ');
+                                                if (!days[d]) days[d] = [];
+                                                days[d].push(item);
+                                            });
+
+                                            return (
+                                                <div key={month.month}>
+                                                    <Text weight="bold" size={500} style={{ marginBottom: '10px', display: 'block', borderBottom: `2px solid ${tokens.colorBrandBackground}`, paddingBottom: '5px' }}>
+                                                        📅 {month.month}
+                                                    </Text>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                        {Object.entries(days).map(([dayDate, dayItems]) => {
+                                                            // Calculate summaries
+                                                            const counts = dayItems.reduce((acc, item) => {
+                                                                acc[item.category] = (acc[item.category] || 0) + 1;
+                                                                return acc;
+                                                            }, {} as Record<string, number>);
+
+                                                            const isExpanded = expandedDays.has(dayDate);
+
+                                                            return (
+                                                                <Card key={dayDate} style={{ padding: '0px', overflow: 'hidden' }}>
+                                                                    {/* Group Header */}
+                                                                    <div
+                                                                        onClick={() => toggleDay(dayDate)}
+                                                                        style={{
+                                                                            padding: '10px',
+                                                                            cursor: 'pointer',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            backgroundColor: tokens.colorNeutralBackground2,
+                                                                            gap: '10px'
+                                                                        }}
+                                                                    >
+                                                                        {isExpanded ? <ChevronDown24Regular /> : <ChevronRight24Regular />}
+                                                                        <Text weight="semibold" size={400}>{dayDate}</Text>
+                                                                        <div style={{ flex: 1 }} />
+                                                                        <div style={{ display: 'flex', gap: '5px' }}>
+                                                                            {Object.entries(counts).map(([cat, count]) => (
+                                                                                <Badge key={cat} appearance="tint" size="small" color={
+                                                                                    cat === 'feature' ? 'success' :
+                                                                                        cat === 'bugfix' ? 'danger' :
+                                                                                            cat === 'improvement' ? 'informative' :
+                                                                                                cat === 'refactor' ? 'warning' : 'brand'
+                                                                                }>
+                                                                                    {cat === 'feature' ? '✨' :
+                                                                                        cat === 'bugfix' ? '🐛' :
+                                                                                            cat === 'improvement' ? '📈' :
+                                                                                                cat === 'refactor' ? '🔧' : '🚀'} {count}
+                                                                                </Badge>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Items List */}
+                                                                    {isExpanded && (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', backgroundColor: tokens.colorNeutralStroke2 }}>
+                                                                            {dayItems.map(item => (
+                                                                                <div
+                                                                                    key={item.id}
+                                                                                    style={{
+                                                                                        padding: '10px 15px',
+                                                                                        backgroundColor: tokens.colorNeutralBackground1,
+                                                                                        cursor: 'pointer',
+                                                                                        borderLeft: item.category === 'feature' ? `3px solid ${tokens.colorPaletteGreenBorderActive}` :
+                                                                                            item.category === 'bugfix' ? `3px solid ${tokens.colorPaletteRedBorderActive}` : '3px solid transparent'
+                                                                                    }}
+                                                                                    onClick={() => {
+                                                                                        setExpandedItems(prev => {
+                                                                                            const next = new Set(prev);
+                                                                                            if (next.has(item.id)) next.delete(item.id);
+                                                                                            else next.add(item.id);
+                                                                                            return next;
+                                                                                        });
+                                                                                    }}
+                                                                                >
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                                        <Badge
+                                                                                            appearance="outline"
+                                                                                            size="extra-small"
+                                                                                            color={item.category === 'feature' ? 'success' :
+                                                                                                item.category === 'bugfix' ? 'danger' :
+                                                                                                    item.category === 'improvement' ? 'informative' :
+                                                                                                        item.category === 'refactor' ? 'warning' : 'brand'}
+                                                                                            style={{ minWidth: '70px', textAlign: 'center' }}
+                                                                                        >
+                                                                                            {item.category}
+                                                                                        </Badge>
+                                                                                        <Text weight="medium" style={{ flex: 1 }}>{item.title}</Text>
+                                                                                        {item.task_id && <Text size={200} weight="semibold">#{item.task_id}</Text>}
+                                                                                    </div>
+                                                                                    {expandedItems.has(item.id) && item.description && (
+                                                                                        <div style={{ marginTop: '5px', paddingLeft: '80px', color: tokens.colorNeutralForeground2, fontSize: '13px', whiteSpace: 'pre-wrap' }}>
+                                                                                            {item.description}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </Card>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                         {historyData.length === 0 && <Text>Zatím žádná historie.</Text>}
                                     </div>
                                 )}

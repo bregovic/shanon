@@ -4,6 +4,7 @@
 ## 1. Architektura a Design
 - **Žádné "divoké" fallbacky:** Kód nesmí tiše obcházet chyby (např. vytvářet tabulky za běhu bez evidence). Všechny změny struktury musí jít přes migrace.
 - **Evidence technického dluhu:** Veškerá dočasná funkcionalita, "hacky" nebo testovací funkce musí být evidovány v systému (tabulka `sys_technical_debt`).
+- **Historie změn:** Každý deploy, migrace nebo významná změna musí být zalogována v `development_history`.
 
 ## 2. Best Practices
 - **Databáze:**
