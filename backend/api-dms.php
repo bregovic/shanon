@@ -84,7 +84,11 @@ try {
         $alters = [
             "ALTER TABLE dms_doc_types ADD COLUMN IF NOT EXISTS description TEXT",
             "ALTER TABLE dms_doc_types ADD COLUMN IF NOT EXISTS number_series_id INTEGER",
-            "ALTER TABLE dms_documents ADD COLUMN IF NOT EXISTS storage_profile_id INTEGER"
+            "ALTER TABLE dms_documents ADD COLUMN IF NOT EXISTS storage_profile_id INTEGER",
+            "ALTER TABLE dms_attributes ADD COLUMN IF NOT EXISTS tenant_id UUID",
+            "ALTER TABLE dms_doc_types ADD COLUMN IF NOT EXISTS tenant_id UUID",
+            "ALTER TABLE dms_number_series ADD COLUMN IF NOT EXISTS tenant_id UUID",
+            "ALTER TABLE dms_storage_profiles ADD COLUMN IF NOT EXISTS tenant_id UUID"
         ];
         foreach ($alters as $q) {
             try { $pdo->exec($q); } catch (Exception $e) { /* ignore */ }
