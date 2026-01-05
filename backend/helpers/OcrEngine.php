@@ -271,8 +271,7 @@ class OcrEngine {
             }
         }
         
-        // SPECIAL FALLBACKS FOR ITEMS
-        }
+        // SPECIAL FALLBACKS FOR ITEMS (Corrected structure)
 
         // SPECIAL LOGIC: TOTAL AMOUNT (Global Search)
         if ($code === 'TOTAL_AMOUNT') {
@@ -356,7 +355,9 @@ class OcrEngine {
             if (in_array(mb_strtolower($w, 'UTF-8'), $stopWords)) break;
             $cleanParts[] = $w;
         }
-        // Reassemble, but careful. If we stripped everything, fallback to original?
+        // Reassemble
+        $candidate = implode(' ', $cleanParts);
+
         // Actually for Date/Number we extract specifically. For text we accept the cut.
         if ($dataType === 'text') {
             // For Supplier Name, check for "Variabilní symbol" or other distinct blocks on the same line
