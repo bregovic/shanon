@@ -264,20 +264,25 @@ export const DmsSettings: React.FC = () => {
                 id: editingStorageProfile?.rec_id
             };
 
-            await fetch(`/api/api-dms.php?action=${action}`, {
+            const res = await fetch(`/api/api-dms.php?action=${action}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-
-            setIsStorageDialogOpen(false);
-            // Reload data
-            const res = await fetch('/api/api-dms.php?action=storage_profiles');
             const json = await res.json();
-            if (json.success) setStorageProfiles(json.data);
+
+            if (json.success) {
+                setIsStorageDialogOpen(false);
+                // Reload data
+                const resList = await fetch('/api/api-dms.php?action=storage_profiles');
+                const jsonList = await resList.json();
+                if (jsonList.success) setStorageProfiles(jsonList.data);
+            } else {
+                alert('Chyba: ' + (json.error || 'Neznámá chyba'));
+            }
         } catch (e) {
             console.error(e);
-            alert('Chyba při ukládání úložiště');
+            alert('Chyba při ukládání úložiště: ' + String(e));
         }
     };
 

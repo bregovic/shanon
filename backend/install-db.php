@@ -671,7 +671,24 @@ END $$;",
                 END IF;
             END $$;
         "
-    ];
+            CREATE TABLE IF NOT EXISTS dms_storage_profiles (
+                rec_id SERIAL PRIMARY KEY,
+                tenant_id UUID,
+                name VARCHAR(100) NOT NULL,
+                storage_type VARCHAR(50) DEFAULT 'local',
+                base_path VARCHAR(500),
+                connection_string TEXT,
+                is_default BOOLEAN DEFAULT FALSE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            DO $$ 
+            BEGIN 
+                -- Alter connection_string to TEXT if it is not already
+                ALTER TABLE dms_storage_profiles ALTER COLUMN connection_string TYPE TEXT;
+            END $$;
+        "
 
 
     // --- EXECUTION ---
