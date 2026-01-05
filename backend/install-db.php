@@ -670,7 +670,8 @@ END $$;",
                     VALUES (v_tenant_id, 'BANK_CODE', 'Kód banky', 'text', true, false);
                 END IF;
             END $$;
-        "
+        ",
+        '024_storage_fix' => "
             CREATE TABLE IF NOT EXISTS dms_storage_profiles (
                 rec_id SERIAL PRIMARY KEY,
                 tenant_id UUID,
@@ -685,10 +686,10 @@ END $$;",
             
             DO $$ 
             BEGIN 
-                -- Alter connection_string to TEXT if it is not already
                 ALTER TABLE dms_storage_profiles ALTER COLUMN connection_string TYPE TEXT;
             END $$;
         "
+    ];
 
 
     // --- EXECUTION ---
