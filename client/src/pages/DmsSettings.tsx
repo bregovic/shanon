@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PageLayout, PageContent, PageHeader } from '../components/PageLayout';
 import {
     Button,
@@ -93,6 +94,7 @@ const STORAGE_TYPES = [
 ];
 
 export const DmsSettings: React.FC = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabValue>('doc_types');
     const [loading, setLoading] = useState(false);
@@ -264,12 +266,13 @@ export const DmsSettings: React.FC = () => {
     return (
         <PageLayout>
             <PageHeader>
-                <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
-                    Zpět
-                </Button>
-                <div style={{ width: '24px' }} />
-                <Settings24Regular />
-                <Title3 style={{ marginLeft: '8px' }}>Nastavení DMS</Title3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
+                        {t('common.back', 'Zpět')}
+                    </Button>
+                    <Settings24Regular />
+                    <Title3>{t('dms.settings.title', 'Nastavení DMS')}</Title3>
+                </div>
             </PageHeader>
 
             <PageContent>
@@ -278,10 +281,10 @@ export const DmsSettings: React.FC = () => {
                     onTabSelect={(_, data) => setActiveTab(data.value as TabValue)}
                     style={{ marginBottom: '24px' }}
                 >
-                    <Tab value="doc_types">Typy dokumentů</Tab>
-                    <Tab value="number_series">Číselné řady</Tab>
-                    <Tab value="attributes">Atributy</Tab>
-                    <Tab value="storage">Úložiště</Tab>
+                    <Tab value="doc_types">{t('dms.settings.doc_types', 'Typy dokumentů')}</Tab>
+                    <Tab value="number_series">{t('dms.settings.number_series', 'Číselné řady')}</Tab>
+                    <Tab value="attributes">{t('dms.settings.attributes', 'Atributy')}</Tab>
+                    <Tab value="storage">{t('dms.settings.storage', 'Úložiště')}</Tab>
                 </TabList>
 
                 {loading ? (
@@ -528,8 +531,8 @@ export const DmsSettings: React.FC = () => {
                             </div>
                         </DialogContent>
                         <DialogActions>
-                            <Button appearance="secondary" onClick={() => setIsAttrDialogOpen(false)}>Zrušit</Button>
-                            <Button appearance="primary" onClick={handleSaveAttribute}>Uložit</Button>
+                            <Button appearance="primary" onClick={handleSaveAttribute}>{t('common.save', 'Uložit')}</Button>
+                            <Button appearance="secondary" onClick={() => setIsAttrDialogOpen(false)}>{t('common.cancel', 'Zrušit')}</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>
@@ -585,8 +588,8 @@ export const DmsSettings: React.FC = () => {
                             </div>
                         </DialogContent>
                         <DialogActions>
-                            <Button appearance="secondary" onClick={() => setIsDocTypeDialogOpen(false)}>Zrušit</Button>
-                            <Button appearance="primary" onClick={handleSaveDocType} disabled={!docTypeForm.code || !docTypeForm.name}>Uložit</Button>
+                            <Button appearance="primary" onClick={handleSaveDocType} disabled={!docTypeForm.code || !docTypeForm.name}>{t('common.save', 'Uložit')}</Button>
+                            <Button appearance="secondary" onClick={() => setIsDocTypeDialogOpen(false)}>{t('common.cancel', 'Zrušit')}</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>

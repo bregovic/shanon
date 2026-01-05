@@ -20,84 +20,8 @@ $userId = $_SESSION['user']['rec_id'] ?? null;
 try {
     $pdo = DB::connect();
 
-    // ===== DEBUG SETUP: CREATE TABLES =====
-    if ($action === 'debug_setup') {
-        $queries = [
-            "CREATE TABLE IF NOT EXISTS dms_doc_types (
-                rec_id SERIAL PRIMARY KEY,
-                tenant_id UUID,
-                code TEXT,
-                name TEXT,
-                description TEXT,
-                number_series_id INTEGER,
-                is_active BOOLEAN DEFAULT TRUE
-            )",
-            "CREATE TABLE IF NOT EXISTS dms_number_series (
-                rec_id SERIAL PRIMARY KEY,
-                tenant_id UUID,
-                code TEXT,
-                name TEXT,
-                prefix TEXT,
-                suffix TEXT,
-                number_length INTEGER DEFAULT 5,
-                current_number INTEGER DEFAULT 0,
-                is_default BOOLEAN DEFAULT FALSE,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_by INTEGER
-            )",
-            "CREATE TABLE IF NOT EXISTS dms_attributes (
-                rec_id SERIAL PRIMARY KEY,
-                tenant_id UUID,
-                name TEXT,
-                data_type TEXT,
-                is_required BOOLEAN DEFAULT FALSE,
-                is_searchable BOOLEAN DEFAULT TRUE,
-                default_value TEXT,
-                help_text TEXT
-            )",
-            "CREATE TABLE IF NOT EXISTS dms_storage_profiles (
-                rec_id SERIAL PRIMARY KEY,
-                tenant_id UUID,
-                name TEXT,
-                storage_type TEXT,
-                connection_string TEXT,
-                base_path TEXT,
-                is_default BOOLEAN DEFAULT FALSE,
-                is_active BOOLEAN DEFAULT TRUE
-            )",
-            "CREATE TABLE IF NOT EXISTS sys_translations (
-                rec_id SERIAL PRIMARY KEY,
-                table_name VARCHAR(64) NOT NULL,
-                record_id INTEGER NOT NULL,
-                language_code VARCHAR(10) NOT NULL,
-                translation TEXT NOT NULL,
-                field_name VARCHAR(64) DEFAULT 'name',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )",
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_translations_unique ON sys_translations (table_name, record_id, language_code, field_name)"
-        ];
-
-        foreach ($queries as $q) {
-            $pdo->exec($q);
-        }
-        
-        // Add columns if missing (naive check via manual ALTER attempts, ignoring errors)
-        $alters = [
-            "ALTER TABLE dms_doc_types ADD COLUMN IF NOT EXISTS description TEXT",
-            "ALTER TABLE dms_doc_types ADD COLUMN IF NOT EXISTS number_series_id INTEGER",
-            "ALTER TABLE dms_documents ADD COLUMN IF NOT EXISTS storage_profile_id INTEGER",
-            "ALTER TABLE dms_attributes ADD COLUMN IF NOT EXISTS tenant_id UUID",
-            "ALTER TABLE dms_doc_types ADD COLUMN IF NOT EXISTS tenant_id UUID",
-            "ALTER TABLE dms_number_series ADD COLUMN IF NOT EXISTS tenant_id UUID",
-            "ALTER TABLE dms_storage_profiles ADD COLUMN IF NOT EXISTS tenant_id UUID"
-        ];
-        foreach ($alters as $q) {
-            try { $pdo->exec($q); } catch (Exception $e) { /* ignore */ }
-        }
-
-        echo json_encode(['success' => true, 'message' => 'Tables created/verified']);
-        exit;
-    }
+    // ===== DEBUG SETUP: CREATE TABLES (MIGRATED TO install-db.php) =====
+    // if ($action === 'debug_setup') { ... }
     
     // ===== LIST DOCUMENTS =====
     if ($action === 'list') {

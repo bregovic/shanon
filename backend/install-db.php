@@ -352,6 +352,52 @@ END $$;",
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT '2026-01-04', 'UI Standardization (Requests & Dashboard)', 'Refactored Requests Form and Dashboard to meet new UI Standard (Two-Bar Layout, Mobile Scroll, Menu Hierarchy). Fixed variable declaration bugs in RequestsPage.', 'Refactor', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'UI Standardization (Requests & Dashboard)' AND date = '2026-01-04');
+        ",
+        '016_dms_translations_and_tenant' => "
+            -- 1. Create System Translations Table
+            CREATE TABLE IF NOT EXISTS sys_translations (
+                rec_id SERIAL PRIMARY KEY,
+                table_name VARCHAR(64) NOT NULL,
+                record_id INTEGER NOT NULL,
+                language_code VARCHAR(10) NOT NULL,
+                translation TEXT NOT NULL,
+                field_name VARCHAR(64) DEFAULT 'name',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_translations_unique ON sys_translations (table_name, record_id, language_code, field_name);
+
+            -- 2. Add Tenant ID to DMS tables (if missing)
+            DO $$ 
+            BEGIN 
+                -- dms_doc_types has tenant_id via 002 but let's ensure
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='tenant_id') THEN 
+                    ALTER TABLE dms_doc_types ADD COLUMN tenant_id UUID;
+                END IF;
+                -- dms_attributes
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_attributes' AND column_name='tenant_id') THEN 
+                    ALTER TABLE dms_attributes ADD COLUMN tenant_id UUID;
+                END IF;
+                -- dms_number_series
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_number_series' AND column_name='tenant_id') THEN 
+                    ALTER TABLE dms_number_series ADD COLUMN tenant_id UUID;
+                END IF;
+                -- dms_storage_profiles
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='tenant_id') THEN 
+                    ALTER TABLE dms_storage_profiles ADD COLUMN tenant_id UUID;
+                END IF;
+                -- dms_doc_types description and series
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='description') THEN 
+                    ALTER TABLE dms_doc_types ADD COLUMN description TEXT;
+                END IF;
+                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='number_series_id') THEN 
+                    ALTER TABLE dms_doc_types ADD COLUMN number_series_id INTEGER;
+                END IF;
+            END $$;
+
+            -- 3. Log this feature
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT '2026-01-05', 'DMS Translations & Multi-Tenant', 'Implemented sys_translations for multilingual attributes and ensured tenant_id across all DMS tables.', 'Feature', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Translations & Multi-Tenant' AND date = '2026-01-05');
         "
     ];
 
