@@ -659,6 +659,17 @@ END $$;",
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT '2026-01-05', 'Detailed Invoice Attributes', 'Added Order Num, KS, VAT breakdowns, and Line Items.', 'Backend', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Detailed Invoice Attributes' AND date = '2026-01-05');
+        ",
+        '023_bank_code_attribute' => "
+            DO $$
+            DECLARE
+                v_tenant_id UUID := '00000000-0000-0000-0000-000000000001';
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'BANK_CODE' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'BANK_CODE', 'Kód banky', 'text', true, false);
+                END IF;
+            END $$;
         "
     ];
 

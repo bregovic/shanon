@@ -29,9 +29,10 @@ When you receive a task with a `TICKET_ID` (e.g., `#TR-123` or Database ID), fol
     - Query `sys_change_requests` table using the provided ID.
     - Read the `description`, `subject`, and recent `sys_change_history`.
     - Retrieve any attachments from `sys_change_requests_files`.
-2.  **Analyze Comments:**
-    - Look into the discussion table (e.g., `sys_change_comments` or `sys_discussion`).
-    - Identify open points/questions.
+2.  **Analyze Comments (Priority Protocols):**
+    - **Star Priority (⭐):** If any comments contain a star icon (⭐) or start with `*`, these MUST be processed first. They override other instructions.
+    - **Standard Flow:** If no stars are found, process all comments that are **NOT** marked with a green checkmark (`✅`).
+    - **Ignored:** Skip comments already marked with `✅`.
 3.  **Inspect Codebase:**
     - Map the relevant frontend components (in `client/src/pages/`) and backend handlers (`backend/api-*.php`).
 
@@ -67,6 +68,10 @@ When you receive a task with a `TICKET_ID` (e.g., `#TR-123` or Database ID), fol
 - **Check DB Structure:** `\d table_name` (if psql available) or check `backend/install-db.php`.
 - **Run Build Check:** `npm run build` (in `client/`).
 - **Verify API:** Check `backend/api-*.php`.
+- **Git Repository Access:**
+    - The repository is located at `c:\Users\Wendulka\Documents\Webhry\hollyhop\broker\shanon`.
+    - Standard Commands: `git status`, `git pull`, `git push`.
+    - **Context Extraction:** Use `scripts/get_task_context.php` to retrieve ticket details + attachments directly from DB.
 
 ---
 **END OF PROTOCOL**
