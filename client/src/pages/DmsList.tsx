@@ -134,24 +134,21 @@ export const DmsList: React.FC = () => {
     return (
         <PageLayout>
             <PageHeader>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
-                        Zpět
-                    </Button>
-                    <Breadcrumb>
-                        <BreadcrumbItem>
-                            <BreadcrumbButton onClick={() => navigate('/dms')}>DMS</BreadcrumbButton>
-                        </BreadcrumbItem>
-                        <BreadcrumbDivider />
-                        <BreadcrumbItem>
-                            <BreadcrumbButton current>Všechny dokumenty</BreadcrumbButton>
-                        </BreadcrumbItem>
-                    </Breadcrumb>
-                </div>
+                <Breadcrumb>
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => navigate('/dms')}>Moduly</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    <BreadcrumbDivider />
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => navigate('/dms')}>DMS</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    <BreadcrumbDivider />
+                    <BreadcrumbItem>
+                        <BreadcrumbButton current>Všechny dokumenty</BreadcrumbButton>
+                    </BreadcrumbItem>
+                </Breadcrumb>
                 <div style={{ flex: 1 }} />
-                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData}>
-                    Obnovit
-                </Button>
+                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData} aria-label="Obnovit" />
                 <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate('/dms/import')}>
                     Nový dokument
                 </Button>
@@ -166,9 +163,6 @@ export const DmsList: React.FC = () => {
                     onChange={(_e, data) => setSearchText(data.value)}
                     style={{ minWidth: '300px' }}
                 />
-                <Button appearance="subtle" icon={<Filter24Regular />}>
-                    Filtry
-                </Button>
             </PageFilterBar>
 
             <PageContent>
