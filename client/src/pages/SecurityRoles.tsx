@@ -22,6 +22,7 @@ import {
     Save24Regular,
     Search24Regular
 } from '@fluentui/react-icons';
+import { PageLayout, PageHeader, PageContent, PageFilterBar } from '../components/PageLayout';
 import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
@@ -272,127 +273,134 @@ export default function SecurityRoles() {
     }
 
     return (
-        <div className={styles.container}>
-            {/* Header */}
-            <div className={styles.header}>
-                <Shield24Regular />
-                <Title2>Správa rolí zabezpečení</Title2>
-            </div>
+        <PageLayout>
+            <PageHeader>
+                <div className={styles.header}>
+                    <Shield24Regular />
+                    <Title2>Správa rolí zabezpečení</Title2>
+                </div>
+            </PageHeader>
+            <PageFilterBar>
+                <Input
+                    className={styles.searchBox}
+                    placeholder="Hledat objekty..."
+                    contentBefore={<Search24Regular />}
+                    value={searchQuery}
+                    onChange={(_, d) => setSearchQuery(d.value)}
+                    disabled={!selectedRole}
+                />
+            </PageFilterBar>
+            <PageContent>
+                {message && (
+                    <MessageBar intent={message.type === 'success' ? 'success' : 'error'} style={{ marginBottom: '16px' }}>
+                        <MessageBarBody>
+                            <MessageBarTitle>{message.type === 'success' ? 'Úspěch' : 'Chyba'}</MessageBarTitle>
+                            {message.text}
+                        </MessageBarBody>
+                    </MessageBar>
+                )}
 
-            {message && (
-                <MessageBar intent={message.type === 'success' ? 'success' : 'error'}>
-                    <MessageBarBody>
-                        <MessageBarTitle>{message.type === 'success' ? 'Úspěch' : 'Chyba'}</MessageBarTitle>
-                        {message.text}
-                    </MessageBarBody>
-                </MessageBar>
-            )}
-
-            <div className={styles.grid}>
-                {/* Left: Roles List */}
-                <Card>
-                    <CardHeader header={<Title3>Role</Title3>} />
-                    <div className={styles.rolesList}>
-                        {roles.map(role => (
-                            <div
-                                key={role.rec_id}
-                                className={`${styles.roleItem} ${selectedRole?.rec_id === role.rec_id ? styles.roleItemActive : ''}`}
-                                onClick={() => setSelectedRole(role)}
-                            >
-                                <Text weight="semibold">{role.code}</Text>
-                                {role.description && (
-                                    <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                                        {role.description}
-                                    </Text>
-                                )}
-                            </div>
-                        ))}
-
-                        <Divider style={{ margin: '12px 0' }} />
-
-                        {/* New Role */}
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <Input
-                                placeholder="Kód nové role"
-                                value={newRoleCode}
-                                onChange={(_, d) => setNewRoleCode(d.value)}
-                                style={{ flex: 1 }}
-                            />
-                            <Button icon={<Add24Regular />} onClick={handleCreateRole} />
-                        </div>
-                    </div>
-                </Card>
-
-                {/* Right: Permissions */}
-                <Card>
-                    <CardHeader
-                        header={
-                            <Title3>
-                                {selectedRole
-                                    ? `Oprávnění pro roli: ${selectedRole.code}`
-                                    : 'Vyberte roli'}
-                            </Title3>
-                        }
-                        action={
-                            selectedRole && (
-                                <Button
-                                    appearance="primary"
-                                    icon={<Save24Regular />}
-                                    onClick={handleSavePermissions}
-                                    disabled={saving}
+                <div className={styles.grid}>
+                    {/* Left: Roles List */}
+                    <Card>
+                        <CardHeader header={<Title3>Role</Title3>} />
+                        <div className={styles.rolesList}>
+                            {roles.map(role => (
+                                <div
+                                    key={role.rec_id}
+                                    className={`${styles.roleItem} ${selectedRole?.rec_id === role.rec_id ? styles.roleItemActive : ''}`}
+                                    onClick={() => setSelectedRole(role)}
                                 >
-                                    {saving ? 'Ukládám...' : 'Uložit'}
-                                </Button>
-                            )
-                        }
-                    />
-
-                    {selectedRole ? (
-                        <div className={styles.permissionsPanel}>
-                            <Input
-                                className={styles.searchBox}
-                                placeholder="Hledat objekty..."
-                                contentBefore={<Search24Regular />}
-                                value={searchQuery}
-                                onChange={(_, d) => setSearchQuery(d.value)}
-                            />
-
-                            {Object.entries(groupedObjects).map(([type, objs]) => (
-                                <div key={type}>
-                                    <Text className={styles.typeLabel}>{type}</Text>
-                                    <div className={styles.objectsGrid}>
-                                        {objs.map(obj => (
-                                            <div key={obj.rec_id} className={styles.objectCard}>
-                                                <Text weight="semibold">{obj.display_name}</Text>
-                                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                                                    {obj.identifier}
-                                                </Text>
-                                                <div className={styles.accessLevelRow}>
-                                                    {ACCESS_LEVEL_KEYS.map(level => (
-                                                        <Button
-                                                            key={level.value}
-                                                            className={styles.accessButton}
-                                                            size="small"
-                                                            appearance={permissions[obj.rec_id] === level.value ? 'primary' : 'subtle'}
-                                                            onClick={() => handleSetAccessLevel(obj.rec_id, level.value)}
-                                                        >
-                                                            {t(level.key)}
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <Text weight="semibold">{role.code}</Text>
+                                    {role.description && (
+                                        <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                                            {role.description}
+                                        </Text>
+                                    )}
                                 </div>
                             ))}
+
+                            <Divider style={{ margin: '12px 0' }} />
+
+                            {/* New Role */}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <Input
+                                    placeholder="Kód nové role"
+                                    value={newRoleCode}
+                                    onChange={(_, d) => setNewRoleCode(d.value)}
+                                    style={{ flex: 1 }}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <Button icon={<Add24Regular />} onClick={(e) => { e.stopPropagation(); handleCreateRole(); }} />
+                            </div>
                         </div>
-                    ) : (
-                        <Text style={{ padding: '24px', color: tokens.colorNeutralForeground3 }}>
-                            Vyberte roli ze seznamu vlevo pro zobrazení a úpravu oprávnění.
-                        </Text>
-                    )}
-                </Card>
-            </div>
-        </div>
+                    </Card>
+
+                    {/* Right: Permissions */}
+                    <Card>
+                        <CardHeader
+                            header={
+                                <Title3>
+                                    {selectedRole
+                                        ? `Oprávnění pro roli: ${selectedRole.code}`
+                                        : 'Vyberte roli'}
+                                </Title3>
+                            }
+                            action={
+                                selectedRole && (
+                                    <Button
+                                        appearance="primary"
+                                        icon={<Save24Regular />}
+                                        onClick={handleSavePermissions}
+                                        disabled={saving}
+                                    >
+                                        {saving ? 'Ukládám...' : 'Uložit'}
+                                    </Button>
+                                )
+                            }
+                        />
+
+                        {selectedRole ? (
+                            <div className={styles.permissionsPanel}>
+                                {/* Search moved to FilterBar */}
+
+                                {Object.entries(groupedObjects).map(([type, objs]) => (
+                                    <div key={type}>
+                                        <Text className={styles.typeLabel}>{type}</Text>
+                                        <div className={styles.objectsGrid}>
+                                            {objs.map(obj => (
+                                                <div key={obj.rec_id} className={styles.objectCard}>
+                                                    <Text weight="semibold">{obj.display_name}</Text>
+                                                    <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                                                        {obj.identifier}
+                                                    </Text>
+                                                    <div className={styles.accessLevelRow}>
+                                                        {ACCESS_LEVEL_KEYS.map(level => (
+                                                            <Button
+                                                                key={level.value}
+                                                                className={styles.accessButton}
+                                                                size="small"
+                                                                appearance={permissions[obj.rec_id] === level.value ? 'primary' : 'subtle'}
+                                                                onClick={() => handleSetAccessLevel(obj.rec_id, level.value)}
+                                                            >
+                                                                {t(level.key)}
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <Text style={{ padding: '24px', color: tokens.colorNeutralForeground3 }}>
+                                Vyberte roli ze seznamu vlevo pro zobrazení a úpravu oprávnění.
+                            </Text>
+                        )}
+                    </Card>
+                </div>
+            </PageContent>
+        </PageLayout>
     );
 }

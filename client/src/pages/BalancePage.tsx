@@ -15,7 +15,7 @@ import { ArrowClockwise24Regular, GroupList24Regular } from "@fluentui/react-ico
 import { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
-import { PageLayout, PageContent, PageHeader } from "../components/PageLayout";
+import { PageLayout, PageContent, PageHeader, PageFilterBar } from "../components/PageLayout";
 import { useTranslation } from "../context/TranslationContext";
 
 const useStyles = makeStyles({
@@ -216,20 +216,20 @@ export const BalancePage = () => {
             <PageHeader>
                 <Toolbar>
                     <ToolbarButton icon={<ArrowClockwise24Regular />} onClick={loadData}>{t('btn_refresh')}</ToolbarButton>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '16px' }}>
-                        <GroupList24Regular />
-                        <Dropdown
-                            value={groupBy === 'ticker_platform' ? 'Ticker + Platforma' : 'Jen Ticker'}
-                            selectedOptions={[groupBy]}
-                            onOptionSelect={(_, data) => setGroupBy(data.optionValue as 'ticker_platform' | 'ticker')}
-                            style={{ minWidth: '180px' }}
-                        >
-                            <Option value="ticker_platform">Ticker + Platforma</Option>
-                            <Option value="ticker">Jen Ticker (agregovaně)</Option>
-                        </Dropdown>
-                    </div>
                 </Toolbar>
             </PageHeader>
+            <PageFilterBar>
+                <GroupList24Regular />
+                <Dropdown
+                    value={groupBy === 'ticker_platform' ? 'Ticker + Platforma' : 'Jen Ticker'}
+                    selectedOptions={[groupBy]}
+                    onOptionSelect={(_, data) => setGroupBy(data.optionValue as 'ticker_platform' | 'ticker')}
+                    style={{ minWidth: '180px' }}
+                >
+                    <Option value="ticker_platform">Ticker + Platforma</Option>
+                    <Option value="ticker">Jen Ticker (agregovaně)</Option>
+                </Dropdown>
+            </PageFilterBar>
             <PageContent>
                 {summary && (
                     <div className={styles.summaryContainer}>

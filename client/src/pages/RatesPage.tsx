@@ -23,7 +23,7 @@ import {
 import { Add24Regular, ArrowClockwise24Regular } from '@fluentui/react-icons';
 import axios from 'axios';
 import { SmartDataGrid } from "../components/SmartDataGrid";
-import { PageLayout, PageHeader, PageContent } from "../components/PageLayout";
+import { PageLayout, PageHeader, PageContent, PageFilterBar } from "../components/PageLayout";
 import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
@@ -140,21 +140,20 @@ export const RatesPage = () => {
                 <Toolbar>
                     <ToolbarButton icon={<Add24Regular />} onClick={() => setIsAddOpen(true)}>{t('btn_add_rate')}</ToolbarButton>
                     <ToolbarButton icon={<ArrowClockwise24Regular />} onClick={() => setIsYearOpen(true)}>{t('btn_import_cnb')}</ToolbarButton>
-                    <ToolbarDivider />
-                    <div className={styles.filters}>
-                        <Label size="small">{t('filter_currency')}</Label>
-                        <Dropdown
-                            placeholder={t('all')}
-                            onOptionSelect={(_e, data) => setSelectedCurrency(data.optionValue || '')}
-                            value={selectedCurrency || t('all')}
-                            size="small"
-                        >
-                            <Option value="">{t('all')}</Option>
-                            {currencies.map(c => <Option key={c} value={c}>{c}</Option>)}
-                        </Dropdown>
-                    </div>
                 </Toolbar>
             </PageHeader>
+            <PageFilterBar>
+                <Label size="small">{t('filter_currency')}</Label>
+                <Dropdown
+                    placeholder={t('all')}
+                    onOptionSelect={(_e, data) => setSelectedCurrency(data.optionValue || '')}
+                    value={selectedCurrency || t('all')}
+                    size="small"
+                >
+                    <Option value="">{t('all')}</Option>
+                    {currencies.map(c => <Option key={c} value={c}>{c}</Option>)}
+                </Dropdown>
+            </PageFilterBar>
             <PageContent>
                 {loading && <Spinner label={t('loading_rates')} />}
 

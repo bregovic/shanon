@@ -18,7 +18,7 @@ import {
     Filter24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
-import { ActionBar } from '../components/ActionBar';
+import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
 import { DataGrid } from '../components/DataGrid';
 import type { DataGridColumn } from '../components/DataGrid';
 import { useTranslation } from '../context/TranslationContext'; // Assuming context exists or use hardcoded for now if uncertain
@@ -166,8 +166,8 @@ export const DmsList: React.FC = () => {
     ];
 
     return (
-        <div className={styles.root}>
-            <ActionBar>
+        <PageLayout>
+            <PageHeader>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
                         Zpět
@@ -189,10 +189,10 @@ export const DmsList: React.FC = () => {
                 <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate('/dms/import')}>
                     Nový dokument
                 </Button>
-            </ActionBar>
+            </PageHeader>
 
             {/* Filter Bar Standard */}
-            <div className={styles.filterBar}>
+            <PageFilterBar>
                 <Input
                     contentBefore={<Search24Regular />}
                     placeholder="Hledat dokumenty..."
@@ -203,9 +203,9 @@ export const DmsList: React.FC = () => {
                 <Button appearance="subtle" icon={<Filter24Regular />}>
                     Filtry
                 </Button>
-            </div>
+            </PageFilterBar>
 
-            <div className={styles.content}>
+            <PageContent>
                 <DataGrid
                     data={filteredDocs}
                     columns={columns}
@@ -214,7 +214,7 @@ export const DmsList: React.FC = () => {
                     emptyMessage="Žádné dokumenty"
                     onRowClick={(doc) => console.log('Open document:', doc.rec_id)}
                 />
-            </div>
-        </div>
+            </PageContent>
+        </PageLayout>
     );
 };

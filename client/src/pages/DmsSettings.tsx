@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ActionBar } from '../components/ActionBar';
+import { PageLayout, PageContent, PageHeader } from '../components/PageLayout';
 import {
     Button,
     Title3,
@@ -113,17 +113,17 @@ export const DmsSettings: React.FC = () => {
     }, [activeTab]);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <ActionBar>
+        <PageLayout>
+            <PageHeader>
                 <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
                     Zpět
                 </Button>
                 <div style={{ width: '24px' }} />
                 <Settings24Regular />
                 <Title3 style={{ marginLeft: '8px' }}>Nastavení DMS</Title3>
-            </ActionBar>
+            </PageHeader>
 
-            <div style={{ padding: '24px', flex: 1, overflow: 'auto' }}>
+            <PageContent>
                 <TabList
                     selectedValue={activeTab}
                     onTabSelect={(_, data) => setActiveTab(data.value as TabValue)}
@@ -283,7 +283,7 @@ export const DmsSettings: React.FC = () => {
                         )}
                     </>
                 )}
-            </div>
-        </div>
+            </PageContent>
+        </PageLayout>
     );
 };

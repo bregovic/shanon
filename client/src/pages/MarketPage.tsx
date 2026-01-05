@@ -35,7 +35,7 @@ import {
     Line24Regular
 } from '@fluentui/react-icons';
 import { SmartDataGrid } from '../components/SmartDataGrid';
-import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
+import { PageLayout, PageHeader, PageContent, PageFilterBar } from '../components/PageLayout';
 import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
@@ -372,15 +372,14 @@ const MarketPage = () => {
                             </DialogBody>
                         </DialogSurface>
                     </Dialog>
-                    <div style={{ display: 'flex', alignItems: 'center', marginLeft: '10px', gap: '8px' }}>
-                        <Switch label={showWatchedOnly ? t('filter_watched_on') : t('filter_watched_off')} checked={showWatchedOnly} onChange={(_ev, data) => setShowWatchedOnly(Boolean(data.checked))} />
-                    </div>
-                    <ToolbarDivider />
                     <ToolbarDivider />
                     <ToolbarButton aria-label="Refresh" icon={<ArrowClockwise24Regular />} onClick={() => window.location.reload()}>{t('btn_refresh')}</ToolbarButton>
                     <ToolbarButton aria-label="Update Prices" icon={<Flash24Regular />} onClick={() => setUpdateOptionsOpen(true)}>{t('btn_update_prices') || 'Aktualizovat ceny'}</ToolbarButton>
                 </Toolbar>
             </PageHeader>
+            <PageFilterBar>
+                <Switch label={showWatchedOnly ? t('filter_watched_on') : t('filter_watched_off')} checked={showWatchedOnly} onChange={(_ev, data) => setShowWatchedOnly(Boolean(data.checked))} />
+            </PageFilterBar>
             <PageContent noScroll>
                 {loading ? <Spinner label={t('loading_data')} /> : (
                     <div className={styles.gridCard} style={{ flex: 1, minHeight: 0 }}>

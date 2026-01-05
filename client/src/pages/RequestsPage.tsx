@@ -30,11 +30,11 @@ import { useTranslation } from "../context/TranslationContext";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { useState, useEffect, type SyntheticEvent } from "react";
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ActionBar } from "../components/ActionBar";
+
 import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
 import type { SelectionItemId, OnSelectionChangeData } from '@fluentui/react-components';
-import { PageLayout, PageContent, PageHeader } from "../components/PageLayout";
+import { PageLayout, PageContent, PageHeader, PageFilterBar } from "../components/PageLayout";
 import { VisualEditor } from "../components/VisualEditor";
 import {
     Attach24Regular,
@@ -1094,7 +1094,7 @@ const RequestsPage = () => {
 
     return (
         <PageLayout>
-            <ActionBar>
+            <PageHeader>
                 <Breadcrumb>
                     <BreadcrumbItem>
                         <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
@@ -1142,63 +1142,61 @@ const RequestsPage = () => {
                     <Button icon={<Attach24Regular />} appearance="subtle" title="Přílohy" />
                     <Button icon={<Share24Regular />} appearance="subtle" title="Export/Import" />
                 </div>
-            </ActionBar>
-            <PageContent noScroll>
-                <div className={styles.root}>
-                    <div className={styles.filterBar}>
-                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Switch
-                                    label="Jen moje"
-                                    checked={showOnlyMine}
-                                    onChange={(_, data) => {
-                                        setShowOnlyMine(!!data.checked);
-                                        setSearchParams(prev => {
-                                            if (data.checked) prev.set('mine', '1');
-                                            else prev.delete('mine');
-                                            return prev;
-                                        });
-                                    }}
-                                />
-                            </div>
-                            <Popover trapFocus>
-                                <PopoverTrigger disableButtonEnhancement>
-                                    <Button icon={<Filter24Regular />}>
-                                        Stavy {selectedStatuses.length < allStatuses.length ? `(${selectedStatuses.length})` : ''}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverSurface>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <Text weight="semibold" style={{ marginBottom: '8px' }}>Filtrovat stavy</Text>
-                                        {allStatuses.map(s => (
-                                            <Checkbox
-                                                key={s}
-                                                label={s}
-                                                checked={selectedStatuses.includes(s)}
-                                                onChange={(_, data) => {
-                                                    if (data.checked) setSelectedStatuses(prev => [...prev, s]);
-                                                    else setSelectedStatuses(prev => prev.filter(x => x !== s));
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </PopoverSurface>
-                            </Popover>
-                        </div>
+            </PageHeader>
+            <PageFilterBar>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Switch
+                            label="Jen moje"
+                            checked={showOnlyMine}
+                            onChange={(_, data) => {
+                                setShowOnlyMine(!!data.checked);
+                                setSearchParams(prev => {
+                                    if (data.checked) prev.set('mine', '1');
+                                    else prev.delete('mine');
+                                    return prev;
+                                });
+                            }}
+                        />
                     </div>
-                    <div style={{ flex: 1, minHeight: 0, boxShadow: tokens.shadow2, borderRadius: tokens.borderRadiusMedium, overflow: 'auto' }}>
-                        <div style={{ minWidth: '1000px', height: '100%' }}>
-                            {loadingRequests ? <Spinner /> : (
-                                <SmartDataGrid
-                                    items={requests}
-                                    columns={columns}
-                                    getRowId={(i: RequestItem) => i.id}
-                                    onRowClick={setSelectedRequest}
-                                    selectedItems={selectedItems}
-                                    onSelectionChange={handleSelectionChange}
-                                />
-                            )}
-                        </div>
+                    <Popover trapFocus>
+                        <PopoverTrigger disableButtonEnhancement>
+                            <Button icon={<Filter24Regular />}>
+                                Stavy {selectedStatuses.length < allStatuses.length ? `(${selectedStatuses.length})` : ''}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverSurface>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <Text weight="semibold" style={{ marginBottom: '8px' }}>Filtrovat stavy</Text>
+                                {allStatuses.map(s => (
+                                    <Checkbox
+                                        key={s}
+                                        label={s}
+                                        checked={selectedStatuses.includes(s)}
+                                        onChange={(_, data) => {
+                                            if (data.checked) setSelectedStatuses(prev => [...prev, s]);
+                                            else setSelectedStatuses(prev => prev.filter(x => x !== s));
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        </PopoverSurface>
+                    </Popover>
+                </div>
+            </PageFilterBar>
+            <PageContent noScroll>
+                <div style={{ flex: 1, minHeight: 0, boxShadow: tokens.shadow2, borderRadius: tokens.borderRadiusMedium, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ minWidth: '1000px', height: '100%' }}>
+                        {loadingRequests ? <Spinner /> : (
+                            <SmartDataGrid
+                                items={requests}
+                                columns={columns}
+                                getRowId={(i: RequestItem) => i.id}
+                                onRowClick={setSelectedRequest}
+                                selectedItems={selectedItems}
+                                onSelectionChange={handleSelectionChange}
+                            />
+                        )}
                     </div>
                 </div>
             </PageContent>
