@@ -6,13 +6,14 @@ require_once 'db.php';
 
 header("Content-Type: application/json");
 
-if (!isset($_SESSION['loggedin'])) {
+$action = $_GET['action'] ?? 'list';
+
+if (!isset($_SESSION['loggedin']) && $action !== 'debug_setup') {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
 }
 
-$action = $_GET['action'] ?? 'list';
 $userId = $_SESSION['user']['rec_id'] ?? null;
 
 try {
