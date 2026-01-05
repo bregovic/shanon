@@ -16,9 +16,8 @@ import {
     Spinner,
     Text
 } from '@fluentui/react-components';
-import { Add24Regular, Delete24Regular, Save24Regular } from '@fluentui/react-icons';
+import { Add24Regular, Delete24Regular } from '@fluentui/react-icons';
 import axios from 'axios';
-import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
     content: {
@@ -66,7 +65,6 @@ const LANGUAGES = [
 
 export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, title, fieldName = 'name' }: TranslationDialogProps) => {
     const styles = useStyles();
-    const { t } = useTranslation();
     const [translations, setTranslations] = useState<TranslationItem[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -81,19 +79,13 @@ export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, tit
         ? `http://localhost/Webhry/hollyhop/broker/broker 2.0/${endpoint}`
         : `/api/${endpoint}`;
 
-    useEffect(() => {
-        if (open && recordId) {
-            loadTranslations();
-        }
-    }, [open, recordId]);
-
     const loadTranslations = async () => {
         setLoading(true);
         try {
             const res = await axios.get(getApiUrl(`api-system.php?action=translations_list&table_name=${tableName}&record_id=${recordId}`));
             if (res.data.success) {
                 // Filter by field name manually if backend returns all fields for record
-                const filtered = res.data.data.filter((i: any) => i.field_name === fieldName);
+                const filtered = res.data.data.filter((i: TranslationItem) => i.field_name === fieldName);
                 setTranslations(filtered);
             }
         } catch (e) {
@@ -102,6 +94,13 @@ export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, tit
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (open && recordId) {
+            loadTranslations();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, recordId]);
 
     const handleSave = async (lang: string, val: string) => {
         if (!val.trim()) return;

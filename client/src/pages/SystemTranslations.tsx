@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Table,
     TableHeader,
@@ -11,17 +11,22 @@ import {
     Card,
     Badge,
     Spinner,
-    makeStyles
+    makeStyles,
+    Input,
+    Label
 } from '@fluentui/react-components';
-import { Delete24Regular } from '@fluentui/react-icons';
+import { Delete24Regular, Search24Regular } from '@fluentui/react-icons';
 import axios from 'axios';
-import PageLayout from '../components/PageLayout';
-import { PageHeader } from '../components/PageLayout';
-import { PageContent } from '../components/PageLayout';
+import { PageLayout, PageHeader, PageContent, PageFilterBar } from '../components/PageLayout';
 
 const useStyles = makeStyles({
     tableContainer: {
         overflowX: 'auto',
+    },
+    filterGroup: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px'
     }
 });
 
@@ -40,6 +45,11 @@ export const SystemTranslations = () => {
     const [translations, setTranslations] = useState<Translation[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Filters
+    const [filterTable, setFilterTable] = useState('');
+    const [filterLang, setFilterLang] = useState('');
+    const [filterText, setFilterText] = useState('');
+
     const isDev = import.meta.env.DEV;
     const getApiUrl = (endpoint: string) => isDev
         ? `http://localhost/Webhry/hollyhop/broker/broker 2.0/${endpoint}`
@@ -47,9 +57,10 @@ export const SystemTranslations = () => {
 
     useEffect(() => {
         loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await axios.get(getApiUrl('api-system.php?action=translations_list'));
@@ -61,7 +72,7 @@ export const SystemTranslations = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     const handleDelete = async (id: number) => {
         if (!confirm('Opravdu smazat tento překlad?')) return;
@@ -74,13 +85,52 @@ export const SystemTranslations = () => {
         }
     };
 
+    const filteredTranslations = useMemo(() => {
+        return translations.filter(t => {
+            const matchTable = t.table_name.toLowerCase().includes(filterTable.toLowerCase());
+            const matchLang = t.language_code.toLowerCase().includes(filterLang.toLowerCase());
+            const matchText = t.translation.toLowerCase().includes(filterText.toLowerCase()) ||
+                t.field_name.toLowerCase().includes(filterText.toLowerCase());
+            return matchTable && matchLang && matchText;
+        });
+    }, [translations, filterTable, filterLang, filterText]);
+
     return (
         <PageLayout>
             <PageHeader>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Text size={500} weight="semibold">Systémové Překlady</Text>
+                    <Badge appearance="tint" style={{ marginLeft: '10px' }}>{filteredTranslations.length}</Badge>
                 </div>
             </PageHeader>
+            <PageFilterBar>
+                <div className={styles.filterGroup}>
+                    <Label size="small">Tabulka</Label>
+                    <Input
+                        placeholder="Např. dms_attributes"
+                        value={filterTable}
+                        onChange={(_e, d) => setFilterTable(d.value)}
+                        contentBefore={<Search24Regular />}
+                    />
+                </div>
+                <div className={styles.filterGroup}>
+                    <Label size="small">Jazyk</Label>
+                    <Input
+                        placeholder="en/de..."
+                        value={filterLang}
+                        onChange={(_e, d) => setFilterLang(d.value)}
+                        style={{ width: '100px' }}
+                    />
+                </div>
+                <div className={styles.filterGroup}>
+                    <Label size="small">Hledat text</Label>
+                    <Input
+                        placeholder="Text překladu..."
+                        value={filterText}
+                        onChange={(_e, d) => setFilterText(d.value)}
+                    />
+                </div>
+            </PageFilterBar>
             <PageContent>
                 <Card>
                     {loading ? <Spinner label="Načítám překlady..." /> : (
@@ -98,7 +148,7 @@ export const SystemTranslations = () => {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {translations.map((item) => (
+                                    {filteredTranslations.map((item) => (
                                         <TableRow key={item.rec_id}>
                                             <TableCell><Badge appearance="tint">{item.table_name}</Badge></TableCell>
                                             <TableCell>{item.record_id}</TableCell>
@@ -116,10 +166,10 @@ export const SystemTranslations = () => {
                                             </TableCell>
                                         </TableRow>
                                     ))}
-                                    {translations.length === 0 && (
+                                    {filteredTranslations.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={7} style={{ textAlign: 'center', padding: '20px' }}>
-                                                Žádné překlady nenalezeny.
+                                                {translations.length === 0 ? "Žádné data." : "Žádné výsledky odpovídající filtru."}
                                             </TableCell>
                                         </TableRow>
                                     )}

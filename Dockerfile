@@ -1,5 +1,5 @@
 # --- STAGE 1: Build Frontend (React) ---
-FROM node:18-alpine as frontend-builder
+FROM node:22-alpine as frontend-builder
 
 # Set memory limit to prevent OOM (Exit 137)
 ENV NODE_OPTIONS="--max-old-space-size=4096"

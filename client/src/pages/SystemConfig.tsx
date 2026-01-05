@@ -24,7 +24,6 @@ import {
 import { MenuSection, MenuItem } from '../components/MenuSection';
 import {
     Settings24Regular,
-    ChevronRight16Regular,
     ArrowLeft24Regular,
     ArrowClockwise24Regular,
     ChevronDown16Regular,
@@ -460,6 +459,7 @@ export const SystemConfig: React.FC = () => {
                     {/* 6. SETTINGS */}
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.global_params')} onClick={() => alert('Settings')} />
+                        <MenuItem label="Překlady" onClick={() => navigate('/system/translations')} />
                     </MenuSection>
                 </div>
 

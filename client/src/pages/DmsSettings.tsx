@@ -15,7 +15,6 @@ import {
     TableBody,
     TableCell,
     Spinner,
-    tokens,
     Badge,
     Dialog,
     DialogSurface,
@@ -31,8 +30,6 @@ import {
 } from '@fluentui/react-components';
 import {
     ArrowLeft24Regular,
-    Save24Regular,
-    Dismiss24Regular,
     Add24Regular,
     Edit24Regular,
     Translate24Regular,
@@ -110,6 +107,16 @@ export const DmsSettings: React.FC = () => {
     const [isAttrDialogOpen, setIsAttrDialogOpen] = useState(false);
     const [editingAttr, setEditingAttr] = useState<Attribute | null>(null);
 
+    // DocType Dialog State
+    const [isDocTypeDialogOpen, setIsDocTypeDialogOpen] = useState(false);
+    const [editingDocType, setEditingDocType] = useState<DocType | null>(null);
+    const [docTypeForm, setDocTypeForm] = useState({
+        code: '',
+        name: '',
+        description: '',
+        number_series_id: undefined as number | undefined
+    });
+
     // Translation State
     const [transOpen, setTransOpen] = useState(false);
     const [transTarget, setTransTarget] = useState<{ id: number, name: string } | null>(null);
@@ -173,6 +180,51 @@ export const DmsSettings: React.FC = () => {
         } catch (e) {
             console.error(e);
             alert('Chyba při ukládání atributu');
+        }
+    };
+
+    const openDocTypeDialog = (dt?: DocType) => {
+        if (dt) {
+            setEditingDocType(dt);
+            setDocTypeForm({
+                code: dt.code,
+                name: dt.name,
+                description: dt.description || '',
+                number_series_id: dt.number_series_id
+            });
+        } else {
+            setEditingDocType(null);
+            setDocTypeForm({
+                code: '',
+                name: '',
+                description: '',
+                number_series_id: undefined
+            });
+        }
+        setIsDocTypeDialogOpen(true);
+    };
+
+    const handleSaveDocType = async () => {
+        try {
+            const action = editingDocType ? 'doc_type_update' : 'doc_type_create';
+            const payload = {
+                ...docTypeForm,
+                id: editingDocType?.rec_id
+            };
+
+            await fetch(`/api/api-dms.php?action=${action}`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            setIsDocTypeDialogOpen(false);
+            // Reload data
+            const res = await fetch('/api/api-dms.php?action=doc_types');
+            const json = await res.json();
+            if (json.success) setDocTypes(json.data);
+        } catch (e) {
+            console.error(e);
+            alert('Chyba při ukládání typu dokumentu');
         }
     };
 
@@ -241,7 +293,7 @@ export const DmsSettings: React.FC = () => {
                             <Card style={{ padding: '16px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                     <Text weight="semibold" size={400}>Typy dokumentů</Text>
-                                    <Button appearance="primary" icon={<Add24Regular />} size="small">
+                                    <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openDocTypeDialog()}>
                                         Nový typ
                                     </Button>
                                 </div>
@@ -267,7 +319,7 @@ export const DmsSettings: React.FC = () => {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" />
+                                                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openDocTypeDialog(dt)} />
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -478,6 +530,63 @@ export const DmsSettings: React.FC = () => {
                         <DialogActions>
                             <Button appearance="secondary" onClick={() => setIsAttrDialogOpen(false)}>Zrušit</Button>
                             <Button appearance="primary" onClick={handleSaveAttribute}>Uložit</Button>
+                        </DialogActions>
+                    </DialogBody>
+                </DialogSurface>
+            </Dialog>
+
+            {/* DOC TYPE DIALOG */}
+            <Dialog open={isDocTypeDialogOpen} onOpenChange={(_, data) => setIsDocTypeDialogOpen(data.open)}>
+                <DialogSurface>
+                    <DialogBody>
+                        <DialogTitle>{editingDocType ? 'Upravit typ dokumentu' : 'Nový typ dokumentu'}</DialogTitle>
+                        <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div>
+                                <Label required>Kód</Label>
+                                <Input
+                                    value={docTypeForm.code}
+                                    onChange={(_, data) => setDocTypeForm({ ...docTypeForm, code: data.value })}
+                                    style={{ width: '100%' }}
+                                    placeholder="NAPŘ. INV, CONTRACT..."
+                                />
+                            </div>
+                            <div>
+                                <Label required>Název</Label>
+                                <Input
+                                    value={docTypeForm.name}
+                                    onChange={(_, data) => setDocTypeForm({ ...docTypeForm, name: data.value })}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div>
+                                <Label>Popis (volitelné)</Label>
+                                <Input
+                                    value={docTypeForm.description}
+                                    onChange={(_, data) => setDocTypeForm({ ...docTypeForm, description: data.value })}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div>
+                                <Label>Číselná řada (volitelné)</Label>
+                                <Dropdown
+                                    value={numberSeries.find(ns => ns.rec_id === docTypeForm.number_series_id)?.name || ''}
+                                    selectedOptions={docTypeForm.number_series_id ? [docTypeForm.number_series_id.toString()] : []}
+                                    onOptionSelect={(_, data) => setDocTypeForm({ ...docTypeForm, number_series_id: data.optionValue ? parseInt(data.optionValue) : undefined })}
+                                    style={{ width: '100%' }}
+                                    placeholder="-- Žádná --"
+                                >
+                                    <Option value="">-- Žádná --</Option>
+                                    {numberSeries.map(ns => (
+                                        <Option key={ns.rec_id} value={ns.rec_id.toString()} text={ns.name}>
+                                            {ns.name} ({ns.code})
+                                        </Option>
+                                    ))}
+                                </Dropdown>
+                            </div>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button appearance="secondary" onClick={() => setIsDocTypeDialogOpen(false)}>Zrušit</Button>
+                            <Button appearance="primary" onClick={handleSaveDocType} disabled={!docTypeForm.code || !docTypeForm.name}>Uložit</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>
