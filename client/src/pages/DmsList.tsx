@@ -8,12 +8,9 @@ import {
     Input,
     Badge
 } from '@fluentui/react-components';
-import {
-    Add24Regular,
-    ArrowLeft24Regular,
+Add24Regular,
     ArrowClockwise24Regular,
-    Search24Regular,
-    Filter24Regular
+    Search24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
