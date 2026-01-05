@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { makeStyles, tokens, Button, Tooltip } from '@fluentui/react-components';
-import { Filter24Regular } from '@fluentui/react-icons';
+import { Filter24Regular, ChevronDown24Regular, ChevronUp24Regular } from '@fluentui/react-icons';
 
 // --- Context ---
 interface PageLayoutContextValue {
@@ -85,11 +85,15 @@ export const PageHeader: React.FC<{ children: React.ReactNode }> = ({ children }
             {hasFilters && (
                 <Tooltip content={isFiltersOpen ? "Skrýt filtry" : "Zobrazit filtry"} relationship="label">
                     <Button
-                        appearance={isFiltersOpen ? "secondary" : "subtle"}
+                        appearance="subtle"
                         icon={<Filter24Regular />}
+                        iconPosition="before"
                         onClick={toggleFilters}
                         aria-label="Toggle Filters"
-                    />
+                    >
+                        Filtry
+                        {isFiltersOpen ? <ChevronUp24Regular style={{ marginLeft: 6 }} /> : <ChevronDown24Regular style={{ marginLeft: 6 }} />}
+                    </Button>
                 </Tooltip>
             )}
         </div>
