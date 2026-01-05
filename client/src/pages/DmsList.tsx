@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-    makeStyles,
-    tokens,
-    Button,
+Button,
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbButton,
@@ -21,41 +18,9 @@ import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
 import { DataGrid } from '../components/DataGrid';
 import type { DataGridColumn } from '../components/DataGrid';
-import { useTranslation } from '../context/TranslationContext'; // Assuming context exists or use hardcoded for now if uncertain
 
-const useStyles = makeStyles({
-    root: {
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        backgroundColor: tokens.colorNeutralBackground2
-    },
-    filterBar: {
-        display: 'flex',
-        gap: '16px',
-        flexWrap: 'nowrap',
-        alignItems: 'center',
-        padding: '8px 24px',
-        backgroundColor: tokens.colorNeutralBackground2,
-        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-        overflowX: 'auto',
-        width: '100%',
-        boxSizing: 'border-box',
-        flexShrink: 0
-    },
-    content: {
-        flex: 1,
-        overflow: 'hidden', // DataGrid handles its own scroll usually, or we wrap it
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '24px'
-    },
-    searchContainer: {
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center'
-    }
-});
+
+
 
 interface DmsDocument {
     rec_id: number;
@@ -68,7 +33,7 @@ interface DmsDocument {
 }
 
 export const DmsList: React.FC = () => {
-    const styles = useStyles();
+
     const navigate = useNavigate();
     const [documents, setDocuments] = useState<DmsDocument[]>([]);
     const [loading, setLoading] = useState(true);
