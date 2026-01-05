@@ -170,7 +170,7 @@ export const DmsList: React.FC = () => {
                     loading={loading}
                     pageSize={20}
                     emptyMessage="Žádné dokumenty"
-                    onRowClick={(doc) => console.log('Open document:', doc.rec_id)}
+                    onRowClick={(doc) => window.open(`/api/api-dms.php?action=view&id=${doc.rec_id}`, '_blank')}
                 />
             </PageContent>
         </PageLayout>

@@ -359,6 +359,47 @@ try {
         exit;
     }
 
+    // ===== DOWNLOAD/VIEW DOCUMENT =====
+    if ($action === 'download' || $action === 'view') {
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) {
+            http_response_code(400);
+            exit('ID required');
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM dms_documents WHERE rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$doc) {
+            http_response_code(404);
+            exit('Dokument nenalezen');
+        }
+
+        // Resolve path (basic implementation for local storage)
+        // If path starts with uploads/, prepend __DIR__
+        $filepath = $doc['storage_path'];
+        if (!file_exists($filepath)) {
+            $filepath = __DIR__ . '/' . $filepath;
+        }
+
+        if (!file_exists($filepath)) {
+            http_response_code(404);
+            exit('Soubor na disku neexistuje: ' . $filepath); // Debug info (remove in prod?)
+        }
+
+        // Headers
+        header('Content-Description: File Transfer');
+        header('Content-Type: ' . ($doc['mime_type'] ?: 'application/octet-stream'));
+        
+        $disposition = ($action === 'view') ? 'inline' : 'attachment';
+        header('Content-Disposition: ' . $disposition . '; filename="' . rawurlencode($doc['original_filename']) . '"');
+        
+        header('Content-Length: ' . filesize($filepath));
+        readfile($filepath);
+        exit;
+    }
+
     // ===== UNKNOWN ACTION =====
     echo json_encode(['success' => false, 'error' => 'Unknown action']);
 
