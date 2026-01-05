@@ -14,7 +14,10 @@ import {
     Text,
     Card,
     CardHeader,
-    Divider
+    Divider,
+    TableCellLayout,
+    TableColumnDefinition,
+    createTableColumn
 } from '@fluentui/react-components';
 import {
     Add24Regular,
@@ -26,8 +29,7 @@ import {
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
-import { DataGrid } from '../components/DataGrid';
-import type { DataGridColumn } from '../components/DataGrid';
+import { SmartDataGrid } from '../components/SmartDataGrid';
 
 interface DmsDocument {
     rec_id: number;
@@ -119,49 +121,47 @@ export const DmsList: React.FC = () => {
     };
 
     // Column definitions
-    const columns: DataGridColumn<DmsDocument>[] = [
-        {
-            key: 'rec_id',
-            label: 'ID',
-            sortable: true,
-            width: '60px',
-            render: (item) => <Text>{item.rec_id}</Text>
-        },
-        {
-            key: 'display_name',
-            label: 'Název',
-            sortable: true,
-            width: '30%',
-            render: (item) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: selectedDoc?.rec_id === item.rec_id ? '#0078d4' : 'inherit', fontWeight: selectedDoc?.rec_id === item.rec_id ? '600' : 'normal' }} onClick={(e) => { e.stopPropagation(); setSelectedDoc(item); setIsDrawerOpen(true); }}>
+    const columns: TableColumnDefinition<DmsDocument>[] = [
+        createTableColumn<DmsDocument>({
+            columnId: 'rec_id',
+            compare: (a, b) => a.rec_id - b.rec_id,
+            renderHeaderCell: () => 'ID',
+            renderCell: (item) => <Text>{item.rec_id}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'display_name',
+            compare: (a, b) => a.display_name.localeCompare(b.display_name),
+            renderHeaderCell: () => 'Název',
+            renderCell: (item) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: selectedDoc?.rec_id === item.rec_id ? '#0078d4' : 'inherit', fontWeight: selectedDoc?.rec_id === item.rec_id ? '600' : 'normal' }}>
                     <Document24Regular />
-                    <Text weight="semibold">{item.display_name}</Text>
+                    <Text weight={selectedDoc?.rec_id === item.rec_id ? 'semibold' : 'regular'}>{item.display_name}</Text>
                 </div>
             )
-        },
-        {
-            key: 'doc_type_name',
-            label: 'Typ',
-            sortable: true,
-            filterable: true
-        },
-        {
-            key: 'file_size_bytes',
-            label: 'Velikost',
-            sortable: true,
-            render: (item) => formatSize(item.file_size_bytes)
-        },
-        {
-            key: 'uploaded_by_name',
-            label: 'Autor',
-            sortable: true
-        },
-        {
-            key: 'ocr_status',
-            label: 'OCR Stav',
-            sortable: true,
-            filterable: true,
-            render: (item) => {
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'doc_type_name',
+            compare: (a, b) => (a.doc_type_name || '').localeCompare(b.doc_type_name || ''),
+            renderHeaderCell: () => 'Typ',
+            renderCell: (item) => <Text>{item.doc_type_name}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'file_size_bytes',
+            compare: (a, b) => a.file_size_bytes - b.file_size_bytes,
+            renderHeaderCell: () => 'Velikost',
+            renderCell: (item) => <Text>{formatSize(item.file_size_bytes)}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'uploaded_by_name',
+            compare: (a, b) => (a.uploaded_by_name || '').localeCompare(b.uploaded_by_name || ''),
+            renderHeaderCell: () => 'Autor',
+            renderCell: (item) => <Text>{item.uploaded_by_name}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'ocr_status',
+            compare: (a, b) => (a.ocr_status || '').localeCompare(b.ocr_status || ''),
+            renderHeaderCell: () => 'OCR Stav',
+            renderCell: (item) => {
                 const colors: Record<string, 'warning' | 'success' | 'informative' | 'danger'> = {
                     pending: 'warning',
                     completed: 'success',
@@ -174,13 +174,13 @@ export const DmsList: React.FC = () => {
                     </Badge>
                 );
             }
-        },
-        {
-            key: 'created_at',
-            label: 'Vytvořeno',
-            sortable: true,
-            render: (item) => new Date(item.created_at).toLocaleString('cs-CZ')
-        }
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'created_at',
+            compare: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+            renderHeaderCell: () => 'Vytvořeno',
+            renderCell: (item) => <Text>{new Date(item.created_at).toLocaleString('cs-CZ')}</Text>
+        })
     ];
 
     // Helper to parse metadata safely
@@ -255,14 +255,15 @@ export const DmsList: React.FC = () => {
             </PageFilterBar>
 
             <PageContent>
-                <DataGrid
-                    data={documents}
-                    columns={columns}
-                    loading={loading}
-                    pageSize={20}
-                    emptyMessage="Žádné dokumenty"
-                    onRowClick={(doc) => { setSelectedDoc(doc); setIsDrawerOpen(true); }}
-                />
+                <div style={{ height: 'calc(100vh - 180px)', width: '100%', overflow: 'hidden' }}>
+                    <SmartDataGrid
+                        items={documents}
+                        columns={columns}
+                        getRowId={(item) => item.rec_id}
+                        withFilterRow={true}
+                        onRowClick={(doc) => { setSelectedDoc(doc); setIsDrawerOpen(true); }}
+                    />
+                </div>
             </PageContent>
 
             <Drawer
