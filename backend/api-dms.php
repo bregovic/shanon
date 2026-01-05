@@ -278,6 +278,55 @@ try {
         exit;
     }
 
+    // ===== ADMIN: DOCUMENT TYPES =====
+    if ($action === 'doc_types') {
+        $sql = "SELECT t.*, s.name as number_series_name 
+                FROM dms_doc_types t
+                LEFT JOIN sys_number_series s ON t.number_series_id = s.rec_id
+                ORDER BY t.name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+
+    // ===== ADMIN: NUMBER SERIES =====
+    if ($action === 'number_series') {
+        $sql = "SELECT * FROM sys_number_series ORDER BY name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+
+    // ===== ADMIN: ATTRIBUTES =====
+    if ($action === 'attributes') {
+        $sql = "SELECT * FROM dms_attributes ORDER BY name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+
+    // ===== ADMIN: STORAGE PROFILES =====
+    if ($action === 'storage_profiles') {
+        // Use try-catch to avoid breaking if table missing (though it should exist)
+        try {
+            $sql = "SELECT * FROM dms_storage_profiles ORDER BY name";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute();
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['success' => true, 'data' => $data]);
+        } catch (Exception $e) {
+            // Return empty list if table doesn't exist
+            echo json_encode(['success' => true, 'data' => []]);
+        }
+        exit;
+    }
+
     // ===== UNKNOWN ACTION =====
     echo json_encode(['success' => false, 'error' => 'Unknown action']);
 
