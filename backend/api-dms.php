@@ -72,7 +72,8 @@ try {
                 translation TEXT NOT NULL,
                 field_name VARCHAR(64) DEFAULT 'name',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )"
+            )",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_translations_unique ON sys_translations (table_name, record_id, language_code, field_name)"
         ];
 
         foreach ($queries as $q) {
