@@ -401,6 +401,13 @@ export const DmsSettings: React.FC = () => {
                                                         size="small"
                                                         onClick={() => openAttrDialog(attr)}
                                                     />
+                                                    <Button
+                                                        icon={<Translate24Regular />}
+                                                        appearance="subtle"
+                                                        size="small"
+                                                        onClick={() => openTranslations(attr)}
+                                                        title="Překlady"
+                                                    />
                                                 </TableCell>
                                             </TableRow>
                                         ))}
