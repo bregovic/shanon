@@ -3,6 +3,7 @@
 require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
+require_once 'helpers/OcrEngine.php';
 
 header("Content-Type: application/json");
 
@@ -477,6 +478,22 @@ try {
         
         header('Content-Length: ' . filesize($filepath));
         readfile($filepath);
+        exit;
+    }
+
+    // ===== OCR ANALYZE DOCUMENT =====
+    if ($action === 'analyze_doc') {
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) throw new Exception('ID is required');
+
+        // Check if tenant_id column exists (setup backward compatibility)
+        // Usually we get tenant from session or fixed dev tenant
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+
+        $engine = new OcrEngine($pdo, $tenantId);
+        $result = $engine->analyzeDocument($id);
+
+        echo json_encode($result);
         exit;
     }
 

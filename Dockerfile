@@ -29,7 +29,11 @@ USER root
 # We don't use 'docker-php-ext-install' because this is not an official PHP image base.
 RUN apk add --no-cache \
     php83-pdo_pgsql \
-    php83-pgsql
+    php83-pgsql \
+    tesseract-ocr \
+    tesseract-ocr-data-eng \
+    tesseract-ocr-data-ces \
+    poppler-utils
 
 # Copy Nginx Config
 COPY nginx.conf /etc/nginx/nginx.conf
