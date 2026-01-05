@@ -6,20 +6,29 @@ import {
     BreadcrumbButton,
     BreadcrumbDivider,
     Input,
-    Badge
+    Badge,
+    Drawer,
+    DrawerHeader,
+    DrawerHeaderTitle,
+    DrawerBody,
+    Title3,
+    Text,
+    Card,
+    CardHeader,
+    Divider
 } from '@fluentui/react-components';
 import {
     Add24Regular,
     ArrowClockwise24Regular,
-    Search24Regular
+    Search24Regular,
+    Document24Regular,
+    ScanText24Regular,
+    Dismiss24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
 import { DataGrid } from '../components/DataGrid';
 import type { DataGridColumn } from '../components/DataGrid';
-
-
-
 
 interface DmsDocument {
     rec_id: number;
@@ -29,6 +38,7 @@ interface DmsDocument {
     uploaded_by_name: string;
     ocr_status: string;
     created_at: string;
+    metadata?: string; // JSON string from DB
 }
 
 export const DmsList: React.FC = () => {
@@ -37,6 +47,10 @@ export const DmsList: React.FC = () => {
     const [documents, setDocuments] = useState<DmsDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchText, setSearchText] = useState('');
+
+    // Detail Drawer
+    const [selectedDoc, setSelectedDoc] = useState<DmsDocument | null>(null);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
@@ -66,6 +80,24 @@ export const DmsList: React.FC = () => {
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
 
+    const handleAnalyze = async (doc: DmsDocument) => {
+        if (!confirm('Spustit vytěžování (OCR)?')) return;
+        try {
+            const res = await fetch(`/api/api-dms.php?action=analyze_doc&id=${doc.rec_id}`);
+            const json = await res.json();
+            if (json.success) {
+                fetchData(); // Reload to get new status/metadata
+                if (selectedDoc?.rec_id === doc.rec_id) setIsDrawerOpen(false); // Close drawer to force refresh or just re-open
+                alert('Dokončeno. Nalezeno atributů: ' + (json.attributes?.length || 0));
+            } else {
+                alert('Chyba: ' + (json.error || json.message));
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Chyba komunikace');
+        }
+    };
+
     // Filter logic
     const filteredDocs = documents.filter(doc => {
         if (!searchText) return true;
@@ -83,7 +115,13 @@ export const DmsList: React.FC = () => {
             key: 'display_name',
             label: 'Název',
             sortable: true,
-            width: '30%'
+            width: '30%',
+            render: (item) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#0078d4' }} onClick={(e) => { e.stopPropagation(); setSelectedDoc(item); setIsDrawerOpen(true); }}>
+                    <Document24Regular />
+                    <Text weight="semibold">{item.display_name}</Text>
+                </div>
+            )
         },
         {
             key: 'doc_type_name',
@@ -129,6 +167,17 @@ export const DmsList: React.FC = () => {
         }
     ];
 
+    // Helper to parse metadata safely
+    const getMetadataAttributes = (doc: DmsDocument) => {
+        try {
+            if (!doc.metadata) return null;
+            const meta = typeof doc.metadata === 'string' ? JSON.parse(doc.metadata) : doc.metadata;
+            return meta.attributes || null;
+        } catch (e) {
+            return null;
+        }
+    };
+
     return (
         <PageLayout>
             <PageHeader>
@@ -170,9 +219,82 @@ export const DmsList: React.FC = () => {
                     loading={loading}
                     pageSize={20}
                     emptyMessage="Žádné dokumenty"
-                    onRowClick={(doc) => window.open(`/api/api-dms.php?action=view&id=${doc.rec_id}`, '_blank')}
+                    onRowClick={(doc) => { setSelectedDoc(doc); setIsDrawerOpen(true); }}
                 />
             </PageContent>
+
+            <Drawer
+                type="overlay"
+                position="end"
+                size="medium"
+                open={isDrawerOpen}
+                onOpenChange={(_, { open }) => setIsDrawerOpen(open)}
+            >
+                <DrawerHeader>
+                    <DrawerHeaderTitle
+                        action={
+                            <Button
+                                appearance="subtle"
+                                aria-label="Close"
+                                icon={<Dismiss24Regular />}
+                                onClick={() => setIsDrawerOpen(false)}
+                            />
+                        }
+                    >
+                        Detail dokumentu
+                    </DrawerHeaderTitle>
+                </DrawerHeader>
+
+                <DrawerBody>
+                    {selectedDoc && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <Card>
+                                <CardHeader header={<Text weight="semibold">{selectedDoc.display_name}</Text>} />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 16px 16px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', fontSize: '13px' }}>
+                                        <Text weight="medium">Typ:</Text> <Text>{selectedDoc.doc_type_name}</Text>
+                                        <Text weight="medium">Velikost:</Text> <Text>{formatSize(selectedDoc.file_size_bytes)}</Text>
+                                        <Text weight="medium">Nahráno:</Text> <Text>{new Date(selectedDoc.created_at).toLocaleString('cs-CZ')}</Text>
+                                        <Text weight="medium">Autor:</Text> <Text>{selectedDoc.uploaded_by_name}</Text>
+                                    </div>
+                                    <Divider />
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                        <Button appearance="primary" icon={<Document24Regular />} onClick={() => window.open(`/api/api-dms.php?action=view&id=${selectedDoc.rec_id}`, '_blank')}>
+                                            Otevřít
+                                        </Button>
+                                        <Button icon={<ScanText24Regular />} onClick={() => handleAnalyze(selectedDoc)}>
+                                            Vytěžit (OCR)
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <Title3>Vytěžená data (OCR)</Title3>
+                            <Card>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}>
+                                    {getMetadataAttributes(selectedDoc) ? (
+                                        Object.entries(getMetadataAttributes(selectedDoc)!).map(([key, val]) => (
+                                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f0f0f0', paddingBottom: '4px' }}>
+                                                <Text weight="medium" style={{ color: '#666' }}>{key}</Text>
+                                                <Text>{String(val)}</Text>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
+                                            <ScanText24Regular style={{ fontSize: '32px', marginBottom: '8px' }} />
+                                            <br />
+                                            <Text>Žádná vytěžená data.</Text>
+                                            <div style={{ marginTop: '8px' }}>
+                                                <Button size="small" onClick={() => handleAnalyze(selectedDoc)}>Spustit OCR</Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+                </DrawerBody>
+            </Drawer>
         </PageLayout>
     );
 };

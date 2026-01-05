@@ -425,6 +425,35 @@ try {
         $engine = new OcrEngine($pdo, $tenantId);
         $result = $engine->analyzeDocument($id);
 
+        if ($result['success'] && !empty($result['attributes'])) {
+            // Transform attributes to simple key-value for metadata
+            $extracted = [];
+            foreach ($result['attributes'] as $attr) {
+                // Use code if possible (cleaner for machine ref), else name
+                // Note: OcrEngine currently returns 'attribute_name'. We might need to fetch code or just use name.
+                // Since OcrEngine doesn't return Code yet, let's use name.
+                // Ideally we should modify OcrEngine to return Code too.
+                $key = $attr['attribute_name'];
+                $extracted[$key] = $attr['found_value'];
+            }
+
+            // Update Metadata column in DB with merged data
+            // PostgreSQL specific for JSONB merge used '||'
+            $metaJson = json_encode(['attributes' => $extracted]);
+            
+            $sql = "UPDATE dms_documents 
+                    SET metadata = metadata || :new_meta, 
+                        ocr_status = 'completed' 
+                    WHERE rec_id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([':new_meta' => $metaJson, ':id' => $id]);
+        } else {
+             // Mark as completed even if nothing found, so we don't retry forever?
+             // Or maybe 'completed' with empty results.
+             $sql = "UPDATE dms_documents SET ocr_status = 'completed' WHERE rec_id = :id";
+             $pdo->prepare($sql)->execute([':id' => $id]);
+        }
+
         echo json_encode($result);
         exit;
     }
