@@ -11,6 +11,14 @@ export const translations = {
         'common.error': 'Chyba',
         'common.success': 'Úspěch',
         'common.modules': 'Moduly',
+        'common.back': 'Zpět',
+
+        // DMS Settings
+        'dms.settings.title': 'Nastavení DMS',
+        'dms.settings.doc_types': 'Typy dokumentů',
+        'dms.settings.number_series': 'Číselné řady',
+        'dms.settings.attributes': 'Atributy',
+        'dms.settings.storage': 'Úložiště',
 
         // Modules
         'modules.dashboard': 'Dashboard',
@@ -101,6 +109,14 @@ export const translations = {
         'common.error': 'Error',
         'common.success': 'Success',
         'common.modules': 'Modules',
+        'common.back': 'Back',
+
+        // DMS Settings
+        'dms.settings.title': 'DMS Settings',
+        'dms.settings.doc_types': 'Document Types',
+        'dms.settings.number_series': 'Number Series',
+        'dms.settings.attributes': 'Attributes',
+        'dms.settings.storage': 'Storage',
 
         // Modules
         'modules.dashboard': 'Dashboard',
