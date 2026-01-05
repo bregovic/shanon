@@ -47,6 +47,14 @@ try {
         $stmt->execute();
         $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        // Fallback: If no types found, return defaults temporarily to unblock user
+        if (empty($types)) {
+             $types = [
+                 ['rec_id' => '0', 'name' => 'Faktura (Fallback)', 'code' => 'INV'],
+                 ['rec_id' => '-1', 'name' => 'Nezařazeno', 'code' => 'OTHER']
+             ];
+        }
+
         echo json_encode(['success' => true, 'data' => $types]);
         exit;
     }
