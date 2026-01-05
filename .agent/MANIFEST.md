@@ -75,3 +75,9 @@
 *   **Registry Check:** Before creating any new UI element or Module, verify or register its `identifier` in `SECURITY.md`.
 *   **Context:** AI Assistants must check permissions logic when generating UI components.
 
+
+## 12. Quality Assurance & Test Cases
+**Rule:** Ensure proactive testing for proactive or non-standard development.
+*   **Requirement:** When developing features "proactively" or outside of explicit user acceptance criteria, you MUST generate **Test Cases**.
+*   **Format:** A brief, actionable checklist (e.g., "*Action: Upload PDF. Expectation: OCR triggers automatically.*").
+*   **Location:** These test cases must be added as a **Comment** to the corresponding Task (Požadavek) in the internal system.

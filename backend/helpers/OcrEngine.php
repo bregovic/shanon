@@ -81,7 +81,7 @@ class OcrEngine {
      */
     private function extractAttributes($text) {
         // Fetch all attributes for this tenant (include CODE)
-        $sql = "SELECT a.rec_id, a.name, a.code, a.data_type, 
+        $sql = "SELECT a.rec_id, a.name, a.code, a.data_type, a.scan_direction,
                        t.translation
                 FROM dms_attributes a
                 LEFT JOIN sys_translations t 
@@ -104,6 +104,7 @@ class OcrEngine {
                     'name' => $row['name'],
                     'code' => $row['code'], // Ensure CODE is used for smart matching
                     'type' => $row['data_type'],
+                    'scan_direction' => $row['scan_direction'] ?? 'auto',
                     'keywords' => [$row['name']]
                 ];
             }
@@ -122,7 +123,7 @@ class OcrEngine {
             
             foreach ($attr['keywords'] as $keyword) {
                 // Try to find this keyword in the text
-                $val = $this->findValueForKeyword($lines, $keyword, $attr['type'], $attr['code']);
+                $val = $this->findValueForKeyword($lines, $keyword, $attr['type'], $attr['code'], $attr['scan_direction']);
                 if ($val) {
                     $bestMatch = $val;
                     break;
@@ -147,7 +148,7 @@ class OcrEngine {
     /**
      * Search strategies
      */
-    private function findValueForKeyword($lines, $keyword, $dataType, $code = null) {
+    private function findValueForKeyword($lines, $keyword, $dataType, $code = null, $scanDirection = 'auto') {
         $keyLower = mb_strtolower($keyword, 'UTF-8');
         $keyLower = rtrim($keyLower, ':');
 
@@ -241,31 +242,36 @@ class OcrEngine {
                      if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'VAT_SameLine'];
                 }
 
-                // --- GENERIC TYPE LOGIC ---
+                // --- GENERIC TYPE LOGIC WITH DIRECTION ---
+                $direction = $scanDirection ?? 'auto';
                 
-                // Strategy A: Same Line
-                $val = $this->parseValue($suffix, $dataType, $code);
-                
-                // FILTER: Validate Supplier Name
-                if ($code === 'SUPPLIER_NAME' && $val) {
-                    if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
-                    if (is_numeric(str_replace([' ','.'], '', $val))) $val = null; 
+                // Strategy A: Same Line (Right)
+                if ($direction === 'auto' || $direction === 'right') {
+                    $val = $this->parseValue($suffix, $dataType, $code);
+                    
+                    // FILTER: Validate Supplier Name
+                    if ($code === 'SUPPLIER_NAME' && $val) {
+                        if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
+                        if (is_numeric(str_replace([' ','.'], '', $val))) $val = null; 
+                    }
+
+                    if ($val) return ['value' => $val, 'confidence' => 'High', 'strategy' => 'SameLine'];
                 }
 
-                if ($val) return ['value' => $val, 'confidence' => 'High', 'strategy' => 'SameLine'];
+                // Strategy B: Next Line (Down)
+                if ($direction === 'auto' || $direction === 'down') {
+                    if (isset($lines[$i+1])) {
+                        $nextLine = trim($lines[$i+1]);
+                        if (!preg_match('/:$/', $nextLine)) { 
+                             $val = $this->parseValue($nextLine, $dataType, $code);
+                             
+                             if ($code === 'SUPPLIER_NAME' && $val) {
+                                 if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
+                                 if (is_numeric(str_replace([' ','.'], '', $val))) $val = null; 
+                             }
 
-                // Strategy B: Next Line
-                if (isset($lines[$i+1])) {
-                    $nextLine = trim($lines[$i+1]);
-                    if (!preg_match('/:$/', $nextLine)) { 
-                         $val = $this->parseValue($nextLine, $dataType, $code);
-                         
-                         if ($code === 'SUPPLIER_NAME' && $val) {
-                             if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
-                             if (is_numeric(str_replace([' ','.'], '', $val))) $val = null; 
-                         }
-
-                         if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'NextLine'];
+                             if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'NextLine'];
+                        }
                     }
                 }
             }

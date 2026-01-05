@@ -737,6 +737,43 @@ END $$;",
                     ALTER TABLE dms_storage_profiles ADD COLUMN base_path VARCHAR(500);
                 END IF;
             END $$;
+        ",
+        ",
+        '025_add_scan_direction' => "
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_attributes' AND column_name='scan_direction') THEN
+                    ALTER TABLE dms_attributes ADD COLUMN scan_direction VARCHAR(20) DEFAULT 'auto'; -- 'auto', 'right', 'down'
+                END IF;
+            END $$;
+        ",
+        '026_update_history_status' => "
+            -- Insert History if not exists
+            INSERT INTO development_history (date, title, description, category, related_task_id)
+            SELECT CURRENT_DATE, 'Google Drive Integration', 'Implemented full support for uploads and error reporting (Feature)', 'feature', 14
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Google Drive Integration');
+
+            INSERT INTO development_history (date, title, description, category, related_task_id)
+            SELECT CURRENT_DATE, 'OCR Scan Direction', 'Configurable Right/Down scan logic per attribute', 'feature', 14
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'OCR Scan Direction');
+
+            -- Insert QA Comment (Check duplicate to avoid spam)
+            INSERT INTO sys_change_comments (cr_id, user_id, comment)
+            SELECT 14, 1, 
+'**QA Checklist (Auto-generated)**
+
+**1. Google Drive Import**
+- [ ] **Test připojení:** Nastavení -> Úložiště -> Test. Očekávání: \"Connection Successful\".
+- [ ] **Nahrání (Validní):** Nahrajte PDF. Očekávání: Úspěch.
+- [ ] **Nahrání (Chyba):** Změňte Folder ID na nesmysl. Očekávání: Warning \"Google Drive Error: 404/403\".
+
+**2. OCR Směr čtení**
+- [ ] **Konfigurace:** Nastavení -> Atributy -> Směr \"Vpravo\".
+- [ ] **Test:** Nahrajte dokument. Očekávání: Hledá vpravo.
+
+**3. Deployment**
+- [ ] **Historie:** Ověřte nové položky v Historii vývoje.'
+            WHERE NOT EXISTS (SELECT 1 FROM sys_change_comments WHERE cr_id = 14 AND comment LIKE '%QA Checklist%');
         "
     ];
 

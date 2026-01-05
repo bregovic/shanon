@@ -136,6 +136,7 @@ try {
         $storageProfileId = $profile['rec_id'];
         
         // Handle External Storage
+        $uploadWarning = null;
         if (($profile['provider_type'] ?? '') === 'google_drive') {
             try {
                 require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
@@ -146,12 +147,12 @@ try {
                 if (isset($gFile['id'])) {
                     $storagePath = $gFile['id']; // Store Google ID as path
                 } else {
-                    // Fallback or error? Let's log but keep local path if fail
-                    // For now, let's keep going, maybe user will see error in OCR status or logs
+                    // Fallback or error?
+                    $uploadWarning = "Google Drive API nevrátilo ID souboru.";
                 }
             } catch (Exception $e) {
-                // If Google upload fails, we still have the local copy in $storagePath
-                // Maybe log error?
+                // Return the specific error to the user
+                $uploadWarning = "Chyba nahrávání na Google Drive: " . $e->getMessage();
             }
         }
 
@@ -185,7 +186,8 @@ try {
         echo json_encode([
             'success' => true,
             'message' => 'Dokument byl úspěšně nahrán.',
-            'doc_id' => $newId
+            'doc_id' => $newId,
+            'warning' => $uploadWarning
         ]);
         exit;
     }
@@ -406,12 +408,13 @@ try {
         $helpText = $input['help_text'] ?? '';
         
         $code = $input['code'] ?? null;
+        $scanDirection = $input['scan_direction'] ?? 'auto';
 
         if (!$name) throw new Exception('Name is required');
 
         if ($action === 'attribute_create') {
-            $sql = "INSERT INTO dms_attributes (tenant_id, name, code, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (:tid, :name, :code, :d, :req, :srch, :def, :hlp)";
+            $sql = "INSERT INTO dms_attributes (tenant_id, name, code, data_type, is_required, is_searchable, default_value, help_text, scan_direction)
+                    VALUES (:tid, :name, :code, :d, :req, :srch, :def, :hlp, :sd)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':tid' => $tenantId,
@@ -421,7 +424,8 @@ try {
                 ':req' => $isRequired ? 't' : 'f',
                 ':srch' => $isSearchable ? 't' : 'f',
                 ':def' => $defaultValue,
-                ':hlp' => $helpText
+                ':hlp' => $helpText,
+                ':sd' => $scanDirection
             ]);
         } else {
             $id = $input['id'] ?? 0;
@@ -429,7 +433,7 @@ try {
             
             $sql = "UPDATE dms_attributes SET 
                     name = :name, code = :code, data_type = :d, is_required = :req, is_searchable = :srch, 
-                    default_value = :def, help_text = :hlp 
+                    default_value = :def, help_text = :hlp, scan_direction = :sd
                     WHERE rec_id = :id";
              $stmt = $pdo->prepare($sql);
              $stmt->execute([
@@ -440,6 +444,7 @@ try {
                 ':srch' => $isSearchable ? 't' : 'f',
                 ':def' => $defaultValue,
                 ':hlp' => $helpText,
+                ':sd' => $scanDirection,
                 ':id' => $id
              ]);
         }

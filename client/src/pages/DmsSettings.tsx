@@ -72,6 +72,7 @@ interface Attribute {
     is_searchable: boolean;
     default_value: string;
     help_text: string;
+    scan_direction?: string;
 }
 
 const STORAGE_TYPES = [
@@ -137,7 +138,8 @@ export const DmsSettings: React.FC = () => {
         is_required: false,
         is_searchable: true,
         default_value: '',
-        help_text: ''
+        help_text: '',
+        scan_direction: 'auto'
     });
 
     const openAttrDialog = (attr?: Attribute) => {
@@ -149,8 +151,10 @@ export const DmsSettings: React.FC = () => {
                 data_type: attr.data_type,
                 is_required: attr.is_required,
                 is_searchable: attr.is_searchable,
+                is_searchable: attr.is_searchable,
                 default_value: attr.default_value || '',
-                help_text: attr.help_text || ''
+                help_text: attr.help_text || '',
+                scan_direction: attr.scan_direction || 'auto'
             });
         } else {
             setEditingAttr(null);
@@ -161,7 +165,8 @@ export const DmsSettings: React.FC = () => {
                 is_required: false,
                 is_searchable: true,
                 default_value: '',
-                help_text: ''
+                help_text: '',
+                scan_direction: 'auto'
             });
         }
         setIsAttrDialogOpen(true);
@@ -627,6 +632,22 @@ export const DmsSettings: React.FC = () => {
                                 />
                                 <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
                                     Určuje, jak systém tento atribut interpretuje (pro OCR a automatizaci).
+                                </Text>
+                            </div>
+                            <div>
+                                <Label>Směr čtení OCR</Label>
+                                <Dropdown
+                                    value={attrForm.scan_direction === 'right' ? 'Vpravo (Na stejném řádku)' : attrForm.scan_direction === 'down' ? 'Dolů (Na dalším řádku)' : 'Automaticky (Vpravo nebo Dolů)'}
+                                    selectedOptions={[attrForm.scan_direction]}
+                                    onOptionSelect={(_, data) => setAttrForm({ ...attrForm, scan_direction: data.optionValue || 'auto' })}
+                                    style={{ width: '100%' }}
+                                >
+                                    <Option value="auto">Automaticky (Vpravo nebo Dolů)</Option>
+                                    <Option value="right">Vpravo (Na stejném řádku)</Option>
+                                    <Option value="down">Dolů (Na dalším řádku)</Option>
+                                </Dropdown>
+                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                                    Určuje, kde systém hledá hodnotu po nalezení "nadpisu" atributu.
                                 </Text>
                             </div>
                             <div>

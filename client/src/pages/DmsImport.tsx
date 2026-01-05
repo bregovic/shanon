@@ -41,6 +41,7 @@ export const DmsImport: React.FC = () => {
     const [enableOcr, setEnableOcr] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
+    const [warning, setWarning] = useState('');
     const [success, setSuccess] = useState(false);
     const [dragOver, setDragOver] = useState(false);
 
@@ -62,6 +63,7 @@ export const DmsImport: React.FC = () => {
             setFile(selected);
             setDisplayName(selected.name.replace(/\.[^/.]+$/, '')); // Remove extension
             setError('');
+            setWarning('');
             setSuccess(false);
         }
     };
@@ -74,6 +76,7 @@ export const DmsImport: React.FC = () => {
             setFile(dropped);
             setDisplayName(dropped.name.replace(/\.[^/.]+$/, ''));
             setError('');
+            setWarning('');
             setSuccess(false);
         }
     };
@@ -102,9 +105,13 @@ export const DmsImport: React.FC = () => {
 
             if (json.success) {
                 setSuccess(true);
+                if (json.warning) setWarning(json.warning);
                 setFile(null);
                 setDisplayName('');
-                setTimeout(() => navigate('/dms/list'), 1500);
+                // If warning, maybe don't redirect immediately so user can see it?
+                if (!json.warning) {
+                    setTimeout(() => navigate('/dms/list'), 1500);
+                }
             } else {
                 setError(json.error || 'Nahrání selhalo.');
             }
@@ -142,7 +149,18 @@ export const DmsImport: React.FC = () => {
 
                 {success && (
                     <MessageBar intent="success" style={{ marginBottom: '16px' }}>
-                        <MessageBarBody>Dokument byl úspěšně nahrán! Přesměrování...</MessageBarBody>
+                        <MessageBarBody>
+                            Dokument byl úspěšně nahrán!
+                            {!warning && ' Přesměrování...'}
+                        </MessageBarBody>
+                    </MessageBar>
+                )}
+
+                {warning && (
+                    <MessageBar intent="warning" style={{ marginBottom: '16px' }}>
+                        <MessageBarBody>
+                            <strong>Upozornění:</strong> {warning}
+                        </MessageBarBody>
                     </MessageBar>
                 )}
 
