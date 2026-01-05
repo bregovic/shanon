@@ -518,6 +518,53 @@ END $$;",
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT '2026-01-05', 'DMS Metadata Column', 'Added metadata JSONB column to dms_documents for storing OCR and custom attributes.', 'Backend', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Metadata Column' AND date = '2026-01-05');
+        ",
+        '020_refine_attributes' => "
+            DO $$
+            DECLARE
+                v_tenant_id UUID := '00000000-0000-0000-0000-000000000001';
+            BEGIN
+                -- 1. IČO dodavatele (SUPPLIER_ICO)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'SUPPLIER_ICO' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'SUPPLIER_ICO', 'IČO dodavatele', 'text', true, false);
+                END IF;
+
+                -- 2. Číslo účtu (BANK_ACCOUNT)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'BANK_ACCOUNT' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'BANK_ACCOUNT', 'Číslo účtu', 'text', true, false);
+                END IF;
+
+                -- 3. Datum vystavení (ISSUE_DATE)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'ISSUE_DATE' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'ISSUE_DATE', 'Datum vystavení', 'date', true, false);
+                END IF;
+
+                -- 4. Datum splatnosti (DUE_DATE)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'DUE_DATE' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'DUE_DATE', 'Datum splatnosti', 'date', true, false);
+                END IF;
+
+                -- 5. Celková částka (TOTAL_AMOUNT)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'TOTAL_AMOUNT' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'TOTAL_AMOUNT', 'Celková částka', 'number', true, false);
+                END IF;
+                
+                -- 6. Dodavatel (SUPPLIER_NAME)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'SUPPLIER_NAME' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'SUPPLIER_NAME', 'Dodavatel', 'text', true, false);
+                END IF;
+
+            END $$;
+
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT '2026-01-05', 'Refined Attributes', 'Added standard invoice attributes for improved OCR matching.', 'Backend', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Refined Attributes' AND date = '2026-01-05');
         "
     ];
 
