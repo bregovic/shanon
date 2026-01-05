@@ -280,6 +280,30 @@ try {
         exit;
     }
 
+    // ===== ATTRIBUTES: UPDATE =====
+    if ($action === 'attribute_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        $id = (int)($input['id'] ?? 0);
+        if (!$id) throw new Exception('ID is required');
+
+        $sql = "UPDATE dms_attributes SET 
+                name = :name, data_type = :type, is_required = :req, 
+                is_searchable = :search, default_value = :default, help_text = :help
+                WHERE rec_id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':id' => $id,
+            ':name' => $input['name'] ?? '',
+            ':type' => $input['data_type'] ?? 'text',
+            ':req' => ($input['is_required'] ?? false) ? 'true' : 'false',
+            ':search' => ($input['is_searchable'] ?? true) ? 'true' : 'false',
+            ':default' => $input['default_value'] ?? '',
+            ':help' => $input['help_text'] ?? ''
+        ]);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     // ===== STORAGE PROFILES: LIST =====
     if ($action === 'storage_profiles') {
         $sql = "SELECT * FROM dms_storage_profiles WHERE tenant_id = :tid ORDER BY name";

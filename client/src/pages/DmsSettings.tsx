@@ -16,7 +16,18 @@ import {
     TableCell,
     Spinner,
     tokens,
-    Badge
+    Badge,
+    Dialog,
+    DialogSurface,
+    DialogBody,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Label,
+    Input,
+    Checkbox,
+    Dropdown,
+    Option
 } from '@fluentui/react-components';
 import {
     ArrowLeft24Regular,
@@ -60,6 +71,16 @@ interface StorageProfile {
     is_active: boolean;
 }
 
+interface Attribute {
+    rec_id: number;
+    name: string;
+    data_type: string;
+    is_required: boolean;
+    is_searchable: boolean;
+    default_value: string;
+    help_text: string;
+}
+
 const STORAGE_TYPES = [
     { value: 'local', label: 'Lokální úložiště' },
     { value: 'ftp', label: 'FTP Server' },
@@ -79,6 +100,68 @@ export const DmsSettings: React.FC = () => {
     const [docTypes, setDocTypes] = useState<DocType[]>([]);
     const [numberSeries, setNumberSeries] = useState<NumberSeries[]>([]);
     const [storageProfiles, setStorageProfiles] = useState<StorageProfile[]>([]);
+    const [attributes, setAttributes] = useState<Attribute[]>([]);
+
+    // Attribute Dialog State
+    const [isAttrDialogOpen, setIsAttrDialogOpen] = useState(false);
+    const [editingAttr, setEditingAttr] = useState<Attribute | null>(null);
+    const [attrForm, setAttrForm] = useState({
+        name: '',
+        data_type: 'text',
+        is_required: false,
+        is_searchable: true,
+        default_value: '',
+        help_text: ''
+    });
+
+    const openAttrDialog = (attr?: Attribute) => {
+        if (attr) {
+            setEditingAttr(attr);
+            setAttrForm({
+                name: attr.name,
+                data_type: attr.data_type,
+                is_required: attr.is_required,
+                is_searchable: attr.is_searchable,
+                default_value: attr.default_value || '',
+                help_text: attr.help_text || ''
+            });
+        } else {
+            setEditingAttr(null);
+            setAttrForm({
+                name: '',
+                data_type: 'text',
+                is_required: false,
+                is_searchable: true,
+                default_value: '',
+                help_text: ''
+            });
+        }
+        setIsAttrDialogOpen(true);
+    };
+
+    const handleSaveAttribute = async () => {
+        try {
+            const action = editingAttr ? 'attribute_update' : 'attribute_create';
+            const payload = {
+                ...attrForm,
+                id: editingAttr?.rec_id
+            };
+
+            await fetch(`/api/api-dms.php?action=${action}`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            setIsAttrDialogOpen(false);
+            // Reload data
+            const res = await fetch('/api/api-dms.php?action=attributes');
+            const json = await res.json();
+            if (json.success) setAttributes(json.data);
+        } catch (e) {
+            console.error(e);
+            alert('Chyba při ukládání atributu');
+        }
+    };
 
     // Fetch data based on active tab
     useEffect(() => {
@@ -101,6 +184,7 @@ export const DmsSettings: React.FC = () => {
                         case 'doc_types': setDocTypes(json.data || []); break;
                         case 'number_series': setNumberSeries(json.data || []); break;
                         case 'storage': setStorageProfiles(json.data || []); break;
+                        case 'attributes': setAttributes(json.data || []); break;
                     }
                 }
             } catch (e) {
@@ -272,18 +356,112 @@ export const DmsSettings: React.FC = () => {
                             <Card style={{ padding: '16px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                     <Text weight="semibold" size={400}>Sledované atributy</Text>
-                                    <Button appearance="primary" icon={<Add24Regular />} size="small">
+                                    <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openAttrDialog()}>
                                         Nový atribut
                                     </Button>
                                 </div>
-                                <Text style={{ color: tokens.colorNeutralForeground4 }}>
-                                    Atributy umožňují přidávat vlastní metadata k dokumentům (např. číslo faktury, datum splatnosti, atd.)
-                                </Text>
+                                <Table aria-label="Attributes">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHeaderCell>Název</TableHeaderCell>
+                                            <TableHeaderCell>Typ dat</TableHeaderCell>
+                                            <TableHeaderCell>Povinný</TableHeaderCell>
+                                            <TableHeaderCell>Vyhledávatelný</TableHeaderCell>
+                                            <TableHeaderCell>Výchozí hodnota</TableHeaderCell>
+                                            <TableHeaderCell>Akce</TableHeaderCell>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {attributes.map(attr => (
+                                            <TableRow key={attr.rec_id}>
+                                                <TableCell><Text weight="semibold">{attr.name}</Text></TableCell>
+                                                <TableCell>
+                                                    <Badge appearance="tint">{attr.data_type}</Badge>
+                                                </TableCell>
+                                                <TableCell>{attr.is_required ? 'Ano' : 'Ne'}</TableCell>
+                                                <TableCell>{attr.is_searchable ? 'Ano' : 'Ne'}</TableCell>
+                                                <TableCell>{attr.default_value || '-'}</TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        icon={<Edit24Regular />}
+                                                        appearance="subtle"
+                                                        size="small"
+                                                        onClick={() => openAttrDialog(attr)}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             </Card>
                         )}
                     </>
                 )}
             </PageContent>
+
+            {/* ATTRIBUTE DIALOG */}
+            <Dialog open={isAttrDialogOpen} onOpenChange={(_, data) => setIsAttrDialogOpen(data.open)}>
+                <DialogSurface>
+                    <DialogBody>
+                        <DialogTitle>{editingAttr ? 'Upravit atribut' : 'Nový atribut'}</DialogTitle>
+                        <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div>
+                                <Label required>Název atributu</Label>
+                                <Input
+                                    value={attrForm.name}
+                                    onChange={(e) => setAttrForm({ ...attrForm, name: e.target.value })}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div>
+                                <Label>Typ dat</Label>
+                                <Dropdown
+                                    value={attrForm.data_type}
+                                    onOptionSelect={(_, data) => setAttrForm({ ...attrForm, data_type: data.optionValue || 'text' })}
+                                    style={{ width: '100%' }}
+                                >
+                                    <Option value="text">Text</Option>
+                                    <Option value="number">Číslo</Option>
+                                    <Option value="date">Datum</Option>
+                                    <Option value="boolean">Ano/Ne</Option>
+                                </Dropdown>
+                            </div>
+                            <div style={{ display: 'flex', gap: '16px' }}>
+                                <Checkbox
+                                    label="Povinný údaj"
+                                    checked={attrForm.is_required}
+                                    onChange={(_, data) => setAttrForm({ ...attrForm, is_required: data.checked === true })}
+                                />
+                                <Checkbox
+                                    label="Vyhledávatelný"
+                                    checked={attrForm.is_searchable}
+                                    onChange={(_, data) => setAttrForm({ ...attrForm, is_searchable: data.checked === true })}
+                                />
+                            </div>
+                            <div>
+                                <Label>Výchozí hodnota</Label>
+                                <Input
+                                    value={attrForm.default_value}
+                                    onChange={(e) => setAttrForm({ ...attrForm, default_value: e.target.value })}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div>
+                                <Label>Nápověda (tooltip)</Label>
+                                <Input
+                                    value={attrForm.help_text}
+                                    onChange={(e) => setAttrForm({ ...attrForm, help_text: e.target.value })}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button appearance="secondary" onClick={() => setIsAttrDialogOpen(false)}>Zrušit</Button>
+                            <Button appearance="primary" onClick={handleSaveAttribute}>Uložit</Button>
+                        </DialogActions>
+                    </DialogBody>
+                </DialogSurface>
+            </Dialog>
         </PageLayout>
     );
 };
