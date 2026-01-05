@@ -45,8 +45,11 @@ export const DmsImport: React.FC = () => {
     const [success, setSuccess] = useState(false);
     const [dragOver, setDragOver] = useState(false);
 
-    // Load document types
+    const [targetStorage, setTargetStorage] = useState('');
+
+    // Load document types and storage info
     useEffect(() => {
+        // Types
         fetch('/api/api-dms.php?action=types')
             .then(res => res.json())
             .then(data => {
@@ -55,6 +58,19 @@ export const DmsImport: React.FC = () => {
                 }
             })
             .catch(console.error);
+
+        // Storage Profile (find default)
+        fetch('/api/api-dms.php?action=storage_profiles')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    const def = data.data.find((p: any) => p.is_default) || data.data[0];
+                    if (def) {
+                        setTargetStorage(def.name + (def.provider_type === 'google_drive' ? ' (Google Drive)' : ' (Local)'));
+                    }
+                }
+            })
+            .catch(() => { });
     }, []);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,6 +100,10 @@ export const DmsImport: React.FC = () => {
     const handleUpload = async () => {
         if (!file) {
             setError('Vyberte soubor k nahrání.');
+            return;
+        }
+        if (!selectedType) {
+            setError('Vyberte typ dokumentu.');
             return;
         }
 
@@ -141,6 +161,10 @@ export const DmsImport: React.FC = () => {
             </ActionBar>
 
             <div style={{ padding: '24px', maxWidth: '600px' }}>
+                <Text size={200} style={{ marginBottom: '16px', display: 'block', color: tokens.colorNeutralForeground2 }}>
+                    Cílové úložiště: <strong>{targetStorage || 'Zjišťuji...'}</strong>
+                </Text>
+
                 {error && (
                     <MessageBar intent="error" style={{ marginBottom: '16px' }}>
                         <MessageBarBody>{error}</MessageBarBody>
