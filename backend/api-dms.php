@@ -4,7 +4,7 @@ require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
 require_once 'helpers/OcrEngine.php';
-require_once 'helpers/GoogleDriveStorage.php';
+// GoogleDriveStorage loaded on demand
 
 header("Content-Type: application/json");
 
@@ -487,6 +487,9 @@ try {
                 exit;
             }
 
+            if (file_exists('helpers/GoogleDriveStorage.php')) {
+                require_once 'helpers/GoogleDriveStorage.php';
+            }
             try {
                 $drive = new GoogleDriveStorage($connStr, $basePath);
                 $result = $drive->testConnection();
