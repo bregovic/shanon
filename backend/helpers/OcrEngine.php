@@ -29,10 +29,33 @@ class OcrEngine {
         }
 
         if (!file_exists($filepath)) {
-            $filepath = dirname(__DIR__) . '/uploads/dms/' . basename($doc['storage_path']);
-            if (!file_exists($filepath)) {
-                // If file is missing on disk, try to recover from DB blob if needed (not implemented here for OCR yet)
-                throw new Exception("File not found on disk: " . $doc['storage_path']);
+            $checkPath = dirname(__DIR__) . '/uploads/dms/' . basename($doc['storage_path']);
+            if (file_exists($checkPath)) {
+                $filepath = $checkPath;
+            } else {
+                 // Try to recover from DB BLOB
+                 $stmtBlob = $this->pdo->prepare("SELECT content FROM dms_file_contents WHERE doc_id = :id");
+                 $stmtBlob->execute([':id' => $docId]);
+                 $blob = $stmtBlob->fetchColumn();
+                 
+                 if ($blob) {
+                     // Ensure directory
+                     $dir = dirname($filepath);
+                     if (!is_dir($dir)) mkdir($dir, 0777, true);
+                     
+                     // Write to file
+                     if (is_resource($blob)) {
+                         $fp = fopen($filepath, 'w');
+                         stream_copy_to_stream($blob, $fp);
+                         fclose($fp);
+                     } else {
+                         file_put_contents($filepath, $blob);
+                     }
+                 }
+  
+                 if (!file_exists($filepath) || filesize($filepath) === 0) {
+                     throw new Exception("File not found on disk and could not be restored from DB: " . $doc['storage_path']);
+                 }
             }
         }
 
@@ -128,16 +151,24 @@ class OcrEngine {
         $keyLower = mb_strtolower($keyword, 'UTF-8');
         $keyLower = rtrim($keyLower, ':');
 
+        // SPECIAL GLOBAL SEARCHES (don't rely on specific keyword position for some types)
+        if ($code === 'CURRENCY') {
+            // Scan whole text for currency symbols
+            foreach ($lines as $line) {
+                if (preg_match('/\b(CZK|EUR|USD|Kč)\b/i', $line, $m)) {
+                    $curr = strtoupper($m[1]);
+                    if ($curr === 'KČ') $curr = 'CZK';
+                    return ['value' => $curr, 'confidence' => 'High', 'strategy' => 'GlobalCurrencyRegex'];
+                }
+            }
+        }
+
         foreach ($lines as $i => $line) {
             $lineLower = mb_strtolower($line, 'UTF-8');
             
             // Match Keyword
             $pos = mb_strpos($lineLower, $keyLower);
             if ($pos !== false) {
-                // Potential candidates: 
-                // 1. Same line (suffix)
-                // 2. Next line (if same line is empty or just label)
-                
                 $suffix = mb_substr($line, $pos + mb_strlen($keyLower));
                 $suffix = ltrim($suffix, " \t:-");
 
@@ -145,20 +176,43 @@ class OcrEngine {
 
                 // 1. IBAN / Bank Account
                 if ($code === 'BANK_ACCOUNT' || $code === 'IBAN') {
-                    // Try to find regex in Suffix
                     if (preg_match('/CZ\d{22}/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'IBAN_Regex'];
-                    // Try next line if not found
                     if (isset($lines[$i+1]) && preg_match('/CZ\d{22}/', $lines[$i+1], $m)) {
                         return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'IBAN_Regex_NextLine'];
                     }
                 }
 
                 // 2. ICO / ID Number (8 digits)
-                if (strpos($code, 'ICO') !== false || $code === 'SUPPLIER_ID') {
+                if (strpos($code, 'ICO') !== false || $code === 'SUPPLIER_ICO') {
                      if (preg_match('/\b\d{8}\b/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'ICO_Regex'];
                      if (isset($lines[$i+1]) && preg_match('/\b\d{8}\b/', $lines[$i+1], $m)) {
                         return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'ICO_Regex_NextLine'];
                      }
+                }
+
+                // 3. DIČ / VAT ID
+                if ($code === 'SUPPLIER_VAT_ID') {
+                     if (preg_match('/\bCZ\d{8,10}\b/i', $suffix, $m)) return ['value' => strtoupper($m[0]), 'confidence' => 'High', 'strategy' => 'VATID_Regex'];
+                     if (isset($lines[$i+1]) && preg_match('/\bCZ\d{8,10}\b/i', $lines[$i+1], $m)) {
+                        return ['value' => strtoupper($m[0]), 'confidence' => 'High', 'strategy' => 'VATID_Regex_NextLine'];
+                     }
+                }
+
+                // 4. Variable Symbol (digits, usually 10 max) & Constant Symbol
+                if ($code === 'VARIABLE_SYMBOL' || $code === 'CONSTANT_SYMBOL') {
+                     // Look for standalone number block
+                     if (preg_match('/\b\d{4,10}\b/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'Medium', 'strategy' => 'Symbol_Regex'];
+                     if (isset($lines[$i+1]) && preg_match('/\b\d{1,10}\b/', $lines[$i+1], $m)) { // Check next line
+                        // Often VS is on next line below label
+                        return ['value' => $m[0], 'confidence' => 'Medium', 'strategy' => 'Symbol_Regex_NextLine'];
+                     }
+                }
+                
+                // 5. VAT Rates (Base/Amount)
+                // e.g. "Základ DPH 21%" -> find number
+                if (strpos($code, 'VAT_') === 0) {
+                     $val = $this->parseValue($suffix, 'number', $code);
+                     if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'VAT_SameLine'];
                 }
 
                 // --- GENERIC TYPE LOGIC ---
@@ -170,14 +224,32 @@ class OcrEngine {
                 // Strategy B: Next Line
                 if (isset($lines[$i+1])) {
                     $nextLine = trim($lines[$i+1]);
-                    // Avoid taking next line if it looks like a label (ends with :)
-                    if (!preg_match('/:$/', $nextLine)) {
+                    if (!preg_match('/:$/', $nextLine)) { // Avoid labels
+                         // If looking for dates or numbers, check next line strictly
                          $val = $this->parseValue($nextLine, $dataType, $code);
                          if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'NextLine'];
                     }
                 }
             }
         }
+        
+        // SPECIAL FALLBACKS FOR ITEMS
+        if ($code === 'INVOICE_ITEMS') {
+            // Try to look for "Fakturujeme Vám" if specific keywords failed
+             foreach ($lines as $i => $line) {
+                 if (mb_stripos($line, 'Fakturujeme Vám') !== false || mb_stripos($line, 'Označení dodávky') !== false) {
+                     // Collect next few lines til end? Or just next 3 lines as preview
+                     $items = [];
+                     for($k=1; $k<=5; $k++) {
+                         if (isset($lines[$i+$k])) $items[] = trim($lines[$i+$k]);
+                     }
+                     if (!empty($items)) {
+                         return ['value' => implode('; ', $items), 'confidence' => 'Low', 'strategy' => 'Items_Block'];
+                     }
+                 }
+             }
+        }
+
         return null;
     }
 
