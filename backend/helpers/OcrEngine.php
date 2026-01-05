@@ -321,8 +321,13 @@ class OcrEngine {
                          if (isset($lines[$i+$k])) {
                              $l = trim($lines[$i+$k]);
                              if (mb_stripos($l, 'Celkem') !== false || mb_stripos($l, 'Součet') !== false || mb_stripos($l, 'K úhradě') !== false) break;
-                             // Skip empty lines or lines with just numbers/prices
-                             if (mb_strlen($l) > 3) $items[] = $l;
+                             
+                             // Skip empty lines or table headers
+                             if (mb_strlen($l) < 3) continue;
+                             if (mb_stripos($l, 'Cena bez DPH') !== false || mb_stripos($l, 'Sazba DPH') !== false || mb_stripos($l, 'DPH') !== false) continue;
+                             if (mb_stripos($l, 'Množství') !== false || mb_stripos($l, 'Jednotková cena') !== false) continue;
+
+                             $items[] = $l;
                          }
                      }
                      if (!empty($items)) {
