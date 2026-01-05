@@ -121,6 +121,13 @@ export const DmsList: React.FC = () => {
     // Column definitions
     const columns: DataGridColumn<DmsDocument>[] = [
         {
+            key: 'rec_id',
+            label: 'ID',
+            sortable: true,
+            width: '60px',
+            render: (item) => <Text>{item.rec_id}</Text>
+        },
+        {
             key: 'display_name',
             label: 'Název',
             sortable: true,

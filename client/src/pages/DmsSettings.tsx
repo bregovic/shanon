@@ -39,7 +39,7 @@ import {
 import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
 
-type TabValue = 'doc_types' | 'number_series' | 'attributes' | 'storage';
+type TabValue = 'doc_types' | 'attributes' | 'storage';
 
 interface DocType {
     rec_id: number;
@@ -51,17 +51,7 @@ interface DocType {
     is_active: boolean;
 }
 
-interface NumberSeries {
-    rec_id: number;
-    code: string;
-    name: string;
-    prefix: string;
-    suffix: string;
-    current_number: number;
-    number_length: number;
-    is_default: boolean;
-    is_active: boolean;
-}
+
 
 interface StorageProfile {
     rec_id: number;
@@ -101,7 +91,7 @@ export const DmsSettings: React.FC = () => {
 
     // Data
     const [docTypes, setDocTypes] = useState<DocType[]>([]);
-    const [numberSeries, setNumberSeries] = useState<NumberSeries[]>([]);
+
     const [storageProfiles, setStorageProfiles] = useState<StorageProfile[]>([]);
     const [attributes, setAttributes] = useState<Attribute[]>([]);
 
@@ -116,7 +106,7 @@ export const DmsSettings: React.FC = () => {
         code: '',
         name: '',
         description: '',
-        number_series_id: undefined as number | undefined
+
     });
 
     // Translation State
@@ -192,16 +182,14 @@ export const DmsSettings: React.FC = () => {
             setDocTypeForm({
                 code: dt.code,
                 name: dt.name,
-                description: dt.description || '',
-                number_series_id: dt.number_series_id
+                description: dt.description || ''
             });
         } else {
             setEditingDocType(null);
             setDocTypeForm({
                 code: '',
                 name: '',
-                description: '',
-                number_series_id: undefined
+                description: ''
             });
         }
         setIsDocTypeDialogOpen(true);
@@ -240,7 +228,6 @@ export const DmsSettings: React.FC = () => {
                 let endpoint = '';
                 switch (activeTab) {
                     case 'doc_types': endpoint = 'doc_types'; break;
-                    case 'number_series': endpoint = 'number_series'; break;
                     case 'storage': endpoint = 'storage_profiles'; break;
                     case 'attributes': endpoint = 'attributes'; break;
                 }
@@ -251,7 +238,7 @@ export const DmsSettings: React.FC = () => {
                 if (json.success) {
                     switch (activeTab) {
                         case 'doc_types': setDocTypes(json.data || []); break;
-                        case 'number_series': setNumberSeries(json.data || []); break;
+
                         case 'storage': setStorageProfiles(json.data || []); break;
                         case 'attributes': setAttributes(json.data || []); break;
                     }
@@ -333,47 +320,7 @@ export const DmsSettings: React.FC = () => {
                             </Card>
                         )}
 
-                        {/* NUMBER SERIES TAB */}
-                        {activeTab === 'number_series' && (
-                            <Card style={{ padding: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                    <Text weight="semibold" size={400}>Číselné řady</Text>
-                                    <Button appearance="primary" icon={<Add24Regular />} size="small">
-                                        Nová řada
-                                    </Button>
-                                </div>
-                                <Table aria-label="Number Series">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHeaderCell>Kód</TableHeaderCell>
-                                            <TableHeaderCell>Název</TableHeaderCell>
-                                            <TableHeaderCell>Formát</TableHeaderCell>
-                                            <TableHeaderCell>Poslední číslo</TableHeaderCell>
-                                            <TableHeaderCell>Výchozí</TableHeaderCell>
-                                            <TableHeaderCell>Akce</TableHeaderCell>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {numberSeries.map(ns => (
-                                            <TableRow key={ns.rec_id}>
-                                                <TableCell><Text weight="semibold">{ns.code}</Text></TableCell>
-                                                <TableCell>{ns.name}</TableCell>
-                                                <TableCell>
-                                                    <code>{ns.prefix}{'0'.repeat(ns.number_length)}{ns.suffix}</code>
-                                                </TableCell>
-                                                <TableCell>{ns.current_number}</TableCell>
-                                                <TableCell>
-                                                    {ns.is_default && <Badge appearance="tint" color="brand">Výchozí</Badge>}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </Card>
-                        )}
+
 
                         {/* STORAGE PROFILES TAB */}
                         {activeTab === 'storage' && (
@@ -574,23 +521,7 @@ export const DmsSettings: React.FC = () => {
                                     style={{ width: '100%' }}
                                 />
                             </div>
-                            <div>
-                                <Label>Číselná řada (volitelné)</Label>
-                                <Dropdown
-                                    value={numberSeries.find(ns => ns.rec_id === docTypeForm.number_series_id)?.name || ''}
-                                    selectedOptions={docTypeForm.number_series_id ? [docTypeForm.number_series_id.toString()] : []}
-                                    onOptionSelect={(_, data) => setDocTypeForm({ ...docTypeForm, number_series_id: data.optionValue ? parseInt(data.optionValue) : undefined })}
-                                    style={{ width: '100%' }}
-                                    placeholder="-- Žádná --"
-                                >
-                                    <Option value="">-- Žádná --</Option>
-                                    {numberSeries.map(ns => (
-                                        <Option key={ns.rec_id} value={ns.rec_id.toString()} text={ns.name}>
-                                            {ns.name} ({ns.code})
-                                        </Option>
-                                    ))}
-                                </Dropdown>
-                            </div>
+
                         </DialogContent>
                         <DialogActions>
                             <Button appearance="primary" onClick={handleSaveDocType} disabled={!docTypeForm.code || !docTypeForm.name}>{t('common.save', 'Uložit')}</Button>
