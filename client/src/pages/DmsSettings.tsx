@@ -9,12 +9,6 @@ import {
     Card,
     TabList,
     Tab,
-    Table,
-    TableHeader,
-    TableRow,
-    TableHeaderCell,
-    TableBody,
-    TableCell,
     Spinner,
     Badge,
     Dialog,
@@ -27,17 +21,21 @@ import {
     Input,
     Checkbox,
     Dropdown,
-    Option
+    Option,
+    createTableColumn
 } from '@fluentui/react-components';
+import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
     ArrowLeft24Regular,
     Add24Regular,
     Edit24Regular,
     Translate24Regular,
-    Settings24Regular
+    Settings24Regular,
+    PlugConnected24Regular
 } from '@fluentui/react-icons';
 import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
+import { SmartDataGrid } from '../components/SmartDataGrid';
 
 type TabValue = 'doc_types' | 'attributes' | 'storage';
 
@@ -282,6 +280,31 @@ export const DmsSettings: React.FC = () => {
         }
     };
 
+    const handleTestConnection = async () => {
+        try {
+            const payload = {
+                ...storageForm,
+                id: editingStorageProfile?.rec_id
+            };
+
+            const res = await fetch(`/api/api-dms.php?action=storage_profile_test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                alert(json.message);
+            } else {
+                alert('Chyba: ' + json.error);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Chyba při testování připojení');
+        }
+    };
+
     // Fetch data based on active tab
     useEffect(() => {
         const fetchData = async () => {
@@ -314,6 +337,142 @@ export const DmsSettings: React.FC = () => {
         fetchData();
     }, [activeTab]);
 
+    // Column Definitions using Fluent UI createTableColumn
+    const docTypeColumns: TableColumnDefinition<DocType>[] = [
+        createTableColumn<DocType>({
+            columnId: 'code',
+            compare: (a, b) => a.code.localeCompare(b.code),
+            renderHeaderCell: () => 'Kód',
+            renderCell: (item) => <Text weight="semibold">{item.code}</Text>
+        }),
+        createTableColumn<DocType>({
+            columnId: 'name',
+            compare: (a, b) => a.name.localeCompare(b.name),
+            renderHeaderCell: () => 'Název',
+            renderCell: (item) => <Text>{item.name}</Text>
+        }),
+        createTableColumn<DocType>({
+            columnId: 'status',
+            compare: (a, b) => (a.is_active ? 1 : 0) - (b.is_active ? 1 : 0),
+            renderHeaderCell: () => 'Stav',
+            renderCell: (item) => (
+                <Badge appearance="tint" color={item.is_active ? 'success' : 'danger'}>
+                    {item.is_active ? 'Aktivní' : 'Neaktivní'}
+                </Badge>
+            )
+        }),
+        createTableColumn<DocType>({
+            columnId: 'actions',
+            renderHeaderCell: () => 'Akce',
+            renderCell: (item) => (
+                <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openDocTypeDialog(item)} />
+            )
+        })
+    ];
+
+    const storageColumns: TableColumnDefinition<StorageProfile>[] = [
+        createTableColumn<StorageProfile>({
+            columnId: 'name',
+            compare: (a, b) => a.name.localeCompare(b.name),
+            renderHeaderCell: () => 'Název',
+            renderCell: (item) => <Text weight="semibold">{item.name}</Text>
+        }),
+        createTableColumn<StorageProfile>({
+            columnId: 'type',
+            compare: (a, b) => a.storage_type.localeCompare(b.storage_type),
+            renderHeaderCell: () => 'Typ',
+            renderCell: (item) => (
+                <Text>{STORAGE_TYPES.find(t => t.value === item.storage_type)?.label || item.storage_type}</Text>
+            )
+        }),
+        createTableColumn<StorageProfile>({
+            columnId: 'path',
+            compare: (a, b) => (a.base_path || '').localeCompare(b.base_path || ''),
+            renderHeaderCell: () => 'Cesta / IDFolder',
+            renderCell: (item) => <Text>{item.base_path || '-'}</Text>
+        }),
+        createTableColumn<StorageProfile>({
+            columnId: 'default',
+            compare: (a, b) => (a.is_default ? 1 : 0) - (b.is_default ? 1 : 0),
+            renderHeaderCell: () => 'Výchozí',
+            renderCell: (item) => (
+                item.is_default && <Badge appearance="tint" color="brand">Výchozí</Badge>
+            )
+        }),
+        createTableColumn<StorageProfile>({
+            columnId: 'status',
+            compare: (a, b) => (a.is_active ? 1 : 0) - (b.is_active ? 1 : 0),
+            renderHeaderCell: () => 'Stav',
+            renderCell: (item) => (
+                <Badge appearance="tint" color={item.is_active ? 'success' : 'danger'}>
+                    {item.is_active ? 'Aktivní' : 'Neaktivní'}
+                </Badge>
+            )
+        }),
+        createTableColumn<StorageProfile>({
+            columnId: 'actions',
+            renderHeaderCell: () => 'Akce',
+            renderCell: (item) => (
+                <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openStorageDialog(item)} />
+            )
+        })
+    ];
+
+    const attributeColumns: TableColumnDefinition<Attribute>[] = [
+        createTableColumn<Attribute>({
+            columnId: 'name',
+            compare: (a, b) => a.name.localeCompare(b.name),
+            renderHeaderCell: () => 'Název',
+            renderCell: (item) => <Text weight="semibold">{item.name}</Text>
+        }),
+        createTableColumn<Attribute>({
+            columnId: 'data_type',
+            compare: (a, b) => a.data_type.localeCompare(b.data_type),
+            renderHeaderCell: () => 'Typ dat',
+            renderCell: (item) => <Badge appearance="tint">{item.data_type}</Badge>
+        }),
+        createTableColumn<Attribute>({
+            columnId: 'required',
+            compare: (a, b) => (a.is_required ? 1 : 0) - (b.is_required ? 1 : 0),
+            renderHeaderCell: () => 'Povinný',
+            renderCell: (item) => <Text>{item.is_required ? 'Ano' : 'Ne'}</Text>
+        }),
+        createTableColumn<Attribute>({
+            columnId: 'searchable',
+            compare: (a, b) => (a.is_searchable ? 1 : 0) - (b.is_searchable ? 1 : 0),
+            renderHeaderCell: () => 'Vyhledávatelný',
+            renderCell: (item) => <Text>{item.is_searchable ? 'Ano' : 'Ne'}</Text>
+        }),
+        createTableColumn<Attribute>({
+            columnId: 'default',
+            compare: (a, b) => (a.default_value || '').localeCompare(b.default_value || ''),
+            renderHeaderCell: () => 'Výchozí hodnota',
+            renderCell: (item) => <Text>{item.default_value || '-'}</Text>
+        }),
+        createTableColumn<Attribute>({
+            columnId: 'actions',
+            renderHeaderCell: () => 'Akce',
+            renderCell: (item) => (
+                <div style={{ display: 'flex', gap: '4px' }}>
+                    <Button
+                        icon={<Edit24Regular />}
+                        appearance="subtle"
+                        size="small"
+                        onClick={() => openAttrDialog(item)}
+                        title="Upravit"
+                    />
+                    <Button
+                        icon={<Translate24Regular />}
+                        appearance="subtle"
+                        size="small"
+                        onClick={() => openTranslations(item)}
+                        title="Překlady"
+                    />
+                </div>
+            )
+        })
+    ];
+
     return (
         <PageLayout>
             <PageHeader>
@@ -333,7 +492,6 @@ export const DmsSettings: React.FC = () => {
                     style={{ marginBottom: '24px' }}
                 >
                     <Tab value="doc_types">{t('dms.settings.doc_types', 'Typy dokumentů')}</Tab>
-                    <Tab value="number_series">{t('dms.settings.number_series', 'Číselné řady')}</Tab>
                     <Tab value="attributes">{t('dms.settings.attributes', 'Atributy')}</Tab>
                     <Tab value="storage">{t('dms.settings.storage', 'Úložiště')}</Tab>
                 </TabList>
@@ -344,144 +502,58 @@ export const DmsSettings: React.FC = () => {
                     <>
                         {/* DOC TYPES TAB */}
                         {activeTab === 'doc_types' && (
-                            <Card style={{ padding: '16px' }}>
+                            <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                     <Text weight="semibold" size={400}>Typy dokumentů</Text>
                                     <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openDocTypeDialog()}>
                                         Nový typ
                                     </Button>
                                 </div>
-                                <Table aria-label="Doc Types">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHeaderCell>Kód</TableHeaderCell>
-                                            <TableHeaderCell>Název</TableHeaderCell>
-                                            <TableHeaderCell>Číselná řada</TableHeaderCell>
-                                            <TableHeaderCell>Stav</TableHeaderCell>
-                                            <TableHeaderCell>Akce</TableHeaderCell>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {docTypes.map(dt => (
-                                            <TableRow key={dt.rec_id}>
-                                                <TableCell><Text weight="semibold">{dt.code}</Text></TableCell>
-                                                <TableCell>{dt.name}</TableCell>
-                                                <TableCell>{dt.number_series_name || '-'}</TableCell>
-                                                <TableCell>
-                                                    <Badge appearance="tint" color={dt.is_active ? 'success' : 'danger'}>
-                                                        {dt.is_active ? 'Aktivní' : 'Neaktivní'}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openDocTypeDialog(dt)} />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
+                                    <SmartDataGrid
+                                        items={docTypes}
+                                        columns={docTypeColumns}
+                                        getRowId={(item) => item.rec_id}
+                                    />
+                                </div>
                             </Card>
                         )}
 
-
-
                         {/* STORAGE PROFILES TAB */}
                         {activeTab === 'storage' && (
-                            <Card style={{ padding: '16px' }}>
+                            <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                     <Text weight="semibold" size={400}>Úložiště</Text>
                                     <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openStorageDialog()}>
                                         Nové úložiště
                                     </Button>
                                 </div>
-                                <Table aria-label="Storage Profiles">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHeaderCell>Název</TableHeaderCell>
-                                            <TableHeaderCell>Typ</TableHeaderCell>
-                                            <TableHeaderCell>Cesta</TableHeaderCell>
-                                            <TableHeaderCell>Výchozí</TableHeaderCell>
-                                            <TableHeaderCell>Stav</TableHeaderCell>
-                                            <TableHeaderCell>Akce</TableHeaderCell>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {storageProfiles.map(sp => (
-                                            <TableRow key={sp.rec_id}>
-                                                <TableCell><Text weight="semibold">{sp.name}</Text></TableCell>
-                                                <TableCell>
-                                                    {STORAGE_TYPES.find(t => t.value === sp.storage_type)?.label || sp.storage_type}
-                                                </TableCell>
-                                                <TableCell>{sp.base_path || '-'}</TableCell>
-                                                <TableCell>
-                                                    {sp.is_default && <Badge appearance="tint" color="brand">Výchozí</Badge>}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge appearance="tint" color={sp.is_active ? 'success' : 'danger'}>
-                                                        {sp.is_active ? 'Aktivní' : 'Neaktivní'}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openStorageDialog(sp)} />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
+                                    <SmartDataGrid
+                                        items={storageProfiles}
+                                        columns={storageColumns}
+                                        getRowId={(item) => item.rec_id}
+                                    />
+                                </div>
                             </Card>
                         )}
 
                         {/* ATTRIBUTES TAB */}
                         {activeTab === 'attributes' && (
-                            <Card style={{ padding: '16px' }}>
+                            <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                     <Text weight="semibold" size={400}>Sledované atributy</Text>
                                     <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openAttrDialog()}>
                                         Nový atribut
                                     </Button>
                                 </div>
-                                <Table aria-label="Attributes">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHeaderCell>Název</TableHeaderCell>
-                                            <TableHeaderCell>Typ dat</TableHeaderCell>
-                                            <TableHeaderCell>Povinný</TableHeaderCell>
-                                            <TableHeaderCell>Vyhledávatelný</TableHeaderCell>
-                                            <TableHeaderCell>Výchozí hodnota</TableHeaderCell>
-                                            <TableHeaderCell>Akce</TableHeaderCell>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {attributes.map(attr => (
-                                            <TableRow key={attr.rec_id}>
-                                                <TableCell><Text weight="semibold">{attr.name}</Text></TableCell>
-                                                <TableCell>
-                                                    <Badge appearance="tint">{attr.data_type}</Badge>
-                                                </TableCell>
-                                                <TableCell>{attr.is_required ? 'Ano' : 'Ne'}</TableCell>
-                                                <TableCell>{attr.is_searchable ? 'Ano' : 'Ne'}</TableCell>
-                                                <TableCell>{attr.default_value || '-'}</TableCell>
-                                                <TableCell>
-                                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                                        <Button
-                                                            icon={<Edit24Regular />}
-                                                            appearance="subtle"
-                                                            size="small"
-                                                            onClick={() => openAttrDialog(attr)}
-                                                            title="Upravit"
-                                                        />
-                                                        <Button
-                                                            icon={<Translate24Regular />}
-                                                            appearance="subtle"
-                                                            size="small"
-                                                            onClick={() => openTranslations(attr)}
-                                                            title="Překlady"
-                                                        />
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
+                                    <SmartDataGrid
+                                        items={attributes}
+                                        columns={attributeColumns}
+                                        getRowId={(item) => item.rec_id}
+                                    />
+                                </div>
                             </Card>
                         )}
                     </>
@@ -684,6 +756,14 @@ export const DmsSettings: React.FC = () => {
 
                         </DialogContent>
                         <DialogActions>
+                            <Button
+                                appearance="secondary"
+                                icon={<PlugConnected24Regular />}
+                                onClick={handleTestConnection}
+                                disabled={!storageForm.base_path || (storageForm.storage_type === 'google_drive' && !storageForm.connection_string)}
+                            >
+                                Test
+                            </Button>
                             <Button appearance="primary" onClick={handleSaveStorageProfile}>{t('common.save', 'Uložit')}</Button>
                             <Button appearance="secondary" onClick={() => setIsStorageDialogOpen(false)}>{t('common.cancel', 'Zrušit')}</Button>
                         </DialogActions>

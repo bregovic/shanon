@@ -4,6 +4,7 @@ require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
 require_once 'helpers/OcrEngine.php';
+require_once 'helpers/GoogleDriveStorage.php';
 
 header("Content-Type: application/json");
 
@@ -469,6 +470,60 @@ try {
         }
         
         echo json_encode(['success' => true]);
+        exit;
+    }
+
+    // ===== ADMIN: STORAGE PROFILE TEST =====
+    if ($action === 'storage_profile_test' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $name = $input['name'] ?? 'Test';
+        $storageType = $input['storage_type'] ?? 'local';
+        $basePath = $input['base_path'] ?? '';
+        $connStr = $input['connection_string'] ?? '';
+
+        if ($storageType === 'google_drive') {
+            if (empty($connStr) || empty($basePath)) {
+                echo json_encode(['success' => false, 'error' => 'Chybí Folder ID nebo Credentials JSON']);
+                exit;
+            }
+
+            try {
+                $drive = new GoogleDriveStorage($connStr, $basePath);
+                $result = $drive->testConnection();
+                
+                if ($result['success']) {
+                    echo json_encode(['success' => true, 'message' => 'Připojení úspěšné. Složka: ' . $result['folderName']]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => $result['error']]);
+                }
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+        }
+
+        if ($storageType === 'local') {
+            if (empty($basePath)) {
+                echo json_encode(['success' => false, 'error' => 'Chybí cesta k adresáři']);
+                exit;
+            }
+            
+            // Basic directory check (if allowed by server config)
+            if (is_dir($basePath) && is_writable($basePath)) {
+                 echo json_encode(['success' => true, 'message' => 'Adresář existuje a je zapisovatelný']);
+            } else {
+                 // Try relative path from basedir
+                 $fullPath = __DIR__ . '/' . ltrim($basePath, '/');
+                 if (is_dir($fullPath) && is_writable($fullPath)) {
+                     echo json_encode(['success' => true, 'message' => 'Relativní adresář existuje a je zapisovatelný']);
+                 } else {
+                     echo json_encode(['success' => false, 'error' => 'Adresář neexistuje nebo není zapisovatelný']);
+                 }
+            }
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Test pro tento typ úložiště zatím není implementován']);
         exit;
     }
 
