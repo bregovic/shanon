@@ -692,6 +692,21 @@ END $$;",
                 ELSE
                     ALTER TABLE dms_storage_profiles ALTER COLUMN connection_string TYPE TEXT;
                 END IF;
+
+                -- Ensure is_default
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='is_default') THEN
+                    ALTER TABLE dms_storage_profiles ADD COLUMN is_default BOOLEAN DEFAULT FALSE;
+                END IF;
+
+                -- Ensure is_active
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='is_active') THEN
+                    ALTER TABLE dms_storage_profiles ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+                END IF;
+                
+                -- Ensure tenant_id
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='tenant_id') THEN
+                    ALTER TABLE dms_storage_profiles ADD COLUMN tenant_id UUID;
+                END IF;
             END $$;
         "
     ];

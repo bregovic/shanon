@@ -108,8 +108,26 @@ try {
                  doc_type_id, storage_profile_id, storage_path, ocr_status, created_by)
                 VALUES 
                 (:tenant_id, :display_name, :original_filename, :extension, :file_size, :mime_type,
-                 :doc_type_id, 1, :storage_path, :ocr_status, :created_by)
+                :doc_type_id, :profile_id, :storage_path, :ocr_status, :created_by)
                 RETURNING rec_id";
+
+        // Resolve Storage Profile ID
+        $stmtProf = $pdo->prepare("SELECT rec_id FROM dms_storage_profiles WHERE is_default = true LIMIT 1");
+        $stmtProf->execute();
+        $storageProfileId = $stmtProf->fetchColumn();
+
+        if (!$storageProfileId) {
+            // Fallback: any active
+            $stmtProf = $pdo->prepare("SELECT rec_id FROM dms_storage_profiles WHERE is_active = true ORDER BY rec_id ASC LIMIT 1");
+            $stmtProf->execute();
+            $storageProfileId = $stmtProf->fetchColumn();
+        }
+
+        if (!$storageProfileId) {
+             // Auto-create default local profile if receiving files but no profile exists
+             $pdo->prepare("INSERT INTO dms_storage_profiles (tenant_id, name, storage_type, is_default, is_active) VALUES (:tid, 'Local Storage', 'local', true, true)")->execute([':tid' => $tenantId]);
+             $storageProfileId = $pdo->lastInsertId();
+        }
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -120,6 +138,7 @@ try {
             ':file_size' => $fileSize,
             ':mime_type' => $mimeType,
             ':doc_type_id' => $docTypeId,
+            ':profile_id' => $storageProfileId,
             ':storage_path' => $storagePath,
             ':ocr_status' => $enableOcr ? 'pending' : 'skipped',
             ':created_by' => $userId
@@ -360,15 +379,18 @@ try {
         $defaultValue = $input['default_value'] ?? '';
         $helpText = $input['help_text'] ?? '';
         
+        $code = $input['code'] ?? null;
+
         if (!$name) throw new Exception('Name is required');
 
         if ($action === 'attribute_create') {
-            $sql = "INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (:tid, :name, :d, :req, :srch, :def, :hlp)";
+            $sql = "INSERT INTO dms_attributes (tenant_id, name, code, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (:tid, :name, :code, :d, :req, :srch, :def, :hlp)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':tid' => $tenantId,
                 ':name' => $name,
+                ':code' => $code,
                 ':d' => $dataType,
                 ':req' => $isRequired ? 't' : 'f',
                 ':srch' => $isSearchable ? 't' : 'f',
@@ -380,12 +402,13 @@ try {
             if (!$id) throw new Exception('ID required for update');
             
             $sql = "UPDATE dms_attributes SET 
-                    name = :name, data_type = :d, is_required = :req, is_searchable = :srch, 
+                    name = :name, code = :code, data_type = :d, is_required = :req, is_searchable = :srch, 
                     default_value = :def, help_text = :hlp 
                     WHERE rec_id = :id";
              $stmt = $pdo->prepare($sql);
              $stmt->execute([
                 ':name' => $name,
+                ':code' => $code,
                 ':d' => $dataType,
                 ':req' => $isRequired ? 't' : 'f',
                 ':srch' => $isSearchable ? 't' : 'f',
