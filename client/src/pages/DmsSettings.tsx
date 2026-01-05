@@ -109,6 +109,18 @@ export const DmsSettings: React.FC = () => {
 
     });
 
+    // Storage Dialog State
+    const [isStorageDialogOpen, setIsStorageDialogOpen] = useState(false);
+    const [editingStorageProfile, setEditingStorageProfile] = useState<StorageProfile | null>(null);
+    const [storageForm, setStorageForm] = useState({
+        name: '',
+        storage_type: 'local',
+        base_path: '',
+        connection_string: '',
+        is_default: false,
+        is_active: true
+    });
+
     // Translation State
     const [transOpen, setTransOpen] = useState(false);
     const [transTarget, setTransTarget] = useState<{ id: number, name: string } | null>(null);
@@ -220,6 +232,56 @@ export const DmsSettings: React.FC = () => {
         }
     };
 
+    const openStorageDialog = (sp?: StorageProfile) => {
+        if (sp) {
+            setEditingStorageProfile(sp);
+            setStorageForm({
+                name: sp.name,
+                storage_type: sp.storage_type,
+                base_path: sp.base_path || '',
+                connection_string: sp.connection_string || '',
+                is_default: sp.is_default,
+                is_active: sp.is_active
+            });
+        } else {
+            setEditingStorageProfile(null);
+            setStorageForm({
+                name: '',
+                storage_type: 'local',
+                base_path: '',
+                connection_string: '',
+                is_default: false,
+                is_active: true
+            });
+        }
+        setIsStorageDialogOpen(true);
+    };
+
+    const handleSaveStorageProfile = async () => {
+        try {
+            const action = editingStorageProfile ? 'storage_profile_update' : 'storage_profile_create';
+            const payload = {
+                ...storageForm,
+                id: editingStorageProfile?.rec_id
+            };
+
+            await fetch(`/api/api-dms.php?action=${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            setIsStorageDialogOpen(false);
+            // Reload data
+            const res = await fetch('/api/api-dms.php?action=storage_profiles');
+            const json = await res.json();
+            if (json.success) setStorageProfiles(json.data);
+        } catch (e) {
+            console.error(e);
+            alert('Chyba při ukládání úložiště');
+        }
+    };
+
     // Fetch data based on active tab
     useEffect(() => {
         const fetchData = async () => {
@@ -327,7 +389,7 @@ export const DmsSettings: React.FC = () => {
                             <Card style={{ padding: '16px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                                     <Text weight="semibold" size={400}>Úložiště</Text>
-                                    <Button appearance="primary" icon={<Add24Regular />} size="small">
+                                    <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openStorageDialog()}>
                                         Nové úložiště
                                     </Button>
                                 </div>
@@ -359,7 +421,7 @@ export const DmsSettings: React.FC = () => {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" />
+                                                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openStorageDialog(sp)} />
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -537,6 +599,97 @@ export const DmsSettings: React.FC = () => {
                 recordId={transTarget?.id || 0}
                 title={transTarget?.name || ''}
             />
+
+            {/* STORAGE PROFILE DIALOG */}
+            <Dialog open={isStorageDialogOpen} onOpenChange={(_, data) => setIsStorageDialogOpen(data.open)}>
+                <DialogSurface style={{ minWidth: '500px' }}>
+                    <DialogBody>
+                        <DialogTitle>{editingStorageProfile ? 'Upravit úložiště' : 'Nové úložiště'}</DialogTitle>
+                        <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div>
+                                <Label required>Název</Label>
+                                <Input
+                                    value={storageForm.name}
+                                    onChange={(_, data) => setStorageForm({ ...storageForm, name: data.value })}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div>
+                                <Label>Typ úložiště</Label>
+                                <Dropdown
+                                    value={STORAGE_TYPES.find(t => t.value === storageForm.storage_type)?.label || storageForm.storage_type}
+                                    selectedOptions={[storageForm.storage_type]}
+                                    onOptionSelect={(_, data) => setStorageForm({ ...storageForm, storage_type: data.optionValue || 'local' })}
+                                    style={{ width: '100%' }}
+                                >
+                                    {STORAGE_TYPES.map(t => (
+                                        <Option key={t.value} value={t.value} text={t.label}>
+                                            {t.label}
+                                        </Option>
+                                    ))}
+                                </Dropdown>
+                            </div>
+
+                            {storageForm.storage_type === 'local' && (
+                                <div>
+                                    <Label>Cesta k adresáři (na serveru)</Label>
+                                    <Input
+                                        value={storageForm.base_path}
+                                        onChange={(_, data) => setStorageForm({ ...storageForm, base_path: data.value })}
+                                        placeholder="např. /var/www/uploads nebo C:/uploads"
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                            )}
+
+                            {storageForm.storage_type === 'google_drive' && (
+                                <>
+                                    <div style={{ padding: '8px', background: '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
+                                        Pro nastavení Google Drive je potřeba vytvořit <strong>Service Account</strong> v Google Cloud Console,
+                                        stáhnout jeho JSON klíč a povolit mu přístup k cílovému adresáři.
+                                    </div>
+                                    <div>
+                                        <Label required>ID Složky (Google Folder ID)</Label>
+                                        <Input
+                                            value={storageForm.base_path}
+                                            onChange={(_, data) => setStorageForm({ ...storageForm, base_path: data.value })}
+                                            placeholder="např. 19V3digDrRSIk2BhfbdytlXW0YgCoO1J8"
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label required>Service Account JSON (Credentials)</Label>
+                                        <textarea
+                                            value={storageForm.connection_string}
+                                            onChange={(e) => setStorageForm({ ...storageForm, connection_string: e.target.value })}
+                                            placeholder={'{\n  "type": "service_account",\n  "project_id": "...",\n  "private_key_id": "...",\n  ... \n}'}
+                                            style={{ width: '100%', minHeight: '150px', fontFamily: 'monospace', padding: '8px', border: '1px solid #d1d1d1', borderRadius: '4px' }}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                                <Checkbox
+                                    label="Aktivní"
+                                    checked={storageForm.is_active}
+                                    onChange={(_, data) => setStorageForm({ ...storageForm, is_active: data.checked === true })}
+                                />
+                                <Checkbox
+                                    label="Výchozí úložiště"
+                                    checked={storageForm.is_default}
+                                    onChange={(_, data) => setStorageForm({ ...storageForm, is_default: data.checked === true })}
+                                />
+                            </div>
+
+                        </DialogContent>
+                        <DialogActions>
+                            <Button appearance="primary" onClick={handleSaveStorageProfile}>{t('common.save', 'Uložit')}</Button>
+                            <Button appearance="secondary" onClick={() => setIsStorageDialogOpen(false)}>{t('common.cancel', 'Zrušit')}</Button>
+                        </DialogActions>
+                    </DialogBody>
+                </DialogSurface>
+            </Dialog>
         </PageLayout>
     );
 };

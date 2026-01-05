@@ -414,6 +414,64 @@ try {
         exit;
     }
 
+    // ===== ADMIN: STORAGE PROFILE CREATE/UPDATE =====
+    if (($action === 'storage_profile_create' || $action === 'storage_profile_update') && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+
+        $name = $input['name'] ?? '';
+        $storageType = $input['storage_type'] ?? 'local';
+        $basePath = $input['base_path'] ?? '';
+        $connStr = $input['connection_string'] ?? '';
+        $isDefault = !empty($input['is_default']);
+        $isActive = isset($input['is_active']) ? $input['is_active'] : true;
+
+        if (!$name) throw new Exception('Name is required');
+
+        // If setting as default, unset others first
+        if ($isDefault) {
+             $pdo->prepare("UPDATE dms_storage_profiles SET is_default = false WHERE tenant_id = :tid")
+                 ->execute([':tid' => $tenantId]);
+        }
+
+        if ($action === 'storage_profile_create') {
+            $sql = "INSERT INTO dms_storage_profiles 
+                    (tenant_id, name, storage_type, base_path, connection_string, is_default, is_active)
+                    VALUES (:tid, :name, :type, :path, :conn, :def, :act)";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':tid' => $tenantId,
+                ':name' => $name,
+                ':type' => $storageType,
+                ':path' => $basePath,
+                ':conn' => $connStr,
+                ':def' => $isDefault ? 't' : 'f',
+                ':act' => $isActive ? 't' : 'f'
+            ]);
+        } else {
+            $id = $input['id'] ?? 0;
+            if (!$id) throw new Exception('ID required for update');
+            
+            $sql = "UPDATE dms_storage_profiles SET 
+                    name = :name, storage_type = :type, base_path = :path, 
+                    connection_string = :conn, is_default = :def, is_active = :act
+                    WHERE rec_id = :id";
+             $stmt = $pdo->prepare($sql);
+             $stmt->execute([
+                ':name' => $name,
+                ':type' => $storageType,
+                ':path' => $basePath,
+                ':conn' => $connStr,
+                ':def' => $isDefault ? 't' : 'f',
+                ':act' => $isActive ? 't' : 'f',
+                ':id' => $id
+             ]);
+        }
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     // ===== UNKNOWN ACTION =====
     echo json_encode(['success' => false, 'error' => 'Unknown action']);
 
