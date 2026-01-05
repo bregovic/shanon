@@ -738,7 +738,6 @@ END $$;",
                 END IF;
             END $$;
         ",
-        ",
         '025_add_scan_direction' => "
             DO $$
             BEGIN
@@ -757,7 +756,7 @@ END $$;",
             SELECT CURRENT_DATE, 'OCR Scan Direction', 'Configurable Right/Down scan logic per attribute', 'feature', 14
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'OCR Scan Direction');
 
-            -- Insert QA Comment (Check duplicate to avoid spam)
+            -- Insert QA Comment
             INSERT INTO sys_change_comments (cr_id, user_id, comment)
             SELECT 14, 1, 
 '**QA Checklist (Auto-generated)**
@@ -773,7 +772,21 @@ END $$;",
 
 **3. Deployment**
 - [ ] **Historie:** Ověřte nové položky v Historii vývoje.'
+
             WHERE NOT EXISTS (SELECT 1 FROM sys_change_comments WHERE cr_id = 14 AND comment LIKE '%QA Checklist%');
+        ",
+        '027_confirm_testing' => "
+            -- Insert confirmation of testing based on user evidence
+            INSERT INTO sys_change_comments (cr_id, user_id, comment)
+            SELECT 14, 1,
+'**QA Update: Testing Results**
+
+✅ **Google Drive Import - Error Handling:** PASSED.
+*Evidence:* System correctly identified Service Account quota issue (Error 403) and displayed warning to user.
+
+⚠️ **Action Required:**
+Administrator must configure Shared Drive or Enable Domain-Wide Delegation for the Service Account to resolve the quota 403 error.'
+            WHERE NOT EXISTS (SELECT 1 FROM sys_change_comments WHERE cr_id = 14 AND comment LIKE '%QA Update%');
         "
     ];
 
