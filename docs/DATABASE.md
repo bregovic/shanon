@@ -26,14 +26,56 @@ Tracks the changelog of the application visible in the UI.
 
 ### `dms_documents`
 Primary file storage metadata.
-- `file_path`: Relative path to storage
+- `rec_id` (PK)
+- `tenant_id`: Multi-tenancy isolation
 - `display_name`: User facing filename
-- `metadata`: JSONB for custom fields
+- `original_filename`: Original uploaded filename
+- `doc_type_id`: FK to `dms_doc_types`
+- `storage_profile_id`: FK to `dms_storage_profiles`
+- `storage_path`: Relative path or ID within the storage system
+- `file_size_bytes`: Size in bytes
+- `mime_type`: File MIME type
+- `ocr_status`: `pending`, `completed`, `verified`, `skipped`
+- `metadata`: JSONB for extracted attributes (`{"attributes": {"INVOICE_NUMBER": "2024001"}}`)
+- `created_by`: User ID
+
+### `dms_file_contents`
+Blob storage for files (used when local/cloud storage is not available or for caching).
+- `doc_id` (PK, FK): References `dms_documents`
+- `content`: Binary data (BYTEA)
 
 ### `dms_doc_types`
 Categorization for documents.
+- `rec_id` (PK)
+- `tenant_id`: Multi-tenancy isolation
 - `code`: System identifier (e.g. `INV_IN`)
+- `name`: Human-readable name
 - `icon`: FluentUI icon name
+- `number_series_id`: FK to `sys_number_series`
+- `description`: Optional description
+
+### `dms_attributes`
+Defines attributes that should be extracted from documents (OCR) or manually entered.
+- `rec_id` (PK)
+- `tenant_id`: Multi-tenancy isolation
+- `name`: Display name (e.g. "Číslo faktury")
+- `code`: System code for OCR mapping (e.g. `INVOICE_NUMBER`)
+- `data_type`: `text`, `number`, `date`, `boolean`
+- `is_required`: Validated on save
+- `is_searchable`: Included in fulltext search
+- `default_value`: Pre-filled value
+- `help_text`: User hint
+
+### `dms_storage_profiles`
+Configuration for where documents are physically stored.
+- `rec_id` (PK)
+- `tenant_id`: Multi-tenancy isolation
+- `name`: Profile name (e.g. "Google Drive Finance")
+- `storage_type`: `local`, `google_drive` ...
+- `base_path`: Root folder path or ID
+- `connection_string`: Credentials or configuration JSON (Encrypted/TEXT)
+- `is_default`: Auto-selected for new uploads
+- `is_active`: Enabled/Disabled
 
 ## Security & RBAC
 

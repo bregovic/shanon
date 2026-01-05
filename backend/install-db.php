@@ -726,6 +726,16 @@ END $$;",
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='tenant_id') THEN
                     ALTER TABLE dms_storage_profiles ADD COLUMN tenant_id UUID;
                 END IF;
+
+                -- Ensure storage_type
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='storage_type') THEN
+                    ALTER TABLE dms_storage_profiles ADD COLUMN storage_type VARCHAR(50) DEFAULT 'local';
+                END IF;
+
+                -- Ensure base_path
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='base_path') THEN
+                    ALTER TABLE dms_storage_profiles ADD COLUMN base_path VARCHAR(500);
+                END IF;
             END $$;
         "
     ];

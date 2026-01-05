@@ -22,7 +22,8 @@ import {
     Checkbox,
     Dropdown,
     Option,
-    createTableColumn
+    createTableColumn,
+    tokens
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
