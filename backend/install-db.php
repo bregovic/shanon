@@ -787,6 +787,23 @@ END $$;",
 ⚠️ **Action Required:**
 Administrator must configure Shared Drive or Enable Domain-Wide Delegation for the Service Account to resolve the quota 403 error.'
             WHERE NOT EXISTS (SELECT 1 FROM sys_change_comments WHERE cr_id = 14 AND comment LIKE '%QA Update%');
+        ",
+        '028_ensure_doc_types' => "
+            INSERT INTO dms_doc_types (tenant_id, name, code)
+            SELECT '00000000-0000-0000-0000-000000000001', 'Faktura přijatá', 'INV_IN'
+            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'INV_IN');
+
+            INSERT INTO dms_doc_types (tenant_id, name, code)
+            SELECT '00000000-0000-0000-0000-000000000001', 'Smlouva', 'CONTRACT'
+            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'CONTRACT');
+
+            INSERT INTO dms_doc_types (tenant_id, name, code)
+            SELECT '00000000-0000-0000-0000-000000000001', 'Účtenka', 'RECEIPT'
+            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'RECEIPT');
+
+            INSERT INTO dms_doc_types (tenant_id, name, code)
+            SELECT '00000000-0000-0000-0000-000000000001', 'Ostatní', 'OTHER'
+            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'OTHER');
         "
     ];
 
