@@ -487,12 +487,15 @@ try {
                 exit;
             }
 
+            /*
             if (file_exists('helpers/GoogleDriveStorage.php')) {
                 require_once 'helpers/GoogleDriveStorage.php';
             }
+            */
             try {
-                $drive = new GoogleDriveStorage($connStr, $basePath);
-                $result = $drive->testConnection();
+                // $drive = new GoogleDriveStorage($connStr, $basePath);
+                // $result = $drive->testConnection();
+                $result = ['success' => false, 'error' => 'Temporarily disabled for debugging'];
                 
                 if ($result['success']) {
                     echo json_encode(['success' => true, 'message' => 'Připojení úspěšné. Složka: ' . $result['folderName']]);
