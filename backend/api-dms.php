@@ -503,7 +503,33 @@ try {
         }
 
         // For Google Drive and others
-        echo json_encode(['success' => true, 'message' => 'Test pro typ ' . $storageType . ' je dočasně vypnutý pro údržbu.']);
+        if ($storageType === 'google_drive') {
+            if (empty($connStr) || empty($basePath)) {
+                echo json_encode(['success' => false, 'error' => 'Chybí Folder ID nebo Credentials JSON']);
+                exit;
+            }
+
+            if (file_exists('helpers/GoogleDriveStorage.php')) {
+                require_once 'helpers/GoogleDriveStorage.php';
+            }
+
+            try {
+                // Initialize Storage
+                $drive = new GoogleDriveStorage($connStr, $basePath);
+                $result = $drive->testConnection();
+                
+                if ($result['success']) {
+                    echo json_encode(['success' => true, 'message' => 'Připojení úspěšné. Složka: ' . ($result['folderName'] ?? 'Neznámá')]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => $result['error']]);
+                }
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Test pro typ ' . $storageType . ' není implementován nebo je vypnutý.']);
         exit;
     }
 
