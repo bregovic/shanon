@@ -452,19 +452,22 @@ export const DmsSettings: React.FC = () => {
                                                 <TableCell>{attr.is_searchable ? 'Ano' : 'Ne'}</TableCell>
                                                 <TableCell>{attr.default_value || '-'}</TableCell>
                                                 <TableCell>
-                                                    <Button
-                                                        icon={<Edit24Regular />}
-                                                        appearance="subtle"
-                                                        size="small"
-                                                        onClick={() => openAttrDialog(attr)}
-                                                    />
-                                                    <Button
-                                                        icon={<Translate24Regular />}
-                                                        appearance="subtle"
-                                                        size="small"
-                                                        onClick={() => openTranslations(attr)}
-                                                        title="Překlady"
-                                                    />
+                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                        <Button
+                                                            icon={<Edit24Regular />}
+                                                            appearance="subtle"
+                                                            size="small"
+                                                            onClick={() => openAttrDialog(attr)}
+                                                            title="Upravit"
+                                                        />
+                                                        <Button
+                                                            icon={<Translate24Regular />}
+                                                            appearance="subtle"
+                                                            size="small"
+                                                            onClick={() => openTranslations(attr)}
+                                                            title="Překlady"
+                                                        />
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

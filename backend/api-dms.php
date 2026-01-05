@@ -311,6 +311,57 @@ try {
         exit;
     }
 
+    // ===== ADMIN: ATTRIBUTE CREATE/UPDATE =====
+    if (($action === 'attribute_create' || $action === 'attribute_update') && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+
+        $name = $input['name'] ?? '';
+        $dataType = $input['data_type'] ?? 'text';
+        $isRequired = !empty($input['is_required']);
+        $isSearchable = !empty($input['is_searchable']);
+        $defaultValue = $input['default_value'] ?? '';
+        $helpText = $input['help_text'] ?? '';
+        
+        if (!$name) throw new Exception('Name is required');
+
+        if ($action === 'attribute_create') {
+            $sql = "INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (:tid, :name, :d, :req, :srch, :def, :hlp)";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':tid' => $tenantId,
+                ':name' => $name,
+                ':d' => $dataType,
+                ':req' => $isRequired ? 't' : 'f',
+                ':srch' => $isSearchable ? 't' : 'f',
+                ':def' => $defaultValue,
+                ':hlp' => $helpText
+            ]);
+        } else {
+            $id = $input['id'] ?? 0;
+            if (!$id) throw new Exception('ID required for update');
+            
+            $sql = "UPDATE dms_attributes SET 
+                    name = :name, data_type = :d, is_required = :req, is_searchable = :srch, 
+                    default_value = :def, help_text = :hlp 
+                    WHERE rec_id = :id";
+             $stmt = $pdo->prepare($sql);
+             $stmt->execute([
+                ':name' => $name,
+                ':d' => $dataType,
+                ':req' => $isRequired ? 't' : 'f',
+                ':srch' => $isSearchable ? 't' : 'f',
+                ':def' => $defaultValue,
+                ':hlp' => $helpText,
+                ':id' => $id
+             ]);
+        }
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     // ===== ADMIN: STORAGE PROFILES =====
     if ($action === 'storage_profiles') {
         // Use try-catch to avoid breaking if table missing (though it should exist)
