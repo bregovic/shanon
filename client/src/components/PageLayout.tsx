@@ -83,15 +83,15 @@ export const PageHeader: React.FC<{ children: React.ReactNode }> = ({ children }
                 {children}
             </div>
             {hasFilters && (
-                <Tooltip content={isFiltersOpen ? "Skrýt filtry" : "Zobrazit filtry"} relationship="label">
+                <Tooltip content={isFiltersOpen ? "Skrýt funkce" : "Zobrazit funkce"} relationship="label">
                     <Button
                         appearance="subtle"
                         icon={<Filter24Regular />}
                         iconPosition="before"
                         onClick={toggleFilters}
-                        aria-label="Toggle Filters"
+                        aria-label="Toggle Functions"
                     >
-                        Filtry
+                        Funkce
                         {isFiltersOpen ? <ChevronUp24Regular style={{ marginLeft: 6 }} /> : <ChevronDown24Regular style={{ marginLeft: 6 }} />}
                     </Button>
                 </Tooltip>
