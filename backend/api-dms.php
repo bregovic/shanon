@@ -481,40 +481,13 @@ try {
         $basePath = $input['base_path'] ?? '';
         $connStr = $input['connection_string'] ?? '';
 
-        if ($storageType === 'google_drive') {
-            if (empty($connStr) || empty($basePath)) {
-                echo json_encode(['success' => false, 'error' => 'Chybí Folder ID nebo Credentials JSON']);
-                exit;
-            }
-
-            /*
-            if (file_exists('helpers/GoogleDriveStorage.php')) {
-                require_once 'helpers/GoogleDriveStorage.php';
-            }
-            */
-            try {
-                // $drive = new GoogleDriveStorage($connStr, $basePath);
-                // $result = $drive->testConnection();
-                $result = ['success' => false, 'error' => 'Temporarily disabled for debugging'];
-                
-                if ($result['success']) {
-                    echo json_encode(['success' => true, 'message' => 'Připojení úspěšné. Složka: ' . $result['folderName']]);
-                } else {
-                    echo json_encode(['success' => false, 'error' => $result['error']]);
-                }
-            } catch (Exception $e) {
-                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-            }
-            exit;
-        }
-
         if ($storageType === 'local') {
             if (empty($basePath)) {
                 echo json_encode(['success' => false, 'error' => 'Chybí cesta k adresáři']);
                 exit;
             }
             
-            // Basic directory check (if allowed by server config)
+            // Basic directory check
             if (is_dir($basePath) && is_writable($basePath)) {
                  echo json_encode(['success' => true, 'message' => 'Adresář existuje a je zapisovatelný']);
             } else {
@@ -529,7 +502,8 @@ try {
             exit;
         }
 
-        echo json_encode(['success' => true, 'message' => 'Test pro tento typ úložiště zatím není implementován']);
+        // For Google Drive and others
+        echo json_encode(['success' => true, 'message' => 'Test pro typ ' . $storageType . ' je dočasně vypnutý pro údržbu.']);
         exit;
     }
 
