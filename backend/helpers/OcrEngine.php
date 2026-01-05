@@ -166,6 +166,15 @@ class OcrEngine {
         foreach ($lines as $i => $line) {
             $lineLower = mb_strtolower($line, 'UTF-8');
             
+            // EXCLUSION for Supplier Attributes:
+            // Ignore lines that clearly belong to the Buyer (Odběratel/Příjemce) logic avoids mixing IČO.
+            $isSupplierAttr = (strpos($code ?? '', 'SUPPLIER_') !== false || $code === 'IBAN' || $code === 'BANK_ACCOUNT');
+            if ($isSupplierAttr) {
+                if (mb_stripos($line, 'Odběratel') !== false || mb_stripos($line, 'Příjemce') !== false) {
+                    continue; 
+                }
+            }
+
             // Match Keyword
             $pos = mb_strpos($lineLower, $keyLower);
             if ($pos !== false) {
@@ -173,6 +182,17 @@ class OcrEngine {
                 $suffix = ltrim($suffix, " \t:-");
 
                 // --- SMART LOGIC BASED ON CODE ---
+                
+                // INVOICE NUMBER - Priority check
+                if ($code === 'INVOICE_NUMBER') {
+                    // Avoid picking up Deposit/Order numbers
+                    if (mb_stripos($line, 'záloha') !== false || mb_stripos($line, 'objednávka') !== false) continue;
+                    
+                    // Regex search on suffix
+                    if (preg_match('/(?:č\.?|číslo)?\s*:?\s*(\d{6,15})/iu', $suffix, $m)) {
+                         return ['value' => $m[1], 'confidence' => 'High', 'strategy' => 'Invoice_Num_Regex'];
+                    }
+                }
 
                 // 1. IBAN / Bank Account
                 if ($code === 'BANK_ACCOUNT' || $code === 'IBAN') {
@@ -189,8 +209,13 @@ class OcrEngine {
                 // 2. ICO / ID Number (8 digits)
                 if (strpos($code, 'ICO') !== false || $code === 'SUPPLIER_ICO') {
                      if (preg_match('/\b\d{8}\b/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'ICO_Regex'];
-                     if (isset($lines[$i+1]) && preg_match('/\b\d{8}\b/', $lines[$i+1], $m)) {
-                        return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'ICO_Regex_NextLine'];
+                     
+                     if (isset($lines[$i+1])) {
+                         // Double check next line isn't Odběratel
+                         if ($isSupplierAttr && mb_stripos($lines[$i+1], 'Odběratel') !== false) { /* skip */ }
+                         else if (preg_match('/\b\d{8}\b/', $lines[$i+1], $m)) {
+                            return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'ICO_Regex_NextLine'];
+                         }
                      }
                 }
 
@@ -204,7 +229,7 @@ class OcrEngine {
 
                 // 4. Variable Symbol (digits, usually 10 max) & Constant Symbol
                 if ($code === 'VARIABLE_SYMBOL' || $code === 'CONSTANT_SYMBOL') {
-                     if (preg_match('/\b\d{4,10}\b/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'Medium', 'strategy' => 'Symbol_Regex'];
+                     if (preg_match('/\b\d{1,10}\b/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'Medium', 'strategy' => 'Symbol_Regex'];
                      if (isset($lines[$i+1]) && preg_match('/\b\d{1,10}\b/', $lines[$i+1], $m)) {
                         return ['value' => $m[0], 'confidence' => 'Medium', 'strategy' => 'Symbol_Regex_NextLine'];
                      }
@@ -224,6 +249,7 @@ class OcrEngine {
                 // FILTER: Validate Supplier Name
                 if ($code === 'SUPPLIER_NAME' && $val) {
                     if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
+                    if (is_numeric(str_replace([' ','.'], '', $val))) $val = null; 
                 }
 
                 if ($val) return ['value' => $val, 'confidence' => 'High', 'strategy' => 'SameLine'];
@@ -236,6 +262,7 @@ class OcrEngine {
                          
                          if ($code === 'SUPPLIER_NAME' && $val) {
                              if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
+                             if (is_numeric(str_replace([' ','.'], '', $val))) $val = null; 
                          }
 
                          if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'NextLine'];
