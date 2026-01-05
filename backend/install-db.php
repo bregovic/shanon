@@ -565,6 +565,47 @@ END $$;",
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT '2026-01-05', 'Refined Attributes', 'Added standard invoice attributes for improved OCR matching.', 'Backend', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Refined Attributes' AND date = '2026-01-05');
+        ",
+        '021_more_invoice_attributes' => "
+            DO $$
+            DECLARE
+                v_tenant_id UUID := '00000000-0000-0000-0000-000000000001';
+            BEGIN
+                -- 7. Variabilní symbol (VARIABLE_SYMBOL)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'VARIABLE_SYMBOL' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'VARIABLE_SYMBOL', 'Variabilní symbol', 'text', true, false);
+                END IF;
+
+                -- 8. DIČ dodavatele (SUPPLIER_VAT_ID)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'SUPPLIER_VAT_ID' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'SUPPLIER_VAT_ID', 'DIČ dodavatele', 'text', true, false);
+                END IF;
+
+                -- 9. Datum plnění (DUZP)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'DUZP' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'DUZP', 'Datum plnění (DUZP)', 'date', true, false);
+                END IF;
+
+                -- 10. Měna (CURRENCY)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'CURRENCY' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required, default_value)
+                    VALUES (v_tenant_id, 'CURRENCY', 'Měna', 'text', true, false, 'CZK');
+                END IF;
+
+                -- 11. DPH Celkem (VAT_TOTAL)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'VAT_TOTAL' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'VAT_TOTAL', 'DPH celkem', 'number', true, false);
+                END IF;
+
+            END $$;
+
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT '2026-01-05', 'More Attributes', 'Added VS, VAT ID, DUZP, Currency, and VAT Total attributes.', 'Backend', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'More Attributes' AND date = '2026-01-05');
         "
     ];
 
