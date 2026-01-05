@@ -686,7 +686,12 @@ END $$;",
             
             DO $$ 
             BEGIN 
-                ALTER TABLE dms_storage_profiles ALTER COLUMN connection_string TYPE TEXT;
+                -- Alter connection_string to TEXT if it is not already, or ADD it if missing
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='connection_string') THEN
+                    ALTER TABLE dms_storage_profiles ADD COLUMN connection_string TEXT;
+                ELSE
+                    ALTER TABLE dms_storage_profiles ALTER COLUMN connection_string TYPE TEXT;
+                END IF;
             END $$;
         "
     ];
