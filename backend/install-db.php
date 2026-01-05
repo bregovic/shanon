@@ -408,8 +408,10 @@ END $$;",
             BEGIN
                 -- 1. Invoice Number (Číslo faktury)
                 IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Číslo faktury' AND tenant_id = v_tenant_id) THEN
-                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (v_tenant_id, 'Číslo faktury', 'text', true, true, '', 'Unique invoice number')
+                    -- Check if code column exists (it should based on error), if so include it.
+                    -- Assuming strict schema where code exists.
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'INVOICE_NUMBER', 'Číslo faktury', 'text', true, true, '', 'Unique invoice number')
                     RETURNING rec_id INTO v_attr_id;
 
                     -- Translations / Variants
@@ -423,8 +425,8 @@ END $$;",
 
                 -- 2. Supplier ICO (IČO dodavatele)
                 IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'IČO dodavatele' AND tenant_id = v_tenant_id) THEN
-                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (v_tenant_id, 'IČO dodavatele', 'text', false, true, '', 'Supplier Identification Number')
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'SUPPLIER_ICO', 'IČO dodavatele', 'text', false, true, '', 'Supplier Identification Number')
                     RETURNING rec_id INTO v_attr_id;
 
                     INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
@@ -437,8 +439,8 @@ END $$;",
 
                 -- 3. Customer ICO (IČO odběratele)
                 IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'IČO odběratele' AND tenant_id = v_tenant_id) THEN
-                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (v_tenant_id, 'IČO odběratele', 'text', false, true, '', 'Customer Identification Number')
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'CUSTOMER_ICO', 'IČO odběratele', 'text', false, true, '', 'Customer Identification Number')
                     RETURNING rec_id INTO v_attr_id;
 
                     INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
@@ -449,8 +451,8 @@ END $$;",
 
                 -- 4. Bank Account (Číslo účtu)
                 IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Číslo účtu' AND tenant_id = v_tenant_id) THEN
-                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (v_tenant_id, 'Číslo účtu', 'text', false, true, '', 'Bank Account / IBAN')
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'BANK_ACCOUNT', 'Číslo účtu', 'text', false, true, '', 'Bank Account / IBAN')
                     RETURNING rec_id INTO v_attr_id;
 
                     INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
@@ -462,8 +464,8 @@ END $$;",
                 
                   -- 5. Total Price (Celková částka)
                 IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Celková částka' AND tenant_id = v_tenant_id) THEN
-                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (v_tenant_id, 'Celková částka', 'number', false, true, '', 'Total Amount')
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'TOTAL_AMOUNT', 'Celková částka', 'number', false, true, '', 'Total Amount')
                     RETURNING rec_id INTO v_attr_id;
 
                     INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
@@ -475,8 +477,8 @@ END $$;",
                 
                  -- 6. Date (Datum vystavení)
                 IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Datum vystavení' AND tenant_id = v_tenant_id) THEN
-                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
-                    VALUES (v_tenant_id, 'Datum vystavení', 'date', false, true, '', 'Issue Date')
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'ISSUE_DATE', 'Datum vystavení', 'date', false, true, '', 'Issue Date')
                     RETURNING rec_id INTO v_attr_id;
 
                     INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
