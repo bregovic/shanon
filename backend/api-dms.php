@@ -125,7 +125,7 @@ try {
 
         if (!$storageProfileId) {
              // Auto-create default local profile if receiving files but no profile exists
-             $pdo->prepare("INSERT INTO dms_storage_profiles (tenant_id, name, storage_type, is_default, is_active) VALUES (:tid, 'Local Storage', 'local', true, true)")->execute([':tid' => $tenantId]);
+             $pdo->prepare("INSERT INTO dms_storage_profiles (tenant_id, name, storage_type, provider_type, is_default, is_active) VALUES (:tid, 'Local Storage', 'local', 'local', true, true)")->execute([':tid' => $tenantId]);
              $storageProfileId = $pdo->lastInsertId();
         }
 
@@ -460,13 +460,14 @@ try {
 
         if ($action === 'storage_profile_create') {
             $sql = "INSERT INTO dms_storage_profiles 
-                    (tenant_id, name, storage_type, base_path, connection_string, is_default, is_active)
-                    VALUES (:tid, :name, :type, :path, :conn, :def, :act)";
+                    (tenant_id, name, storage_type, provider_type, base_path, connection_string, is_default, is_active)
+                    VALUES (:tid, :name, :type, :prov_type, :path, :conn, :def, :act)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':tid' => $tenantId,
                 ':name' => $name,
                 ':type' => $storageType,
+                ':prov_type' => $storageType,
                 ':path' => $basePath,
                 ':conn' => $connStr,
                 ':def' => $isDefault ? 't' : 'f',
@@ -477,13 +478,14 @@ try {
             if (!$id) throw new Exception('ID required for update');
             
             $sql = "UPDATE dms_storage_profiles SET 
-                    name = :name, storage_type = :type, base_path = :path, 
+                    name = :name, storage_type = :type, provider_type = :prov_type, base_path = :path, 
                     connection_string = :conn, is_default = :def, is_active = :act
                     WHERE rec_id = :id";
              $stmt = $pdo->prepare($sql);
              $stmt->execute([
                 ':name' => $name,
                 ':type' => $storageType,
+                ':prov_type' => $storageType,
                 ':path' => $basePath,
                 ':conn' => $connStr,
                 ':def' => $isDefault ? 't' : 'f',
