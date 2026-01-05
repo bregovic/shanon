@@ -738,7 +738,7 @@ const RequestsPage = () => {
     if (selectedRequest) {
         return (
             <PageLayout>
-                <ActionBar>
+                <PageHeader>
                     <Breadcrumb>
                         <BreadcrumbItem>
                             <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
@@ -757,7 +757,7 @@ const RequestsPage = () => {
                     </Breadcrumb>
                     <div style={{ flex: 1 }} />
                     <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(selectedRequest.id)}>Obnovit</Button>
-                </ActionBar>
+                </PageHeader>
 
                 <PageContent>
                     {/* Detail Header / Title Area */}
