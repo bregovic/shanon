@@ -128,17 +128,20 @@ export const DmsList: React.FC = () => {
             renderHeaderCell: () => 'ID',
             renderCell: (item) => <Text>{item.rec_id}</Text>
         }),
-        createTableColumn<DmsDocument>({
-            columnId: 'display_name',
-            compare: (a, b) => a.display_name.localeCompare(b.display_name),
-            renderHeaderCell: () => 'Název',
-            renderCell: (item) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: selectedDoc?.rec_id === item.rec_id ? '#0078d4' : 'inherit', fontWeight: selectedDoc?.rec_id === item.rec_id ? '600' : 'normal' }}>
-                    <Document24Regular />
-                    <Text weight={selectedDoc?.rec_id === item.rec_id ? 'semibold' : 'regular'}>{item.display_name}</Text>
-                </div>
-            )
-        }),
+        {
+            ...createTableColumn<DmsDocument>({
+                columnId: 'display_name',
+                compare: (a, b) => a.display_name.localeCompare(b.display_name),
+                renderHeaderCell: () => 'Název',
+                renderCell: (item) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: selectedDoc?.rec_id === item.rec_id ? '#0078d4' : 'inherit', fontWeight: selectedDoc?.rec_id === item.rec_id ? '600' : 'normal' }}>
+                        <Document24Regular />
+                        <Text weight={selectedDoc?.rec_id === item.rec_id ? 'semibold' : 'regular'}>{item.display_name}</Text>
+                    </div>
+                )
+            }),
+            minWidth: 400
+        },
         createTableColumn<DmsDocument>({
             columnId: 'doc_type_name',
             compare: (a, b) => (a.doc_type_name || '').localeCompare(b.doc_type_name || ''),

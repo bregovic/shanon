@@ -167,7 +167,7 @@ export const DmsDashboard: React.FC = () => {
 
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label="Typy dokumentů" onClick={() => navigate('/dms/settings')} />
-                        <MenuItem label="Číselné řady" onClick={() => { }} />
+                        {/* <MenuItem label="Číselné řady" onClick={() => { }} /> */}
                         <MenuItem label="Atributy" onClick={() => { }} />
                         <MenuItem label="Úložiště" onClick={() => { }} />
                     </MenuSection>
