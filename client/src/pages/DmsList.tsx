@@ -220,13 +220,7 @@ export const DmsList: React.FC = () => {
             {/* Function Toolbar (replaces search) */}
             <PageFilterBar>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <Button
-                        appearance="secondary"
-                        icon={<Add24Regular />}
-                        onClick={() => navigate('/dms/import')}
-                    >
-                        Nový
-                    </Button>
+
 
                     <Button
                         appearance="secondary"
