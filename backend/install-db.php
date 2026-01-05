@@ -606,6 +606,59 @@ END $$;",
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT '2026-01-05', 'More Attributes', 'Added VS, VAT ID, DUZP, Currency, and VAT Total attributes.', 'Backend', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'More Attributes' AND date = '2026-01-05');
+        ",
+        '022_detailed_invoice_attributes' => "
+            DO $$
+            DECLARE
+                v_tenant_id UUID := '00000000-0000-0000-0000-000000000001';
+            BEGIN
+                -- 12. Číslo objednávky (ORDER_NUMBER)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'ORDER_NUMBER' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'ORDER_NUMBER', 'Číslo objednávky', 'text', true, false);
+                END IF;
+
+                -- 13. Konstantní symbol (CONSTANT_SYMBOL)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'CONSTANT_SYMBOL' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'CONSTANT_SYMBOL', 'Konstantní symbol', 'text', true, false);
+                END IF;
+
+                -- 14. Základ DPH 21% (VAT_BASE_21)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'VAT_BASE_21' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'VAT_BASE_21', 'Základ DPH 21%', 'number', true, false);
+                END IF;
+
+                -- 15. Částka DPH 21% (VAT_AMOUNT_21)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'VAT_AMOUNT_21' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'VAT_AMOUNT_21', 'Částka DPH 21%', 'number', true, false);
+                END IF;
+
+                -- 16. Základ DPH snížená (VAT_BASE_REDUCED)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'VAT_BASE_REDUCED' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'VAT_BASE_REDUCED', 'Základ DPH snížená', 'number', true, false);
+                END IF;
+
+                -- 17. Částka DPH snížená (VAT_AMOUNT_REDUCED)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'VAT_AMOUNT_REDUCED' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'VAT_AMOUNT_REDUCED', 'Částka DPH snížená', 'number', true, false);
+                END IF;
+
+                -- 18. Položky faktury (INVOICE_ITEMS)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE code = 'INVOICE_ITEMS' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_searchable, is_required)
+                    VALUES (v_tenant_id, 'INVOICE_ITEMS', 'Položky faktury', 'text', true, false);
+                END IF;
+
+            END $$;
+
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT '2026-01-05', 'Detailed Invoice Attributes', 'Added Order Num, KS, VAT breakdowns, and Line Items.', 'Backend', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Detailed Invoice Attributes' AND date = '2026-01-05');
         "
     ];
 
