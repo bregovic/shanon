@@ -50,17 +50,21 @@ export const DmsImport: React.FC = () => {
     // Load document types and storage info
     useEffect(() => {
         // Types
-        fetch('/api/api-dms.php?action=types')
+        fetch('/api/api-dms.php?action=types&t=' + Date.now())
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    setDocTypes(data.data || []);
+                    const types = data.data || [];
+                    setDocTypes(types);
+                    if (types.length > 0) {
+                        setSelectedType(types[0].rec_id.toString());
+                    }
                 }
             })
             .catch(console.error);
 
         // Storage Profile (find default)
-        fetch('/api/api-dms.php?action=storage_profiles')
+        fetch('/api/api-dms.php?action=storage_profiles&t=' + Date.now())
             .then(res => res.json())
             .then(data => {
                 if (data.success && data.data) {
