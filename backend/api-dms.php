@@ -278,6 +278,42 @@ try {
         exit;
     }
 
+    // ===== UPDATE METADATA (MANUAL CORRECTION) =====
+    if ($action === 'update_metadata' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = $input['id'] ?? 0;
+        $attributes = $input['attributes'] ?? []; 
+
+        if (!$id) throw new Exception('ID is required');
+
+        // Fetch existing
+        $stmt = $pdo->prepare("SELECT metadata FROM dms_documents WHERE rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $currMeta = json_decode($stmt->fetchColumn() ?: '{}', true);
+        
+        $currAttrs = $currMeta['attributes'] ?? [];
+        
+        foreach ($attributes as $k => $v) {
+            $currAttrs[$k] = $v;
+        }
+        
+        $currMeta['attributes'] = $currAttrs;
+        
+        // Update DB
+        $sql = "UPDATE dms_documents 
+                SET metadata = :meta, 
+                    ocr_status = 'verified' 
+                WHERE rec_id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':meta' => json_encode($currMeta), 
+            ':id' => $id
+        ]);
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     // ===== ADMIN: DOCUMENT TYPES =====
     if ($action === 'doc_types') {
         $sql = "SELECT t.*, s.name as number_series_name 
