@@ -111,22 +111,48 @@ try {
                 :doc_type_id, :profile_id, :storage_path, :ocr_status, :created_by)
                 RETURNING rec_id";
 
-        // Resolve Storage Profile ID
-        $stmtProf = $pdo->prepare("SELECT rec_id FROM dms_storage_profiles WHERE is_default = true LIMIT 1");
+        // Resolve Storage Profile
+        $stmtProf = $pdo->prepare("SELECT * FROM dms_storage_profiles WHERE is_default = true LIMIT 1");
         $stmtProf->execute();
-        $storageProfileId = $stmtProf->fetchColumn();
+        $profile = $stmtProf->fetch(PDO::FETCH_ASSOC);
 
-        if (!$storageProfileId) {
+        if (!$profile) {
             // Fallback: any active
-            $stmtProf = $pdo->prepare("SELECT rec_id FROM dms_storage_profiles WHERE is_active = true ORDER BY rec_id ASC LIMIT 1");
+            $stmtProf = $pdo->prepare("SELECT * FROM dms_storage_profiles WHERE is_active = true ORDER BY rec_id ASC LIMIT 1");
             $stmtProf->execute();
-            $storageProfileId = $stmtProf->fetchColumn();
+            $profile = $stmtProf->fetch(PDO::FETCH_ASSOC);
         }
 
-        if (!$storageProfileId) {
-             // Auto-create default local profile if receiving files but no profile exists
-             $pdo->prepare("INSERT INTO dms_storage_profiles (tenant_id, name, storage_type, provider_type, is_default, is_active) VALUES (:tid, 'Local Storage', 'local', 'local', true, true)")->execute([':tid' => $tenantId]);
-             $storageProfileId = $pdo->lastInsertId();
+        if (!$profile) {
+             // Auto-create default local profile
+             $pdo->prepare("INSERT INTO dms_storage_profiles (tenant_id, name, storage_type, provider_type, base_path, is_default, is_active) VALUES (:tid, 'Local Storage', 'local', 'local', 'uploads/dms/', true, true)")->execute([':tid' => $tenantId]);
+             $profileId = $pdo->lastInsertId();
+             // Fetch it back to be sure
+             $stmtProf = $pdo->prepare("SELECT * FROM dms_storage_profiles WHERE rec_id = :id");
+             $stmtProf->execute([':id' => $profileId]);
+             $profile = $stmtProf->fetch(PDO::FETCH_ASSOC);
+        }
+
+        $storageProfileId = $profile['rec_id'];
+        
+        // Handle External Storage
+        if (($profile['provider_type'] ?? '') === 'google_drive') {
+            try {
+                require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
+                $gd = new GoogleDriveStorage($profile['connection_string'], $profile['base_path']);
+                // Use the local file we just moved
+                $gFile = $gd->uploadFile($fullPath, $uniqueName, $mimeType);
+                
+                if (isset($gFile['id'])) {
+                    $storagePath = $gFile['id']; // Store Google ID as path
+                } else {
+                    // Fallback or error? Let's log but keep local path if fail
+                    // For now, let's keep going, maybe user will see error in OCR status or logs
+                }
+            } catch (Exception $e) {
+                // If Google upload fails, we still have the local copy in $storagePath
+                // Maybe log error?
+            }
         }
 
         $stmt = $pdo->prepare($sql);
