@@ -473,6 +473,30 @@ try {
         exit;
     }
 
+    // ===== ADMIN: STORAGE PROFILE DELETE =====
+    if ($action === 'storage_profile_delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = $input['id'] ?? 0;
+        
+        if (!$id) throw new Exception('ID is required');
+
+        // Check usage before delete
+        $count = $pdo->prepare("SELECT COUNT(*) FROM dms_documents WHERE storage_profile_id = :id")->execute([':id'=>$id]);
+        // Actually execute returns bool, fetchColumn needed. 
+        // Let's maximize safety.
+        $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM dms_documents WHERE storage_profile_id = :id");
+        $stmtCheck->execute([':id'=>$id]);
+        if ($stmtCheck->fetchColumn() > 0) {
+            throw new Exception('Nelze smazat úložiště, které obsahuje dokumenty.');
+        }
+
+        $sql = "DELETE FROM dms_storage_profiles WHERE rec_id = :id";
+        $pdo->prepare($sql)->execute([':id' => $id]);
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     // ===== ADMIN: STORAGE PROFILE TEST =====
     if ($action === 'storage_profile_test' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);

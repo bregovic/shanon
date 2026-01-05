@@ -31,7 +31,8 @@ import {
     Edit24Regular,
     Translate24Regular,
     Settings24Regular,
-    PlugConnected24Regular
+    PlugConnected24Regular,
+    Delete24Regular
 } from '@fluentui/react-icons';
 import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
@@ -280,6 +281,29 @@ export const DmsSettings: React.FC = () => {
         }
     };
 
+    const handleDeleteStorageProfile = async (sp: StorageProfile) => {
+        if (!confirm(`Opravdu smazat úložiště "${sp.name}"?`)) return;
+        try {
+            const res = await fetch('/api/api-dms.php?action=storage_profile_delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: sp.rec_id })
+            });
+            const json = await res.json();
+            if (json.success) {
+                // Reload data
+                const resList = await fetch('/api/api-dms.php?action=storage_profiles');
+                const jsonList = await resList.json();
+                if (jsonList.success) setStorageProfiles(jsonList.data);
+            } else {
+                alert('Chyba: ' + (json.error || json.message));
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Chyba při mazání');
+        }
+    };
+
     const handleTestConnection = async () => {
         try {
             const payload = {
@@ -413,7 +437,16 @@ export const DmsSettings: React.FC = () => {
             columnId: 'actions',
             renderHeaderCell: () => 'Akce',
             renderCell: (item) => (
-                <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openStorageDialog(item)} />
+                <div style={{ display: 'flex', gap: '4px' }}>
+                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openStorageDialog(item)} />
+                    <Button
+                        icon={<Delete24Regular />}
+                        appearance="subtle"
+                        size="small"
+                        style={{ color: '#d13438' }}
+                        onClick={() => handleDeleteStorageProfile(item)}
+                    />
+                </div>
             )
         })
     ];
