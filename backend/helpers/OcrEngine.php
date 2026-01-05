@@ -272,15 +272,58 @@ class OcrEngine {
         }
         
         // SPECIAL FALLBACKS FOR ITEMS
+        }
+
+        // SPECIAL LOGIC: TOTAL AMOUNT (Global Search)
+        if ($code === 'TOTAL_AMOUNT') {
+            foreach ($lines as $line) {
+                // Look for "Celkem", "K úhradě", "Částka", "K zaplacení"
+                if (preg_match('/(celkem|k úhradě|k zaplacení|částka)\s*[:\s]*([\d\s\.,]+)\s*(?:kč|eur|czk)?/iu', $line, $m)) {
+                     // Check if it's a valid amount
+                     $val = $this->parseValue($m[2], 'number', $code);
+                     if ($val && $val > 0) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'TotalAmount_Regex'];
+                }
+            }
+        }
+
+        // SPECIAL LOGIC: BANK CODE
+        if ($code === 'BANK_CODE') {
+             // Look for account pattern: 123456/BANK_CODE
+             // Try to find any /XXXX pattern where XXXX are digits
+             foreach ($lines as $line) {
+                 if (preg_match('#/(\d{4})\b#', $line, $m)) {
+                     return ['value' => $m[1], 'confidence' => 'High', 'strategy' => 'BankCode_Slash'];
+                 }
+             }
+        }
+        
+        // CUSTOMER NAME (Buyer) - Similar to Supplier but for "Odběratel" / "Příjemce"
+        if ($code === 'CUSTOMER_NAME') {
+             foreach ($lines as $i => $line) {
+                 if (mb_stripos($line, 'Odběratel') !== false || mb_stripos($line, 'Příjemce') !== false) {
+                     // Try Next Line first as it's most common for address blocks
+                     if (isset($lines[$i+1])) {
+                         $val = trim($lines[$i+1]);
+                         // Basic validation: not empty, not just a number
+                         if ($val && !is_numeric(str_replace(' ', '', $val))) {
+                             return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'Customer_NextLine'];
+                         }
+                     }
+                 }
+             }
+        }
+
+        // SPECIAL FALLBACKS FOR ITEMS
         if ($code === 'INVOICE_ITEMS') {
              foreach ($lines as $i => $line) {
-                 if (mb_stripos($line, 'Fakturujeme Vám') !== false || mb_stripos($line, 'Označení dodávky') !== false) {
+                 if (mb_stripos($line, 'Fakturujeme Vám') !== false || mb_stripos($line, 'Označení dodávky') !== false || mb_stripos($line, 'Položky') !== false) {
                      $items = [];
-                     for($k=1; $k<=6; $k++) {
+                     for($k=1; $k<=10; $k++) {
                          if (isset($lines[$i+$k])) {
                              $l = trim($lines[$i+$k]);
-                             if (mb_stripos($l, 'Celkem') !== false || mb_stripos($l, 'Součet') !== false) break;
-                             $items[] = $l;
+                             if (mb_stripos($l, 'Celkem') !== false || mb_stripos($l, 'Součet') !== false || mb_stripos($l, 'K úhradě') !== false) break;
+                             // Skip empty lines or lines with just numbers/prices
+                             if (mb_strlen($l) > 3) $items[] = $l;
                          }
                      }
                      if (!empty($items)) {
@@ -315,24 +358,52 @@ class OcrEngine {
         }
         // Reassemble, but careful. If we stripped everything, fallback to original?
         // Actually for Date/Number we extract specifically. For text we accept the cut.
-        $candidate = implode(' ', $cleanParts);
-
+        if ($dataType === 'text') {
+            // For Supplier Name, check for "Variabilní symbol" or other distinct blocks on the same line
+            if ($code === 'SUPPLIER_NAME') {
+                $stopPhrases = ['variabilní', 'konstantní', 'specifický', 'objednávka', 'ze dne', 'datum', 'odběratel', 'příjemce', 'banka', 'účet', 'iban', 'bic'];
+                foreach ($stopPhrases as $stop) {
+                    $idx = mb_stripos($candidate, $stop);
+                    if ($idx !== false) {
+                        $candidate = mb_substr($candidate, 0, $idx);
+                        break;
+                    }
+                }
+                $candidate = trim($candidate);
+                
+                // If the candidate becomes empty after stripping distinct blocks (e.g. "Dodavatel:               Variabilní symbol..."), return null to force NextLine strategy
+                if (empty($candidate)) return null;
+            }
+            return $candidate;
+        }
 
         if ($dataType === 'number') {
             // Money or Counts
             // Remove spaces, handle comma/dot
-            // Example: "1 234,50" -> 1234.50
-            // Example: "1.234,50" -> 1234.50
-            // Regex to find the number part:
+            // Example: "1 234,50" -> 1234.50 (Czech)
+            
+            // Clean non-numeric stuff but keep delimiters
             if (preg_match('/[\d\s\.,]+/', $rawStr, $matches)) {
                 $numStr = $matches[0];
-                // Replace spaces
+                // 1. Remove spaces (thousands separator in CZ)
                 $numStr = str_replace(' ', '', $numStr);
-                // Replace comma with dot if it looks like decimal separator
-                $numStr = str_replace(',', '.', $numStr);
-                // Handle multiple dots? "1.000.00" -> this simple logic fails. 
-                // Simple parse: keep only digits and last dot/comma
-                return floatval($numStr); // Simplified for MVP
+                $numStr = str_replace("\xc2\xa0", '', $numStr); // Non-breaking space
+                
+                // 2. Decide decimal separator
+                if (strpos($numStr, '.') !== false && strpos($numStr, ',') !== false) {
+                    $lastDot = strrpos($numStr, '.');
+                    $lastComma = strrpos($numStr, ',');
+                    if ($lastComma > $lastDot) {
+                        $numStr = str_replace('.', '', $numStr);
+                        $numStr = str_replace(',', '.', $numStr);
+                    } else {
+                        $numStr = str_replace(',', '', $numStr);
+                    }
+                } elseif (strpos($numStr, ',') !== false) {
+                    $numStr = str_replace(',', '.', $numStr);
+                }
+                
+                return floatval($numStr);
             }
         }
 
