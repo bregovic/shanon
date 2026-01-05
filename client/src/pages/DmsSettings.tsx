@@ -65,6 +65,7 @@ interface StorageProfile {
 interface Attribute {
     rec_id: number;
     name: string;
+    code?: string;
     data_type: string;
     is_required: boolean;
     is_searchable: boolean;
@@ -130,6 +131,7 @@ export const DmsSettings: React.FC = () => {
     };
     const [attrForm, setAttrForm] = useState({
         name: '',
+        code: '',
         data_type: 'text',
         is_required: false,
         is_searchable: true,
@@ -142,6 +144,7 @@ export const DmsSettings: React.FC = () => {
             setEditingAttr(attr);
             setAttrForm({
                 name: attr.name,
+                code: attr.code || '',
                 data_type: attr.data_type,
                 is_required: attr.is_required,
                 is_searchable: attr.is_searchable,
@@ -152,6 +155,7 @@ export const DmsSettings: React.FC = () => {
             setEditingAttr(null);
             setAttrForm({
                 name: '',
+                code: '',
                 data_type: 'text',
                 is_required: false,
                 is_searchable: true,
@@ -613,6 +617,18 @@ export const DmsSettings: React.FC = () => {
                                 />
                             </div>
                             <div>
+                                <Label>Systémová role (Kód)</Label>
+                                <Input
+                                    value={attrForm.code}
+                                    onChange={(e) => setAttrForm({ ...attrForm, code: e.target.value })}
+                                    style={{ width: '100%' }}
+                                    placeholder="např. INVOICE_NUMBER, TOTAL_AMOUNT, ICO..."
+                                />
+                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                                    Určuje, jak systém tento atribut interpretuje (pro OCR a automatizaci).
+                                </Text>
+                            </div>
+                            <div>
                                 <Label>Typ dat</Label>
                                 <Dropdown
                                     value={attrForm.data_type}
@@ -677,6 +693,10 @@ export const DmsSettings: React.FC = () => {
                                     placeholder="NAPŘ. INV, CONTRACT..."
                                 />
                             </div>
+                            {/* Hidden legacy code support */}
+                            {/* 
+                            // ... 
+                            */}
                             <div>
                                 <Label required>Název</Label>
                                 <Input

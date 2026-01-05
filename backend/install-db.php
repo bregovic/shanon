@@ -400,6 +400,25 @@ END $$;",
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Translations & Multi-Tenant' AND date = '2026-01-05');
         ",
 
+        '016b_ensure_attr_code' => "
+            DO $$ 
+            BEGIN 
+                -- Ensure 'code' column exists
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_attributes' AND column_name='code') THEN 
+                    ALTER TABLE dms_attributes ADD COLUMN code VARCHAR(50);
+                END IF;
+
+                -- Ensure 'code' is unique (optional but good practice)
+                -- We check constraint existence to avoid error
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'dms_attributes_code_key') THEN
+                     -- Only enforce unique if we are sure data is clean. Maybe skip for now to be safe, 
+                     -- or just add it. Let's add it but handle potential duplicates? 
+                     -- For now just adding the column is sufficient for the 500 error.
+                     NULL;
+                END IF;
+            END $$;
+        ",
+
         '017_seed_invoice_attributes' => "
             DO $$
             DECLARE
