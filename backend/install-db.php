@@ -493,6 +493,18 @@ END $$;",
                 SELECT '2026-01-05', 'DMS Seed Attributes', 'Seeded standard invoice attributes (Invoice No, ICO, Bank Acc) with translations and variants for OCR.', 'Content', NOW()
                 WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Seed Attributes' AND date = '2026-01-05');
             END $$;
+        ",
+
+        '018_dms_file_contents' => "
+            -- Separate table for BLOB storage to avoid slowing down lists
+            CREATE TABLE IF NOT EXISTS dms_file_contents (
+                doc_id INTEGER PRIMARY KEY REFERENCES dms_documents(rec_id) ON DELETE CASCADE,
+                content BYTEA NOT NULL
+            );
+
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT '2026-01-05', 'DMS Blob Storage', 'Added dms_file_contents table for persistent database file storage to support ephemeral hosting environments.', 'Backend', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Blob Storage' AND date = '2026-01-05');
         "
     ];
 

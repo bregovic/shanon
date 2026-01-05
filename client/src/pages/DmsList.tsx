@@ -178,6 +178,28 @@ export const DmsList: React.FC = () => {
         }
     };
 
+    const handleDelete = async (doc: DmsDocument) => {
+        if (!confirm(`Opravdu smazat dokument "${doc.display_name}"?`)) return;
+        try {
+            const res = await fetch('/api/api-dms.php?action=delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: doc.rec_id })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setIsDrawerOpen(false);
+                setSelectedDoc(null);
+                fetchData();
+            } else {
+                alert('Chyba: ' + (json.error || 'Unknown error'));
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Chyba sítě');
+        }
+    };
+
     return (
         <PageLayout>
             <PageHeader>
@@ -258,12 +280,19 @@ export const DmsList: React.FC = () => {
                                         <Text weight="medium">Autor:</Text> <Text>{selectedDoc.uploaded_by_name}</Text>
                                     </div>
                                     <Divider />
-                                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                                         <Button appearance="primary" icon={<Document24Regular />} onClick={() => window.open(`/api/api-dms.php?action=view&id=${selectedDoc.rec_id}`, '_blank')}>
                                             Otevřít
                                         </Button>
                                         <Button icon={<ScanText24Regular />} onClick={() => handleAnalyze(selectedDoc)}>
                                             Vytěžit (OCR)
+                                        </Button>
+                                        <Button
+                                            appearance="secondary"
+                                            style={{ color: '#d13438', borderColor: '#d13438' }}
+                                            onClick={() => handleDelete(selectedDoc)}
+                                        >
+                                            Smazat
                                         </Button>
                                     </div>
                                 </div>
