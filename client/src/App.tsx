@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { DmsDashboard } from './pages/DmsDashboard';
 import { DmsList } from './pages/DmsList';
 import { DmsImport } from './pages/DmsImport';
+import { DmsReview } from './pages/DmsReview';
 import { DmsSettings } from './pages/DmsSettings';
 import RequestsPage from './pages/RequestsPage';
 import SecurityRoles from './pages/SecurityRoles';
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
                     { path: "dms", element: <DmsDashboard /> },
                     { path: "dms/list", element: <DmsList /> },
                     { path: "dms/import", element: <DmsImport /> },
+                    { path: "dms/review", element: <DmsReview /> },
                     { path: "dms/settings", element: <DmsSettings /> },
                     { path: "requests", element: <RequestsPage /> },
                     { path: "system", element: <SystemConfig /> },
