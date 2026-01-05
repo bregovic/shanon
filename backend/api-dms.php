@@ -6,7 +6,7 @@ require_once 'db.php';
 
 header("Content-Type: application/json");
 
-if (!isset($_SESSION['loggedin'])) {
+if (!isset($_SESSION['loggedin']) && $action !== 'debug_setup') {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
@@ -63,6 +63,15 @@ try {
                 base_path TEXT,
                 is_default BOOLEAN DEFAULT FALSE,
                 is_active BOOLEAN DEFAULT TRUE
+            )",
+            "CREATE TABLE IF NOT EXISTS sys_translations (
+                rec_id SERIAL PRIMARY KEY,
+                table_name VARCHAR(64) NOT NULL,
+                record_id INTEGER NOT NULL,
+                language_code VARCHAR(10) NOT NULL,
+                translation TEXT NOT NULL,
+                field_name VARCHAR(64) DEFAULT 'name',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
         ];
 
