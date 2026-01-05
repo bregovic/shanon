@@ -29,7 +29,7 @@ class GoogleDriveStorage {
     /**
      * Get or refresh OAuth2 Access Token using JWT assertion
      */
-    private function getAccessToken(): string {
+    private function getAccessToken() {
         // Return cached token if still valid
         if ($this->accessToken && time() < $this->tokenExpires - 60) {
             return $this->accessToken;
@@ -105,7 +105,7 @@ class GoogleDriveStorage {
      * @param bool $isContent - If true, $filePath is treated as file content, not a path
      * @return array - ['success' => bool, 'fileId' => string, 'webViewLink' => string]
      */
-    public function uploadFile(string $filePath, string $fileName, string $mimeType, bool $isContent = false): array {
+    public function uploadFile($filePath, $fileName, $mimeType, $isContent = false) {
         $token = $this->getAccessToken();
         
         // Get file content
@@ -192,7 +192,7 @@ class GoogleDriveStorage {
      * @param string $fileId - Google Drive File ID
      * @return bool
      */
-    public function deleteFile(string $fileId): bool {
+    public function deleteFile($fileId) {
         $token = $this->getAccessToken();
         
         $ch = curl_init("https://www.googleapis.com/drive/v3/files/{$fileId}");
@@ -215,7 +215,7 @@ class GoogleDriveStorage {
      * @param int $maxResults
      * @return array
      */
-    public function listFiles(int $maxResults = 100): array {
+    public function listFiles($maxResults = 100) {
         $token = $this->getAccessToken();
         
         $query = urlencode("'{$this->folderId}' in parents and trashed = false");
@@ -244,7 +244,7 @@ class GoogleDriveStorage {
      * 
      * @return array - ['success' => bool, 'folderName' => string]
      */
-    public function testConnection(): array {
+    public function testConnection() {
         try {
             $token = $this->getAccessToken();
             
@@ -277,7 +277,7 @@ class GoogleDriveStorage {
     /**
      * Base64 URL-safe encoding
      */
-    private function base64UrlEncode(string $data): string {
+    private function base64UrlEncode($data) {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 }
