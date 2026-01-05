@@ -369,7 +369,7 @@ END $$;",
             -- 2. Add Tenant ID to DMS tables (if missing)
             DO $$ 
             BEGIN 
-                -- dms_doc_types has tenant_id via 002 but let's ensure
+                -- dms_doc_types
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='tenant_id') THEN 
                     ALTER TABLE dms_doc_types ADD COLUMN tenant_id UUID;
                 END IF;
@@ -385,7 +385,7 @@ END $$;",
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_storage_profiles' AND column_name='tenant_id') THEN 
                     ALTER TABLE dms_storage_profiles ADD COLUMN tenant_id UUID;
                 END IF;
-                -- dms_doc_types description and series
+                -- dms_doc_types additional cols
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_doc_types' AND column_name='description') THEN 
                     ALTER TABLE dms_doc_types ADD COLUMN description TEXT;
                 END IF;
@@ -398,6 +398,99 @@ END $$;",
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT '2026-01-05', 'DMS Translations & Multi-Tenant', 'Implemented sys_translations for multilingual attributes and ensured tenant_id across all DMS tables.', 'Feature', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Translations & Multi-Tenant' AND date = '2026-01-05');
+        ",
+
+        '017_seed_invoice_attributes' => "
+            DO $$
+            DECLARE
+                v_tenant_id UUID := '00000000-0000-0000-0000-000000000001';
+                v_attr_id INTEGER;
+            BEGIN
+                -- 1. Invoice Number (Číslo faktury)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Číslo faktury' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'Číslo faktury', 'text', true, true, '', 'Unique invoice number')
+                    RETURNING rec_id INTO v_attr_id;
+
+                    -- Translations / Variants
+                    INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
+                    ('dms_attributes', v_attr_id, 'en', 'Invoice Number'),
+                    ('dms_attributes', v_attr_id, 'en-s1', 'Invoice No'),
+                    ('dms_attributes', v_attr_id, 'en-s2', 'Invoice #'),
+                    ('dms_attributes', v_attr_id, 'cs-s1', 'Faktura č.'),
+                    ('dms_attributes', v_attr_id, 'cs-s2', 'Daňový doklad č.');
+                END IF;
+
+                -- 2. Supplier ICO (IČO dodavatele)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'IČO dodavatele' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'IČO dodavatele', 'text', false, true, '', 'Supplier Identification Number')
+                    RETURNING rec_id INTO v_attr_id;
+
+                    INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
+                    ('dms_attributes', v_attr_id, 'en', 'Supplier ID'),
+                    ('dms_attributes', v_attr_id, 'cs-s1', 'IČ:'),
+                    ('dms_attributes', v_attr_id, 'cs-s2', 'IČO:'),
+                    ('dms_attributes', v_attr_id, 'en-s1', 'Reg. No.'),
+                    ('dms_attributes', v_attr_id, 'en-s2', 'Company ID');
+                END IF;
+
+                -- 3. Customer ICO (IČO odběratele)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'IČO odběratele' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'IČO odběratele', 'text', false, true, '', 'Customer Identification Number')
+                    RETURNING rec_id INTO v_attr_id;
+
+                    INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
+                    ('dms_attributes', v_attr_id, 'en', 'Customer ID'),
+                    ('dms_attributes', v_attr_id, 'cs-s1', 'Odběratel IČ'),
+                    ('dms_attributes', v_attr_id, 'cs-s2', 'Odběratel IČO');
+                END IF;
+
+                -- 4. Bank Account (Číslo účtu)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Číslo účtu' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'Číslo účtu', 'text', false, true, '', 'Bank Account / IBAN')
+                    RETURNING rec_id INTO v_attr_id;
+
+                    INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
+                    ('dms_attributes', v_attr_id, 'en', 'Bank Account'),
+                    ('dms_attributes', v_attr_id, 'en-s1', 'IBAN'),
+                    ('dms_attributes', v_attr_id, 'cs-s1', 'Účet č.'),
+                    ('dms_attributes', v_attr_id, 'cs-s2', 'Bankovní spojení');
+                END IF;
+                
+                  -- 5. Total Price (Celková částka)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Celková částka' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'Celková částka', 'number', false, true, '', 'Total Amount')
+                    RETURNING rec_id INTO v_attr_id;
+
+                    INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
+                    ('dms_attributes', v_attr_id, 'en', 'Total Amount'),
+                    ('dms_attributes', v_attr_id, 'en-s1', 'Total Price'),
+                    ('dms_attributes', v_attr_id, 'cs-s1', 'Celkem'),
+                    ('dms_attributes', v_attr_id, 'cs-s2', 'K úhradě');
+                END IF;
+                
+                 -- 6. Date (Datum vystavení)
+                IF NOT EXISTS (SELECT 1 FROM dms_attributes WHERE name = 'Datum vystavení' AND tenant_id = v_tenant_id) THEN
+                    INSERT INTO dms_attributes (tenant_id, name, data_type, is_required, is_searchable, default_value, help_text)
+                    VALUES (v_tenant_id, 'Datum vystavení', 'date', false, true, '', 'Issue Date')
+                    RETURNING rec_id INTO v_attr_id;
+
+                    INSERT INTO sys_translations (table_name, record_id, language_code, translation) VALUES 
+                    ('dms_attributes', v_attr_id, 'en', 'Issue Date'),
+                    ('dms_attributes', v_attr_id, 'en-s1', 'Date'),
+                    ('dms_attributes', v_attr_id, 'cs-s1', 'Datum'),
+                    ('dms_attributes', v_attr_id, 'cs-s2', 'Vystaveno');
+                END IF;
+
+                -- Log
+                INSERT INTO development_history (date, title, description, category, created_at)
+                SELECT '2026-01-05', 'DMS Seed Attributes', 'Seeded standard invoice attributes (Invoice No, ICO, Bank Acc) with translations and variants for OCR.', 'Content', NOW()
+                WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Seed Attributes' AND date = '2026-01-05');
+            END $$;
         "
     ];
 
