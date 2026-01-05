@@ -176,9 +176,13 @@ class OcrEngine {
 
                 // 1. IBAN / Bank Account
                 if ($code === 'BANK_ACCOUNT' || $code === 'IBAN') {
-                    if (preg_match('/CZ\d{22}/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'IBAN_Regex'];
-                    if (isset($lines[$i+1]) && preg_match('/CZ\d{22}/', $lines[$i+1], $m)) {
-                        return ['value' => $m[0], 'confidence' => 'High', 'strategy' => 'IBAN_Regex_NextLine'];
+                    if (preg_match('/CZ(?:\s*\d){22}/', $suffix, $m)) {
+                         $clean = str_replace(' ', '', $m[0]);
+                         return ['value' => $clean, 'confidence' => 'High', 'strategy' => 'IBAN_Regex_Spaces'];
+                    }
+                    if (isset($lines[$i+1]) && preg_match('/CZ(?:\s*\d){22}/', $lines[$i+1], $m)) {
+                         $clean = str_replace(' ', '', $m[0]);
+                         return ['value' => $clean, 'confidence' => 'High', 'strategy' => 'IBAN_Regex_NextLine'];
                     }
                 }
 
@@ -200,16 +204,13 @@ class OcrEngine {
 
                 // 4. Variable Symbol (digits, usually 10 max) & Constant Symbol
                 if ($code === 'VARIABLE_SYMBOL' || $code === 'CONSTANT_SYMBOL') {
-                     // Look for standalone number block
                      if (preg_match('/\b\d{4,10}\b/', $suffix, $m)) return ['value' => $m[0], 'confidence' => 'Medium', 'strategy' => 'Symbol_Regex'];
-                     if (isset($lines[$i+1]) && preg_match('/\b\d{1,10}\b/', $lines[$i+1], $m)) { // Check next line
-                        // Often VS is on next line below label
+                     if (isset($lines[$i+1]) && preg_match('/\b\d{1,10}\b/', $lines[$i+1], $m)) {
                         return ['value' => $m[0], 'confidence' => 'Medium', 'strategy' => 'Symbol_Regex_NextLine'];
                      }
                 }
                 
                 // 5. VAT Rates (Base/Amount)
-                // e.g. "Základ DPH 21%" -> find number
                 if (strpos($code, 'VAT_') === 0) {
                      $val = $this->parseValue($suffix, 'number', $code);
                      if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'VAT_SameLine'];
@@ -219,14 +220,24 @@ class OcrEngine {
                 
                 // Strategy A: Same Line
                 $val = $this->parseValue($suffix, $dataType, $code);
+                
+                // FILTER: Validate Supplier Name
+                if ($code === 'SUPPLIER_NAME' && $val) {
+                    if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
+                }
+
                 if ($val) return ['value' => $val, 'confidence' => 'High', 'strategy' => 'SameLine'];
 
                 // Strategy B: Next Line
                 if (isset($lines[$i+1])) {
                     $nextLine = trim($lines[$i+1]);
-                    if (!preg_match('/:$/', $nextLine)) { // Avoid labels
-                         // If looking for dates or numbers, check next line strictly
+                    if (!preg_match('/:$/', $nextLine)) { 
                          $val = $this->parseValue($nextLine, $dataType, $code);
+                         
+                         if ($code === 'SUPPLIER_NAME' && $val) {
+                             if (mb_stripos($val, 'Faktura') !== false || mb_stripos($val, 'Doklad') !== false) $val = null;
+                         }
+
                          if ($val) return ['value' => $val, 'confidence' => 'Medium', 'strategy' => 'NextLine'];
                     }
                 }
@@ -235,13 +246,15 @@ class OcrEngine {
         
         // SPECIAL FALLBACKS FOR ITEMS
         if ($code === 'INVOICE_ITEMS') {
-            // Try to look for "Fakturujeme Vám" if specific keywords failed
              foreach ($lines as $i => $line) {
                  if (mb_stripos($line, 'Fakturujeme Vám') !== false || mb_stripos($line, 'Označení dodávky') !== false) {
-                     // Collect next few lines til end? Or just next 3 lines as preview
                      $items = [];
-                     for($k=1; $k<=5; $k++) {
-                         if (isset($lines[$i+$k])) $items[] = trim($lines[$i+$k]);
+                     for($k=1; $k<=6; $k++) {
+                         if (isset($lines[$i+$k])) {
+                             $l = trim($lines[$i+$k]);
+                             if (mb_stripos($l, 'Celkem') !== false || mb_stripos($l, 'Součet') !== false) break;
+                             $items[] = $l;
+                         }
                      }
                      if (!empty($items)) {
                          return ['value' => implode('; ', $items), 'confidence' => 'Low', 'strategy' => 'Items_Block'];
