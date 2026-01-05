@@ -5,7 +5,6 @@ import {
     BreadcrumbItem,
     BreadcrumbButton,
     BreadcrumbDivider,
-    Input,
     Badge,
     Drawer,
     DrawerHeader,
@@ -20,10 +19,10 @@ import {
 import {
     Add24Regular,
     ArrowClockwise24Regular,
-    Search24Regular,
     Document24Regular,
     ScanText24Regular,
-    Dismiss24Regular
+    Dismiss24Regular,
+    Delete24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
@@ -46,7 +45,6 @@ export const DmsList: React.FC = () => {
     const navigate = useNavigate();
     const [documents, setDocuments] = useState<DmsDocument[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchText, setSearchText] = useState('');
 
     // Detail Drawer
     const [selectedDoc, setSelectedDoc] = useState<DmsDocument | null>(null);
@@ -98,16 +96,27 @@ export const DmsList: React.FC = () => {
         }
     };
 
-    // Filter logic
-    const filteredDocs = documents.filter(doc => {
-        if (!searchText) return true;
-        const low = searchText.toLowerCase();
-        return (
-            doc.display_name?.toLowerCase().includes(low) ||
-            doc.doc_type_name?.toLowerCase().includes(low) ||
-            doc.uploaded_by_name?.toLowerCase().includes(low)
-        );
-    });
+    const handleDelete = async (doc: DmsDocument) => {
+        if (!confirm(`Opravdu smazat dokument "${doc.display_name}"?`)) return;
+        try {
+            const res = await fetch('/api/api-dms.php?action=delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: doc.rec_id })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setIsDrawerOpen(false);
+                setSelectedDoc(null);
+                fetchData();
+            } else {
+                alert('Chyba: ' + (json.error || 'Unknown error'));
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Chyba sítě');
+        }
+    };
 
     // Column definitions
     const columns: DataGridColumn<DmsDocument>[] = [
@@ -117,7 +126,7 @@ export const DmsList: React.FC = () => {
             sortable: true,
             width: '30%',
             render: (item) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#0078d4' }} onClick={(e) => { e.stopPropagation(); setSelectedDoc(item); setIsDrawerOpen(true); }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: selectedDoc?.rec_id === item.rec_id ? '#0078d4' : 'inherit', fontWeight: selectedDoc?.rec_id === item.rec_id ? '600' : 'normal' }} onClick={(e) => { e.stopPropagation(); setSelectedDoc(item); setIsDrawerOpen(true); }}>
                     <Document24Regular />
                     <Text weight="semibold">{item.display_name}</Text>
                 </div>
@@ -178,28 +187,6 @@ export const DmsList: React.FC = () => {
         }
     };
 
-    const handleDelete = async (doc: DmsDocument) => {
-        if (!confirm(`Opravdu smazat dokument "${doc.display_name}"?`)) return;
-        try {
-            const res = await fetch('/api/api-dms.php?action=delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: doc.rec_id })
-            });
-            const json = await res.json();
-            if (json.success) {
-                setIsDrawerOpen(false);
-                setSelectedDoc(null);
-                fetchData();
-            } else {
-                alert('Chyba: ' + (json.error || 'Unknown error'));
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Chyba sítě');
-        }
-    };
-
     return (
         <PageLayout>
             <PageHeader>
@@ -223,20 +210,52 @@ export const DmsList: React.FC = () => {
                 </Button>
             </PageHeader>
 
-            {/* Filter Bar Standard */}
+            {/* Function Toolbar (replaces search) */}
             <PageFilterBar>
-                <Input
-                    contentBefore={<Search24Regular />}
-                    placeholder="Hledat dokumenty..."
-                    value={searchText}
-                    onChange={(_e, data) => setSearchText(data.value)}
-                    style={{ minWidth: '300px' }}
-                />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Button
+                        appearance="secondary"
+                        icon={<Add24Regular />}
+                        onClick={() => navigate('/dms/import')}
+                    >
+                        Nový
+                    </Button>
+
+                    <Button
+                        appearance="secondary"
+                        icon={<ScanText24Regular />}
+                        disabled={!selectedDoc}
+                        onClick={() => selectedDoc && handleAnalyze(selectedDoc)}
+                    >
+                        Vytěžit (OCR)
+                    </Button>
+
+                    <Button
+                        appearance="secondary"
+                        icon={<Document24Regular />}
+                        disabled={!selectedDoc}
+                        onClick={() => selectedDoc && setIsDrawerOpen(true)}
+                    >
+                        Detail / Atributy
+                    </Button>
+
+                    <div style={{ width: '1px', backgroundColor: '#e0e0e0', margin: '0 8px', height: '20px' }} />
+
+                    <Button
+                        appearance="secondary"
+                        style={{ color: !selectedDoc ? 'inherit' : '#d13438', borderColor: !selectedDoc ? 'transparent' : '#d13438' }}
+                        icon={<Delete24Regular />}
+                        disabled={!selectedDoc}
+                        onClick={() => selectedDoc && handleDelete(selectedDoc)}
+                    >
+                        Smazat
+                    </Button>
+                </div>
             </PageFilterBar>
 
             <PageContent>
                 <DataGrid
-                    data={filteredDocs}
+                    data={documents}
                     columns={columns}
                     loading={loading}
                     pageSize={20}

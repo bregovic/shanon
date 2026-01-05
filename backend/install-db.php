@@ -505,6 +505,19 @@ END $$;",
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT '2026-01-05', 'DMS Blob Storage', 'Added dms_file_contents table for persistent database file storage to support ephemeral hosting environments.', 'Backend', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Blob Storage' AND date = '2026-01-05');
+        ",
+        '019_add_metadata_column' => "
+            DO $$ 
+            BEGIN 
+                -- Ensure 'metadata' column exists in dms_documents
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dms_documents' AND column_name='metadata') THEN 
+                    ALTER TABLE dms_documents ADD COLUMN metadata JSONB DEFAULT '{}';
+                END IF;
+            END $$;
+
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT '2026-01-05', 'DMS Metadata Column', 'Added metadata JSONB column to dms_documents for storing OCR and custom attributes.', 'Backend', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'DMS Metadata Column' AND date = '2026-01-05');
         "
     ];
 
