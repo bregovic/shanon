@@ -8,7 +8,8 @@ import {
     Input,
     Badge
 } from '@fluentui/react-components';
-Add24Regular,
+import {
+    Add24Regular,
     ArrowClockwise24Regular,
     Search24Regular
 } from '@fluentui/react-icons';
