@@ -171,6 +171,7 @@ export const DmsSettings: React.FC = () => {
 
             await fetch(`/api/api-dms.php?action=${action}`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
@@ -216,6 +217,7 @@ export const DmsSettings: React.FC = () => {
 
             await fetch(`/api/api-dms.php?action=${action}`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 

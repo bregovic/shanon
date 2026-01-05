@@ -263,7 +263,11 @@ try {
     }
 
     // ===== ATTRIBUTES: CREATE =====
-    if ($action === 'attribute_create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($action === 'attribute_create') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+             http_response_code(405);
+             exit(json_encode(['success' => false, 'error' => 'Method Not Allowed']));
+        }
         $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
         
         $sql = "INSERT INTO dms_attributes 
@@ -286,7 +290,11 @@ try {
     }
 
     // ===== ATTRIBUTES: UPDATE =====
-    if ($action === 'attribute_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($action === 'attribute_update') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+             http_response_code(405);
+             exit(json_encode(['success' => false, 'error' => 'Method Not Allowed']));
+        }
         $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
         $id = (int)($input['id'] ?? 0);
         if (!$id) throw new Exception('ID is required');
