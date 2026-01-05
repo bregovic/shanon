@@ -31,10 +31,14 @@ import {
 } from '@fluentui/react-components';
 import {
     ArrowLeft24Regular,
+    Save24Regular,
+    Dismiss24Regular,
     Add24Regular,
     Edit24Regular,
+    Translate24Regular,
     Settings24Regular
 } from '@fluentui/react-icons';
+import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
 
 type TabValue = 'doc_types' | 'number_series' | 'attributes' | 'storage';
@@ -105,6 +109,15 @@ export const DmsSettings: React.FC = () => {
     // Attribute Dialog State
     const [isAttrDialogOpen, setIsAttrDialogOpen] = useState(false);
     const [editingAttr, setEditingAttr] = useState<Attribute | null>(null);
+
+    // Translation State
+    const [transOpen, setTransOpen] = useState(false);
+    const [transTarget, setTransTarget] = useState<{ id: number, name: string } | null>(null);
+
+    const openTranslations = (attr: Attribute) => {
+        setTransTarget({ id: attr.rec_id, name: attr.name });
+        setTransOpen(true);
+    };
     const [attrForm, setAttrForm] = useState({
         name: '',
         data_type: 'text',
@@ -462,6 +475,13 @@ export const DmsSettings: React.FC = () => {
                     </DialogBody>
                 </DialogSurface>
             </Dialog>
+            <TranslationDialog
+                open={transOpen}
+                onOpenChange={setTransOpen}
+                tableName="dms_attributes"
+                recordId={transTarget?.id || 0}
+                title={transTarget?.name || ''}
+            />
         </PageLayout>
     );
 };
