@@ -477,10 +477,22 @@ class OcrEngine {
 
             // Fallback for scanned PDF (if text is too short)
             if (strlen(trim($text)) < 50) {
-                 // Try tesseract on PDF directly? 
-                 // Tesseract 5 can handle PDF if configured, but normally needs image conversion.
-                 // We will skip complex conversion in this script for now to avoid dependency hell.
-                 // Recommend User scans with OCR enabled or we add pdftoppm later.
+                 error_log("OcrEngine: pdftotext gave little/no text (" . strlen($text) . " chars). Trying fallback to Tesseract on PDF.");
+                 // Try tesseract on PDF directly
+                 // Note: Expects Tesseract 4/5 with PDF support
+                 $cmd = "tesseract " . escapeshellarg($filepath) . " stdout -l ces+eng";
+                 $output = [];
+                 $code = 0;
+                 exec($cmd, $output, $code);
+                 if ($code === 0 && !empty($output)) {
+                     $ocrText = implode("\n", $output);
+                     if (strlen(trim($ocrText)) > strlen(trim($text))) {
+                         $text = $ocrText;
+                         error_log("OcrEngine: Tesseract fallback successful (" . strlen($text) . " chars).");
+                     }
+                 } else {
+                     error_log("OcrEngine: Tesseract fallback failed (code $code).");
+                 }
             }
         }
         // 2. Images
@@ -496,6 +508,9 @@ class OcrEngine {
             }
         }
 
+        error_log("OcrEngine: Final extracted text length: " . strlen($text));
+        if (strlen($text) < 100) error_log("OcrEngine: Text preview: " . $text);
+        
         return $text;
     }
 }
