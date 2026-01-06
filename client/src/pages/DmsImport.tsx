@@ -34,16 +34,21 @@ export const DmsImport: React.FC = () => {
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
     const [docTypes, setDocTypes] = useState<DocType[]>([]);
     const [selectedType, setSelectedType] = useState<string>('');
+
+    // Valid only for single file upload override
     const [displayName, setDisplayName] = useState('');
+
     const [enableOcr, setEnableOcr] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
     const [warning, setWarning] = useState('');
-    const [success, setSuccess] = useState(false);
+    const [successMsg, setSuccessMsg] = useState('');
     const [dragOver, setDragOver] = useState(false);
+
+    const [progress, setProgress] = useState(0);
 
     const [targetStorage, setTargetStorage] = useState('');
 
@@ -78,32 +83,51 @@ export const DmsImport: React.FC = () => {
     }, []);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selected = e.target.files?.[0];
-        if (selected) {
-            setFile(selected);
-            setDisplayName(selected.name.replace(/\.[^/.]+$/, '')); // Remove extension
+        const selected = e.target.files;
+        if (selected && selected.length > 0) {
+            const newFiles = Array.from(selected);
+            setFiles(prev => [...prev, ...newFiles]);
+
+            // If single file total, set display name defaults
+            if (files.length + newFiles.length === 1) {
+                setDisplayName(newFiles[0].name.replace(/\.[^/.]+$/, ''));
+            } else {
+                setDisplayName(''); // Batch mode -> clear manual name
+            }
+
             setError('');
             setWarning('');
-            setSuccess(false);
+            setSuccessMsg('');
         }
     };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setDragOver(false);
-        const dropped = e.dataTransfer.files?.[0];
-        if (dropped) {
-            setFile(dropped);
-            setDisplayName(dropped.name.replace(/\.[^/.]+$/, ''));
+        const dropped = e.dataTransfer.files;
+        if (dropped && dropped.length > 0) {
+            const newFiles = Array.from(dropped);
+            setFiles(prev => [...prev, ...newFiles]);
+
+            if (files.length + newFiles.length === 1) {
+                setDisplayName(newFiles[0].name.replace(/\.[^/.]+$/, ''));
+            } else {
+                setDisplayName('');
+            }
+
             setError('');
             setWarning('');
-            setSuccess(false);
+            setSuccessMsg('');
         }
     };
 
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handleUpload = async () => {
-        if (!file) {
-            setError('Vyberte soubor k nahrání.');
+        if (files.length === 0) {
+            setError('Vyberte soubor(y) k nahrání.');
             return;
         }
         if (!selectedType) {
@@ -113,36 +137,58 @@ export const DmsImport: React.FC = () => {
 
         setUploading(true);
         setError('');
+        setSuccessMsg('');
+        setProgress(0);
 
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('display_name', displayName || file.name);
-        formData.append('doc_type_id', selectedType);
-        formData.append('enable_ocr', enableOcr ? '1' : '0');
+        let successCount = 0;
+        let failCount = 0;
+        let lastWarning = '';
 
-        try {
-            const res = await fetch('/api/api-dms.php?action=upload', {
-                method: 'POST',
-                body: formData
-            });
-            const json = await res.json();
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const formData = new FormData();
+            formData.append('file', file);
 
-            if (json.success) {
-                setSuccess(true);
-                if (json.warning) setWarning(json.warning);
-                setFile(null);
-                setDisplayName('');
-                // If warning, maybe don't redirect immediately so user can see it?
-                if (!json.warning) {
-                    setTimeout(() => navigate('/dms/list'), 1500);
-                }
-            } else {
-                setError(json.error || 'Nahrání selhalo.');
+            // Use custom name if only 1 file and specified, else filename
+            let nameToSend = file.name;
+            if (files.length === 1 && displayName) {
+                nameToSend = displayName;
             }
-        } catch (err) {
-            setError('Chyba při komunikaci se serverem.');
-        } finally {
-            setUploading(false);
+            formData.append('display_name', nameToSend);
+            formData.append('doc_type_id', selectedType);
+            formData.append('enable_ocr', enableOcr ? '1' : '0');
+
+            try {
+                const res = await fetch('/api/api-dms.php?action=upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const json = await res.json();
+                if (json.success) {
+                    successCount++;
+                    if (json.warning) lastWarning = json.warning;
+                } else {
+                    failCount++;
+                    console.error('Upload failed for', file.name, json.error);
+                }
+            } catch (err) {
+                failCount++;
+            }
+
+            setProgress(i + 1);
+        }
+
+        setUploading(false);
+        setFiles([]); // Clear queue
+        setDisplayName('');
+
+        if (failCount === 0) {
+            setSuccessMsg(`Všechny dokumenty (${successCount}) byly úspěšně nahrány.`);
+            if (lastWarning) setWarning(lastWarning);
+            setTimeout(() => navigate('/dms/list'), 1500);
+        } else {
+            setError(`Nahráno: ${successCount}, Chyba: ${failCount}. Zkontrolujte prosím konzoli nebo logy.`);
+            if (lastWarning) setWarning(lastWarning);
         }
     };
 
@@ -161,7 +207,7 @@ export const DmsImport: React.FC = () => {
                     Zpět
                 </Button>
                 <div style={{ width: '24px' }} />
-                <Title3>Import dokumentu</Title3>
+                <Title3>Import dokumentů</Title3>
             </ActionBar>
 
             <div style={{ padding: '24px', maxWidth: '600px' }}>
@@ -175,11 +221,11 @@ export const DmsImport: React.FC = () => {
                     </MessageBar>
                 )}
 
-                {success && (
+                {successMsg && (
                     <MessageBar intent="success" style={{ marginBottom: '16px' }}>
                         <MessageBarBody>
-                            Dokument byl úspěšně nahrán!
-                            {!warning && ' Přesměrování...'}
+                            {successMsg}
+                            {!warning && !error && ' Přesměrování...'}
                         </MessageBarBody>
                     </MessageBar>
                 )}
@@ -213,47 +259,57 @@ export const DmsImport: React.FC = () => {
                         ref={fileInputRef}
                         style={{ display: 'none' }}
                         onChange={handleFileSelect}
+                        multiple
                         accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt"
                     />
                     <ArrowUpload24Regular style={{ fontSize: '48px', color: tokens.colorBrandForeground1 }} />
                     <Text block style={{ marginTop: '12px' }}>
-                        Přetáhněte soubor sem nebo klikněte pro výběr
+                        Přetáhněte soubory sem (více naráz) nebo klikněte
                     </Text>
                     <Text size={200} style={{ color: tokens.colorNeutralForeground4, marginTop: '8px' }}>
                         PDF, Word, Excel, Obrázky (max 10 MB)
                     </Text>
                 </Card>
 
-                {/* Selected File Preview */}
-                {file && (
-                    <Card style={{ padding: '16px', marginBottom: '24px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div>
-                                <Text weight="semibold">{file.name}</Text>
-                                <Text size={200} style={{ marginLeft: '12px', color: tokens.colorNeutralForeground4 }}>
-                                    {formatBytes(file.size)}
-                                </Text>
-                            </div>
-                            <Button
-                                icon={<Dismiss24Regular />}
-                                appearance="subtle"
-                                onClick={() => { setFile(null); setDisplayName(''); }}
-                            />
-                        </div>
-                    </Card>
+                {/* Selected Files List */}
+                {files.length > 0 && (
+                    <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <Text weight="medium">Vybrané soubory ({files.length}):</Text>
+                        {files.map((f, i) => (
+                            <Card key={i} style={{ padding: '8px 16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <Text>{f.name}</Text>
+                                        <Text size={200} style={{ marginLeft: '8px', color: tokens.colorNeutralForeground4 }}>
+                                            {formatBytes(f.size)}
+                                        </Text>
+                                    </div>
+                                    <Button
+                                        icon={<Dismiss24Regular />}
+                                        appearance="subtle"
+                                        size="small"
+                                        onClick={() => removeFile(i)}
+                                    />
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
                 )}
+
 
                 {/* Form Fields */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <Field label="Název dokumentu">
-                        <Input
-                            value={displayName}
-                            onChange={(_, data) => setDisplayName(data.value)}
-                            placeholder="Zadejte název..."
-                        />
-                    </Field>
+                    {files.length === 1 && (
+                        <Field label="Název dokumentu (volitelné)">
+                            <Input
+                                value={displayName}
+                                onChange={(_, data) => setDisplayName(data.value)}
+                                placeholder={files[0].name}
+                            />
+                        </Field>
+                    )}
 
-                    <Field label="Typ dokumentu">
+                    <Field label="Typ dokumentů (společný pro všechny)">
                         <Dropdown
                             placeholder="Vyberte typ..."
                             value={docTypes.find(t => t.rec_id.toString() === selectedType)?.name || ''}
@@ -270,21 +326,21 @@ export const DmsImport: React.FC = () => {
                     <Checkbox
                         checked={enableOcr}
                         onChange={(_, data) => setEnableOcr(!!data.checked)}
-                        label="Provést OCR (rozpoznání textu)"
+                        label="Provést OCR u všech souborů"
                     />
                 </div>
 
                 {/* Submit Button */}
-                <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+                <div style={{ marginTop: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <Button
                         appearance="primary"
                         icon={uploading ? <Spinner size="tiny" /> : <DocumentAdd24Regular />}
                         onClick={handleUpload}
-                        disabled={!file || uploading}
+                        disabled={files.length === 0 || uploading}
                     >
-                        {uploading ? 'Nahrávám...' : 'Nahrát dokument'}
+                        {uploading ? `Nahrávám ${progress} / ${files.length}...` : 'Nahrát vše'}
                     </Button>
-                    <Button appearance="secondary" onClick={() => navigate('/dms/list')}>
+                    <Button appearance="secondary" onClick={() => navigate('/dms/list')} disabled={uploading}>
                         Zrušit
                     </Button>
                 </div>
