@@ -220,8 +220,45 @@ try {
 
         // Delete multiple
         foreach ($ids as $docId) {
+             // 1. Fetch File Info to delete physical file
+             try {
+                $stmtDoc = $pdo->prepare("
+                    SELECT d.storage_path, p.provider_type, p.base_path, p.connection_string 
+                    FROM dms_documents d
+                    LEFT JOIN dms_storage_profiles p ON d.storage_profile_id = p.rec_id
+                    WHERE d.rec_id = :id
+                ");
+                $stmtDoc->execute([':id' => $docId]);
+                $doc = $stmtDoc->fetch(PDO::FETCH_ASSOC);
+
+                if ($doc) {
+                    $path = $doc['storage_path'];
+                    
+                    if ($doc['provider_type'] === 'local') {
+                        $fullPath = __DIR__ . '/' . $path;
+                        if (file_exists($fullPath)) {
+                            unlink($fullPath);
+                        }
+                    } elseif ($doc['provider_type'] === 'google_drive') {
+                        // Load helper if needed
+                        if (!class_exists('GoogleDriveStorage')) {
+                            require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
+                        }
+                        try {
+                            $gd = new GoogleDriveStorage($doc['connection_string'], $doc['base_path']);
+                            $gd->deleteFile($path); // path is File ID
+                        } catch (Exception $e) {
+                            // Log warning but continue? 
+                            error_log("Google Drive delete failed: " . $e->getMessage());
+                        }
+                    }
+                }
+             } catch (Exception $e) {
+                 error_log("Physical delete failed for doc $docId: " . $e->getMessage());
+             }
+
+             // 2. Delete DB Record
              $pdo->prepare("DELETE FROM dms_documents WHERE rec_id = :id")->execute([':id' => $docId]);
-             // Note: Physical deletion not implemented for simplicity, but DB row gone.
         }
 
         echo json_encode(['success' => true]);
