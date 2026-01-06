@@ -76,7 +76,18 @@ try {
             'request' => [
                 'is_https' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
                 'remote_addr' => $_SERVER['REMOTE_ADDR']
-            ]
+            ],
+            'dms_checks' => (function($pdo) {
+                try {
+                     return [
+                         'doc_types_count' => $pdo->query("SELECT COUNT(*) FROM dms_doc_types")->fetchColumn(),
+                         'storage_profiles_count' => $pdo->query("SELECT COUNT(*) FROM dms_storage_profiles")->fetchColumn(),
+                         'documents_count' => $pdo->query("SELECT COUNT(*) FROM dms_documents")->fetchColumn()
+                     ];
+                } catch (Exception $e) {
+                    return ['error' => 'DMS Tables missing or queries failed'];
+                }
+            })($pdo)
         ];
 
         echo json_encode(['success' => true, 'data' => $diagnostics]);
