@@ -182,8 +182,9 @@ try {
         $newId = $stmt->fetchColumn();
 
         // Save binary content to DB (Persistent Storage)
-        $content = file_get_contents($file['tmp_name']);
-        if ($content !== false) {
+        // Note: tmp_name is gone after move_uploaded_file, so read from the new location logic
+        $content = file_get_contents($fullPath);
+        if ($content !== false && strlen($content) > 0) {
              $stmtBlob = $pdo->prepare("INSERT INTO dms_file_contents (doc_id, content) VALUES (:id, :content)");
              // Bind as parameter (PDO handles escaping for Bytea)
              $stmtBlob->bindParam(':id', $newId);
