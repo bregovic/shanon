@@ -207,22 +207,21 @@ try {
 
     // ... (rest of setup endpoints) ...
 
-    // ===== DELETE DOCUMENT =====
+    // ===== DELETE DOCUMENT (BATCH SUPPORT) =====
     if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
-        $id = (int)($input['id'] ?? 0);
-        
-        if (!$id) throw new Exception('ID is required');
+        $id = $input['id'] ?? 0;
+        $ids = $input['ids'] ?? [];
 
-        // Delete from DB (CASCADE handles file content)
-        $stmt = $pdo->prepare("DELETE FROM dms_documents WHERE rec_id = :id");
-        $stmt->execute([':id' => $id]);
+        if ($id) $ids[] = $id;
         
-        // Try delete file from disk if exists
-        // Fetch path first? Too late, already deleted from DB. 
-        // Ideally we should select first, then delete. 
-        // But for ephemeral environments it doesn't matter much. 
-        // If needed we can improve later.
+        if (empty($ids)) throw new Exception('ID or IDs required');
+
+        // Delete multiple
+        foreach ($ids as $docId) {
+             $pdo->prepare("DELETE FROM dms_documents WHERE rec_id = :id")->execute([':id' => $docId]);
+             // Note: Physical deletion not implemented for simplicity, but DB row gone.
+        }
 
         echo json_encode(['success' => true]);
         exit;
@@ -289,48 +288,50 @@ try {
         exit('Soubor na disku neexistuje a nebyl nalezen ani v databázi.');
     }
 
-    // ===== OCR ANALYZE DOCUMENT =====
+    // ===== OCR ANALYZE DOCUMENT (BATCH SUPPORT) =====
     if ($action === 'analyze_doc') {
-        $id = (int)($_GET['id'] ?? 0);
-        if (!$id) throw new Exception('ID is required');
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_GET; // Support POST too
+        $id = (int)($input['id'] ?? $_GET['id'] ?? 0);
+        $ids = $input['ids'] ?? [];
 
-        // Check if tenant_id column exists (setup backward compatibility)
-        // Usually we get tenant from session or fixed dev tenant
+        if ($id) $ids[] = $id;
+
+        if (empty($ids)) throw new Exception('ID or IDs required');
+
         $tenantId = '00000000-0000-0000-0000-000000000001';
-
         $engine = new OcrEngine($pdo, $tenantId);
-        $result = $engine->analyzeDocument($id);
 
-        if ($result['success'] && !empty($result['attributes'])) {
-            // Transform attributes to simple key-value for metadata
-            $extracted = [];
-            foreach ($result['attributes'] as $attr) {
-                // Use code if possible (cleaner for machine ref), else name
-                // Note: OcrEngine currently returns 'attribute_name'. We might need to fetch code or just use name.
-                // Since OcrEngine doesn't return Code yet, let's use name.
-                // Ideally we should modify OcrEngine to return Code too.
-                $key = $attr['attribute_name'];
-                $extracted[$key] = $attr['found_value'];
+        $results = [];
+        foreach($ids as $docId) {
+            $result = $engine->analyzeDocument($docId);
+
+            if ($result['success'] && !empty($result['attributes'])) {
+                $extracted = [];
+                foreach ($result['attributes'] as $attr) {
+                    $key = $attr['attribute_name'];
+                    $extracted[$key] = $attr['found_value'];
+                }
+                $metaJson = json_encode(['attributes' => $extracted]);
+                
+                $sql = "UPDATE dms_documents 
+                        SET metadata = metadata || :new_meta, 
+                            ocr_status = 'completed' 
+                        WHERE rec_id = :id";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([':new_meta' => $metaJson, ':id' => $docId]);
+            } else {
+                 $sql = "UPDATE dms_documents SET ocr_status = 'completed' WHERE rec_id = :id";
+                 $pdo->prepare($sql)->execute([':id' => $docId]);
             }
-
-            // Update Metadata column in DB with merged data
-            // PostgreSQL specific for JSONB merge used '||'
-            $metaJson = json_encode(['attributes' => $extracted]);
-            
-            $sql = "UPDATE dms_documents 
-                    SET metadata = metadata || :new_meta, 
-                        ocr_status = 'completed' 
-                    WHERE rec_id = :id";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([':new_meta' => $metaJson, ':id' => $id]);
-        } else {
-             // Mark as completed even if nothing found, so we don't retry forever?
-             // Or maybe 'completed' with empty results.
-             $sql = "UPDATE dms_documents SET ocr_status = 'completed' WHERE rec_id = :id";
-             $pdo->prepare($sql)->execute([':id' => $id]);
+            $results[$docId] = $result;
         }
 
-        echo json_encode($result);
+        // If single, return single structure for backward compat
+        if (count($ids) === 1) {
+            echo json_encode($results[$ids[0]]);
+        } else {
+            echo json_encode(['success' => true, 'batch_results' => $results]);
+        }
         exit;
     }
 

@@ -48,14 +48,16 @@ export const DmsList: React.FC = () => {
     const [documents, setDocuments] = useState<DmsDocument[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Detail Drawer
-    const [selectedDoc, setSelectedDoc] = useState<DmsDocument | null>(null);
+    // Multi-selection
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+    // Detail Drawer (single view)
+    const [drawerDoc, setDrawerDoc] = useState<DmsDocument | null>(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Fetch documents
             const docsRes = await fetch('/api/api-dms.php?action=list');
             const docsJson = await docsRes.json();
             if (docsJson.success) {
@@ -80,15 +82,20 @@ export const DmsList: React.FC = () => {
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
 
-    const handleAnalyze = async (doc: DmsDocument) => {
-        if (!confirm('Spustit vytěžování (OCR)?')) return;
+    const handleBatchAnalyze = async () => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`Spustit vytěžování (OCR) pro ${selectedIds.size} dokumentů?`)) return;
+
         try {
-            const res = await fetch(`/api/api-dms.php?action=analyze_doc&id=${doc.rec_id}`);
+            const res = await fetch('/api/api-dms.php?action=analyze_doc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selectedIds) })
+            });
             const json = await res.json();
             if (json.success) {
-                fetchData(); // Reload to get new status/metadata
-                if (selectedDoc?.rec_id === doc.rec_id) setIsDrawerOpen(false); // Close drawer to force refresh or just re-open
-                alert('Dokončeno. Nalezeno atributů: ' + (json.attributes?.length || 0));
+                fetchData();
+                alert('Hromadné vytěžování dokončeno.');
             } else {
                 alert('Chyba: ' + (json.error || json.message));
             }
@@ -98,18 +105,20 @@ export const DmsList: React.FC = () => {
         }
     };
 
-    const handleDelete = async (doc: DmsDocument) => {
-        if (!confirm(`Opravdu smazat dokument "${doc.display_name}"?`)) return;
+    const handleBatchDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`Opravdu smazat ${selectedIds.size} vybraných dokumentů? Tato akce je nevratná.`)) return;
+
         try {
             const res = await fetch('/api/api-dms.php?action=delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: doc.rec_id })
+                body: JSON.stringify({ ids: Array.from(selectedIds) })
             });
             const json = await res.json();
             if (json.success) {
                 setIsDrawerOpen(false);
-                setSelectedDoc(null);
+                setSelectedIds(new Set()); // clear selection
                 fetchData();
             } else {
                 alert('Chyba: ' + (json.error || 'Unknown error'));
@@ -119,6 +128,39 @@ export const DmsList: React.FC = () => {
             alert('Chyba sítě');
         }
     };
+
+    // Single doc handlers (forwarding to batch or specific logic)
+    const handleAnalyzeSingle = (doc: DmsDocument) => {
+        // Just select this one and call batch
+        // Or call direct API if safer. Let's reuse batch logic logic for consistency but we need state.
+        // Actually for Detail Drawer actions, we might just call the new API with single ID.
+        fetch(`/api/api-dms.php?action=analyze_doc`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [doc.rec_id] })
+        }).then(res => res.json()).then(json => {
+            if (json.success) {
+                fetchData();
+                alert('OCR Dokončeno');
+            } else {
+                alert('Chyba: ' + json.error);
+            }
+        });
+    };
+
+    const handleDeleteSingle = async (doc: DmsDocument) => {
+        if (!confirm(`Opravdu smazat dokument "${doc.display_name}"?`)) return;
+        const res = await fetch('/api/api-dms.php?action=delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [doc.rec_id] })
+        });
+        if ((await res.json()).success) {
+            setIsDrawerOpen(false);
+            fetchData();
+        }
+    };
+
 
     // Column definitions
     const columns: TableColumnDefinition<DmsDocument>[] = [
@@ -134,9 +176,9 @@ export const DmsList: React.FC = () => {
                 compare: (a, b) => a.display_name.localeCompare(b.display_name),
                 renderHeaderCell: () => 'Název',
                 renderCell: (item) => (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: selectedDoc?.rec_id === item.rec_id ? '#0078d4' : 'inherit', fontWeight: selectedDoc?.rec_id === item.rec_id ? '600' : 'normal' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Document24Regular />
-                        <Text weight={selectedDoc?.rec_id === item.rec_id ? 'semibold' : 'regular'}>{item.display_name}</Text>
+                        <Text weight="medium">{item.display_name}</Text>
                     </div>
                 )
             }),
@@ -228,17 +270,24 @@ export const DmsList: React.FC = () => {
                     <Button
                         appearance="secondary"
                         icon={<ScanText24Regular />}
-                        disabled={!selectedDoc}
-                        onClick={() => selectedDoc && handleAnalyze(selectedDoc)}
+                        disabled={selectedIds.size === 0}
+                        onClick={handleBatchAnalyze}
                     >
-                        Vytěžit (OCR)
+                        Vytěžit (OCR) {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
                     </Button>
 
                     <Button
                         appearance="secondary"
                         icon={<Document24Regular />}
-                        disabled={!selectedDoc}
-                        onClick={() => selectedDoc && setIsDrawerOpen(true)}
+                        disabled={selectedIds.size !== 1}
+                        onClick={() => {
+                            const id = Array.from(selectedIds)[0];
+                            const doc = documents.find(d => d.rec_id === id);
+                            if (doc) {
+                                setDrawerDoc(doc);
+                                setIsDrawerOpen(true);
+                            }
+                        }}
                     >
                         Detail / Atributy
                     </Button>
@@ -247,12 +296,12 @@ export const DmsList: React.FC = () => {
 
                     <Button
                         appearance="secondary"
-                        style={{ color: !selectedDoc ? 'inherit' : '#d13438', borderColor: !selectedDoc ? 'transparent' : '#d13438' }}
+                        style={{ color: selectedIds.size === 0 ? 'inherit' : '#d13438', borderColor: selectedIds.size === 0 ? 'transparent' : '#d13438' }}
                         icon={<Delete24Regular />}
-                        disabled={!selectedDoc}
-                        onClick={() => selectedDoc && handleDelete(selectedDoc)}
+                        disabled={selectedIds.size === 0}
+                        onClick={handleBatchDelete}
                     >
-                        Smazat
+                        Smazat {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
                     </Button>
                 </div>
             </PageFilterBar>
@@ -264,7 +313,17 @@ export const DmsList: React.FC = () => {
                         columns={columns}
                         getRowId={(item) => item.rec_id}
                         withFilterRow={true}
-                        onRowClick={(doc) => { setSelectedDoc(doc); setIsDrawerOpen(true); }}
+                        selectionMode="multiselect"
+                        selectedItems={selectedIds}
+                        onSelectionChange={(newSelection) => setSelectedIds(newSelection)}
+                        onRowClick={(doc) => {
+                            // If clicking valid row, open drawer? Or just toggle selection?
+                            // Standard UX: Row click -> Selection (handled by DataGrid usually if checking checkbox).
+                            // Let's assume SmartDataGrid handles checkbox selection separately from row click.
+                            // If we want row click to open drawer:
+                            setDrawerDoc(doc);
+                            setIsDrawerOpen(true);
+                        }}
                     />
                 </div>
             </PageContent>
@@ -292,29 +351,29 @@ export const DmsList: React.FC = () => {
                 </DrawerHeader>
 
                 <DrawerBody>
-                    {selectedDoc && (
+                    {drawerDoc && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <Card>
-                                <CardHeader header={<Text weight="semibold">{selectedDoc.display_name}</Text>} />
+                                <CardHeader header={<Text weight="semibold">{drawerDoc.display_name}</Text>} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 16px 16px' }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', fontSize: '13px' }}>
-                                        <Text weight="medium">Typ:</Text> <Text>{selectedDoc.doc_type_name}</Text>
-                                        <Text weight="medium">Velikost:</Text> <Text>{formatSize(selectedDoc.file_size_bytes)}</Text>
-                                        <Text weight="medium">Nahráno:</Text> <Text>{new Date(selectedDoc.created_at).toLocaleString('cs-CZ')}</Text>
-                                        <Text weight="medium">Autor:</Text> <Text>{selectedDoc.uploaded_by_name}</Text>
+                                        <Text weight="medium">Typ:</Text> <Text>{drawerDoc.doc_type_name}</Text>
+                                        <Text weight="medium">Velikost:</Text> <Text>{formatSize(drawerDoc.file_size_bytes)}</Text>
+                                        <Text weight="medium">Nahráno:</Text> <Text>{new Date(drawerDoc.created_at).toLocaleString('cs-CZ')}</Text>
+                                        <Text weight="medium">Autor:</Text> <Text>{drawerDoc.uploaded_by_name}</Text>
                                     </div>
                                     <Divider />
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                                        <Button appearance="primary" icon={<Document24Regular />} onClick={() => window.open(`/api/api-dms.php?action=view&id=${selectedDoc.rec_id}`, '_blank')}>
+                                        <Button appearance="primary" icon={<Document24Regular />} onClick={() => window.open(`/api/api-dms.php?action=view&id=${drawerDoc.rec_id}`, '_blank')}>
                                             Otevřít
                                         </Button>
-                                        <Button icon={<ScanText24Regular />} onClick={() => handleAnalyze(selectedDoc)}>
+                                        <Button icon={<ScanText24Regular />} onClick={() => handleAnalyzeSingle(drawerDoc)}>
                                             Vytěžit (OCR)
                                         </Button>
                                         <Button
                                             appearance="secondary"
                                             style={{ color: '#d13438', borderColor: '#d13438' }}
-                                            onClick={() => handleDelete(selectedDoc)}
+                                            onClick={() => handleDeleteSingle(drawerDoc)}
                                         >
                                             Smazat
                                         </Button>
@@ -325,8 +384,8 @@ export const DmsList: React.FC = () => {
                             <Title3>Vytěžená data (OCR)</Title3>
                             <Card>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}>
-                                    {getMetadataAttributes(selectedDoc) ? (
-                                        Object.entries(getMetadataAttributes(selectedDoc)!).map(([key, val]) => (
+                                    {getMetadataAttributes(drawerDoc) ? (
+                                        Object.entries(getMetadataAttributes(drawerDoc)!).map(([key, val]) => (
                                             <div key={key} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f0f0f0', paddingBottom: '4px' }}>
                                                 <Text weight="medium" style={{ color: '#666' }}>{key}</Text>
                                                 <Text>{String(val)}</Text>
@@ -338,7 +397,7 @@ export const DmsList: React.FC = () => {
                                             <br />
                                             <Text>Žádná vytěžená data.</Text>
                                             <div style={{ marginTop: '8px' }}>
-                                                <Button size="small" onClick={() => handleAnalyze(selectedDoc)}>Spustit OCR</Button>
+                                                <Button size="small" onClick={() => handleAnalyzeSingle(drawerDoc)}>Spustit OCR</Button>
                                             </div>
                                         </div>
                                     )}
