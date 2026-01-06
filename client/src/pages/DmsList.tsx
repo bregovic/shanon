@@ -315,7 +315,7 @@ export const DmsList: React.FC = () => {
                         withFilterRow={true}
                         selectionMode="multiselect"
                         selectedItems={selectedIds}
-                        onSelectionChange={(newSelection) => setSelectedIds(newSelection)}
+                        onSelectionChange={(_, data) => setSelectedIds(data.selectedItems as Set<number>)}
                         onRowClick={(doc) => {
                             // If clicking valid row, open drawer? Or just toggle selection?
                             // Standard UX: Row click -> Selection (handled by DataGrid usually if checking checkbox).
