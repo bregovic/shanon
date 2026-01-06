@@ -21,42 +21,55 @@ class OcrEngine {
 
         if (!$doc) throw new Exception("Document not found");
 
-        // 2. Resolve File Path
+        // 2. Resolve File Path (or Recover from DB)
         $filepath = $doc['storage_path'];
+        $tempFileUsed = false;
+
+        // Correct relative path check
         if (!file_exists($filepath)) {
             $baseDir = dirname(__DIR__);
-            $filepath = $baseDir . '/' . $filepath;
+            $testPath = $baseDir . '/' . ltrim($filepath, '/');
+            if (file_exists($testPath)) {
+                $filepath = $testPath;
+            } else {
+                // Try standard upload dir just in case
+                $testPath2 = $baseDir . '/uploads/dms/' . basename($doc['storage_path']);
+                if (file_exists($testPath2)) {
+                    $filepath = $testPath2;
+                }
+            }
         }
 
-        if (!file_exists($filepath)) {
-            $checkPath = dirname(__DIR__) . '/uploads/dms/' . basename($doc['storage_path']);
-            if (file_exists($checkPath)) {
-                $filepath = $checkPath;
-            } else {
-                 // Try to recover from DB BLOB
-                 $stmtBlob = $this->pdo->prepare("SELECT content FROM dms_file_contents WHERE doc_id = :id");
-                 $stmtBlob->execute([':id' => $docId]);
-                 $blob = $stmtBlob->fetchColumn();
+        // If STILL not found (e.g. Google Drive ID), restore from DB Blob to Temp
+        if (!file_exists($filepath) || is_dir($filepath)) {
+             $stmtBlob = $this->pdo->prepare("SELECT content FROM dms_file_contents WHERE doc_id = :id");
+             $stmtBlob->execute([':id' => $docId]);
+             $blob = $stmtBlob->fetchColumn();
+             
+             if ($blob) {
+                 // Create temp file with correct extension (important for tools)
+                 $ext = $doc['file_extension'] ?? 'tmp';
+                 $tempPath = sys_get_temp_dir() . '/' . uniqid('ocr_') . '.' . $ext;
                  
-                 if ($blob) {
-                     // Ensure directory
-                     $dir = dirname($filepath);
-                     if (!is_dir($dir)) mkdir($dir, 0777, true);
-                     
-                     // Write to file
-                     if (is_resource($blob)) {
-                         $fp = fopen($filepath, 'w');
-                         stream_copy_to_stream($blob, $fp);
-                         fclose($fp);
-                     } else {
-                         file_put_contents($filepath, $blob);
-                     }
+                 if (is_resource($blob)) {
+                     // Stream
+                     $fp = fopen($tempPath, 'w');
+                     stream_copy_to_stream($blob, $fp);
+                     fclose($fp);
+                 } else {
+                     // String
+                     file_put_contents($tempPath, $blob);
                  }
-  
-                 if (!file_exists($filepath) || filesize($filepath) === 0) {
-                     throw new Exception("File not found on disk and could not be restored from DB: " . $doc['storage_path']);
+                 
+                 if (file_exists($tempPath) && filesize($tempPath) > 0) {
+                     $filepath = $tempPath;
+                     $tempFileUsed = true;
                  }
-            }
+             }
+
+             if (!file_exists($filepath) || is_dir($filepath)) {
+                 throw new Exception("File not found locally and could not be restored from DB. Storage Path: " . $doc['storage_path']);
+             }
         }
 
         // 3. Extract Text
@@ -67,6 +80,11 @@ class OcrEngine {
 
         // 4. Find Attributes
         $foundAttributes = $this->extractAttributes($rawText);
+
+        // Cleanup temp file
+        if ($tempFileUsed && file_exists($filepath)) {
+            unlink($filepath);
+        }
 
         return [
             'success' => true,
