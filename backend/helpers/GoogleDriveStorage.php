@@ -8,8 +8,13 @@ class GoogleDriveStorage {
 
     public function __construct($credentialsJson, $folderId) {
         $data = json_decode($credentialsJson, true);
-        if (!$data || !isset($data['private_key']) || !isset($data['client_email'])) {
-            throw new Exception("Neplatný JSON s přihlašovacími údaji (chybí private_key nebo client_email)");
+        
+        // Validate specifically for Service Account OR User OAuth
+        $isServiceAccount = isset($data['private_key']) && isset($data['client_email']);
+        $isUserOAuth = isset($data['refresh_token']) && isset($data['client_id']);
+
+        if (!$data || (!$isServiceAccount && !$isUserOAuth)) {
+            throw new Exception("Neplatný JSON s přihlašovacími údaji. Musí obsahovat buď 'private_key' (Service Account) nebo 'refresh_token' (Osobní účet).");
         }
         $this->credentials = $data;
         $this->folderId = $folderId;
