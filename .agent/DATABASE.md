@@ -64,6 +64,16 @@ Public-facing changelog / release notes.
 | `category` | VARCHAR(50) | `feature`, `bugfix`, `refactor`, `improvement`, `deploy` |
 | `related_task_id`| INT | Link to `sys_change_requests` (Optional) |
 
+### `sys_change_comment_reactions`
+Reactions to comments (e.g. Likes, Checks).
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `rec_id` | SERIAL (PK) | ID |
+| `comment_id` | INT (FK) | Link to `sys_change_comments` |
+| `user_id` | INT (FK) | User who reacted |
+| `reaction_type` | VARCHAR(50) | `smile`, `check`, `cross`, `heart` |
+
+
 ---
 
 ## 3. Document Management (DMS)

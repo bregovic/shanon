@@ -789,23 +789,43 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
             WHERE NOT EXISTS (SELECT 1 FROM sys_change_comments WHERE cr_id = 14 AND comment LIKE '%QA Update%');
         ",
         '028_ensure_doc_types' => "
-            INSERT INTO dms_doc_types (tenant_id, name, code)
-            SELECT '00000000-0000-0000-0000-000000000001', 'Faktura přijatá', 'INV_IN'
-            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'INV_IN');
+            DO $$
+            DECLARE
+                v_tenant_id UUID := '00000000-0000-0000-0000-000000000001';
+            BEGIN
+                -- 1. Faktura přijatá (INV_IN)
+                IF EXISTS (SELECT 1 FROM dms_doc_types WHERE name = 'Faktura přijatá') THEN
+                    UPDATE dms_doc_types SET code = 'INV_IN' WHERE name = 'Faktura přijatá' AND code != 'INV_IN';
+                ELSIF NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'INV_IN') THEN
+                    INSERT INTO dms_doc_types (tenant_id, name, code) VALUES (v_tenant_id, 'Faktura přijatá', 'INV_IN');
+                END IF;
 
-            INSERT INTO dms_doc_types (tenant_id, name, code)
-            SELECT '00000000-0000-0000-0000-000000000001', 'Smlouva', 'CONTRACT'
-            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'CONTRACT');
+                -- 2. Smlouva (CONTRACT)
+                IF EXISTS (SELECT 1 FROM dms_doc_types WHERE name = 'Smlouva') THEN
+                    UPDATE dms_doc_types SET code = 'CONTRACT' WHERE name = 'Smlouva' AND code != 'CONTRACT';
+                ELSIF NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'CONTRACT') THEN
+                    INSERT INTO dms_doc_types (tenant_id, name, code) VALUES (v_tenant_id, 'Smlouva', 'CONTRACT');
+                END IF;
 
-            INSERT INTO dms_doc_types (tenant_id, name, code)
-            SELECT '00000000-0000-0000-0000-000000000001', 'Účtenka', 'RECEIPT'
-            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'RECEIPT');
+                -- 3. Účtenka (RECEIPT) - Fixes crash if name exists but code differs
+                IF EXISTS (SELECT 1 FROM dms_doc_types WHERE name = 'Účtenka') THEN
+                    UPDATE dms_doc_types SET code = 'RECEIPT' WHERE name = 'Účtenka' AND code != 'RECEIPT';
+                ELSIF NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'RECEIPT') THEN
+                    INSERT INTO dms_doc_types (tenant_id, name, code) VALUES (v_tenant_id, 'Účtenka', 'RECEIPT');
+                END IF;
 
-            INSERT INTO dms_doc_types (tenant_id, name, code)
-            SELECT '00000000-0000-0000-0000-000000000001', 'Ostatní', 'OTHER'
-            WHERE NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'OTHER');
-        "
+                -- 4. Ostatní (OTHER)
+                IF EXISTS (SELECT 1 FROM dms_doc_types WHERE name = 'Ostatní') THEN
+                    UPDATE dms_doc_types SET code = 'OTHER' WHERE name = 'Ostatní' AND code != 'OTHER';
+                ELSIF NOT EXISTS (SELECT 1 FROM dms_doc_types WHERE code = 'OTHER') THEN
+                    INSERT INTO dms_doc_types (tenant_id, name, code) VALUES (v_tenant_id, 'Ostatní', 'OTHER');
+                END IF;
+            END $$;
+        ",
+        '013_ai_identity_fix' => null,
+        '014_sys_comment_reactions' => null
     ];
+
 
 
     // --- EXECUTION ---
