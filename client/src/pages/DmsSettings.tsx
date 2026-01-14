@@ -23,7 +23,8 @@ import {
     Dropdown,
     Option,
     createTableColumn,
-    tokens
+    tokens,
+    Divider
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
@@ -49,6 +50,7 @@ interface DocType {
     number_series_id?: number;
     number_series_name?: string;
     is_active: boolean;
+    attr_count?: number; // Added from API
 }
 
 
@@ -718,30 +720,28 @@ export const DmsSettings: React.FC = () => {
 
             {/* DOC TYPE DIALOG */}
             <Dialog open={isDocTypeDialogOpen} onOpenChange={(_, data) => setIsDocTypeDialogOpen(data.open)}>
-                <DialogSurface>
+                <DialogSurface style={{ minWidth: '600px', minHeight: '600px' }}>
                     <DialogBody>
                         <DialogTitle>{editingDocType ? 'Upravit typ dokumentu' : 'Nový typ dokumentu'}</DialogTitle>
-                        <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div>
-                                <Label required>Kód</Label>
-                                <Input
-                                    value={docTypeForm.code}
-                                    onChange={(_, data) => setDocTypeForm({ ...docTypeForm, code: data.value })}
-                                    style={{ width: '100%' }}
-                                    placeholder="NAPŘ. INV, CONTRACT..."
-                                />
-                            </div>
-                            {/* Hidden legacy code support */}
-                            {/* 
-                            // ... 
-                            */}
-                            <div>
-                                <Label required>Název</Label>
-                                <Input
-                                    value={docTypeForm.name}
-                                    onChange={(_, data) => setDocTypeForm({ ...docTypeForm, name: data.value })}
-                                    style={{ width: '100%' }}
-                                />
+                        <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div>
+                                    <Label required>Kód</Label>
+                                    <Input
+                                        value={docTypeForm.code}
+                                        onChange={(_, data) => setDocTypeForm({ ...docTypeForm, code: data.value })}
+                                        style={{ width: '100%' }}
+                                        placeholder="NAPŘ. INV, CONTRACT..."
+                                    />
+                                </div>
+                                <div>
+                                    <Label required>Název</Label>
+                                    <Input
+                                        value={docTypeForm.name}
+                                        onChange={(_, data) => setDocTypeForm({ ...docTypeForm, name: data.value })}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <Label>Popis (volitelné)</Label>
@@ -751,6 +751,56 @@ export const DmsSettings: React.FC = () => {
                                     style={{ width: '100%' }}
                                 />
                             </div>
+
+                            <Divider />
+
+                            {/* Attribute Linking Section - Only available for existing records for simplicity */}
+                            {editingDocType && editingDocType.rec_id > 0 ? (
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <Text weight="semibold">Přiřazené atributy</Text>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            {/* Attribute Selector */}
+                                            <Dropdown
+                                                placeholder="Přidat atribut..."
+                                                onOptionSelect={async (_, data) => {
+                                                    // Add attribute
+                                                    const attrId = attributes.find(a => a.name === data.optionText)?.rec_id;
+                                                    if (!attrId) return;
+
+                                                    await fetch('/api/api-dms.php?action=doc_type_attribute_add', {
+                                                        method: 'POST',
+                                                        body: JSON.stringify({
+                                                            doc_type_id: editingDocType.rec_id,
+                                                            attribute_id: attrId,
+                                                            is_required: false
+                                                        })
+                                                    });
+                                                    // Refresh logic would go here, maybe trigger a re-fetch of linked attributes
+                                                    // For now simple alert
+                                                    alert('Atribut přidán. (Refreshněte pro zobrazení - TODO: Live update)');
+                                                }}
+                                            >
+                                                {attributes.map(a => (
+                                                    <Option key={a.rec_id} text={a.name}>{a.name}</Option>
+                                                ))}
+                                            </Dropdown>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ padding: '8px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '4px' }}>
+                                        <Text size={200}>
+                                            Atributy určují, jaká data se budou z tohoto typu dokumentu vytěžovat.
+                                            {/* Fetching and listing linked attributes currently requires a separate specialized API call inside this dialog or expanding the parent data */}
+                                            (Počet přiřazených: {editingDocType.attr_count || 0})
+                                        </Text>
+                                    </div>
+                                </div>
+                            ) : (
+                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                                    Přiřazování atributů bude dostupné po uložení základních údajů.
+                                </Text>
+                            )}
 
                         </DialogContent>
                         <DialogActions>

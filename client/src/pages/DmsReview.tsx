@@ -1,24 +1,22 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Button,
-    Card,
-    CardHeader,
-    CardPreview,
     Text,
     Spinner,
     Input,
     Label,
-    mergeClasses,
     makeStyles,
     tokens,
-    Divider,
+    ProgressBar,
+    Badge
 } from "@fluentui/react-components";
 import {
     Save24Regular,
     Checkmark24Regular,
     ArrowRight24Regular,
-    ArrowLeft24Regular
+    ArrowLeft24Regular,
+    Dismiss24Regular
 } from "@fluentui/react-icons";
 import axios from "axios";
 import { PageLayout, PageHeader, PageContent } from "../components/PageLayout";
@@ -32,8 +30,8 @@ const useStyles = makeStyles({
         maxWidth: "100%",
     },
     sidebar: {
-        width: "400px",
-        minWidth: "400px",
+        width: "350px",
+        minWidth: "350px",
         display: "flex",
         flexDirection: "column",
         gap: "1rem",
@@ -43,6 +41,7 @@ const useStyles = makeStyles({
         borderRadius: tokens.borderRadiusMedium,
         boxShadow: tokens.shadow4,
         padding: "1rem",
+        borderRight: `1px solid ${tokens.colorNeutralStroke1}`
     },
     viewer: {
         flexGrow: 1,
@@ -61,7 +60,7 @@ const useStyles = makeStyles({
     fieldGroup: {
         display: "flex",
         flexDirection: "column",
-        marginBottom: "1rem",
+        marginBottom: "12px",
     },
     actions: {
         display: "flex",
@@ -70,15 +69,20 @@ const useStyles = makeStyles({
         paddingTop: "1rem",
         borderTop: `1px solid ${tokens.colorNeutralStroke1}`,
     },
-    titleBar: {
+    docHeader: {
         marginBottom: "1rem",
+        paddingBottom: "1rem",
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     }
 });
 
 interface DmsDocument {
     rec_id: number;
+    doc_type_id: number;
+    doc_type_name?: string;
     display_name: string;
-    ocr_status: string;
+    ocr_status: string; // 'pending', 'processing', 'completed', 'verified'
+    status?: string;
     storage_path: string;
     mime_type: string;
     metadata: {
@@ -86,132 +90,218 @@ interface DmsDocument {
     };
 }
 
-interface Attribute {
-    rec_id: number;
+interface LinkedAttribute {
+    rec_id: number; // attribute id
     code: string;
     name: string;
     data_type: string;
+    is_linked_required: boolean;
+    display_order: number;
 }
 
 export const DmsReview: React.FC = () => {
     const styles = useStyles();
     const [docs, setDocs] = useState<DmsDocument[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [attributes, setAttributes] = useState<Attribute[]>([]);
+
+    // Attributes specific to the current document's type
+    const [currentAttributes, setCurrentAttributes] = useState<LinkedAttribute[]>([]);
+
+    // Interactive Zoning State
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [activeField, setActiveField] = useState<string | null>(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+
+    // Drawing refs
+    const imageRef = useRef<HTMLImageElement>(null);
+    const [startPos, setStartPos] = useState<{ x: number, y: number } | null>(null);
+    const [currentDrawRect, setCurrentDrawRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+
     const [formData, setFormData] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
+    const [loadingAttrs, setLoadingAttrs] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // Initial Fetch
-    useEffect(() => {
-        const load = async () => {
-            try {
-                // 1. Get Attributes Defs
-                const attrRes = await axios.get('/api/api-dms.php?action=attributes');
-                setAttributes(attrRes.data.data);
+    // DRAWING HANDLERS
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!imageRef.current || !activeField) return;
+        const rect = imageRef.current.getBoundingClientRect();
+        setIsDrawing(true);
+        setStartPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    };
 
-                // 2. Get Docs (TODO: Filter for 'pending review' etc. For now get all)
-                const docRes = await axios.get('/api/api-dms.php?action=list');
-                const allDocs = docRes.data.data;
-                // Filter docs that have OCR done or are verified? 
-                // Maybe checking specifically 'completed' or 'pending'.
-                // Let's filter by ocr_status != 'verified' but has file
-                const toReview = allDocs.filter((d: DmsDocument) => d.ocr_status === 'completed');
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDrawing || !startPos || !imageRef.current) return;
+        const rect = imageRef.current.getBoundingClientRect();
+        const curX = e.clientX - rect.left;
+        const curY = e.clientY - rect.top;
+
+        const w = Math.abs(curX - startPos.x);
+        const h = Math.abs(curY - startPos.y);
+        const x = Math.min(curX, startPos.x);
+        const y = Math.min(curY, startPos.y);
+
+        setCurrentDrawRect({ x, y, w, h });
+    };
+
+    const handleMouseUp = async () => {
+        if (!isDrawing || !currentDrawRect || !imageRef.current || !activeField) {
+            setIsDrawing(false); setStartPos(null); setCurrentDrawRect(null); return;
+        }
+
+        const imgW = imageRef.current.width;
+        const imgH = imageRef.current.height;
+
+        const rectPct = {
+            x: currentDrawRect.x / imgW,
+            y: currentDrawRect.y / imgH,
+            w: currentDrawRect.w / imgW,
+            h: currentDrawRect.h / imgH
+        };
+
+        const fieldCode = activeField;
+        setFormData(prev => ({ ...prev, [fieldCode]: 'Načítám...' }));
+
+        try {
+            const res = await axios.post('/api/api-dms.php?action=ocr_region', {
+                doc_id: currentDoc?.rec_id,
+                rect: rectPct
+            });
+            if (res.data.success) {
+                setFormData(prev => ({ ...prev, [fieldCode]: res.data.text }));
+            } else {
+                alert('OCR Error: ' + res.data.error);
+                setFormData(prev => ({ ...prev, [fieldCode]: '' }));
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Connection Error');
+        } finally {
+            setIsDrawing(false); setStartPos(null); setCurrentDrawRect(null);
+            // activeField remains set
+        }
+    };
+
+
+    // 1. Fetch Documents to Review
+    useEffect(() => {
+        const loadDocs = async () => {
+            try {
+                const res = await axios.get('/api/api-dms.php?action=list');
+                const all = res.data.data;
+                // Filter: OCR is done but not yet "Verified"
+                // Assuming 'verified' status creates a distinction. 
+                // Using new 'status' column if available, else ocr_status.
+                const toReview = all.filter((d: DmsDocument) =>
+                    d.ocr_status === 'done' || d.ocr_status === 'completed'
+                );
 
                 setDocs(toReview);
-                if (toReview.length > 0) {
-                    loadDocData(toReview[0]);
-                }
             } catch (err) {
-                console.error(err);
+                console.error("Error loading docs", err);
             } finally {
                 setLoading(false);
             }
         };
-        load();
+        loadDocs();
     }, []);
 
-    const loadDocData = (doc: DmsDocument) => {
-        // Hydrate form with extracted values
-        const extracted = doc.metadata?.attributes || {};
+    const currentDoc = docs[currentIndex];
 
-        // Find extracted values by Code or Name
-        const initData: Record<string, string> = {};
+    // 2. Fetch Attributes when Current Doc changes
+    useEffect(() => {
+        if (!currentDoc) return;
 
-        attributes.forEach(attr => {
-            // Priority 1: Key matches CODE
-            if (attr.code && extracted[attr.code]) {
-                initData[attr.code] = extracted[attr.code];
+        // Interactive Zoom Setup
+        setImageUrl(null);
+        setActiveField(null);
+        if (currentDoc.mime_type.startsWith('image/')) {
+            setImageUrl(`/api/api-dms.php?action=view&id=${currentDoc.rec_id}`);
+        }
+
+        const loadAttrs = async () => {
+            // ... existing loadAttrs logic ...
+            setLoadingAttrs(true);
+            try {
+                if (currentDoc.doc_type_id) {
+                    try {
+                        const res = await axios.get(`/api/api-dms.php?action=doc_type_attributes&id=${currentDoc.doc_type_id}`);
+                        const attrs = res.data.data;
+                        if (attrs && attrs.length > 0) {
+                            setCurrentAttributes(attrs);
+                        } else {
+                            throw new Error('No linked attributes');
+                        }
+                    } catch (e) {
+                        const allRes = await axios.get('/api/api-dms.php?action=attributes');
+                        setCurrentAttributes(allRes.data.data.map((a: any) => ({ ...a, is_linked_required: false, display_order: 0 })));
+                    }
+                } else {
+                    const allRes = await axios.get('/api/api-dms.php?action=attributes');
+                    setCurrentAttributes(allRes.data.data.map((a: any) => ({ ...a, is_linked_required: false, display_order: 0 })));
+                }
+                const existing = currentDoc.metadata?.attributes || {};
+                setFormData(existing);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoadingAttrs(false);
             }
-            // Priority 2: Key matches NAME
-            else if (extracted[attr.name]) {
-                initData[attr.code] = extracted[attr.name];
-            }
-        });
+        };
+        loadAttrs();
+    }, [currentDoc]);
 
-        setFormData(initData);
-    };
 
     const handleNext = () => {
-        if (currentIndex < docs.length - 1) {
-            const nextIdx = currentIndex + 1;
-            setCurrentIndex(nextIdx);
-            loadDocData(docs[nextIdx]);
-        }
+        if (currentIndex < docs.length - 1) setCurrentIndex(p => p + 1);
     };
 
     const handlePrev = () => {
-        if (currentIndex > 0) {
-            const prevIdx = currentIndex - 1;
-            setCurrentIndex(prevIdx);
-            loadDocData(docs[prevIdx]);
-        }
+        if (currentIndex > 0) setCurrentIndex(p => p - 1);
     };
 
-    const handleSave = async (verify: boolean = false) => {
+    const handleSave = async (markVerified: boolean = false) => {
         if (!currentDoc) return;
         setSaving(true);
         try {
             await axios.post('/api/api-dms.php?action=update_metadata', {
                 id: currentDoc.rec_id,
-                attributes: formData
+                attributes: formData,
+                status: markVerified ? 'verified' : undefined // Trigger status update if needed
             });
 
-            if (verify) {
-                // Remove from local list or mark verified
-                // Move to next
-                const newDocs = [...docs];
-                newDocs.splice(currentIndex, 1);
+            if (markVerified) {
+                // Remove from list
+                const newDocs = docs.filter(d => d.rec_id !== currentDoc.rec_id);
                 setDocs(newDocs);
                 if (newDocs.length > 0) {
-                    const nextIdx = currentIndex >= newDocs.length ? 0 : currentIndex;
-                    setCurrentIndex(nextIdx);
-                    loadDocData(newDocs[nextIdx]);
-                } else {
-                    setFormData({});
+                    // Adjust index if needed
+                    if (currentIndex >= newDocs.length) setCurrentIndex(newDocs.length - 1);
                 }
+            } else {
+                alert('Uloženo (Rozpracováno)');
             }
-        } catch (err) {
-            console.error(err);
+        } catch (e) {
+            console.error(e);
             alert('Chyba při ukládání');
         } finally {
             setSaving(false);
         }
     };
 
-    const currentDoc = docs[currentIndex];
-
-    if (loading) return <Spinner />;
+    if (loading) return <PageLayout><PageContent><Spinner label="Načítám frontu..." /></PageContent></PageLayout>;
 
     if (!currentDoc) {
         return (
             <PageLayout>
-                <PageHeader title="Kontrola vytěžení" />
+                <PageHeader>
+                    <Text size={500} weight="semibold">Revidovat a Vytěžit</Text>
+                </PageHeader>
                 <PageContent>
-                    <div style={{ textAlign: 'center', marginTop: '3rem' }}>
-                        <Text size={600} weight="semibold">Vše hotovo!</Text>
-                        <br />
-                        <Text>Žádné další dokumenty ke kontrole.</Text>
+                    <div style={{ textAlign: 'center', marginTop: '100px', opacity: 0.6 }}>
+                        <Checkmark24Regular style={{ fontSize: '48px', color: 'green' }} />
+                        <Text size={500} block>Vše zkontrolováno!</Text>
+                        <Text>Ve frontě nejsou žádné dokumenty k revizi.</Text>
                     </div>
                 </PageContent>
             </PageLayout>
@@ -222,78 +312,147 @@ export const DmsReview: React.FC = () => {
 
     return (
         <PageLayout>
-            <PageHeader title="Kontrola vytěžení">
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <Text>Dokument {currentIndex + 1} z {docs.length}</Text>
+            <PageHeader>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <Text weight="semibold">Revize dokumentu</Text>
+                        <Badge appearance="tint">{currentIndex + 1} / {docs.length}</Badge>
+                    </div>
+                    <div>
+                        <Button
+                            appearance="subtle"
+                            disabled={currentIndex === 0}
+                            onClick={handlePrev}
+                            icon={<ArrowLeft24Regular />}
+                        >
+                            Předchozí
+                        </Button>
+                        <Button
+                            appearance="subtle"
+                            disabled={currentIndex === docs.length - 1}
+                            onClick={handleNext}
+                            icon={<ArrowRight24Regular />}
+                            iconPosition="after"
+                        >
+                            Další
+                        </Button>
+                    </div>
                 </div>
             </PageHeader>
             <PageContent>
                 <div className={styles.container}>
-                    {/* LEFT PANEL: FORM */}
+                    {/* LEFT SIDEBAR: ATTRIBUTES */}
                     <div className={styles.sidebar}>
-                        <div className={styles.titleBar}>
-                            <Text weight="semibold" size={400}>{currentDoc.display_name}</Text>
+                        <div className={styles.docHeader}>
+                            <Text weight="bold" size={400} block>{currentDoc.display_name}</Text>
+                            <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                                {currentDoc.doc_type_name || 'Neurčený typ'}
+                            </Text>
                         </div>
 
-                        {attributes.map(attr => (
-                            <div key={attr.rec_id} className={styles.fieldGroup}>
-                                <Label htmlFor={`field-${attr.code}`}>
-                                    {attr.name} <span style={{ fontSize: '0.8em', color: tokens.colorNeutralForeground3 }}>({attr.code})</span>
-                                </Label>
-                                <Input
-                                    id={`field-${attr.code}`}
-                                    value={formData[attr.code] || ''}
-                                    onChange={(e, d) => setFormData({ ...formData, [attr.code]: d.value })}
-                                />
+                        {loadingAttrs ? (
+                            <ProgressBar />
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {currentAttributes.map(attr => (
+                                    <div key={attr.rec_id} className={styles.fieldGroup}>
+                                        <Label
+                                            htmlFor={`field-${attr.code}`}
+                                            required={attr.is_linked_required}
+                                            style={{ color: activeField === attr.code ? tokens.colorBrandForeground1 : 'inherit', fontWeight: activeField === attr.code ? 'bold' : 'normal' }}
+                                        >
+                                            {attr.name} {activeField === attr.code && '(Vyberte na obrázku)'}
+                                        </Label>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <Input
+                                                id={`field-${attr.code}`}
+                                                value={formData[attr.code] || ''}
+                                                onChange={(_e, d) => setFormData({ ...formData, [attr.code]: d.value })}
+                                                style={{ flexGrow: 1, borderColor: activeField === attr.code ? tokens.colorBrandStroke1 : undefined }}
+                                                placeholder={attr.data_type === 'date' ? 'DD.MM.RRRR' : ''}
+                                                onFocus={() => { if (imageUrl) setActiveField(attr.code); }}
+                                                contentAfter={
+                                                    activeField === attr.code ?
+                                                        <Dismiss24Regular style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setActiveField(null); }} />
+                                                        : null
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                                {currentAttributes.length === 0 && (
+                                    <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
+                                        Tento typ dokumentu nemá definované žádné atributy.
+                                        Jděte do nastavení a přiřaďte je.
+                                    </Text>
+                                )}
                             </div>
-                        ))}
+                        )}
 
                         <div className={styles.actions}>
                             <Button
                                 appearance="secondary"
-                                icon={<ArrowLeft24Regular />}
-                                onClick={handlePrev}
-                                disabled={currentIndex === 0}
+                                icon={<Save24Regular />}
+                                onClick={() => handleSave(false)}
+                                disabled={saving}
                             >
-                                Zpět
+                                Uložit
                             </Button>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <Button
-                                    appearance="secondary"
-                                    icon={<Save24Regular />}
-                                    onClick={() => handleSave(false)}
-                                    disabled={saving}
-                                >
-                                    Uložit
-                                </Button>
-                                <Button
-                                    appearance="primary"
-                                    icon={<Checkmark24Regular />}
-                                    onClick={() => handleSave(true)}
-                                    disabled={saving}
-                                >
-                                    Potvrdit
-                                </Button>
-                            </div>
                             <Button
-                                appearance="secondary"
-                                icon={<ArrowRight24Regular />}
-                                onClick={handleNext}
-                                disabled={currentIndex === docs.length - 1}
+                                appearance="primary"
+                                icon={<Checkmark24Regular />}
+                                onClick={() => handleSave(true)}
+                                disabled={saving}
                             >
-                                Další
+                                Schválit
                             </Button>
                         </div>
                     </div>
 
-                    {/* RIGHT PANEL: PREVIEW */}
+                    {/* RIGHT SIDE: PREVIEW */}
+                    {/* RIGHT SIDE: PREVIEW */}
                     <div className={styles.viewer}>
-                        {/* Using simple iframe for correct viewer behavior based on browser capabilities */}
-                        <iframe
-                            src={docUrl}
-                            className={styles.iframe}
-                            title="Document Preview"
-                        />
+                        {imageUrl ? (
+                            <div
+                                style={{ position: 'relative', overflow: 'auto', maxHeight: '100%', display: 'flex', justifyContent: 'center', backgroundColor: '#333', height: '100%' }}
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                            >
+                                <img
+                                    ref={imageRef}
+                                    src={imageUrl}
+                                    alt="Review"
+                                    style={{ maxWidth: '100%', display: 'block', cursor: activeField ? 'crosshair' : 'default', alignSelf: 'start' }}
+                                    draggable={false}
+                                />
+                                {currentDrawRect && (
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            left: currentDrawRect.x,
+                                            top: currentDrawRect.y,
+                                            width: currentDrawRect.w,
+                                            height: currentDrawRect.h,
+                                            border: '2px solid red',
+                                            backgroundColor: 'rgba(255, 0, 0, 0.2)',
+                                            pointerEvents: 'none'
+                                        }}
+                                    />
+                                )}
+                                {activeField && !isDrawing && (
+                                    <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none' }}>
+                                        Vyberte oblast pro: {currentAttributes.find(a => a.code === activeField)?.name}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <iframe
+                                src={docUrl}
+                                className={styles.iframe}
+                                title="Document Preview"
+                            />
+                        )}
                     </div>
                 </div>
             </PageContent>

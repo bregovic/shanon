@@ -42,20 +42,61 @@ try {
 
     // ===== LIST DOCUMENT TYPES =====
     if ($action === 'types') {
-        $sql = "SELECT rec_id, name, code FROM dms_doc_types WHERE is_active = true ORDER BY name";
+        // Fetch types with their active attributes count
+        $sql = "SELECT t.*, 
+                (SELECT COUNT(*) FROM dms_doc_type_attributes da 
+                 JOIN dms_attributes a ON da.attribute_id = a.rec_id 
+                 WHERE da.doc_type_id = t.rec_id) as attr_count
+                FROM dms_doc_types t 
+                WHERE t.is_active = true 
+                ORDER BY t.name";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
         $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Fallback: If no types found, return defaults temporarily to unblock user
-        if (empty($types)) {
-             $types = [
-                 ['rec_id' => '0', 'name' => 'Faktura (Fallback)', 'code' => 'INV'],
-                 ['rec_id' => '-1', 'name' => 'Nezařazeno', 'code' => 'OTHER']
-             ];
-        }
-
         echo json_encode(['success' => true, 'data' => $types]);
+        exit;
+    }
+
+    // ===== LIST ATTRIBUTES FOR SPECIFIC DOC TYPE =====
+    if ($action === 'doc_type_attributes') {
+        $id = $_GET['id'] ?? 0;
+        $sql = "SELECT a.*, da.is_required as is_linked_required, da.display_order 
+                FROM dms_attributes a
+                JOIN dms_doc_type_attributes da ON a.rec_id = da.attribute_id
+                WHERE da.doc_type_id = ?
+                ORDER BY da.display_order, a.name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$id]);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    // ===== LINK ATTRIBUTE TO DOC TYPE =====
+    if ($action === 'doc_type_attribute_add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $typeId = $data['doc_type_id'];
+        $attrId = $data['attribute_id'];
+        $required = $data['is_required'] ?? false;
+        
+        // Remove existing link if any (to update)
+        $pdo->prepare("DELETE FROM dms_doc_type_attributes WHERE doc_type_id=? AND attribute_id=?")->execute([$typeId, $attrId]);
+        
+        $stmt = $pdo->prepare("INSERT INTO dms_doc_type_attributes (doc_type_id, attribute_id, is_required) VALUES (?, ?, ?)");
+        $stmt->execute([$typeId, $attrId, $required ? 't' : 'f']);
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    // ===== UNLINK ATTRIBUTE FROM DOC TYPE =====
+    if ($action === 'doc_type_attribute_remove' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $typeId = $data['doc_type_id'];
+        $attrId = $data['attribute_id'];
+        
+        $pdo->prepare("DELETE FROM dms_doc_type_attributes WHERE doc_type_id=? AND attribute_id=?")->execute([$typeId, $attrId]);
+        echo json_encode(['success' => true]);
         exit;
     }
 
@@ -326,6 +367,93 @@ try {
         exit('Soubor na disku neexistuje a nebyl nalezen ani v databázi.');
     }
 
+    // ===== OCR REGION (Interactive) =====
+    if ($action === 'ocr_region') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = $input['doc_id'] ?? 0;
+        $rect = $input['rect'] ?? null; // {x, y, w, h} in % (0-1)
+
+        if (!$id || !$rect) throw new Exception('Missing ID or Rect');
+
+        // Fetch Doc
+        $stmt = $pdo->prepare("SELECT storage_path, mime_type, file_extension, display_name FROM dms_documents WHERE rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$doc) throw new Exception('Document not found');
+
+        // Resolve Path (reuse OcrEngine logic concept)
+        $filepath = $doc['storage_path'];
+        if (!file_exists($filepath)) {
+            $baseDir = __DIR__;
+            $filepath = $baseDir . '/' . ltrim($doc['storage_path'], '/');
+        }
+
+        // Only support Images for now
+        if (strpos($doc['mime_type'], 'image/') !== 0) {
+             echo json_encode(['success' => false, 'error' => 'Interaktivní zónování je dostupné pouze pro obrázky. (Mime: '.$doc['mime_type'].')']);
+             exit;
+        }
+
+        try {
+            // Load Image
+            $srcImg = null;
+            if ($doc['mime_type'] === 'image/jpeg' || $doc['file_extension'] === 'jpg') $srcImg = @imagecreatefromjpeg($filepath);
+            elseif ($doc['mime_type'] === 'image/png' || $doc['file_extension'] === 'png') $srcImg = @imagecreatefrompng($filepath);
+            
+            if (!$srcImg) throw new Exception('Nepodařilo se načíst obrázek (GD Library error).');
+
+            $origW = imagesx($srcImg);
+            $origH = imagesy($srcImg);
+
+            // Calculate Crop
+            $x = (int)($rect['x'] * $origW);
+            $y = (int)($rect['y'] * $origH);
+            $w = (int)($rect['w'] * $origW);
+            $h = (int)($rect['h'] * $origH);
+
+            // Sanity Check
+            if ($w < 1 || $h < 1) throw new Exception('Příliš malá zóna.');
+            
+            // Limit to bounds
+            if ($x < 0) $x = 0; 
+            if ($y < 0) $y = 0;
+            if ($x + $w > $origW) $w = $origW - $x;
+            if ($y + $h > $origH) $h = $origH - $y;
+
+            $crop = imagecrop($srcImg, ['x' => $x, 'y' => $y, 'width' => $w, 'height' => $h]);
+            
+            if ($crop !== false) {
+                // Resize for better OCR? (Optional, Tesseract handles scaling usually, but enlarging small text helps)
+                // Let's just save
+                $tempFile = sys_get_temp_dir() . '/ocr_crop_' . uniqid() . '.png';
+                imagepng($crop, $tempFile);
+                imagedestroy($crop);
+                imagedestroy($srcImg);
+
+                // Run Tesseract
+                $cmd = "tesseract " . escapeshellarg($tempFile) . " stdout -l ces+eng --psm 7"; // PSM 7 = Single text line, typically best for fields
+                $output = [];
+                $ret = 0;
+                exec($cmd, $output, $ret);
+                
+                unlink($tempFile);
+
+                if ($ret === 0) {
+                    $text = trim(implode(" ", $output));
+                    echo json_encode(['success' => true, 'text' => $text]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'Tesseract failed']);
+                }
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Crop failed']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     // ===== OCR ANALYZE DOCUMENT (BATCH SUPPORT) =====
     if ($action === 'analyze_doc') {
         $input = json_decode(file_get_contents('php://input'), true) ?? $_GET; // Support POST too
@@ -377,7 +505,8 @@ try {
     if ($action === 'update_metadata' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
         $id = $input['id'] ?? 0;
-        $attributes = $input['attributes'] ?? []; 
+        $attributes = $input['attributes'] ?? [];
+        $newStatus = $input['status'] ?? null; // e.g. 'verified', 'exported'
 
         if (!$id) throw new Exception('ID is required');
 
@@ -395,15 +524,43 @@ try {
         $currMeta['attributes'] = $currAttrs;
         
         // Update DB
-        $sql = "UPDATE dms_documents 
-                SET metadata = :meta, 
-                    ocr_status = 'verified' 
-                WHERE rec_id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':meta' => json_encode($currMeta), 
-            ':id' => $id
-        ]);
+        // We try to update 'status' column. If it fails (migration not run), we fallback to just ocr_status.
+        // Since we can't easily try-catch SQL prepare in PDO without overhead, we'll try to check column existence or just assume migration 030 runs.
+        // Given constraint: specific migration 030 adds 'status'.
+        
+        $ocrStatus = 'verified'; // Default if saving metadata
+        if ($newStatus === 'verified') $ocrStatus = 'verified';
+        
+        // Dynamic Update Builder
+        $fields = ["metadata = :meta", "ocr_status = :ocr_status"];
+        $params = [':meta' => json_encode($currMeta), ':ocr_status' => $ocrStatus, ':id' => $id];
+        
+        // Check if 'status' column exists (Quick and dirty check for this session context)
+        // Note: In production we rely on migrations. Here we just want to avoid 500 if user didn't migrate.
+        // We'll attempt the update. If it fails, we catch and run legacy update.
+        
+        if ($newStatus) {
+            $fields[] = "status = :status";
+            $params[':status'] = $newStatus;
+        }
+
+        $sql = "UPDATE dms_documents SET " . implode(', ', $fields) . " WHERE rec_id = :id";
+        
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        } catch (PDOException $e) {
+            // Likely 'status' column missing or other SQL error
+            if ($newStatus) {
+                // Retry without status
+                 $sql = "UPDATE dms_documents SET metadata = :meta, ocr_status = :ocr_status WHERE rec_id = :id";
+                 unset($params[':status']);
+                 $stmt = $pdo->prepare($sql);
+                 $stmt->execute($params);
+            } else {
+                throw $e;
+            }
+        }
 
         echo json_encode(['success' => true]);
         exit;
