@@ -147,8 +147,7 @@ export const DmsDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
-                        <MenuItem label="Moje úkoly (0)" onClick={() => { }} />
-                        <MenuItem label="Delegované úkoly" onClick={() => { }} />
+                        <MenuItem label="Konfigurace Google Disk" onClick={() => navigate('/dms/google-setup')} />
                     </MenuSection>
                 </div>
 

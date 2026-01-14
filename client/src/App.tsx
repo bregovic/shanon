@@ -13,6 +13,7 @@ import SecurityRoles from './pages/SecurityRoles';
 import { SystemConfig } from './pages/SystemConfig';
 import { SystemTranslations } from './pages/SystemTranslations';
 import { OcrTemplateDesigner } from './pages/OcrTemplateDesigner';
+import { DmsGoogleSetup } from './pages/DmsGoogleSetup';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SettingsProvider } from './context/SettingsContext';
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
                     { path: "system/translations", element: <SystemTranslations /> },
                     { path: "dms/ocr-designer/:id", element: <OcrTemplateDesigner /> },
                     { path: "dms/ocr-designer", element: <OcrTemplateDesigner /> }, // For new templates
+                    { path: "dms/google-setup", element: <DmsGoogleSetup /> },
                 ]
             }
         ]

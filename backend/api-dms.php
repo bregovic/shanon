@@ -100,6 +100,33 @@ try {
         exit;
     }
 
+    // ===== BATCH SYNC ATTRIBUTES TO DOC TYPE =====
+    if ($action === 'doc_type_attributes_sync' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $typeId = $data['doc_type_id'];
+        $attributeIds = $data['attribute_ids'] ?? []; // Array of IDs
+
+        if (!$typeId) throw new Exception('Missing Doc Type ID');
+
+        $pdo->beginTransaction();
+        try {
+            // 1. Remove all existing for this type
+            $pdo->prepare("DELETE FROM dms_doc_type_attributes WHERE doc_type_id=?")->execute([$typeId]);
+            
+            // 2. Insert new ones
+            $stmt = $pdo->prepare("INSERT INTO dms_doc_type_attributes (doc_type_id, attribute_id, is_required) VALUES (?, ?, 'f')");
+            foreach ($attributeIds as $attrId) {
+                $stmt->execute([$typeId, $attrId]);
+            }
+            $pdo->commit();
+            echo json_encode(['success' => true]);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        exit;
+    }
+
     // ===== UPLOAD DOCUMENT =====
     if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         // Validate file

@@ -49,12 +49,13 @@ if (isset($_GET['code'])) {
         'client_id' => $clientId,
         'client_secret' => $clientSecret,
         'refresh_token' => $refreshToken
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    ], 0); // compact json
 
-    echo "<h1>✅ Hotovo!</h1>";
-    echo "<p>Tento kód zkopírujte a vložte do Shanonu (Nastavení -> Úložiště -> Google Drive -> Connection String):</p>";
-    echo "<textarea style='width:100%; height: 200px; font-family:monospace;'>" . $finalJson . "</textarea>";
-    echo "<p><i>Poznámka: Tento kód obsahuje klíč k vašemu disku, nikomu ho neposílejte!</i></p>";
+    // Redirect back to React App
+    // We assume the React app is at root / (or /dms/google-setup)
+    // We can use the Referer or hardcode? Best is to redirect to the known setup page.
+    $redirectBack = '/dms/google-setup?result=' . urlencode($finalJson);
+    header("Location: " . $redirectBack);
     exit;
 }
 

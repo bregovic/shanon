@@ -39,6 +39,7 @@ import {
 import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
 import { SmartDataGrid } from '../components/SmartDataGrid';
+import { AttributeSelectorDialog } from '../components/AttributeSelectorDialog';
 
 type TabValue = 'doc_types' | 'attributes' | 'storage' | 'ocr_templates';
 
@@ -112,6 +113,9 @@ export const DmsSettings: React.FC = () => {
         description: '',
 
     });
+
+    // Attribute Selector Dialog State
+    const [isAttrSelectorOpen, setIsAttrSelectorOpen] = useState(false);
 
     // Storage Dialog State
     const [isStorageDialogOpen, setIsStorageDialogOpen] = useState(false);
@@ -754,46 +758,31 @@ export const DmsSettings: React.FC = () => {
 
                             <Divider />
 
-                            {/* Attribute Linking Section - Only available for existing records for simplicity */}
+                            {/* Attribute Linking Section (Improved) */}
                             {editingDocType && editingDocType.rec_id > 0 ? (
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                         <Text weight="semibold">Přiřazené atributy</Text>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            {/* Attribute Selector */}
-                                            <Dropdown
-                                                placeholder="Přidat atribut..."
-                                                onOptionSelect={async (_, data) => {
-                                                    // Add attribute
-                                                    const attrId = attributes.find(a => a.name === data.optionText)?.rec_id;
-                                                    if (!attrId) return;
-
-                                                    await fetch('/api/api-dms.php?action=doc_type_attribute_add', {
-                                                        method: 'POST',
-                                                        body: JSON.stringify({
-                                                            doc_type_id: editingDocType.rec_id,
-                                                            attribute_id: attrId,
-                                                            is_required: false
-                                                        })
-                                                    });
-                                                    // Refresh logic would go here, maybe trigger a re-fetch of linked attributes
-                                                    // For now simple alert
-                                                    alert('Atribut přidán. (Refreshněte pro zobrazení - TODO: Live update)');
-                                                }}
-                                            >
-                                                {attributes.map(a => (
-                                                    <Option key={a.rec_id} text={a.name}>{a.name}</Option>
-                                                ))}
-                                            </Dropdown>
-                                        </div>
                                     </div>
 
-                                    <div style={{ padding: '8px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '4px' }}>
-                                        <Text size={200}>
-                                            Atributy určují, jaká data se budou z tohoto typu dokumentu vytěžovat.
-                                            {/* Fetching and listing linked attributes currently requires a separate specialized API call inside this dialog or expanding the parent data */}
-                                            (Počet přiřazených: {editingDocType.attr_count || 0})
-                                        </Text>
+                                    <div style={{ padding: '16px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '4px', border: `1px solid ${tokens.colorNeutralStroke2}` }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <Text size={200} block style={{ marginBottom: '4px' }}>
+                                                    Aktuálně přiřazeno: <strong>{editingDocType.attr_count || 0}</strong>
+                                                </Text>
+                                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                                                    Atributy určují, jaká data se budou z tohoto typu dokumentu vytěžovat.
+                                                </Text>
+                                            </div>
+                                            <Button
+                                                appearance="secondary"
+                                                icon={<Settings24Regular />}
+                                                onClick={() => setIsAttrSelectorOpen(true)}
+                                            >
+                                                Spravovat atributy
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
@@ -816,6 +805,27 @@ export const DmsSettings: React.FC = () => {
                 tableName="dms_attributes"
                 recordId={transTarget?.id || 0}
                 title={transTarget?.name || ''}
+            />
+
+            {/* ATTRIBUTE SELECTOR DIALOG */}
+            <AttributeSelectorDialog
+                open={isAttrSelectorOpen}
+                onOpenChange={setIsAttrSelectorOpen}
+                currentDocTypeId={editingDocType?.rec_id || 0}
+                onSave={() => {
+                    // Refresh Doc Types list to update the "count" column if we added it to SmartDataGrid or just consistency
+                    fetch('/api/api-dms.php?action=doc_types').then(r => r.json()).then(j => {
+                        if (j.success) setDocTypes(j.data);
+                    });
+
+                    // Also if we want to update the local "editingDocType" with new count, we can do that,
+                    // but the dialog is mainly separate.
+                    // The "manage" button is inside "DocType Dialog", so when we return, we might want to refresh the text there?
+                    // Actually the text "Aktuálně přiřazeno: X" uses editingDocType.attr_count.
+                    // We should update editingDocType too.
+                    // But usually we just close/reopen or force refresh.
+                    // Let's at least refetch the doc type list.
+                }}
             />
 
             {/* STORAGE PROFILE DIALOG */}
@@ -863,8 +873,8 @@ export const DmsSettings: React.FC = () => {
                             {storageForm.storage_type === 'google_drive' && (
                                 <>
                                     <div style={{ padding: '8px', background: '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
-                                        Pro nastavení Google Drive je potřeba vytvořit <strong>Service Account</strong> v Google Cloud Console,
-                                        stáhnout jeho JSON klíč a povolit mu přístup k cílovému adresáři.
+                                        Pro nastavení Google Drive použijte buď <strong>Service Account</strong>, nebo <a href="/api/api-setup-google.php" target="_blank">Osobní účet (OAuth generator)</a>.
+                                        JSON klíč vložte níže.
                                     </div>
                                     <div>
                                         <Label required>ID Složky (Google Folder ID)</Label>

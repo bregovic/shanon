@@ -381,10 +381,19 @@ export const DmsReview: React.FC = () => {
                                     </div>
                                 ))}
                                 {currentAttributes.length === 0 && (
-                                    <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
-                                        Tento typ dokumentu nemá definované žádné atributy.
-                                        Jděte do nastavení a přiřaďte je.
-                                    </Text>
+                                    <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fff4f4', border: '1px solid #fed9cc', borderRadius: '4px' }}>
+                                        <Text style={{ color: tokens.colorPaletteRedForeground1 }} block>
+                                            Tento typ dokumentu nemá definované žádné atributy.
+                                        </Text>
+                                        <Button
+                                            appearance="transparent"
+                                            size="small"
+                                            style={{ paddingLeft: 0, color: tokens.colorBrandForegroundLink }}
+                                            onClick={() => window.open('/dms/settings', '_blank')}
+                                        >
+                                            Spravovat atributy v Nastavení
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                         )}

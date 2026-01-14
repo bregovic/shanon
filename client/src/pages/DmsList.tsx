@@ -97,7 +97,7 @@ export const DmsList: React.FC = () => {
                 fetchData();
                 alert('Hromadné vytěžování dokončeno.');
             } else {
-                alert('Chyba: ' + (json.error || json.message));
+                alert('Chyba: ' + (json.error || json.message || 'Neznámá chyba'));
             }
         } catch (e) {
             console.error(e);
@@ -143,7 +143,7 @@ export const DmsList: React.FC = () => {
                 fetchData();
                 alert('OCR Dokončeno');
             } else {
-                alert('Chyba: ' + json.error);
+                alert('Chyba: ' + (json.error || 'Neznámá chyba'));
             }
         });
     };
@@ -268,12 +268,20 @@ export const DmsList: React.FC = () => {
 
 
                     <Button
-                        appearance="secondary"
+                        appearance="primary"
                         icon={<ScanText24Regular />}
                         disabled={selectedIds.size === 0}
                         onClick={handleBatchAnalyze}
                     >
                         Vytěžit (OCR) {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
+                    </Button>
+
+                    <Button
+                        appearance="secondary"
+                        icon={<ArrowClockwise24Regular />} // Or specialized icon
+                        onClick={() => navigate('/dms/review')}
+                    >
+                        Revidovat frontu
                     </Button>
 
                     <Button
@@ -398,6 +406,7 @@ export const DmsList: React.FC = () => {
                                             <Text>Žádná vytěžená data.</Text>
                                             <div style={{ marginTop: '8px' }}>
                                                 <Button size="small" onClick={() => handleAnalyzeSingle(drawerDoc)}>Spustit OCR</Button>
+                                                <Button size="small" appearance="subtle" onClick={() => navigate('/dms/review')}>Revidovat</Button>
                                             </div>
                                         </div>
                                     )}
