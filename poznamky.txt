@@ -1,0 +1,78 @@
+
+xFunkce pro optimalizaci velikosti dokumentů. Bude v parametrech úroveň konverze. Před uložením do úložiště bude provedena změna velikosti souboru, aby byla zachována použitelnost a čitelnost
+
+V rámci manifestu bude zohledněn jednotný princip práce s ukládání změn. Úpravy záznamů budou automaticky uloženy. Pokud by nějaká změna měla zaniknout bude uživatel upozorněn, že je potřeba uložit.
+
+xJen moje 
+
+xMazání položek požadavků
+
+
+dms number series  bude změněno na becnou tabulku s číselnými řadami, v parametrech a všude se bude používat jen ID číselné řady
+
+xJen moje tasky požadavky
+
+Tyy formulářu do best practice
+
+PřizpůsobeníVie details do best pracitce
+
+Vedle notifikací bude systém nápovědy, plus manifest
+
+xSQL dokumentace, strukturovaný dokument podle funkcionality a modulů, přidáno do manifestu a conext prompt
+
+Nasatvení práv automaticky přes helpdesk, práva přímo na uživatele, ne jen na skupinu, posouzení adminem
+
+Konfigurátor worfklow hepldesk
+
+
+System úloha, kontrola best practice- duplicita labelů, chybějcí popisky, chybějící historie, vývoje, nápověda a podobně
+
+
+xMůžeme prosím připravit soubor, třeba textový instrukcemi, který by bylo možné předat libovolnému agentovi? Potřbovali bychom nějak předat contextový prompt, kde odkážeme na náš repozitář, kde se spustí skript na zpracování požadavku z helpdesku. Zadáme číslo požadavku a tento contextový soubor.
+Potřebujeme respektovat naše best practice a použité technologie. Zvolený agent si zkontroluje zadaná požadavek, dostane přehled o sql, a struktuře našeho projektu. Vytvoří objekt, meno upraví stávající v repozitáři.
+Pak zavolá skript pro nasazení, zapíše podle manifestu do historie a vše potřebné. Dále nastaví v help desk stav na testování, zapíše do komentáře jaké změny se provedli. A podepíše se o jakého se jedná agenta, Antigavity- Opus, Gemini, Chatgot a podobně.
+Agent bude řešit i dílčí komentáře. Ty komentáře, které už jsou vyřešení budou označeny emotikonem, zelená fajfka.
+
+Automatické ukládánií
+
+
+
+xSytém security- budeme mít v rámci systémové dokumentace tabulku s objekty a jejich ID. Možná už máme, ale nebudeme evidovat jen ID tabulek, ale i Modulů a formulářů.
+V rámci tabulky bude i Securityindentifikátor objektu, může být technický ale slovní. Pak budeme mít tabulku, která bude umožňovat evidovat jaká role zabezpečení má nárok na jaký sekurity identifkátor, a jakou má úroveň přístupu
+V rámci evidence uživatelů budeme přidávat role zabezpečení k uživateli a podle toho se budou zobrazovat jen přiřazené moduly, formuláře, tlačítka menu, také úroveň přístupu jako edit, view a podobně. Toto bychom potřebovali mít v rámci context promtp a manifestu pro všechny vývoje.
+K tomuto bychom také udržovali dokumentaci.Co ty na to?
+
+
+
+Do manifestu drobečková navigace
+(anglicky breadcrumbs / breadcrumb trail).
+Ohled na zobrazení v mobilním zařízení
+Nápověda
+Security 
+Labely
+Virtuální společnosti
+Zkratky
+Favotrites
+Layout formulářů a modulů
+Filtry
+
+
+Automatizované testování - úloha
+
+Úloha a protokol, formulář testovací a pomocné funkce, možnost multiselect a odstranění
+
+
+Hlavní kniha
+
+
+
+xProsím tě, rád bych zavedl systém externího vývoje.Mohli bychom v vrámci adresáře C:\Users\Wendulka\Documents\Webhry\hollyhop\shanon udělat novu složku External Development? 
+Tady bychom se mohli domluvit, že bychom dělali dílčí projekty pro externí agenty. Měli bychom složy For Development, Deployment. Domluvili bychom se, že třeba externě pořešíme OCR pro DMS.
+vytvřoil by si složku v rámci for development - DMS. Tam by si dal context prompt, manifest a základí soubory, popis struktury aktuální. Tyto soubory by byly poskytnuty jinému agentu pro vývoj.
+Výsledek a upravené soubory by byly nahrány do složky Deployment pro tvou kontrolu a nasazení. Co si o tom myslíš?
+
+x máme s tou cestou pořád problém, nemám prostě ten adresář přesunout někam kde máš práva? 
+
+
+
+xProsím přidat do manifestu, aby se při vývoji nepoužívali pořád nové labely, ale kontrolovalo se, jestli se nedá použít nějaký existující. Stejně tak by bylo dobré používat nějaké obecné lit of values, enums. co myslíš?

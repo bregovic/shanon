@@ -39,7 +39,7 @@ import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
 import { SmartDataGrid } from '../components/SmartDataGrid';
 
-type TabValue = 'doc_types' | 'attributes' | 'storage';
+type TabValue = 'doc_types' | 'attributes' | 'storage' | 'ocr_templates';
 
 interface DocType {
     rec_id: number;
@@ -150,7 +150,6 @@ export const DmsSettings: React.FC = () => {
                 code: attr.code || '',
                 data_type: attr.data_type,
                 is_required: attr.is_required,
-                is_searchable: attr.is_searchable,
                 is_searchable: attr.is_searchable,
                 default_value: attr.default_value || '',
                 help_text: attr.help_text || '',
@@ -542,6 +541,7 @@ export const DmsSettings: React.FC = () => {
                     <Tab value="doc_types">{t('dms.settings.doc_types', 'Typy dokumentů')}</Tab>
                     <Tab value="attributes">{t('dms.settings.attributes', 'Atributy')}</Tab>
                     <Tab value="storage">{t('dms.settings.storage', 'Úložiště')}</Tab>
+                    <Tab value="ocr_templates">OCR Šablony</Tab>
                 </TabList>
 
                 {loading ? (
@@ -601,6 +601,22 @@ export const DmsSettings: React.FC = () => {
                                         columns={attributeColumns}
                                         getRowId={(item) => item.rec_id}
                                     />
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* OCR TEMPLATES TAB */}
+                        {activeTab === 'ocr_templates' && (
+                            <Card style={{ padding: '16px', height: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                    <Text weight="semibold" size={400}>OCR Šablony</Text>
+                                    <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate('/dms/ocr-designer/new')}>
+                                        Nová šablona
+                                    </Button>
+                                </div>
+                                <div style={{ padding: '32px', textAlign: 'center', color: tokens.colorNeutralForeground3 }}>
+                                    <Text>Zatím zde nejsou žádné šablony. Vytvořte novou kliknutím na tlačítko "Nová šablona".</Text>
+                                    {/* TODO: List existing templates via SmartDataGrid once API action=list_templates is verified */}
                                 </div>
                             </Card>
                         )}

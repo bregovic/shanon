@@ -1,0 +1,68 @@
+Prosím tě, můžeme ještě upravit standard pro dashboardy a zahrnout to do best praktice? Bude to vždy jako Forms, pod tím nebude už konkrétní 
+menuitem, ale sub menu. Viz příklad tam bude jen pictogram , Label Dokumenty a ta šipka rozbalovací. PO rozkliknutí se zobrazí už menuitemy
+bez šipky a piktogramu- Všechny dokumenty, Ke schválení, Moje koncepty a podobně.
+
+Chyby -
+ neukládá se nastavení uživatele
+Labely špatné
+chybá tabulka user setup
+číselné řady setup a placeholdery
+prozkok na číselník -doubleclick, nebo hypertext?
+
+Vytvořit standardizovýn layout modulu a funkcí
+dávky
+user
+user sessions
+
+organizace setup - login datová schránka
+debugger
+deadlock db session
+Nápověda
+
+Změny
+Změna velikosti podle parametrů dokumentu
+
+dělat aktualizaci sql jen přes jeden aktualizovaný skript a evidovat ty změnyv helpdesk https://shanon.up.railway.app/api/install-dms.php
+
+
+výchozí společnost
+přiřazení společností uživateli
+změna společností a tenantů
+
+doker image - skrytí zdrojových kódů
+security
+instalace on prem, enterprise
+douref
+technická dokumentace
+změny
+updaty
+dms
+system core
+tenantid, companyID
+
+DMS systém,upload dkokumentů
+Favorites
+Konfigurace modulů
+SUper user¨
+Dávky
+Emaily
+Notifikace
+Neztrácet malým refresh filtry
+
+
+Ukládat pracovní skripty a pomocné funkce do pseciálního tasku v hlepdesk ke smazání
+Manfest, context jak bude struktura funkcí menu
+
+Online projekt
+admin@test.cz Venca123
+
+Id verze
+verzování
+Konfigurační klíče jen superadmin
+Zakládán společností
+OCR
+
+Smlouvy¨
+Faktury
+Účtenky
+

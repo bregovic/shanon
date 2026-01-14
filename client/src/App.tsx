@@ -12,6 +12,7 @@ import RequestsPage from './pages/RequestsPage';
 import SecurityRoles from './pages/SecurityRoles';
 import { SystemConfig } from './pages/SystemConfig';
 import { SystemTranslations } from './pages/SystemTranslations';
+import { OcrTemplateDesigner } from './pages/OcrTemplateDesigner';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SettingsProvider } from './context/SettingsContext';
@@ -55,6 +56,8 @@ const router = createBrowserRouter([
                     { path: "system", element: <SystemConfig /> },
                     { path: "system/security-roles", element: <SecurityRoles /> },
                     { path: "system/translations", element: <SystemTranslations /> },
+                    { path: "dms/ocr-designer/:id", element: <OcrTemplateDesigner /> },
+                    { path: "dms/ocr-designer", element: <OcrTemplateDesigner /> }, // For new templates
                 ]
             }
         ]

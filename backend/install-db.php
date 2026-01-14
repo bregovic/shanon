@@ -823,8 +823,10 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
             END $$;
         ",
         '013_ai_identity_fix' => null,
-        '014_sys_comment_reactions' => null
+        '014_sys_comment_reactions' => null,
+        '029_dms_ocr_templates' => null
     ];
+
 
 
 
