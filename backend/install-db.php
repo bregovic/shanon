@@ -822,7 +822,34 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
                 END IF;
             END $$;
         ",
-        '013_ai_identity_fix' => null,
+        '013_ai_identity_fix' => "
+            DO $$
+            DECLARE
+                v_ai_id INT;
+                v_ticket_id INT := 7;
+            BEGIN
+                -- 1. Ensure AI User
+                SELECT rec_id INTO v_ai_id FROM sys_users WHERE email = 'ai@shanon.dev';
+                
+                IF v_ai_id IS NULL THEN
+                    INSERT INTO sys_users (tenant_id, full_name, email, password_hash, role, created_at)
+                    VALUES ('00000000-0000-0000-0000-000000000001', 'AI Developer', 'ai@shanon.dev', 'DISABLED', 'admin', NOW())
+                    RETURNING rec_id INTO v_ai_id;
+                END IF;
+
+                -- 2. Cleanup (Safe ASCII)
+                UPDATE sys_change_comments 
+                SET user_id = v_ai_id 
+                WHERE comment LIKE '%Antigravity%' AND user_id != v_ai_id;
+
+                -- 3. Log
+                INSERT INTO development_history (date, title, category, related_task_id)
+                SELECT CURRENT_DATE, 'Fix: Request UI Bugs', 'bugfix', v_ticket_id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM development_history WHERE related_task_id = v_ticket_id AND title LIKE 'Fix: Request UI%'
+                );
+            END $$;
+        ",
         '014_sys_comment_reactions' => null,
         '029_dms_ocr_templates' => null,
         '030_dms_doc_type_attributes' => null
