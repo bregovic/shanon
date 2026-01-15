@@ -66,9 +66,25 @@ try {
         // Hardcoded for now as per previous implementation logic
         $profiles = [
             ['rec_id' => 1, 'name' => 'Lokální úložiště (Default)', 'type' => 'local', 'is_default' => true],
-            ['rec_id' => 2, 'name' => 'Google Drive (BETA)', 'type' => 'google_drive', 'is_default' => false]
+            ['rec_id' => 2, 'name' => 'Google Drive', 'type' => 'google_drive', 'is_default' => false]
         ];
         echo json_encode(['success' => true, 'data' => $profiles]);
+        exit;
+    }
+
+    if ($action === 'storage_profile_delete') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = $input['id'] ?? null;
+        
+        // Block deleting system profiles
+        if ($id == 1 || $id == 2) {
+             http_response_code(400); // Bad Request/Forbidden
+             echo json_encode(['success' => false, 'error' => 'Systémová úložiště nelze smazat.']);
+             exit;
+        }
+        
+        // If we had real dynamic profiles in DB, we would delete here.
+        echo json_encode(['success' => true]);
         exit;
     }
 
