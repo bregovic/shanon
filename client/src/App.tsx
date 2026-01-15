@@ -49,15 +49,31 @@ const OrgGuard = () => {
             if (isValid) {
                 switchOrg(orgId, true); // true = prevent reload
             } else if (organizations.length > 0) {
-                // Invalid org, redirect to first valid or root
-                navigate('/');
+                // Invalid org, redirect to first valid
+                navigate(`/${organizations[0].org_id}/dashboard`);
             }
         }
     }, [orgId, currentOrgId, isLoading, organizations, switchOrg, navigate]);
 
     if (isLoading) return null;
-    // Optional: visual loading while switching
-    if (orgId && orgId !== currentOrgId) return <div style={{ padding: 20 }}>Načítání společnosti...</div>;
+
+    // No organizations available (DB migration not run or user has no access)
+    if (organizations.length === 0) {
+        return (
+            <div style={{ padding: 40, textAlign: 'center' }}>
+                <h2>⚠️ Žádné společnosti</h2>
+                <p>Nemáte přiřazeny žádné organizace nebo databáze nebyla inicializována.</p>
+                <p style={{ fontSize: 12, color: '#888' }}>
+                    Administrátor: Spusťte migraci na <code>/api/install-db.php?token=...</code>
+                </p>
+            </div>
+        );
+    }
+
+    // Waiting for context switch
+    if (orgId && orgId !== currentOrgId) {
+        return <div style={{ padding: 20 }}>Načítání společnosti...</div>;
+    }
 
     return <Layout />;
 };
