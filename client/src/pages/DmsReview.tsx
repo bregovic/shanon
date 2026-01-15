@@ -90,6 +90,7 @@ interface DmsDocument {
     mime_type: string;
     metadata: {
         attributes?: Record<string, string>;
+        zones?: Record<string, { x: number, y: number, w: number, h: number }>;
     };
 }
 
@@ -305,6 +306,11 @@ export const DmsReview: React.FC = () => {
                 }
                 const existing = currentDoc.metadata?.attributes || {};
                 setFormData(existing);
+
+                // Load existing zones if available (from Template Auto-OCR)
+                if (currentDoc.metadata?.zones) {
+                    setZonesMap(currentDoc.metadata.zones);
+                }
             } catch (e) {
                 console.error(e);
             } finally {

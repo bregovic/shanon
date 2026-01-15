@@ -351,19 +351,39 @@ try {
         
         $newId = $stmt->fetchColumn();
 
-        // Trigger OCR (Background) - Same as before
+        // Trigger OCR (Background / Inline)
+        require_once __DIR__ . '/helpers/OcrEngine.php';
+        
         if ($autoOcr && $newId) {
              $ocr = new OcrEngine($pdo, $tenantId);
              try {
                  $ocrResult = $ocr->analyzeDocument($newId);
-                 $meta = ['attributes' => []];
-                 foreach ($ocrResult['attributes'] as $attr) {
-                     $meta['attributes'][$attr['attribute_code']] = $attr['found_value'];
+                 
+                 $meta = ['attributes' => [], 'zones' => []];
+                 
+                 if (!empty($ocrResult['attributes'])) {
+                     foreach ($ocrResult['attributes'] as $attr) {
+                         $meta['attributes'][$attr['attribute_code']] = $attr['found_value'];
+                         if (isset($attr['rect'])) {
+                             $meta['zones'][$attr['attribute_code']] = $attr['rect'];
+                         }
+                     }
                  }
-                 $upd = $pdo->prepare("UPDATE dms_documents SET ocr_status = 'completed', status = 'review', metadata = :meta, ocr_text_content = :txt WHERE rec_id = :id");
+
+                 // Determine Status
+                 // If obtained via Template -> 'completed' (high confidence)
+                 // If obtained via Regex -> 'mapping' (needs user check)
+                 $strategy = $ocrResult['strategy_used'] ?? 'Regex';
+                 $ocrStatus = ($strategy === 'Template') ? 'completed' : 'mapping';
+                 
+                 $status = 'review'; // Always needs review
+
+                 $upd = $pdo->prepare("UPDATE dms_documents SET ocr_status = :ost, status = :st, metadata = :meta, ocr_text_content = :txt WHERE rec_id = :id");
                  $upd->execute([
+                     ':ost' => $ocrStatus,
+                     ':st' => $status,
                      ':meta' => json_encode($meta, JSON_INVALID_UTF8_SUBSTITUTE),
-                     ':txt' => $ocrResult['raw_text_preview'],
+                     ':txt' => $ocrResult['raw_text_preview'] ?? '',
                      ':id' => $newId
                  ]);
              } catch (Exception $e) {

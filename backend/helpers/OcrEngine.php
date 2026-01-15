@@ -15,89 +15,222 @@ class OcrEngine {
      */
     public function analyzeDocument($docId) {
         // 1. Get Document Info
-        $stmt = $this->pdo->prepare("SELECT * FROM dms_documents WHERE rec_id = :id");
+        $stmt = $this->pdo->prepare("SELECT d.*, sp.type as storage_type, sp.configuration 
+                                     FROM dms_documents d
+                                     LEFT JOIN dms_storage_profiles sp ON d.storage_profile_id = sp.rec_id
+                                     WHERE d.rec_id = :id");
         $stmt->execute([':id' => $docId]);
         $doc = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$doc) throw new Exception("Document not found");
 
-        // 2. Resolve File Path (or Recover from DB)
-        $filepath = $doc['storage_path'];
-        $tempFileUsed = false;
+        // 2. Resolve File Path (Local or Drive)
+        $tempPath = null;
+        $localPath = null;
+        $isTemp = false;
 
-        // Correct relative path check
-        if (!file_exists($filepath)) {
-            $baseDir = dirname(__DIR__);
-            $testPath = $baseDir . '/' . ltrim($filepath, '/');
-            if (file_exists($testPath)) {
-                $filepath = $testPath;
-            } else {
-                // Try standard upload dir just in case
-                $testPath2 = $baseDir . '/uploads/dms/' . basename($doc['storage_path']);
-                if (file_exists($testPath2)) {
-                    $filepath = $testPath2;
-                }
+        if (($doc['storage_type'] ?? 'local') === 'google_drive') {
+            require_once __DIR__ . '/GoogleDriveStorage.php';
+            $config = json_decode($doc['configuration'] ?? '{}', true);
+            $drive = new GoogleDriveStorage(json_encode($config['service_account_json']), $config['folder_id']);
+            $content = $drive->downloadFile($doc['storage_path']);
+            
+            $ext = $doc['file_extension'] ?: 'tmp';
+            $tempPath = sys_get_temp_dir() . '/' . uniqid('ocr_main_') . '.' . $ext;
+            file_put_contents($tempPath, $content);
+            $localPath = $tempPath;
+            $isTemp = true;
+        } else {
+            // Local fallback logic
+            $baseDir = dirname(__DIR__); // backend/
+            $candidates = [
+                 $baseDir . '/../' . $doc['storage_path'],
+                 $baseDir . '/../uploads/dms/' . basename($doc['storage_path'])
+            ];
+            foreach($candidates as $p) {
+                if (file_exists($p)) { $localPath = $p; break; }
             }
         }
-
-        // If STILL not found (e.g. Google Drive ID), restore from DB Blob to Temp
-        if (!file_exists($filepath) || is_dir($filepath)) {
-             $stmtBlob = $this->pdo->prepare("SELECT content FROM dms_file_contents WHERE doc_id = :id");
-             $stmtBlob->execute([':id' => $docId]);
-             $blob = $stmtBlob->fetchColumn();
-             
-             if ($blob) {
-                 // Create temp file with correct extension (important for tools)
-                 $ext = $doc['file_extension'] ?? 'tmp';
-                 $tempPath = sys_get_temp_dir() . '/' . uniqid('ocr_') . '.' . $ext;
-                 
-                 if (is_resource($blob)) {
-                     // Stream
-                     $fp = fopen($tempPath, 'w');
-                     stream_copy_to_stream($blob, $fp);
-                     fclose($fp);
-                 } else {
-                     // String
-                     file_put_contents($tempPath, $blob);
-                 }
-                 
-                 if (file_exists($tempPath) && filesize($tempPath) > 0) {
-                     $filepath = $tempPath;
-                     $tempFileUsed = true;
-                 }
-             }
-
-             if (!file_exists($filepath) || is_dir($filepath)) {
-                 throw new Exception("File not found locally and could not be restored from DB. Storage Path: " . $doc['storage_path']);
-             }
+        
+        if (!$localPath || !file_exists($localPath)) {
+             throw new Exception("File content unavailable for OCR");
         }
 
-        // 3. Extract Text
-        $rawText = $this->extractText($filepath, $doc['mime_type']);
-        if (empty($rawText)) {
-            return ['success' => false, 'message' => 'No text extracted from document'];
+        // 3. Extract Full Text (Context)
+        $rawText = $this->extractText($localPath, $doc['mime_type']);
+        
+        // 4. Try Template Matching FIRST
+        $templateResults = $this->applyTemplates($doc, $localPath, $rawText);
+        
+        if (!empty($templateResults)) {
+             $foundAttributes = $templateResults;
+             $strategy = 'Template';
+        } else {
+             // 5. Fallback: Smart Attribute Search (Regex)
+             $foundAttributes = $this->extractAttributes($rawText);
+             $strategy = 'Regex';
         }
 
-        // 4. Find Attributes
-        $foundAttributes = $this->extractAttributes($rawText);
-
-        // Cleanup temp file
-        if ($tempFileUsed && file_exists($filepath)) {
-            unlink($filepath);
+        // Cleanup
+        if ($isTemp && file_exists($localPath)) {
+            unlink($localPath);
         }
 
         return [
             'success' => true,
             'doc_id' => $docId,
             'raw_text_preview' => substr($rawText, 0, 500) . '...',
+            'strategy_used' => $strategy,
             'attributes' => $foundAttributes
         ];
     }
 
     /**
-     * Smart Extraction Logic
+     * Try to find a matching template and extract zones
+     */
+    private function applyTemplates($doc, $filePath, $fullText) {
+        // Find templates for this Doc Type
+        $sql = "SELECT * FROM dms_ocr_templates WHERE doc_type_id = :dt OR doc_type_id IS NULL";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':dt' => $doc['doc_type_id']]);
+        $templates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($templates as $tpl) {
+            // Check Anchor
+            if (!empty($tpl['anchor_text'])) {
+                 if (mb_stripos($fullText, $tpl['anchor_text']) === false) {
+                     continue; // Anchor not found
+                 }
+            }
+            
+            // Match found! Process zones
+            return $this->processTemplateZones($tpl['rec_id'], $filePath, $doc['mime_type']);
+        }
+        
+        return [];
+    }
+
+    /**
+     * Process all zones for a specific template against the file
+     */
+    private function processTemplateZones($templateId, $filePath, $mimeType) {
+        $stmt = $this->pdo->prepare("SELECT * FROM dms_ocr_template_zones WHERE template_id = :tid");
+        $stmt->execute([':tid' => $templateId]);
+        $zones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Prepare Image for Cropping (Once)
+        $imagePath = $this->prepareImageForCropping($filePath, $mimeType);
+        if (!$imagePath) return [];
+
+        $results = [];
+        foreach ($zones as $zone) {
+            $val = $this->extractFromZone($imagePath, $zone);
+            if ($val) {
+                $results[] = [
+                    'attribute_code' => $zone['attribute_code'],
+                    'found_value' => $val,
+                    'confidence' => 'High',
+                    'strategy' => 'TemplateZone',
+                    'rect' => [
+                        'x' => (float)$zone['x'],
+                        'y' => (float)$zone['y'],
+                        'w' => (float)$zone['width'],
+                        'h' => (float)$zone['height']
+                    ]
+                ];
+            }
+        }
+
+        // Cleanup temp cropper image
+        if ($imagePath && $imagePath !== $filePath && file_exists($imagePath)) {
+            unlink($imagePath);
+        }
+
+        return $results;
+    }
+
+    private function prepareImageForCropping($filePath, $mimeType) {
+        if (strpos($mimeType, 'image/') === 0) return $filePath;
+        
+        if ($mimeType === 'application/pdf') {
+             $tempImg = sys_get_temp_dir() . '/' . uniqid('crop_base_') . '.jpg';
+             // Try pdftoppm
+             $cmd = "pdftoppm -jpeg -f 1 -l 1 -singlefile " . escapeshellarg($filePath) . " " . escapeshellarg(str_replace('.jpg','',$tempImg));
+             exec($cmd);
+             if (file_exists($tempImg)) return $tempImg;
+             
+             // Try Imagick
+             if (class_exists('Imagick')) {
+                 try {
+                     $im = new Imagick();
+                     $im->setResolution(300, 300);
+                     $im->readImage($filePath . '[0]');
+                     $im->setImageFormat('jpeg');
+                     $im->writeImage($tempImg);
+                     $im->clear();
+                     return $tempImg;
+                 } catch(Exception $e) {}
+             }
+        }
+        return null;
+    }
+
+    private function extractFromZone($imagePath, $zone) {
+        $info = @getimagesize($imagePath);
+        if (!$info) return null;
+        
+        $srcW = $info[0];
+        $srcH = $info[1];
+        $type = $info[2];
+
+        $cropX = floor($zone['x'] * $srcW);
+        $cropY = floor($zone['y'] * $srcH);
+        $cropW = floor($zone['width'] * $srcW);
+        $cropH = floor($zone['height'] * $srcH);
+
+        if ($cropW < 1) $cropW = 1; if ($cropH < 1) $cropH = 1;
+
+        $srcImg = null;
+        switch ($type) {
+            case IMAGETYPE_JPEG: $srcImg = imagecreatefromjpeg($imagePath); break;
+            case IMAGETYPE_PNG: $srcImg = imagecreatefrompng($imagePath); break;
+            case IMAGETYPE_GIF: $srcImg = imagecreatefromgif($imagePath); break;
+        }
+        if (!$srcImg) return null;
+
+        $destImg = imagecreatetruecolor($cropW, $cropH);
+        imagecopy($destImg, $srcImg, 0, 0, $cropX, $cropY, $cropW, $cropH);
+        
+        $cropFile = sys_get_temp_dir() . '/' . uniqid('zone_') . '.jpg';
+        imagejpeg($destImg, $cropFile, 90);
+        imagedestroy($srcImg);
+        imagedestroy($destImg);
+
+        // Run Tesseract
+        $cmd = "tesseract " . escapeshellarg($cropFile) . " stdout -l ces+eng --psm 6";
+        $output = [];
+        exec($cmd, $output);
+        $text = trim(implode("\n", $output));
+        
+        if (file_exists($cropFile)) unlink($cropFile);
+        
+        // Parse Value
+        if ($zone['regex_pattern']) {
+             if (preg_match($zone['regex_pattern'], $text, $m)) return $m[0];
+        }
+        
+        // Basic Type Parsing
+        if ($zone['data_type'] === 'number') return $this->parseValue($text, 'number');
+        if ($zone['data_type'] === 'date') return $this->parseValue($text, 'date');
+        
+        return $text;
+    }
+
+    /**
+     * Smart Extraction Logic (Regex Fallback)
      */
     private function extractAttributes($text) {
+        // ... (Keep existing implementation) ...
         // Fetch all attributes for this tenant (include CODE)
         $sql = "SELECT a.rec_id, a.name, a.code, a.data_type, a.scan_direction,
                        t.translation
