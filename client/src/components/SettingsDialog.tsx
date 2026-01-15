@@ -18,6 +18,7 @@ import { useTranslation } from '../context/TranslationContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
+import { Input } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
     content: {
@@ -41,12 +42,53 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
     const [saving, setSaving] = useState(false);
     const [selectedDefaultOrg, setSelectedDefaultOrg] = useState<string | null>(null);
 
+    // Password Change State
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+
     // Find initial default
     const initialDefault = organizations.find(o => o.is_default)?.org_id || organizations[0]?.org_id || '';
     const effectiveDefault = selectedDefaultOrg ?? initialDefault;
 
     const handleSave = async () => {
         setSaving(true);
+        setPasswordError('');
+
+        // Password Change Logic
+        if (newPassword || confirmPassword) {
+            if (newPassword !== confirmPassword) {
+                setPasswordError('user.passwordsDoNotMatch');
+                setSaving(false);
+                return;
+            }
+            if (newPassword.length < 5) {
+                setPasswordError('user.passwordTooShort');
+                setSaving(false);
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api-users.php?action=update_profile`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: newPassword }),
+                    credentials: 'include'
+                });
+                const json = await res.json();
+                if (!json.success) {
+                    setPasswordError(json.error || 'Failed to change password');
+                    setSaving(false);
+                    return;
+                }
+            } catch (e) {
+                console.error(e);
+                setPasswordError('Network error during password change');
+                setSaving(false);
+                return;
+            }
+        }
+
         await saveSettings();
 
         // Save default org if changed
@@ -111,6 +153,36 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                 </Text>
                             </div>
                         )}
+
+                        {/* Password Change */}
+                        <div style={{ marginTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: '16px' }}>
+                            <Text weight="semibold" style={{ marginBottom: '8px', display: 'block' }}>Změna hesla</Text>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div>
+                                    <Label>Nové heslo</Label>
+                                    <Input
+                                        type="password"
+                                        value={newPassword}
+                                        onChange={(_, d) => setNewPassword(d.value)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Potvrzení hesla</Label>
+                                    <Input
+                                        type="password"
+                                        value={confirmPassword}
+                                        onChange={(_, d) => setConfirmPassword(d.value)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                                {passwordError && (
+                                    <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
+                                        {t(passwordError) || passwordError}
+                                    </Text>
+                                )}
+                            </div>
+                        </div>
                     </DialogContent>
                     <DialogActions>
                         <Button appearance="primary" onClick={handleSave} disabled={saving}>

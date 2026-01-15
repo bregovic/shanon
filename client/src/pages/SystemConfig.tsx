@@ -438,6 +438,7 @@ export const SystemConfig: React.FC = () => {
                         <MenuItem label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label="Správa uživatelů" onClick={() => navigate('/system/users')} />
                     </MenuSection>
 
                     {/* 2. DOCS */}

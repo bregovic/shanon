@@ -205,10 +205,40 @@ export const UsersAdmin: React.FC = () => {
             renderCell: (item) => <TableCellLayout>{item.email}</TableCellLayout>
         }),
         createTableColumn<User>({
-            columnId: 'full_name',
-            compare: (a, b) => (a.full_name || '').localeCompare(b.full_name || ''),
+            columnId: 'first_name',
+            compare: (a, b) => {
+                const nameA = a.full_name.split(' ').slice(0, -1).join(' ');
+                const nameB = b.full_name.split(' ').slice(0, -1).join(' ');
+                return nameA.localeCompare(nameB);
+            },
             renderHeaderCell: () => 'Jméno',
-            renderCell: (item) => <TableCellLayout>{item.full_name}</TableCellLayout>
+            renderCell: (item) => (
+                <TableCellLayout>
+                    {item.full_name.split(' ').slice(0, -1).join(' ') || item.full_name}
+                </TableCellLayout>
+            )
+        }),
+        createTableColumn<User>({
+            columnId: 'last_name',
+            compare: (a, b) => {
+                const partsA = a.full_name.trim().split(' ');
+                const partsB = b.full_name.trim().split(' ');
+                const lastA = partsA[partsA.length - 1] || '';
+                const lastB = partsB[partsB.length - 1] || '';
+                return lastA.localeCompare(lastB);
+            },
+            renderHeaderCell: () => 'Příjmení',
+            renderCell: (item) => {
+                const parts = item.full_name.trim().split(' ');
+                // If only one name, it's usually treated as Last Name or First Name depending on context. 
+                // Let's assume if only one word, it's in the First Name column (above) and this is empty, 
+                // OR we put strictly the last token here.
+                return (
+                    <TableCellLayout>
+                        {parts.length > 1 ? parts[parts.length - 1] : ''}
+                    </TableCellLayout>
+                );
+            }
         }),
         createTableColumn<User>({
             columnId: 'role',

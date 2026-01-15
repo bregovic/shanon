@@ -13,15 +13,19 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// Admin check
+// Admin check (skip for specific actions)
 $userRole = strtolower($_SESSION['user']['role'] ?? '');
-if (!in_array($userRole, ['admin', 'superadmin'])) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Admin access required']);
-    exit;
-}
-
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
+
+$publicActions = ['update_profile'];
+
+if (!in_array($action, $publicActions)) {
+    if (!in_array($userRole, ['admin', 'superadmin'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Admin access required']);
+        exit;
+    }
+}
 
 try {
     $pdo = DB::connect();
@@ -178,6 +182,24 @@ try {
             echo json_encode(['success' => true, 'message' => 'Users deleted', 'count' => $stmt->rowCount()]);
             break;
             
+        case 'update_profile':
+            $input = json_decode(file_get_contents('php://input'), true);
+            $userId = $_SESSION['user']['id'] ?? $_SESSION['user']['rec_id'] ?? null;
+            
+            if (!$userId) throw new Exception("User ID missing in session");
+
+            $newPassword = $input['password'] ?? '';
+            
+            if (empty($newPassword)) throw new Exception("Heslo je povinné");
+            
+            $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+            
+            $stmt = $pdo->prepare("UPDATE sys_users SET password_hash = :pwd, updated_at = NOW() WHERE rec_id = :id");
+            $stmt->execute([':pwd' => $passwordHash, ':id' => $userId]);
+            
+            echo json_encode(['success' => true, 'message' => 'Heslo změněno']);
+            break;
+
         default:
             throw new Exception("Unknown action: $action");
     }
