@@ -13,6 +13,7 @@ import RequestsPage from './pages/RequestsPage';
 import { SystemTestingList } from "./pages/SystemTestingList";
 import { SystemTestingDetail } from "./pages/SystemTestingDetail";
 import SecurityRoles from './pages/SecurityRoles';
+import { UsersAdmin } from './pages/UsersAdmin';
 import { SystemConfig } from './pages/SystemConfig';
 import { SystemTranslations } from './pages/SystemTranslations';
 import { OcrTemplateDesigner } from './pages/OcrTemplateDesigner';
@@ -109,6 +110,7 @@ const router = createBrowserRouter([
                     { path: "requests", element: <RequestsPage /> },
                     { path: "system", element: <SystemConfig /> },
                     { path: "system/security-roles", element: <SecurityRoles /> },
+                    { path: "system/users", element: <UsersAdmin /> },
                     { path: "system/translations", element: <SystemTranslations /> },
                     { path: "system/testing", element: <SystemTestingList /> },
                     { path: "system/testing/:id", element: <SystemTestingDetail /> },

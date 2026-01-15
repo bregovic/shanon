@@ -32,6 +32,11 @@ import {
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { VisualEditor } from "./VisualEditor";
+import { SmartDataGrid } from "./SmartDataGrid";
+import { useAuth } from "../context/AuthContext";
+import type { TableColumnDefinition } from "@fluentui/react-components";
+import { createTableColumn } from "@fluentui/react-components";
+
 
 const useStyles = makeStyles({
     textarea: {
@@ -96,7 +101,14 @@ interface FeedbackModalProps {
 export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackModalProps, 'user'> & { user?: any }) => {
 
     const styles = useStyles();
-    const [tab, setTab] = useState<'report' | 'history'>('report');
+    const { user } = useAuth();
+    const [tab, setTab] = useState<'report' | 'history' | 'manage'>('report');
+    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'developer';
+
+    // Management State
+    const [manageData, setManageData] = useState<any[]>([]);
+    const [loadingManage, setLoadingManage] = useState(false);
+
 
     // Form State
     const [subject, setSubject] = useState("");
@@ -151,10 +163,11 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
         : `/api/${endpoint}`;
 
     useEffect(() => {
-        if (open && tab === 'history') {
-            loadHistory();
+        if (open) {
+            if (tab === 'history') loadHistory();
+            if (tab === 'manage' && isAdmin) loadManageData();
         }
-    }, [open, tab]);
+    }, [open, tab, isAdmin]);
 
     const loadHistory = async () => {
         setLoadingHistory(true);
@@ -169,6 +182,106 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
             setLoadingHistory(false);
         }
     };
+
+    const loadManageData = async () => {
+        setLoadingManage(true);
+        try {
+            const res = await axios.get(getApiUrl('api-changerequests.php?action=list&view=all'));
+            if (res.data.success) {
+                setManageData(res.data.data);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingManage(false);
+        }
+    };
+
+    const handleUpdateStatus = async (id: number, status: string) => {
+        try {
+            await axios.post(getApiUrl('api-changerequests.php?action=update'), { id, status });
+            loadManageData(); // Reload
+        } catch (e) {
+            alert("Chyba při změně stavu");
+        }
+    };
+
+    const handleUpdatePriority = async (id: number, priority: string) => {
+        try {
+            await axios.post(getApiUrl('api-changerequests.php?action=update'), { id, priority });
+            loadManageData(); // Reload
+        } catch (e) {
+            alert("Chyba při změně priority");
+        }
+    };
+
+    // Columns for Management
+    const manageColumns: TableColumnDefinition<any>[] = [
+        createTableColumn<any>({
+            columnId: 'id',
+            compare: (a, b) => a.id - b.id,
+            renderHeaderCell: () => 'ID',
+            renderCell: (item) => <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>#{item.id}</Text>
+        }),
+        createTableColumn<any>({
+            columnId: 'subject',
+            compare: (a, b) => a.subject.localeCompare(b.subject),
+            renderHeaderCell: () => 'Předmět',
+            renderCell: (item) => <Text weight="semibold">{item.subject}</Text>
+        }),
+        createTableColumn<any>({
+            columnId: 'user',
+            compare: (a, b) => (a.username || '').localeCompare(b.username || ''),
+            renderHeaderCell: () => 'Zadal',
+            renderCell: (item) => <Text>{item.username || '-'}</Text>
+        }),
+        createTableColumn<any>({
+            columnId: 'priority',
+            compare: (a, b) => a.priority.localeCompare(b.priority),
+            renderHeaderCell: () => 'Priorita',
+            renderCell: (item) => (
+                <Dropdown
+                    size="small"
+                    value={item.priority}
+                    selectedOptions={[item.priority]}
+                    onOptionSelect={(_, d) => handleUpdatePriority(item.id, d.optionValue || 'medium')}
+                    style={{ minWidth: '100px' }}
+                >
+                    <Option value="low">Low</Option>
+                    <Option value="medium">Medium</Option>
+                    <Option value="high">High</Option>
+                </Dropdown>
+            )
+        }),
+        createTableColumn<any>({
+            columnId: 'status',
+            compare: (a, b) => a.status.localeCompare(b.status),
+            renderHeaderCell: () => 'Stav',
+            renderCell: (item) => (
+                <Dropdown
+                    size="small"
+                    value={item.status}
+                    selectedOptions={[item.status]}
+                    onOptionSelect={(_, d) => handleUpdateStatus(item.id, d.optionValue || 'New')}
+                    style={{ minWidth: '130px' }}
+                >
+                    <Option value="New">Nový</Option>
+                    <Option value="Approved">Schváleno</Option>
+                    <Option value="Development">Vývoj</Option>
+                    <Option value="Testing">Testování</Option>
+                    <Option value="Completed">Hotovo</Option>
+                    <Option value="Rejected">Zamítnuto</Option>
+                </Dropdown>
+            )
+        }),
+        createTableColumn<any>({
+            columnId: 'assigned',
+            compare: (a, b) => (a.assigned_username || '').localeCompare(b.assigned_username || ''),
+            renderHeaderCell: () => 'Řešitel',
+            renderCell: (item) => <Text>{item.assigned_username || '-'}</Text>
+        })
+    ];
+
 
     const handlePaste = (e: React.ClipboardEvent) => {
         // We now use VisualEditor which handles its own pasting for description.
@@ -265,12 +378,22 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
 
     return (
         <Dialog open={open} onOpenChange={(_e, data) => onOpenChange(data.open)}>
-            <DialogSurface style={{ maxWidth: '800px', width: '95%', height: 'auto', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <DialogSurface style={{
+                maxWidth: tab === 'manage' ? '1200px' : '800px',
+                width: '95%',
+                height: '80vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                transition: 'max-width 0.3s ease'
+            }}>
                 <DialogBody style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
                     <DialogTitle>
                         <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as any)}>
-                            <Tab value="report">Nahlásit chybu / Zpětná vazba</Tab>
+                            <Tab value="report">Nahlásit chybu</Tab>
                             <Tab value="history">Historie vývoje</Tab>
+                            {isAdmin && <Tab value="manage">Správa požadavků</Tab>}
                         </TabList>
                     </DialogTitle>
 
@@ -489,6 +612,16 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                                         })}
                                         {historyData.length === 0 && <Text>Zatím žádná historie.</Text>}
                                     </div>
+                                )}
+                            </div>
+                        ) : tab === 'manage' && isAdmin ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                                {loadingManage ? <Spinner label="Načítám požadavky..." /> : (
+                                    <SmartDataGrid
+                                        items={manageData}
+                                        columns={manageColumns}
+                                        getRowId={(item) => item.id}
+                                    />
                                 )}
                             </div>
                         ) : null}
