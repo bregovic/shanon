@@ -136,14 +136,17 @@ try {
         if (!empty($newIds)) {
              $placeholders = implode(',', array_fill(0, count($newIds), '?'));
              $sqlDel = "DELETE FROM sys_test_steps WHERE scenario_id = ? AND rec_id NOT IN ($placeholders)";
-             // BUT, check constraint. Postgres will throw error if linked to results.
-             // We'll wrap in try-catch or just suppress.
-             try {
-                $args = array_merge([$scenarioId], $newIds);
-                $pdo->prepare($sqlDel)->execute($args);
-             } catch (Exception $e) {
-                 // Ignore FK constraint error for now - user can't delete steps with history
-             }
+             $args = array_merge([$scenarioId], $newIds);
+        } else {
+             // If no steps returned (all deleted), delete all for this scenario
+             $sqlDel = "DELETE FROM sys_test_steps WHERE scenario_id = ?";
+             $args = [$scenarioId];
+        }
+
+        try {
+            $pdo->prepare($sqlDel)->execute($args);
+        } catch (Exception $e) {
+             // Ignore FK constraint error for now - user can't delete steps with history
         }
 
         echo json_encode(['success' => true, 'id' => $scenarioId]);

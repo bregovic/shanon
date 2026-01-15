@@ -854,10 +854,10 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         '029_dms_ocr_templates' => null,
         '030_dms_doc_type_attributes' => null,
         '031_reset_attributes' => null,
-        '032_import_feature_log.sql' => null,
-        '033_sys_testing.sql' => null,
-        '034_seed_dms_test.sql' => null,
-        '035_dms_workflow_status.sql' => null
+        '032_import_feature_log' => null,
+        '033_sys_testing' => null,
+        '034_seed_dms_test' => null,
+        '035_dms_workflow_status' => null
     ];
 
 

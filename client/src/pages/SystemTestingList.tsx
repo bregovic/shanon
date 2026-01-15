@@ -1,70 +1,46 @@
-
 import React, { useState, useEffect } from "react";
 import {
-    makeStyles,
-    tokens,
     Button,
-    Text,
-    Spinner,
+    Badge,
     TabList,
     Tab,
-    SelectTabEvent,
-    SelectTabEventHandler
+    SelectTabEventHandler,
+    Text,
+    createTableColumn,
+    TableColumnDefinition
 } from "@fluentui/react-components";
 import {
     Add24Regular,
     ClipboardTaskListLtr24Regular,
     Beaker24Regular,
-    Warning24Regular
+    Warning24Regular,
+    Delete24Regular,
+    Play24Regular,
+    Document24Regular
 } from "@fluentui/react-icons";
 import axios from "axios";
-import { PageLayout, PageHeader, PageContent } from "../components/PageLayout";
+import { PageLayout, PageHeader, PageFilterBar, PageContent } from "../components/PageLayout";
+import { SmartDataGrid } from "../components/SmartDataGrid";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next"; // Using i18next
+import { useTranslation } from "react-i18next";
 
-// Define categories mapping for filter
-const CATEGORIES: Record<string, string> = {
-    'process': 'Procesy',
-    'feature': 'Programové úpravy',
-    'critical_path': 'Kritická cesta'
-};
-
-const useStyles = makeStyles({
-    listContainer: {
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.5rem",
-    },
-    itemRow: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "1rem",
-        backgroundColor: tokens.colorNeutralBackground1,
-        border: `1px solid ${tokens.colorNeutralStroke2}`,
-        borderRadius: tokens.borderRadiusMedium,
-        cursor: "pointer",
-        ":hover": {
-            backgroundColor: tokens.colorNeutralBackground1Hover
-        }
-    },
-    statusBadge: {
-        fontSize: "12px",
-        padding: "2px 8px",
-        borderRadius: "12px",
-        marginLeft: "8px"
-    }
-});
+interface TestScenario {
+    rec_id: number;
+    title: string;
+    description: string;
+    category: string;
+    step_count: number;
+    last_status: string | null;
+    last_run_date: string | null;
+}
 
 export const SystemTestingList: React.FC = () => {
     const navigate = useNavigate();
-    const styles = useStyles();
     const { t } = useTranslation();
-
-    // Valid categories: 'process', 'feature', 'critical_path'
     const [activeTab, setActiveTab] = useState('process');
-    const [scenarios, setScenarios] = useState<any[]>([]);
+    const [items, setItems] = useState<TestScenario[]>([]);
     const [loading, setLoading] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
     useEffect(() => {
         loadData();
@@ -72,9 +48,12 @@ export const SystemTestingList: React.FC = () => {
 
     const loadData = async () => {
         setLoading(true);
+        setSelectedIds(new Set()); // Reset selection on tab change
         try {
             const res = await axios.get(`/api/api-system-testing.php?action=list_scenarios&category=${activeTab}`);
-            setScenarios(res.data.data);
+            if (res.data.success) {
+                setItems(res.data.data);
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -86,10 +65,60 @@ export const SystemTestingList: React.FC = () => {
         setActiveTab(data.value as string);
     };
 
-    const getStatusColor = (status: string) => {
-        if (status === 'passed') return { bg: '#e6ffec', fg: 'green' };
-        if (status === 'failed') return { bg: '#ffe6e6', fg: 'red' };
-        return { bg: '#f3f2f1', fg: '#605e5c' };
+    const columns: TableColumnDefinition<TestScenario>[] = [
+        createTableColumn<TestScenario>({
+            columnId: 'rec_id',
+            compare: (a, b) => a.rec_id - b.rec_id,
+            renderHeaderCell: () => 'ID',
+            renderCell: (item) => <Text>{item.rec_id}</Text>
+        }),
+        createTableColumn<TestScenario>({
+            columnId: 'title',
+            compare: (a, b) => a.title.localeCompare(b.title),
+            renderHeaderCell: () => 'Název scénáře',
+            renderCell: (item) => (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text weight="semibold">{item.title}</Text>
+                    <Text size={200} style={{ color: '#666' }}>{item.description}</Text>
+                </div>
+            )
+        }),
+        createTableColumn<TestScenario>({
+            columnId: 'step_count',
+            compare: (a, b) => a.step_count - b.step_count,
+            renderHeaderCell: () => 'Kroky',
+            renderCell: (item) => <Text>{item.step_count}</Text>
+        }),
+        createTableColumn<TestScenario>({
+            columnId: 'last_status',
+            compare: (a, b) => (a.last_status || '').localeCompare(b.last_status || ''),
+            renderHeaderCell: () => 'Poslední stav',
+            renderCell: (item) => {
+                const map: Record<string, { label: string, color: 'success' | 'danger' | 'informative' }> = {
+                    'passed': { label: 'OK', color: 'success' },
+                    'failed': { label: 'Chyba', color: 'danger' },
+                    'none': { label: 'Netestováno', color: 'informative' }
+                };
+                const st = map[item.last_status || 'none'] || { label: item.last_status || '-', color: 'informative' };
+                return (
+                    <Badge appearance="tint" color={st.color}>
+                        {st.label}
+                    </Badge>
+                );
+            }
+        }),
+        createTableColumn<TestScenario>({
+            columnId: 'last_run_date',
+            compare: (a, b) => (a.last_run_date || '').localeCompare(b.last_run_date || ''),
+            renderHeaderCell: () => 'Naposledy spuštěno',
+            renderCell: (item) => <Text>{item.last_run_date ? new Date(item.last_run_date).toLocaleString('cs-CZ') : '-'}</Text>
+        })
+    ];
+
+    const handleDelete = async () => {
+        if (!confirm(`Smazat ${selectedIds.size} scénářů?`)) return;
+        // Todo: Implement Bulk Delete API
+        alert("Delete not implemented in this demo.");
     };
 
     return (
@@ -97,46 +126,43 @@ export const SystemTestingList: React.FC = () => {
             <PageHeader>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <Text size={500} weight="bold">Testování (Test Management)</Text>
-                    <Button icon={<Add24Regular />} appearance="primary" onClick={() => navigate('/system/testing/new')}>
-                        Nový scénář
-                    </Button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button
+                            appearance="subtle"
+                            icon={<Delete24Regular />}
+                            disabled={selectedIds.size === 0}
+                            onClick={handleDelete} // TODO
+                        >
+                            Smazat
+                        </Button>
+                        <Button icon={<Add24Regular />} appearance="primary" onClick={() => navigate('/system/testing/new')}>
+                            Nový scénář
+                        </Button>
+                    </div>
                 </div>
             </PageHeader>
-            <PageContent>
-                <TabList selectedValue={activeTab} onTabSelect={handleTabSelect} style={{ marginBottom: '1rem' }}>
+
+            <PageFilterBar>
+                <TabList selectedValue={activeTab} onTabSelect={handleTabSelect}>
                     <Tab value="process" icon={<ClipboardTaskListLtr24Regular />}>Procesy</Tab>
                     <Tab value="feature" icon={<Beaker24Regular />}>Programové úpravy</Tab>
                     <Tab value="critical_path" icon={<Warning24Regular />}>Kritická cesta</Tab>
                 </TabList>
+            </PageFilterBar>
 
-                {loading ? <Spinner /> : (
-                    <div className={styles.listContainer}>
-                        {scenarios.length === 0 && (
-                            <div style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
-                                Žádné scénáře v této kategorii.
-                            </div>
-                        )}
-                        {scenarios.map(item => {
-                            const st = getStatusColor(item.last_status || 'none');
-                            return (
-                                <div key={item.rec_id} className={styles.itemRow} onClick={() => navigate(`/system/testing/${item.rec_id}`)}>
-                                    <div>
-                                        <Text weight="semibold" block>{item.title}</Text>
-                                        <Text size={200} style={{ color: '#666' }}>{item.step_count} kroků | {item.description}</Text>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                                        {item.last_status && (
-                                            <span style={{ backgroundColor: st.bg, color: st.fg, ...styles.statusBadge }}>
-                                                {item.last_status} ({item.last_run_date?.substring(0, 10)})
-                                            </span>
-                                        )}
-                                        {!item.last_status && <Text size={200} style={{ color: '#999' }}>Netestováno</Text>}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+            <PageContent>
+                <div style={{ height: 'calc(100vh - 220px)', width: '100%' }}>
+                    <SmartDataGrid
+                        items={items}
+                        columns={columns}
+                        getRowId={(item) => item.rec_id}
+                        selectionMode="multiselect"
+                        selectedItems={selectedIds}
+                        onSelectionChange={(_, data) => setSelectedIds(data.selectedItems as Set<number>)}
+                        onRowClick={(item) => navigate(`/system/testing/${item.rec_id}`)}
+                        withFilterRow={true}
+                    />
+                </div>
             </PageContent>
         </PageLayout>
     );
