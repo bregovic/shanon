@@ -47,7 +47,9 @@ const OrgGuard = () => {
 
     useEffect(() => {
         if (!isLoading && orgId && orgId !== currentOrgId) {
-            const isValid = organizations.some(o => o.org_id === orgId);
+            // Validate if user has access to this org
+            // Case-insensitive check for URL friendliness
+            const isValid = organizations.some(o => o.org_id.toUpperCase() === orgId.toUpperCase());
             if (isValid) {
                 switchOrg(orgId, true); // true = prevent reload
             } else if (organizations.length > 0) {

@@ -47,6 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [permissions, setPermissions] = useState<Record<string, number>>({});
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
+    // URL Prefix helper (e.g. /vackr) - Always lowercase for URLs
+    const orgPrefix = currentOrgId ? `/${currentOrgId.toLowerCase()}` : '';
     const [isLoading, setIsLoading] = useState(true);
 
     // FIX: Set correct API path for Shanon (Nginx maps /api -> Backend)

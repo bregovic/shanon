@@ -584,6 +584,20 @@ END $$;",
             SELECT CURRENT_DATE, 'Module Organizations', 'Database expansion and security registration for Organization management.', 'Feature', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Module Organizations' AND date = CURRENT_DATE);
        ",
+       '031_fix_users_initials' => "
+            DO $$ 
+            BEGIN 
+                -- Add 'initials' to sys_users if missing
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_users' AND column_name='initials') THEN
+                    ALTER TABLE sys_users ADD COLUMN initials VARCHAR(10);
+                END IF;
+
+                -- Populate initials for existing users
+                UPDATE sys_users 
+                SET initials = UPPER(substring(full_name, 1, 2)) 
+                WHERE initials IS NULL AND full_name IS NOT NULL;
+            END $$;
+       ",
         '020_refine_attributes' => "
             DO $$
             DECLARE

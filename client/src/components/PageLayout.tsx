@@ -82,6 +82,14 @@ export const PageHeader: React.FC<{ children: React.ReactNode }> = ({ children }
             <div className={styles.userContent}>
                 {children}
             </div>
+            {/* New Button for Org Switcher */}
+            <Button
+                appearance="subtle"
+                icon={<Building24Regular />}
+                onClick={() => { /* TODO: Open Org Switcher */ }}
+            >
+                {currentOrgId ? currentOrgId.toUpperCase() : 'Select Org'}
+            </Button>
             {hasFilters && (
                 <Tooltip content={isFiltersOpen ? "Skrýt funkce" : "Zobrazit funkce"} relationship="label">
                     <Button
