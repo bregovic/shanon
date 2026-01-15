@@ -887,8 +887,10 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
             $pdo->exec($sql);
             $messages[] = "Migration '$name': OK";
         } catch (Exception $e) {
-            // Rethrow to stop execution
-            throw new Exception("Migration '$name' failed: " . $e->getMessage());
+            // Log error but CONTINUE to next migration (Best Effort)
+            $messages[] = "Migration '$name' FAILED: " . $e->getMessage();
+            error_log("Migration '$name' FAILED: " . $e->getMessage());
+            // continue; implied
         }
     }
     
