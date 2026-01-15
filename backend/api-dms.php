@@ -509,7 +509,10 @@ try {
                 $config = json_decode($doc['configuration'] ?? '{}', true);
                 if (empty($config)) throw new Exception("Empty configuration");
                 
-                $drive = new GoogleDriveStorage(json_encode($config['service_account_json'] ?? []), $config['folder_id'] ?? '');
+                $creds = $config['service_account_json'] ?? [];
+                if (is_array($creds)) $creds = json_encode($creds);
+
+                $drive = new GoogleDriveStorage($creds, $config['folder_id'] ?? '');
                 $content = $drive->downloadFile($doc['storage_path']);
                 
                 $ext = $doc['file_extension'] ?: 'tmp';
@@ -604,7 +607,12 @@ try {
              try {
                  require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
                  $config = json_decode($doc['configuration'] ?? '{}', true);
-                 $drive = new GoogleDriveStorage(json_encode($config['service_account_json'] ?? []), $config['folder_id'] ?? '');
+                 if (empty($config)) throw new Exception("Empty configuration");
+
+                 $creds = $config['service_account_json'] ?? [];
+                 if (is_array($creds)) $creds = json_encode($creds);
+                 
+                 $drive = new GoogleDriveStorage($creds, $config['folder_id'] ?? '');
                  $content = $drive->downloadFile($doc['storage_path']);
                  $ext = $doc['file_extension'] ?: 'tmp';
                  $tempPath = sys_get_temp_dir() . '/' . uniqid('ocr_src_') . '.' . $ext;
