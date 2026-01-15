@@ -203,7 +203,7 @@ export const DmsSettings: React.FC = () => {
                 body: JSON.stringify({ id: attr.rec_id })
             });
             // Reload
-            const res = await fetch('/api/api-dms.php?action=attributes');
+            const res = await fetch(`/api/api-dms.php?action=attributes&_=${Date.now()}`);
             const json = await res.json();
             if (json.success) setAttributes(json.data);
         } catch (e) {
@@ -240,7 +240,7 @@ export const DmsSettings: React.FC = () => {
 
             setIsAttrDialogOpen(false);
             // Reload data
-            const res = await fetch('/api/api-dms.php?action=attributes');
+            const res = await fetch(`/api/api-dms.php?action=attributes&_=${Date.now()}`);
             const json = await res.json();
             if (json.success) setAttributes(json.data);
         } catch (e) {
