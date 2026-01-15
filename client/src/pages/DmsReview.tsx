@@ -639,6 +639,7 @@ export const DmsReview: React.FC = () => {
                                     onMouseDown={handleMouseDown}
                                     onMouseMove={handleMouseMove}
                                     onMouseUp={handleMouseUp}
+                                    onMouseLeave={handleMouseUp}
                                 >
                                     <img
                                         ref={imageRef}

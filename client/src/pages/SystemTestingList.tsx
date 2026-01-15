@@ -4,11 +4,10 @@ import {
     Badge,
     TabList,
     Tab,
-    SelectTabEventHandler,
     Text,
-    createTableColumn,
-    TableColumnDefinition
+    createTableColumn
 } from "@fluentui/react-components";
+import type { SelectTabEventHandler, TableColumnDefinition } from "@fluentui/react-components";
 import {
     Add24Regular,
     ClipboardTaskListLtr24Regular,

@@ -16,7 +16,6 @@ import {
     CardHeader,
     Divider,
     TableCellLayout,
-    TableColumnDefinition,
     createTableColumn,
     Menu,
     MenuTrigger,
@@ -24,6 +23,7 @@ import {
     MenuItem,
     MenuPopover
 } from '@fluentui/react-components';
+import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
     Add24Regular,
     ArrowClockwise24Regular,
