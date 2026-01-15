@@ -856,7 +856,8 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         '031_reset_attributes' => null,
         '032_import_feature_log.sql' => null,
         '033_sys_testing.sql' => null,
-        '034_seed_dms_test.sql' => null
+        '034_seed_dms_test.sql' => null,
+        '035_dms_workflow_status.sql' => null
     ];
 
 

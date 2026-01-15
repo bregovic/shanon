@@ -38,6 +38,7 @@ interface DmsDocument {
     file_size_bytes: number;
     uploaded_by_name: string;
     ocr_status: string;
+    status: string;
     created_at: string;
     metadata?: string; // JSON string from DB
 }
@@ -203,19 +204,30 @@ export const DmsList: React.FC = () => {
             renderCell: (item) => <Text>{item.uploaded_by_name}</Text>
         }),
         createTableColumn<DmsDocument>({
-            columnId: 'ocr_status',
-            compare: (a, b) => (a.ocr_status || '').localeCompare(b.ocr_status || ''),
-            renderHeaderCell: () => 'OCR Stav',
+            columnId: 'status',
+            compare: (a, b) => (a.status || '').localeCompare(b.status || ''),
+            renderHeaderCell: () => 'Stav',
             renderCell: (item) => {
-                const colors: Record<string, 'warning' | 'success' | 'informative' | 'danger'> = {
-                    pending: 'warning',
-                    completed: 'success',
-                    skipped: 'informative',
-                    failed: 'danger'
+                const map: Record<string, string> = {
+                    'new': 'Nový',
+                    'processing': 'Zpracovává se',
+                    'review': 'Ke kontrole',
+                    'verified': 'Schváleno',
+                    'approved': 'Schváleno',
+                    'rejected': 'Zamítnuto'
                 };
+                const colors: Record<string, 'informative' | 'warning' | 'severe' | 'success' | 'danger'> = {
+                    'new': 'informative',
+                    'processing': 'warning',
+                    'review': 'severe',
+                    'verified': 'success',
+                    'approved': 'success',
+                    'rejected': 'danger'
+                };
+                const val = item.status || item.ocr_status || 'new';
                 return (
-                    <Badge appearance="tint" color={colors[item.ocr_status] || 'informative'}>
-                        {item.ocr_status}
+                    <Badge appearance="tint" color={colors[val] || 'informative'}>
+                        {map[val] || val}
                     </Badge>
                 );
             }

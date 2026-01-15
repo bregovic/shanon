@@ -519,6 +519,33 @@ try {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
         exit;
+    // ===== VIEW RAW (for iframe PDF) =====
+    if ($action === 'view_raw') {
+        $id = $_GET['id'] ?? 0;
+        if (!$id) { http_response_code(400); exit; }
+
+        $stmt = $pdo->prepare("SELECT storage_path, mime_type FROM dms_documents WHERE rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$doc) { http_response_code(404); exit; }
+
+        $filepath = $doc['storage_path'];
+        // Path fix if relative
+        if (!file_exists($filepath) && file_exists(__DIR__ . '/' . $filepath)) {
+            $filepath = __DIR__ . '/' . $filepath;
+        }
+
+        if (file_exists($filepath)) {
+            header('Content-Type: ' . $doc['mime_type']);
+            header('Content-Length: ' . filesize($filepath));
+            readfile($filepath);
+            exit;
+        } else {
+            http_response_code(404);
+            echo "File not found on disk.";
+            exit;
+        }
     }
 
     // ===== PREVIEW IMAGE (For PDF/Image interactive zoning) =====
@@ -599,12 +626,13 @@ try {
                 
                 $sql = "UPDATE dms_documents 
                         SET metadata = metadata || :new_meta, 
-                            ocr_status = 'completed' 
+                            ocr_status = 'completed',
+                            status = 'review' 
                         WHERE rec_id = :id";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([':new_meta' => $metaJson, ':id' => $docId]);
             } else {
-                 $sql = "UPDATE dms_documents SET ocr_status = 'completed' WHERE rec_id = :id";
+                 $sql = "UPDATE dms_documents SET ocr_status = 'completed', status = 'review' WHERE rec_id = :id";
                  $pdo->prepare($sql)->execute([':id' => $docId]);
             }
             $results[$docId] = $result;
@@ -646,20 +674,25 @@ try {
         // Since we can't easily try-catch SQL prepare in PDO without overhead, we'll try to check column existence or just assume migration 030 runs.
         // Given constraint: specific migration 030 adds 'status'.
         
-        $ocrStatus = 'verified'; // Default if saving metadata
-        if ($newStatus === 'verified') $ocrStatus = 'verified';
+        $ocrStatus = 'completed'; // Default to completed (OCR done, but not approved)
+        $workflowStatus = 'review'; // Default workflow status
+
+        if ($newStatus === 'verified') {
+             $ocrStatus = 'verified'; 
+             $workflowStatus = 'approved';
+        } elseif ($newStatus) {
+             $workflowStatus = $newStatus;
+             $ocrStatus = $newStatus; // fallback sync
+        }
         
         // Dynamic Update Builder
         $fields = ["metadata = :meta", "ocr_status = :ocr_status"];
         $params = [':meta' => json_encode($currMeta), ':ocr_status' => $ocrStatus, ':id' => $id];
         
-        // Check if 'status' column exists (Quick and dirty check for this session context)
-        // Note: In production we rely on migrations. Here we just want to avoid 500 if user didn't migrate.
-        // We'll attempt the update. If it fails, we catch and run legacy update.
-        
-        if ($newStatus) {
+        // Always try to update status if we have a valid workflow status
+        if ($workflowStatus) {
             $fields[] = "status = :status";
-            $params[':status'] = $newStatus;
+            $params[':status'] = $workflowStatus;
         }
 
         $sql = "UPDATE dms_documents SET " . implode(', ', $fields) . " WHERE rec_id = :id";

@@ -479,46 +479,53 @@ export const DmsReview: React.FC = () => {
 
                     {/* RIGHT SIDE: PREVIEW */}
                     <div className={styles.viewer}>
-                        {imageUrl ? (
-                            <div
-                                style={{ position: 'relative', overflow: 'auto', maxHeight: '100%', display: 'flex', justifyContent: 'center', backgroundColor: '#333', height: '100%' }}
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                            >
-                                <img
-                                    ref={imageRef}
-                                    src={imageUrl}
-                                    alt="Review"
-                                    style={{ maxWidth: '100%', display: 'block', cursor: activeField ? 'crosshair' : 'default', alignSelf: 'start' }}
-                                    draggable={false}
-                                />
-                                {currentDrawRect && (
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            left: currentDrawRect.x,
-                                            top: currentDrawRect.y,
-                                            width: currentDrawRect.w,
-                                            height: currentDrawRect.h,
-                                            border: '2px solid red',
-                                            backgroundColor: 'rgba(255, 0, 0, 0.2)',
-                                            pointerEvents: 'none'
-                                        }}
-                                    />
-                                )}
-                                {activeField && !isDrawing && (
-                                    <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none' }}>
-                                        {t('dms.review.select_region')} {currentAttributes.find(a => a.code === activeField)?.name}
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
+                        {currentDoc.mime_type === 'application/pdf' ? (
                             <iframe
-                                src={docUrl}
+                                src={`/api/api-dms.php?action=view_raw&id=${currentDoc.rec_id}`}
                                 className={styles.iframe}
                                 title="Document Preview"
+                                style={{ width: '100%', height: '100%', border: 'none' }}
                             />
+                        ) : (
+                            imageUrl ? (
+                                <div
+                                    style={{ position: 'relative', overflow: 'auto', maxHeight: '100%', display: 'flex', justifyContent: 'center', backgroundColor: '#333', height: '100%' }}
+                                    onMouseDown={handleMouseDown}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseUp={handleMouseUp}
+                                >
+                                    <img
+                                        ref={imageRef}
+                                        src={imageUrl}
+                                        alt="Review"
+                                        style={{ maxWidth: '100%', display: 'block', cursor: activeField ? 'crosshair' : 'default', alignSelf: 'start' }}
+                                        draggable={false}
+                                    />
+                                    {currentDrawRect && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                left: currentDrawRect.x,
+                                                top: currentDrawRect.y,
+                                                width: currentDrawRect.w,
+                                                height: currentDrawRect.h,
+                                                border: '2px solid red',
+                                                backgroundColor: 'rgba(255, 0, 0, 0.2)',
+                                                pointerEvents: 'none'
+                                            }}
+                                        />
+                                    )}
+                                    {activeField && !isDrawing && (
+                                        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none' }}>
+                                            {t('dms.review.select_region')} {currentAttributes.find(a => a.code === activeField)?.name}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#888' }}>
+                                    Preview not available
+                                </div>
+                            )
                         )}
                     </div>
                 </div>
