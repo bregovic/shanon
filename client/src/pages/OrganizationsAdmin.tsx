@@ -175,16 +175,19 @@ export const OrganizationsAdmin: React.FC = () => {
         },
         {
             columnId: 'reg_no',
+            compare: (a, b) => (a.reg_no || '').localeCompare(b.reg_no || ''),
             renderHeaderCell: () => 'IČO',
             renderCell: (item) => item.reg_no
         },
         {
             columnId: 'city',
+            compare: (a, b) => (a.city || '').localeCompare(b.city || ''),
             renderHeaderCell: () => 'Město',
             renderCell: (item) => item.city
         },
         {
             columnId: 'is_active',
+            compare: (a, b) => (a.is_active === b.is_active ? 0 : a.is_active ? -1 : 1),
             renderHeaderCell: () => 'Status',
             renderCell: (item) => (item.is_active ? 'Aktivní' : 'Neaktivní')
         }
@@ -349,8 +352,6 @@ export const OrganizationsAdmin: React.FC = () => {
                         />
                 ) : (
                     renderForm()
-                )}
-                renderForm()
                 )}
             </PageContent>
         </PageLayout>
