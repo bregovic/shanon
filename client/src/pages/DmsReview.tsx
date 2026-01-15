@@ -176,6 +176,9 @@ export const DmsReview: React.FC = () => {
             setIsDrawing(false); setStartPos(null); setCurrentDrawRect(null); return;
         }
 
+        // Stop drawing immediately to prevent ghosting during async request
+        setIsDrawing(false);
+
         const imgW = imageRef.current.width;
         const imgH = imageRef.current.height;
 
@@ -211,7 +214,7 @@ export const DmsReview: React.FC = () => {
             console.error(e);
             alert(t('common.error'));
         } finally {
-            setIsDrawing(false); setStartPos(null); setCurrentDrawRect(null);
+            setStartPos(null); setCurrentDrawRect(null);
         }
     };
 
