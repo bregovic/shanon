@@ -14,6 +14,7 @@ import { SystemTestingList } from "./pages/SystemTestingList";
 import { SystemTestingDetail } from "./pages/SystemTestingDetail";
 import SecurityRoles from './pages/SecurityRoles';
 import { UsersAdmin } from './pages/UsersAdmin';
+import { OrganizationsAdmin } from './pages/OrganizationsAdmin';
 import { SystemConfig } from './pages/SystemConfig';
 import { SystemTranslations } from './pages/SystemTranslations';
 import { OcrTemplateDesigner } from './pages/OcrTemplateDesigner';
@@ -127,6 +128,7 @@ const router = createBrowserRouter([
                     { path: "system", element: <SystemConfig /> },
                     { path: "system/security-roles", element: <SecurityRoles /> },
                     { path: "system/users", element: <UsersAdmin /> },
+                    { path: "system/organizations", element: <OrganizationsAdmin /> },
                     { path: "system/translations", element: <SystemTranslations /> },
                     { path: "system/testing", element: <SystemTestingList /> },
                     { path: "system/testing/:id", element: <SystemTestingDetail /> },

@@ -442,6 +442,7 @@ export const SystemConfig: React.FC = () => {
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} />
+                        <MenuItem label="Organizace a Subjekty" onClick={() => navigate(orgPrefix + '/system/organizations')} />
                     </MenuSection>
 
                     {/* 2. DOCS */}
