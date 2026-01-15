@@ -53,6 +53,7 @@ try {
              'name' => $user['full_name'],
              'email' => $user['email'],
              'role' => $user['role'],
+             'tenant_id' => $user['tenant_id'],
              'initials' => strtoupper(substr($user['full_name'] ?? 'User', 0, 2))
         ];
 

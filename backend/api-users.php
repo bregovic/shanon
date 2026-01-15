@@ -76,7 +76,7 @@ try {
             $role = trim($input['role'] ?? 'user');
             $password = $input['password'] ?? '';
             // Fix: Strict Tenant Isolation
-            $tenantId = $_SESSION['user']['tenant_id'] ?? null;
+            $tenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? null;
             if (!$tenantId) throw new Exception("Session Tenant ID is lost. Please relogin.");
             
             if (empty($email)) throw new Exception("Email is required");

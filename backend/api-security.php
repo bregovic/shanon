@@ -4,7 +4,7 @@
  * Endpoints for managing roles, objects, and permissions
  */
 require_once 'db.php';
-require_once 'auth.php';
+require_once 'session_init.php'; // Fixed: auth.php didn't exist
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -151,9 +151,8 @@ try {
             $userId = $_GET['user_id'] ?? null;
             
             if (!$userId) {
-                // Try to get from session/auth
-                session_start();
-                $userId = $_SESSION['user_id'] ?? null;
+                // Try to get from session (session_init.php ensures session is started)
+                $userId = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
             }
 
             if (!$userId) {
