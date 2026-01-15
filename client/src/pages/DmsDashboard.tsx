@@ -23,6 +23,7 @@ import {
 import { ActionBar } from '../components/ActionBar';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/TranslationContext';
+import { useAuth } from '../context/AuthContext';
 import { MenuSection, MenuItem } from '../components/MenuSection';
 
 const useStyles = makeStyles({
@@ -65,6 +66,9 @@ export const DmsDashboard: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const { currentOrgId } = useAuth();
+    const orgPrefix = `/${currentOrgId || 'VACKR'}`;
+
 
     // Sections for DMS
     const SECTION_IDS = ['documents', 'reports', 'tasks', 'settings'];
@@ -85,7 +89,7 @@ export const DmsDashboard: React.FC = () => {
             <ActionBar>
                 <Breadcrumb>
                     <BreadcrumbItem>
-                        <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
+                        <BreadcrumbButton onClick={() => navigate(orgPrefix + '/dashboard')}>{t('common.modules')}</BreadcrumbButton>
                     </BreadcrumbItem>
                     <BreadcrumbDivider />
                     <BreadcrumbItem>
@@ -122,8 +126,8 @@ export const DmsDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="documents" title="Dokumenty" icon={<Document24Regular />} isOpen={expandedSections.has('documents')} onToggle={toggleSection}>
-                        <MenuItem label="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
-                        <MenuItem label="Revidovat (OCR)" onClick={() => navigate('/dms/review')} />
+                        <MenuItem label="Všechny dokumenty" onClick={() => navigate(orgPrefix + '/dms/list')} />
+                        <MenuItem label="Revidovat (OCR)" onClick={() => navigate(orgPrefix + '/dms/review')} />
                         <MenuItem label="Ke schválení" onClick={() => { }} />
                         <MenuItem label="Moje koncepty" onClick={() => { }} />
                     </MenuSection>
@@ -148,8 +152,8 @@ export const DmsDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="tasks" title={t('dms.integrations')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
-                        <MenuItem label={t('dms.import_documents')} onClick={() => navigate('/dms/import')} />
-                        <MenuItem label={t('dms.google_setup')} onClick={() => navigate('/dms/google-setup')} />
+                        <MenuItem label={t('dms.import_documents')} onClick={() => navigate(orgPrefix + '/dms/import')} />
+                        <MenuItem label={t('dms.google_setup')} onClick={() => navigate(orgPrefix + '/dms/google-setup')} />
                     </MenuSection>
                 </div>
 
@@ -167,7 +171,7 @@ export const DmsDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem label="Parametry DMS" onClick={() => navigate('/dms/settings')} />
+                        <MenuItem label="Parametry DMS" onClick={() => navigate(orgPrefix + '/dms/settings')} />
                     </MenuSection>
                 </div>
 

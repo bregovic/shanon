@@ -38,6 +38,7 @@ import {
 
 import { ActionBar } from '../components/ActionBar';
 import { useTranslation } from '../context/TranslationContext';
+import { useAuth } from '../context/AuthContext';
 
 const useStyles = makeStyles({
     root: {
@@ -147,6 +148,8 @@ export const SystemConfig: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const { currentOrgId } = useAuth();
+    const orgPrefix = `/${currentOrgId || 'VACKR'}`;
 
     // View State: null = Dashboard, string = specific detail view
     const [activeView, setActiveView] = useState<string | null>(null);
@@ -438,7 +441,7 @@ export const SystemConfig: React.FC = () => {
                         <MenuItem label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem label="Správa uživatelů" onClick={() => navigate('/system/users')} />
+                        <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} />
                     </MenuSection>
 
                     {/* 2. DOCS */}
@@ -455,7 +458,7 @@ export const SystemConfig: React.FC = () => {
                 <div className={styles.scrollColumn}>
                     {/* TEST MANAGEMENT */}
                     <MenuSection id="testing" title="Testování (QA)" icon={<Beaker24Regular />} isOpen={expandedSections.has('testing')} onToggle={toggleSection}>
-                        <MenuItem label="Testovací scénáře" onClick={() => navigate('/system/testing')} />
+                        <MenuItem label="Testovací scénáře" onClick={() => navigate(orgPrefix + '/system/testing')} />
                     </MenuSection>
 
                     {/* 4. REPORTS */}
@@ -475,14 +478,16 @@ export const SystemConfig: React.FC = () => {
                 {/* Column 3 */}
                 <div className={styles.scrollColumn}>
                     {/* 3. SECURITY */}
+                    {/* 3. SECURITY */}
                     <MenuSection id="security" title={t('system.group.security')} icon={<Shield24Regular />} isOpen={expandedSections.has('security')} onToggle={toggleSection}>
-                        <MenuItem label="Správa rolí" onClick={() => navigate('/system/security-roles')} />
+                        <MenuItem label="Správa rolí" onClick={() => navigate(orgPrefix + '/system/security-roles')} />
                     </MenuSection>
 
                     {/* 6. SETTINGS */}
+                    {/* 6. SETTINGS */}
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.global_params')} onClick={() => alert('Settings')} />
-                        <MenuItem label="Překlady" onClick={() => navigate('/system/translations')} />
+                        <MenuItem label="Překlady" onClick={() => navigate(orgPrefix + '/system/translations')} />
                     </MenuSection>
                 </div>
 
@@ -535,7 +540,7 @@ export const SystemConfig: React.FC = () => {
                     )}
                     <Breadcrumb>
                         <BreadcrumbItem>
-                            <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
+                            <BreadcrumbButton onClick={() => navigate(orgPrefix + '/dashboard')}>{t('common.modules')}</BreadcrumbButton>
                         </BreadcrumbItem>
                         <BreadcrumbDivider />
                         <BreadcrumbItem>
@@ -572,4 +577,3 @@ export const SystemConfig: React.FC = () => {
         </div>
     );
 };
-
