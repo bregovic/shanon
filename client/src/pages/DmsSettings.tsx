@@ -34,7 +34,8 @@ import {
     Translate24Regular,
     Settings24Regular,
     PlugConnected24Regular,
-    Delete24Regular
+    Delete24Regular,
+    Dismiss24Regular
 } from '@fluentui/react-icons';
 import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
@@ -76,6 +77,7 @@ interface Attribute {
     default_value: string;
     help_text: string;
     scan_direction?: string;
+    options?: string[];
 }
 
 const STORAGE_TYPES = [
@@ -145,8 +147,21 @@ export const DmsSettings: React.FC = () => {
         is_searchable: true,
         default_value: '',
         help_text: '',
-        scan_direction: 'auto'
+        scan_direction: 'auto',
+        options: [] as string[]
     });
+
+    const [newOption, setNewOption] = useState('');
+
+    const handleAddOption = () => {
+        if (!newOption.trim()) return;
+        setAttrForm(prev => ({ ...prev, options: [...(prev.options || []), newOption.trim()] }));
+        setNewOption('');
+    };
+
+    const handleRemoveOption = (val: string) => {
+        setAttrForm(prev => ({ ...prev, options: (prev.options || []).filter(o => o !== val) }));
+    };
 
     const openAttrDialog = (attr?: Attribute) => {
         if (attr) {
@@ -159,7 +174,8 @@ export const DmsSettings: React.FC = () => {
                 is_searchable: attr.is_searchable,
                 default_value: attr.default_value || '',
                 help_text: attr.help_text || '',
-                scan_direction: attr.scan_direction || 'auto'
+                scan_direction: attr.scan_direction || 'auto',
+                options: attr.options || []
             });
         } else {
             setEditingAttr(null);
@@ -171,10 +187,28 @@ export const DmsSettings: React.FC = () => {
                 is_searchable: true,
                 default_value: '',
                 help_text: '',
-                scan_direction: 'auto'
+                scan_direction: 'auto',
+                options: []
             });
         }
         setIsAttrDialogOpen(true);
+    };
+
+    const handleDeleteAttribute = async (attr: Attribute) => {
+        if (!confirm(`Opravdu smazat atribut "${attr.name}"?`)) return;
+        try {
+            await fetch('/api/api-dms.php?action=attribute_delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: attr.rec_id })
+            });
+            // Reload
+            const res = await fetch('/api/api-dms.php?action=attributes');
+            const json = await res.json();
+            if (json.success) setAttributes(json.data);
+        } catch (e) {
+            alert('Chyba při mazání');
+        }
     };
 
     const handleSaveAttribute = async () => {
@@ -534,6 +568,14 @@ export const DmsSettings: React.FC = () => {
                         onClick={() => openTranslations(item)}
                         title="Překlady"
                     />
+                    <Button
+                        icon={<Delete24Regular />}
+                        appearance="subtle"
+                        size="small"
+                        style={{ color: '#d13438' }}
+                        onClick={() => handleDeleteAttribute(item)}
+                        title="Smazat"
+                    />
                 </div>
             )
         })
@@ -690,6 +732,37 @@ export const DmsSettings: React.FC = () => {
                                     onChange={(e) => setAttrForm({ ...attrForm, default_value: e.target.value })}
                                     style={{ width: '100%' }}
                                 />
+                            </div>
+
+                            {/* Options Manager */}
+                            <div style={{ marginTop: '8px' }}>
+                                <Label>Možnosti (Alternativy hodnot)</Label>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', marginTop: '4px' }}>
+                                    <Input
+                                        placeholder="Přidat možnost..."
+                                        value={newOption}
+                                        onChange={(_, data) => setNewOption(data.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleAddOption(); }}
+                                        style={{ flexGrow: 1 }}
+                                    />
+                                    <Button icon={<Add24Regular />} onClick={handleAddOption}></Button>
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {attrForm.options && attrForm.options.map((opt, i) => (
+                                        <Badge
+                                            key={i}
+                                            shape="rounded"
+                                            appearance="tint"
+                                            iconPosition="after"
+                                            icon={<Dismiss24Regular onClick={() => handleRemoveOption(opt)} style={{ cursor: 'pointer' }} />}
+                                        >
+                                            {opt}
+                                        </Badge>
+                                    ))}
+                                    {(!attrForm.options || attrForm.options.length === 0) && (
+                                        <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>Žádné definované možnosti.</Text>
+                                    )}
+                                </div>
                             </div>
                         </DialogContent>
                         <DialogActions>

@@ -183,17 +183,15 @@ try {
     // -------------------------------------------------------------------------
     // ACTION: ATTRIBUTES (For Type)
     // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // ACTION: ATTRIBUTES (For Type)
+    // -------------------------------------------------------------------------
     if ($action === 'attributes' || $action === 'doc_type_attributes') {
         $typeId = $_GET['type_id'] ?? $_GET['id'] ?? null;
         if (!$typeId) {
-            // Return all attributes if no type specified ? Or just common?
-            // Let's return all.
             $stmt = $pdo->prepare("SELECT * FROM dms_attributes WHERE tenant_id = :tid OR tenant_id IS NULL ORDER BY name");
             $stmt->execute([':tid' => $tenantId]);
         } else {
-            // Get attributes linked to this type + mapped flags
-            // Note: If linking table doesn't exist yet, fallback to all.
-            // Assumption: dms_doc_type_attributes exists (Migration 030)
             $sql = "SELECT a.*, dta.is_required, dta.is_visible 
                     FROM dms_attributes a
                     JOIN dms_doc_type_attributes dta ON a.rec_id = dta.attribute_id
@@ -202,8 +200,74 @@ try {
              $stmt = $pdo->prepare($sql);
              $stmt->execute([':dtid' => $typeId, ':tid' => $tenantId]);
         }
-        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        $attrs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Decode options
+        foreach ($attrs as &$a) {
+            $a['options'] = json_decode($a['options'] ?? '[]', true);
+        }
+        echo json_encode(['success' => true, 'data' => $attrs]);
         exit;
+    }
+
+    // -------------------------------------------------------------------------
+    // ACTION: ATTRIBUTE MANAGE
+    // -------------------------------------------------------------------------
+    if ($action === 'attribute_create' || $action === 'attribute_update') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = $input['id'] ?? null;
+        $name = $input['name'] ?? 'New Attribute';
+        $code = $input['code'] ?? null;
+        $dataType = $input['data_type'] ?? 'text';
+        $isRequired = filter_var($input['is_required'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $isSearchable = filter_var($input['is_searchable'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $defaultValue = $input['default_value'] ?? '';
+        $helpText = $input['help_text'] ?? '';
+        $scanDirection = $input['scan_direction'] ?? 'auto';
+        $options = $input['options'] ?? [];
+
+        if ($action === 'attribute_create') {
+             if (!$code) throw new Exception("Code is required");
+             $stmt = $pdo->prepare("INSERT INTO dms_attributes (tenant_id, code, name, data_type, is_required, is_searchable, default_value, help_text, scan_direction, options) 
+                                    VALUES (:tid, :code, :name, :dtyp, :req, :srch, :def, :hlp, :dir, :opts)");
+             $stmt->execute([
+                 ':tid' => $tenantId, 
+                 ':code' => $code,
+                 ':name' => $name,
+                 ':dtyp' => $dataType,
+                 ':req' => $isRequired ? 'true' : 'false',
+                 ':srch' => $isSearchable ? 'true' : 'false',
+                 ':def' => $defaultValue,
+                 ':hlp' => $helpText,
+                 ':dir' => $scanDirection,
+                 ':opts' => json_encode($options)
+             ]);
+        } else {
+             if (!$id) throw new Exception("ID required for update");
+             $stmt = $pdo->prepare("UPDATE dms_attributes SET name=:name, data_type=:dtyp, is_required=:req, is_searchable=:srch, default_value=:def, help_text=:hlp, scan_direction=:dir, options=:opts WHERE rec_id=:id");
+             $stmt->execute([
+                 ':name' => $name,
+                 ':dtyp' => $dataType,
+                 ':req' => $isRequired ? 'true' : 'false',
+                 ':srch' => $isSearchable ? 'true' : 'false',
+                 ':def' => $defaultValue,
+                 ':hlp' => $helpText,
+                 ':dir' => $scanDirection,
+                 ':opts' => json_encode($options),
+                 ':id' => $id
+             ]);
+        }
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if ($action === 'attribute_delete') {
+         $input = json_decode(file_get_contents('php://input'), true);
+         $id = $input['id'] ?? null;
+         if (!$id) throw new Exception("ID required");
+         $stmt = $pdo->prepare("DELETE FROM dms_attributes WHERE rec_id = :id");
+         $stmt->execute([':id'=>$id]);
+         echo json_encode(['success' => true]);
+         exit;
     }
 
     // -------------------------------------------------------------------------

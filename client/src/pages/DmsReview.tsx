@@ -9,7 +9,9 @@ import {
     makeStyles,
     tokens,
     ProgressBar,
-    Badge
+    Badge,
+    Dropdown,
+    Option
 } from "@fluentui/react-components";
 import { useNavigate } from 'react-router-dom';
 import {
@@ -101,6 +103,7 @@ interface LinkedAttribute {
     data_type: string;
     is_linked_required: boolean;
     display_order: number;
+    options?: string[];
 }
 
 export const DmsReview: React.FC = () => {
@@ -461,26 +464,41 @@ export const DmsReview: React.FC = () => {
                                             {t(`attribute.${attr.code}`, attr.name)} {activeField === attr.code && `(${t('common.edit')})`}
                                         </Label>
                                         <div style={{ display: 'flex', gap: '4px' }}>
-                                            <Input
-                                                id={`field-${attr.code}`}
-                                                value={formData[attr.code] || ''}
-                                                onChange={(_e, d) => setFormData({ ...formData, [attr.code]: d.value })}
-                                                style={{ flexGrow: 1, borderColor: activeField === attr.code ? tokens.colorBrandStroke1 : undefined }}
-                                                placeholder={attr.data_type === 'date' ? 'DD.MM.RRRR' : ''}
-                                                onFocus={() => { if (imageUrl) setActiveField(attr.code); }}
-                                                contentAfter={
-                                                    activeField === attr.code ?
-                                                        <Dismiss24Regular
-                                                            style={{ cursor: 'pointer' }}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleSkip(attr.code);
-                                                            }}
-                                                            title={t('dms.review.skip_tooltip')}
-                                                        />
-                                                        : null
-                                                }
-                                            />
+                                            {attr.options && attr.options.length > 0 ? (
+                                                <Dropdown
+                                                    id={`field-${attr.code}`}
+                                                    value={formData[attr.code] || ''}
+                                                    onOptionSelect={(_e, d) => setFormData({ ...formData, [attr.code]: d.optionValue || '' })}
+                                                    style={{ flexGrow: 1, minWidth: 0, borderColor: activeField === attr.code ? tokens.colorBrandStroke1 : undefined }}
+                                                    placeholder={attr.data_type === 'date' ? 'DD.MM.RRRR' : 'Vyberte hodnotu'}
+                                                    onFocus={() => { if (imageUrl) setActiveField(attr.code); }}
+                                                >
+                                                    {attr.options.map((opt) => (
+                                                        <Option key={opt} value={opt}>{opt}</Option>
+                                                    ))}
+                                                </Dropdown>
+                                            ) : (
+                                                <Input
+                                                    id={`field-${attr.code}`}
+                                                    value={formData[attr.code] || ''}
+                                                    onChange={(_e, d) => setFormData({ ...formData, [attr.code]: d.value })}
+                                                    style={{ flexGrow: 1, borderColor: activeField === attr.code ? tokens.colorBrandStroke1 : undefined }}
+                                                    placeholder={attr.data_type === 'date' ? 'DD.MM.RRRR' : ''}
+                                                    onFocus={() => { if (imageUrl) setActiveField(attr.code); }}
+                                                    contentAfter={
+                                                        activeField === attr.code ?
+                                                            <Dismiss24Regular
+                                                                style={{ cursor: 'pointer' }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleSkip(attr.code);
+                                                                }}
+                                                                title={t('dms.review.skip_tooltip')}
+                                                            />
+                                                            : null
+                                                    }
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 ))}
