@@ -484,7 +484,7 @@ try {
         // 2. Resolve Path (Local or Drive)
         $tempPath = null;
         if (($doc['storage_type'] ?? 'local') === 'google_drive') {
-            require_once 'helpers/GoogleDriveStorage.php';
+            require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
             $config = json_decode($doc['configuration'] ?? '{}', true);
             $drive = new GoogleDriveStorage(json_encode($config['service_account_json']), $config['folder_id']);
             $content = $drive->downloadFile($doc['storage_path']);
@@ -524,7 +524,7 @@ try {
                     echo $im->getImageBlob();
                     $im->clear();
                     $converted = true;
-                } catch (Exception $e) { 
+                } catch (Throwable $e) { 
                     error_log("Imagick preview failed: " . $e->getMessage());
                 }
             }
@@ -582,7 +582,7 @@ try {
         $localPath = null;
 
         if (($doc['storage_type'] ?? 'local') === 'google_drive') {
-             require_once 'helpers/GoogleDriveStorage.php';
+             require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
              $config = json_decode($doc['configuration'] ?? '{}', true);
              $drive = new GoogleDriveStorage(json_encode($config['service_account_json']), $config['folder_id']);
              $content = $drive->downloadFile($doc['storage_path']);
@@ -615,7 +615,7 @@ try {
                          $im->setImageFormat('jpeg');
                          $im->writeImage($tempImg);
                          $im->clear();
-                     } catch(Exception $e) {}
+                     } catch(Throwable $e) {}
                  }
              }
              $imagePath = $tempImg;
