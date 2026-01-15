@@ -9,6 +9,7 @@ echo "<h1>Test Preview Generation</h1>";
 // 1. Zkusit připojení k DB
 try {
     require_once 'db.php';
+    $pdo = DB::connect();
     echo "✅ DB Connected<br>";
 } catch (Throwable $e) {
     die("❌ DB Connection Failed: " . $e->getMessage());

@@ -483,25 +483,33 @@ try {
 
         // 2. Resolve Path (Local or Drive)
         $tempPath = null;
+        $localPath = null;
+        
         if (($doc['storage_type'] ?? 'local') === 'google_drive') {
-            require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
-            $config = json_decode($doc['configuration'] ?? '{}', true);
-            $drive = new GoogleDriveStorage(json_encode($config['service_account_json']), $config['folder_id']);
-            $content = $drive->downloadFile($doc['storage_path']);
-            
-            $ext = $doc['file_extension'] ?: 'tmp';
-            $tempPath = sys_get_temp_dir() . '/' . uniqid('preview_') . '.' . $ext;
-            file_put_contents($tempPath, $content);
-            $localPath = $tempPath;
+            try {
+                require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
+                $config = json_decode($doc['configuration'] ?? '{}', true);
+                if (empty($config)) throw new Exception("Empty configuration");
+                
+                $drive = new GoogleDriveStorage(json_encode($config['service_account_json'] ?? []), $config['folder_id'] ?? '');
+                $content = $drive->downloadFile($doc['storage_path']);
+                
+                $ext = $doc['file_extension'] ?: 'tmp';
+                $tempPath = sys_get_temp_dir() . '/' . uniqid('preview_') . '.' . $ext;
+                file_put_contents($tempPath, $content);
+                $localPath = $tempPath;
+            } catch (Throwable $e) {
+                error_log("Google Drive Preview Error: " . $e->getMessage());
+                die("Remote File Access Failed: " . $e->getMessage());
+            }
         } else {
             $localPath = __DIR__ . '/../' . $doc['storage_path'];
             if (!file_exists($localPath)) {
                  // Try relative fix
                  $localPath = __DIR__ . '/../uploads/dms/' . basename($doc['storage_path']);
             }
+            if (!file_exists($localPath)) die("File access failed locally");
         }
-
-        if (!file_exists($localPath)) die("File access failed");
 
         // 3. Convert/Serve
         $mime = $doc['mime_type'];
@@ -543,13 +551,10 @@ try {
             }
 
             if (!$converted) {
-                // Fallback: Return a 1x1 pixel or placeholder
                  header("Content-Type: image/jpeg");
-                 // Use a default error image or just die
                  die("Preview generation capabilities missing (Imagick/Poppler)");
             }
         } else {
-            // Other types?
             die("Unsupported preview type");
         }
 
@@ -568,9 +573,6 @@ try {
 
         if (!$docId || !$rect) { http_response_code(400); echo json_encode(['success'=>false, 'error'=>'Missing params']); exit; }
 
-        // Fetch Doc & Content (Similar logic as Preview)
-        // Ideally refactor resolveFile logic to helper, but duplicating for speed now
-        // ... (Resolving Local Path)
         $stmt = $pdo->prepare("SELECT d.*, sp.type as storage_type, sp.configuration 
                                FROM dms_documents d
                                LEFT JOIN dms_storage_profiles sp ON d.storage_profile_id = sp.rec_id
@@ -582,17 +584,27 @@ try {
         $localPath = null;
 
         if (($doc['storage_type'] ?? 'local') === 'google_drive') {
-             require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
-             $config = json_decode($doc['configuration'] ?? '{}', true);
-             $drive = new GoogleDriveStorage(json_encode($config['service_account_json']), $config['folder_id']);
-             $content = $drive->downloadFile($doc['storage_path']);
-             $ext = $doc['file_extension'] ?: 'tmp';
-             $tempPath = sys_get_temp_dir() . '/' . uniqid('ocr_src_') . '.' . $ext;
-             file_put_contents($tempPath, $content);
-             $localPath = $tempPath;
+             try {
+                 require_once __DIR__ . '/helpers/GoogleDriveStorage.php';
+                 $config = json_decode($doc['configuration'] ?? '{}', true);
+                 $drive = new GoogleDriveStorage(json_encode($config['service_account_json'] ?? []), $config['folder_id'] ?? '');
+                 $content = $drive->downloadFile($doc['storage_path']);
+                 $ext = $doc['file_extension'] ?: 'tmp';
+                 $tempPath = sys_get_temp_dir() . '/' . uniqid('ocr_src_') . '.' . $ext;
+                 file_put_contents($tempPath, $content);
+                 $localPath = $tempPath;
+             } catch (Throwable $e) {
+                 error_log("Google Drive OCR Error: " . $e->getMessage());
+                 echo json_encode(['success'=>false, 'error'=>'Remote File Access Failed: ' . $e->getMessage()]); 
+                 exit;
+             }
         } else {
              $localPath = __DIR__ . '/../' . $doc['storage_path'];
              if (!file_exists($localPath)) $localPath = __DIR__ . '/../uploads/dms/' . basename($doc['storage_path']);
+             if (!file_exists($localPath)) {
+                 echo json_encode(['success'=>false, 'error'=>'Local file not found']);
+                 exit;
+             }
         }
 
         // Prepare Image Source for Cropping
