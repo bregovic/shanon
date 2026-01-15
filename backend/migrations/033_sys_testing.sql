@@ -2,7 +2,7 @@
 -- Description: Creates tables for Test Management (Scenarios, Steps, Runs)
 
 -- 1. Test Scenarios (Cases)
-CREATE TABLE sys_test_scenarios (
+CREATE TABLE IF NOT EXISTS sys_test_scenarios (
     rec_id SERIAL PRIMARY KEY,
     tenant_id UUID NOT NULL,
     title VARCHAR(255) NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE sys_test_scenarios (
 );
 
 -- 2. Test Steps (Definition)
-CREATE TABLE sys_test_steps (
+CREATE TABLE IF NOT EXISTS sys_test_steps (
     rec_id SERIAL PRIMARY KEY,
     scenario_id INTEGER REFERENCES sys_test_scenarios(rec_id) ON DELETE CASCADE,
     step_order INTEGER NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE sys_test_steps (
 );
 
 -- 3. Test Runs (Executions)
-CREATE TABLE sys_test_runs (
+CREATE TABLE IF NOT EXISTS sys_test_runs (
     rec_id SERIAL PRIMARY KEY,
     scenario_id INTEGER REFERENCES sys_test_scenarios(rec_id) ON DELETE CASCADE,
     run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -37,7 +37,7 @@ CREATE TABLE sys_test_runs (
 );
 
 -- 4. Test Run Step Results
-CREATE TABLE sys_test_run_results (
+CREATE TABLE IF NOT EXISTS sys_test_run_results (
     rec_id SERIAL PRIMARY KEY,
     run_id INTEGER REFERENCES sys_test_runs(rec_id) ON DELETE CASCADE,
     step_id INTEGER REFERENCES sys_test_steps(rec_id) ON DELETE CASCADE,
@@ -47,7 +47,7 @@ CREATE TABLE sys_test_run_results (
 );
 
 -- Indexes
-CREATE INDEX idx_scenarios_category ON sys_test_scenarios(category);
-CREATE INDEX idx_steps_scenario ON sys_test_steps(scenario_id);
-CREATE INDEX idx_runs_scenario ON sys_test_runs(scenario_id);
-CREATE INDEX idx_results_run ON sys_test_run_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_scenarios_category ON sys_test_scenarios(category);
+CREATE INDEX IF NOT EXISTS idx_steps_scenario ON sys_test_steps(scenario_id);
+CREATE INDEX IF NOT EXISTS idx_runs_scenario ON sys_test_runs(scenario_id);
+CREATE INDEX IF NOT EXISTS idx_results_run ON sys_test_run_results(run_id);

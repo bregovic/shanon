@@ -397,8 +397,8 @@ export const SystemConfig: React.FC = () => {
 
     // System Groups Definition
     const SECTION_IDS = ['admin', 'docs', 'testing', 'security', 'reports', 'tasks', 'settings'];
-    // Default: Only 'testing' expanded as per user request to highlight new module
-    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['testing']));
+    // Default: All expanded (standard behavior)
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(SECTION_IDS));
 
     const toggleSection = (id: string) => {
         const next = new Set(expandedSections);
