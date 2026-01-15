@@ -104,6 +104,8 @@ interface SmartDataGridProps<T> {
     selectedItems?: Set<SelectionItemId>;
     onSelectionChange?: (e: SyntheticEvent, data: OnSelectionChangeData) => void;
 }
+// Helper to safely get Array
+const safeArray = <T,>(arr: T[] | undefined | null): T[] => Array.isArray(arr) ? arr : [];
 
 // Smart Date Parser Helper
 const parseSmartDate = (input: string): Date | null => {
@@ -329,7 +331,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
     };
 
     const processedItems = useMemo(() => {
-        let result = [...items];
+        let result = [...safeArray(items)];
 
         if (Object.keys(filters).length > 0) {
             // OPTIMIZATION: Pre-parse filters to avoid repeated expensive operations (like Date parsing) per row
