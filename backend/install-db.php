@@ -852,7 +852,8 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         ",
         '014_sys_comment_reactions' => null,
         '029_dms_ocr_templates' => null,
-        '030_dms_doc_type_attributes' => null
+        '030_dms_doc_type_attributes' => null,
+        '031_reset_attributes' => null
     ];
 
 

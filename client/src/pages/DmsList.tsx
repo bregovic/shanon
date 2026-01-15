@@ -406,7 +406,7 @@ export const DmsList: React.FC = () => {
                                             <Text>Žádná vytěžená data.</Text>
                                             <div style={{ marginTop: '8px' }}>
                                                 <Button size="small" onClick={() => handleAnalyzeSingle(drawerDoc)}>Spustit OCR</Button>
-                                                <Button size="small" appearance="subtle" onClick={() => navigate('/dms/review')}>Revidovat</Button>
+                                                <Button size="small" appearance="subtle" onClick={() => navigate(`/dms/review?id=${drawerDoc.rec_id}`)}>Revidovat</Button>
                                             </div>
                                         </div>
                                     )}

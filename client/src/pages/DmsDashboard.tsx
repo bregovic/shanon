@@ -123,6 +123,7 @@ export const DmsDashboard: React.FC = () => {
 
                     <MenuSection id="documents" title="Dokumenty" icon={<Document24Regular />} isOpen={expandedSections.has('documents')} onToggle={toggleSection}>
                         <MenuItem label="Všechny dokumenty" onClick={() => navigate('/dms/list')} />
+                        <MenuItem label="Revidovat (OCR)" onClick={() => navigate('/dms/review')} />
                         <MenuItem label="Ke schválení" onClick={() => { }} />
                         <MenuItem label="Moje koncepty" onClick={() => { }} />
                     </MenuSection>

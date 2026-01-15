@@ -219,7 +219,37 @@ export const DmsReview: React.FC = () => {
                     (d.status !== 'verified' && d.ocr_status !== 'pending' && d.ocr_status !== 'processing')
                 );
 
-                setDocs(toReview);
+                // Check for start ID in URL
+                const params = new URLSearchParams(window.location.search);
+                const startId = params.get('id');
+
+                if (startId) {
+                    const idNum = parseInt(startId);
+                    const idx = toReview.findIndex((d: DmsDocument) => d.rec_id === idNum);
+
+                    if (idx >= 0) {
+                        setCurrentIndex(idx);
+                        setDocs(toReview);
+                    } else {
+                        // If requested doc is not in the default queue (e.g. already verified), find in all and add it
+                        const foundInAll = all.find((d: DmsDocument) => d.rec_id === idNum);
+                        if (foundInAll) {
+                            const newQueue = [foundInAll, ...toReview];
+                            // Remove duplicates just in case
+                            const uniqueQueue = Array.from(new Map(newQueue.map(item => [item.rec_id, item])).values());
+
+                            setDocs(uniqueQueue);
+
+                            // Find index in new unique queue (should be 0 usually)
+                            const newIdx = uniqueQueue.findIndex(d => d.rec_id === idNum);
+                            setCurrentIndex(newIdx >= 0 ? newIdx : 0);
+                        } else {
+                            setDocs(toReview);
+                        }
+                    }
+                } else {
+                    setDocs(toReview);
+                }
             } catch (err) {
                 console.error("Error loading docs", err);
             } finally {
@@ -382,7 +412,7 @@ export const DmsReview: React.FC = () => {
                                             required={attr.is_linked_required}
                                             style={{ color: activeField === attr.code ? tokens.colorBrandForeground1 : 'inherit', fontWeight: activeField === attr.code ? 'bold' : 'normal' }}
                                         >
-                                            {attr.name} {activeField === attr.code && `(${t('common.edit')})`}
+                                            {t(`attribute.${attr.code}`, attr.name)} {activeField === attr.code && `(${t('common.edit')})`}
                                         </Label>
                                         <div style={{ display: 'flex', gap: '4px' }}>
                                             <Input

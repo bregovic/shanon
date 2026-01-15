@@ -180,8 +180,21 @@ export const DmsSettings: React.FC = () => {
     const handleSaveAttribute = async () => {
         try {
             const action = editingAttr ? 'attribute_update' : 'attribute_create';
+
+            // Auto-generate code slug if empty
+            let code = attrForm.code;
+            if (!code) {
+                code = attrForm.name
+                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, "_") // replace non-alnum with _
+                    .replace(/_+/g, "_") // collapse underscores
+                    .replace(/^_|_$/g, ""); // trim underscores
+            }
+
             const payload = {
                 ...attrForm,
+                code,
                 id: editingAttr?.rec_id
             };
 
@@ -476,7 +489,7 @@ export const DmsSettings: React.FC = () => {
             columnId: 'name',
             compare: (a, b) => a.name.localeCompare(b.name),
             renderHeaderCell: () => 'Název',
-            renderCell: (item) => <Text weight="semibold">{item.name}</Text>
+            renderCell: (item) => <Text weight="semibold">{item.code ? t(`attribute.${item.code}`, item.name) : item.name}</Text>
         }),
         createTableColumn<Attribute>({
             columnId: 'data_type',
@@ -644,34 +657,7 @@ export const DmsSettings: React.FC = () => {
                                     style={{ width: '100%' }}
                                 />
                             </div>
-                            <div>
-                                <Label>Systémová role (Kód)</Label>
-                                <Input
-                                    value={attrForm.code}
-                                    onChange={(e) => setAttrForm({ ...attrForm, code: e.target.value })}
-                                    style={{ width: '100%' }}
-                                    placeholder="např. INVOICE_NUMBER, TOTAL_AMOUNT, ICO..."
-                                />
-                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                                    Určuje, jak systém tento atribut interpretuje (pro OCR a automatizaci).
-                                </Text>
-                            </div>
-                            <div>
-                                <Label>Směr čtení OCR</Label>
-                                <Dropdown
-                                    value={attrForm.scan_direction === 'right' ? 'Vpravo (Na stejném řádku)' : attrForm.scan_direction === 'down' ? 'Dolů (Na dalším řádku)' : 'Automaticky (Vpravo nebo Dolů)'}
-                                    selectedOptions={[attrForm.scan_direction]}
-                                    onOptionSelect={(_, data) => setAttrForm({ ...attrForm, scan_direction: data.optionValue || 'auto' })}
-                                    style={{ width: '100%' }}
-                                >
-                                    <Option value="auto">Automaticky (Vpravo nebo Dolů)</Option>
-                                    <Option value="right">Vpravo (Na stejném řádku)</Option>
-                                    <Option value="down">Dolů (Na dalším řádku)</Option>
-                                </Dropdown>
-                                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                                    Určuje, kde systém hledá hodnotu po nalezení "nadpisu" atributu.
-                                </Text>
-                            </div>
+
                             <div>
                                 <Label>Typ dat</Label>
                                 <Dropdown
@@ -702,14 +688,6 @@ export const DmsSettings: React.FC = () => {
                                 <Input
                                     value={attrForm.default_value}
                                     onChange={(e) => setAttrForm({ ...attrForm, default_value: e.target.value })}
-                                    style={{ width: '100%' }}
-                                />
-                            </div>
-                            <div>
-                                <Label>Nápověda (tooltip)</Label>
-                                <Input
-                                    value={attrForm.help_text}
-                                    onChange={(e) => setAttrForm({ ...attrForm, help_text: e.target.value })}
                                     style={{ width: '100%' }}
                                 />
                             </div>
