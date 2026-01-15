@@ -43,8 +43,10 @@ try {
                     created_at,
                     updated_at
                 FROM sys_users 
+                WHERE tenant_id = :tid
                 ORDER BY rec_id
             ");
+            $stmt->execute([':tid' => $_SESSION['user']['tenant_id']]);
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             echo json_encode(['success' => true, 'data' => $users]);
@@ -73,16 +75,19 @@ try {
             $fullName = trim($input['full_name'] ?? '');
             $role = trim($input['role'] ?? 'user');
             $password = $input['password'] ?? '';
-            $tenantId = $_SESSION['user']['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+            // Fix: Strict Tenant Isolation
+            $tenantId = $_SESSION['user']['tenant_id'] ?? null;
+            if (!$tenantId) throw new Exception("Session Tenant ID is lost. Please relogin.");
             
             if (empty($email)) throw new Exception("Email is required");
             if (empty($fullName)) throw new Exception("Full name is required");
             if (empty($password)) throw new Exception("Password is required");
             
-            // Check email uniqueness
+            // Check email uniqueness within tenant (or globally if strict)
+            // Ideally email should be unique globally for login, but let's check global.
             $stmt = $pdo->prepare("SELECT 1 FROM sys_users WHERE email = :email");
             $stmt->execute([':email' => $email]);
-            if ($stmt->fetch()) throw new Exception("Email already exists");
+            if ($stmt->fetch()) throw new Exception("Email already exists in the system");
             
             // Hash password
             $passwordHash = password_hash($password, PASSWORD_DEFAULT);

@@ -1,28 +1,56 @@
-# STANDARD OPERATING PROCEDURES (SOP)
-> **Role:** Tento dokument slouží jako "Checklist" pro AI agenty a vývojáře. Před každým commitem ověř, zda byly splněny tyto body.
+# STANDARD OPERATING PROCEDURES (SOP) & CHECKLISTS
+> **Version**: 2.0 (Updated 2026-01-16)
+> **Role**: This document is the MANDATORY Checklist for AI Agents and Developers.
+> **Enforcement**: You must complete the relevant checklist before marking any task as "Done".
 
-## A. Přidání Nové Entity (Tabulky)
-Pokud vytváříš novou tabulku (např. `SalesTable`), ověř:
-1.  [ ] **Schema:** Má sloupce `RecId` (PK), `DataAreaId`, `TenantId`, `VersionId`?
-2.  [ ] **SysTableId:** Byla přidána konstanta do `SysTableId` enumu?
-3.  [ ] **Audit:** Jsou přítomny `CreatedBy`, `CreatedDateTime`?
-4.  [ ] **Security:** Byly vytvořeny základní privilegia (`SalesTableView`, `SalesTableEdit`)?
+## A. New Entity / Table Creation
+When creating a new database table (Backend):
+1.  [ ] **Schema Compliance**: 
+    *   Column `rec_id` (SERIAL PK) is present?
+    *   Column `tenant_id` (UUID) is present for isolation? (Unless explicitly Global)
+    *   Audit columns `created_at`, `created_by`, `updated_at`, `updated_by` are present?
+2.  [ ] **Migration**: 
+    *   SQL script added to `backend/migrations/XXX_name.sql`?
+    *   Registered in `backend/install-db.php` `$migrations` array?
+3.  [ ] **Documentation**:
+    *   Added table definition to `.agent/DATABASE.md`?
 
-## B. Úprava Formuláře / UI
-1.  [ ] **Labels:** Žádný text není natvrdo. Vše je přes `Label::get('@Shanon:MyText')`.
-2.  [ ] **Personalizace:** Formulář dědí z `SysFormBase` a podporuje `SysUserSetup`?
-3.  [ ] **Excel:** Funguje tlačítko "Export to Excel"?
+## B. New Form / UI Module
+When creating a new Frontend Page/Form:
+1.  [ ] **Security Context**:
+    *   Registered new ID in `SECURITY.md` (e.g., `form_invoices`)?
+    *   Wrapped in `usePermission('form_id', 'view')` check?
+2.  [ ] **Standard Components**:
+    *   Used `<SmartDataGrid>` for lists?
+    *   Used `<PageLayout>` or `<FluentProvider>` correctly?
+3.  [ ] **Localization**:
+    *   All visible text wrapped in `t('key')`?
+    *   Keys added to `cs.json` and `en.json`?
+4.  [ ] **UX consistency**:
+    *   Contextual Help (InfoLabel) present for complex fields?
+    *   Validation feedback implemented (Required fields, types)?
 
-## C. Zpracování Změn (Change Request)
-1.  [ ] **ALM:** Má změna přidělené ID (např. CR-105)?
-2.  [ ] **Commit:** Je zpráva ve formátu `feat(module): popis změn [CR-105]`?
-3.  [ ] **Changelog:** Je změna uživatelsky viditelná? Pokud ano, přidej záznam do `RELEASE_NOTES_DRAFT.md`.
-4.  [ ] **Help:** Vyžaduje změna aktualizaci nápovědy? Pokud ano, založ záznam v `SysHelpRef`.
+## C. Feature Implementation (Backend API)
+When writing PHP API endpoints:
+1.  [ ] **Security Barrier**:
+    *   `verify_session()` called at the top?
+    *   `has_permission()` check performed?
+2.  [ ] **Tenant Isolation**:
+    *   `WHERE tenant_id = :tid` included in ALL queries?
+3.  [ ] **Validation**:
+    *   Input data sanitized and validated before DB usage?
+4.  [ ] **Error Handling**:
+    *   Returns strictly JSON `{"success": false, "error": "..."}` on failure?
 
-## D. Nasazení (Deployment)
-1.  [ ] **Docker:** Byla přidána nová knihovna? Pokud ano, aktualizuj `Dockerfile`.
-2.  [ ] **Migrations:** Existuje migrační skript v `/migrations`? Je idempotentní (znovupoužitelný)?
-3.  [ ] **Version:** Byl spuštěn `bump_version.ps1`?
+## D. Change Management (Commit & Deploy)
+1.  [ ] **History Log**: 
+    *   Entry added to `development_history` table (via API or SQL)?
+2.  [ ] **Code Quality**:
+    *   No hardcoded secrets?
+    *   No `console.log` or `print_r` left?
+3.  [ ] **Testing**:
+    *   Does the build pass (`npm run build`)?
+    *   Did you verify the fix/feature manually?
 
 ---
-*Tyto procedury zajišťují, že projekt Shanon zůstane Enterprise-Grade i po letech vývoje.*
+*Failure to follow these SOPs creates Technical Debt and reduces System Stability.*

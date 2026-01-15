@@ -79,6 +79,22 @@ const OrgGuard = () => {
     return <Layout />;
 };
 
+// Redirect Helper for non-prefixed routes
+const ContextRedirect = () => {
+    const { currentOrgId, isLoading } = useAuth();
+    const navigate = useNavigate();
+    const { "*": splat } = useParams();
+
+    useEffect(() => {
+        if (!isLoading) {
+            navigate(`/${currentOrgId || 'VACKR'}/${splat}`, { replace: true });
+        }
+    }, [currentOrgId, isLoading, navigate, splat]);
+
+    if (isLoading) return <div>Redirecting...</div>;
+    return null;
+};
+
 const router = createBrowserRouter([
     {
         path: "/login",
@@ -120,6 +136,22 @@ const router = createBrowserRouter([
                 ]
             }
         ]
+    },
+    // Fix: Catch-all for direct module access without Org Prefix (e.g. /dms/import -> /VACKR/dms/import)
+    {
+        path: "/dms/*",
+        element: <RequireAuth />,
+        children: [{ path: "*", element: <ContextRedirect /> }]
+    },
+    {
+        path: "/system/*",
+        element: <RequireAuth />,
+        children: [{ path: "*", element: <ContextRedirect /> }]
+    },
+    {
+        path: "/requests/*",
+        element: <RequireAuth />,
+        children: [{ path: "*", element: <ContextRedirect /> }]
     }
 ], { basename: BASE_NAME });
 

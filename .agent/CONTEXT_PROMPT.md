@@ -2,55 +2,46 @@
 > **CRITICAL INSTRUCTION:** This is the Single Source of Truth for the Shanon Project. All Agents must adhere to the rules and documentation linked herein. Deviations are creating Technical Debt.
 
 ## 1. DOCUMENTATION INDEX (Knowledge Base)
-Before modifying any part of the system, you MUST read the relevant documentation:
+**You are required to consult these files for specific implementation details:**
 
-*   📘 **Process & Workflow:** `docs/AGENT_WORKFLOW.md`
-    *   *Rules for:* Ticket Lifecycle, Signature protocol, Development History logging, Comment marking.
-*   💾 **Database & Objects:** `.agent/DATABASE.md`
-    *   *Rules for:* Schema structure, Migration flow (`install-db.php`), Tenant isolation.
-*   🔒 **Security & RBAC:** `.agent/SECURITY.md`
-    *   *Rules for:* Roles, Permissions, Auth tokens, Visibility rules.
-*   🏗️ **Code & Frameworks:** `.agent/MANIFEST.md`
-    *   *Rules for:* Tech stack (Fluent UI v9, PHP), Directory structure, Naming conventions.
-*   ✅ **Checklists (SOP):** `.agent/SOP.md`
-    *   *Use for:* Self-validation before finalizing any task.
-
----
-
-## 2. CORE PROTOCOLS (Strict)
-
-### A. Database Management
-*   **Migrations:** NEVER create tables on the fly. ALWAYS use `backend/migrations/XXX_name.sql` and register in `backend/install-db.php`.
-*   **Documentation:** Immediately update `.agent/DATABASE.md` after any schema change.
-*   **Isolation:** EVERY query must include `WHERE tenant_id = :tid` (unless strictly System Global).
-
-### B. Security & Access
-*   **Session:** Use `session_init.php` (DB-backed sessions).
-*   **RBAC:** Check permissions against the User Role defined in `SECURITY.md` before rendering UI elements.
-
-### C. Localization & Labels
-*   **No Hardcoding:** All visible text must go through `useTranslation()` (Frontend) or `api-translations.php` (Backend).
-*   **Format:** Use keys like `common.save`, `module.requests.title`.
-*   **Languages:** Maintain at least `cs` (Czech) and `en` (English).
-
-### D. Development History & Reporting
-*   **Identity:** Always perform database actions (comments, history logs) as the `AI Developer` user (email: `ai@shanon.dev`). Do NOT use ID 1 (Super Admin).
-*   **Logging:** Every resolved ticket MUST have an entry in the `development_history` table (via `api-dev-history.php` or direct SQL).
-*   **Signatures:** All automated/agent comments must be signed (e.g., `~ 🤖 Antigravity`).
-*   **Status:** Move tickets from `New` -> `Development` -> `Testing` -> `Done`.
-
-### E. Working Files System (External Development)
-*   **Structure:** `External Development/For Development/[TICKET_ID]_[DESCRIPTION]/`
-*   **Logic:**
-    *   Physical files are bound to Digital Tickets via ID (e.g., `#7`).
-    *   **Input:** Files placed in folder -> Developer works.
-    *   **Output:** Developer commits code -> Ticket updated -> Deployment.
+*   📘 **FORM & UI STANDARD:** `.agent/FORM_STANDARD.md`
+    *   *Rules for:* Creating new forms, RLS (Record Level Security), Layouts, Grids.
+*   ✅ **SOP CHECKLISTS:** `.agent/SOP.md`
+    *   *Rules for:* Pre-commit checks, Database changes, Security compliance.
+*   💾 **DATABASE SCHEMA:** `.agent/DATABASE.md`
+    *   *Rules for:* Current tables, columns, relationships.
+*   🔒 **SECURITY REGISTRY:** `.agent/SECURITY.md`
+    *   *Rules for:* Role definitions, Access Levels, Permission Identifiers.
+*   🏗️ **TECH MANIFEST:** `.agent/MANIFEST.md`
+    *   *Rules for:* Framework usage, Directory structure, Localization.
 
 ---
 
-## 3. TECH STACK SUMMARY
-*   **Frontend:** React 18, TypeScript, **Fluent UI v9** (Strict Design System).
-*   **Backend:** PHP 8.3, PostgreSQL 16 (via PDO), Stateless REST API rules.
-*   **Environment:** Railway (Dockerized).
+## 2. CORE SYSTEM PRINCIPLES
 
-> **FINAL CHECK:** Have you signed your comment? Have you updated the status? Have you logged the history? If not, do it now.
+### A. Strict Multi-Tenancy
+*   **Database:** Almost every table MUST have a `tenant_id` column.
+*   **Querying:** Never trust client IDs blindy. Always append `AND tenant_id = :current_tenant_id` to WHERE clauses.
+*   **Context:** use `useAuth().currentOrgId` on the frontend.
+
+### B. Security First
+*   **Frontend:** Every Page/Action must check `hasPermission(object, level)`.
+*   **Backend:** APIs must verify `verify_session()` AND specific permission for the action.
+*   **Records:** Implement RLS (Record Level Security) where appropriate (Users see only their own data if not Manager).
+
+### C. "Enterprise" User Experience
+*   **Reactivity:** Actions (Save/Delete) must reflect immediately in lists (Optimistic UI or Refetch).
+*   **Consistency:** Use standard `SmartDataGrid` for all tables.
+*   **Help:** Provide inline help (Info/Tooltip) for business logic fields.
+
+### D. Documentation & History
+*   **Self-Documenting:** Code must generally explain itself, but complex logic needs comments.
+*   **Changelog:** Every resolved task MUST be logged in the `development_history` table.
+
+---
+
+## 3. HOW TO START A TASK
+1.  **Read Context:** Check usage in `FORM_STANDARD.md` or `DATABASE.md`.
+2.  **Implementation:** Write code following the `SOP.md` checklist.
+3.  **Verification:** Build `npm run build` and check for lint errors.
+4.  **Finalization:** Log change in History and sign off.
