@@ -115,14 +115,54 @@ try {
         if (!$id) throw new Exception("ID required");
 
         // Protect system profiles if needed, or rely on UI warning.
-        // Let's protect IDs 1 and 2 merely as a precaution if they are indeed the "system" pointers.
-        // Actually, let's look up the TYPE. If type is 'local' and it is the ONLY local one, prevent delete?
-        // Simpler: Just allow delete but maybe not RecID 1.
         
         $stmt = $pdo->prepare("DELETE FROM dms_storage_profiles WHERE rec_id = :id");
         $stmt->execute([':id' => $id]);
         
         echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if ($action === 'storage_profile_test') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $type = $input['type'] ?? 'local';
+        $config = $input['configuration'] ?? $input['config'] ?? [];
+        
+        // Ensure config is array
+        if (is_string($config)) {
+             $config = json_decode($config, true);
+        }
+
+        if ($type === 'google_drive') {
+            require_once 'helpers/GoogleDriveStorage.php';
+            try {
+                $folderId = $config['folder_id'] ?? '';
+                $creds = $config['service_account_json'] ?? ''; 
+                
+                // If creds is array, json_encode it back for the constructor
+                if (is_array($creds)) {
+                    $creds = json_encode($creds);
+                }
+                
+                $drive = new GoogleDriveStorage($creds, $folderId);
+                $result = $drive->testConnection();
+                
+                echo json_encode($result);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        } elseif ($type === 'local') {
+             // Simple check for local
+             $uploadDir = __DIR__ . '/../uploads/dms';
+             if (is_writable($uploadDir)) {
+                echo json_encode(['success' => true, 'message' => 'Lokální úložiště je dostupné a zapisovatelné.']);
+             } else {
+                echo json_encode(['success' => false, 'error' => 'Adresář uploads/dms není zapisovatelný.']);
+             }
+        } else {
+             echo json_encode(['success' => false, 'error' => 'Unknown storage type']);
+        }
         exit;
     }
 
