@@ -446,6 +446,219 @@ try {
     }
     
     // -------------------------------------------------------------------------
+    // ACTION: VIEW PREVIEW (Image of Page 1) for Interactive Draw
+    // -------------------------------------------------------------------------
+    if ($action === 'view_preview') {
+        $id = $_GET['id'] ?? null;
+        if (!$id) die("ID missing");
+
+        // 1. Fetch Doc
+        $stmt = $pdo->prepare("SELECT d.*, sp.type as storage_type, sp.configuration 
+                               FROM dms_documents d
+                               LEFT JOIN dms_storage_profiles sp ON d.storage_profile_id = sp.rec_id
+                               WHERE d.rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$doc) die("Doc not found");
+
+        // 2. Resolve Path (Local or Drive)
+        $tempPath = null;
+        if (($doc['storage_type'] ?? 'local') === 'google_drive') {
+            require_once 'helpers/GoogleDriveStorage.php';
+            $config = json_decode($doc['configuration'] ?? '{}', true);
+            $drive = new GoogleDriveStorage(json_encode($config['service_account_json']), $config['folder_id']);
+            $content = $drive->downloadFile($doc['storage_path']);
+            
+            $ext = $doc['file_extension'] ?: 'tmp';
+            $tempPath = sys_get_temp_dir() . '/' . uniqid('preview_') . '.' . $ext;
+            file_put_contents($tempPath, $content);
+            $localPath = $tempPath;
+        } else {
+            $localPath = __DIR__ . '/../' . $doc['storage_path'];
+            if (!file_exists($localPath)) {
+                 // Try relative fix
+                 $localPath = __DIR__ . '/../uploads/dms/' . basename($doc['storage_path']);
+            }
+        }
+
+        if (!file_exists($localPath)) die("File access failed");
+
+        // 3. Convert/Serve
+        $mime = $doc['mime_type'];
+        
+        if (strpos($mime, 'image/') === 0) {
+            header("Content-Type: $mime");
+            readfile($localPath);
+        } elseif ($mime === 'application/pdf') {
+            // Convert PDF Page 1 to JPEG
+            $converted = false;
+            
+            // A. Try Imagick
+            if (class_exists('Imagick')) {
+                try {
+                    $im = new Imagick();
+                    $im->setResolution(150, 150);
+                    $im->readImage($localPath . '[0]');
+                    $im->setImageFormat('jpeg');
+                    header("Content-Type: image/jpeg");
+                    echo $im->getImageBlob();
+                    $im->clear();
+                    $converted = true;
+                } catch (Exception $e) { 
+                    error_log("Imagick preview failed: " . $e->getMessage());
+                }
+            }
+            
+            // B. Try PDFToPPM (if Imagick failed or missing)
+            if (!$converted) {
+                 $out = sys_get_temp_dir() . '/' . uniqid('ppm_');
+                 $cmd = "pdftoppm -jpeg -f 1 -l 1 -singlefile " . escapeshellarg($localPath) . " " . escapeshellarg($out);
+                 exec($cmd);
+                 if (file_exists($out . '.jpg')) {
+                     header("Content-Type: image/jpeg");
+                     readfile($out . '.jpg');
+                     unlink($out . '.jpg');
+                     $converted = true;
+                 }
+            }
+
+            if (!$converted) {
+                // Fallback: Return a 1x1 pixel or placeholder
+                 header("Content-Type: image/jpeg");
+                 // Use a default error image or just die
+                 die("Preview generation capabilities missing (Imagick/Poppler)");
+            }
+        } else {
+            // Other types?
+            die("Unsupported preview type");
+        }
+
+        // Cleanup
+        if ($tempPath && file_exists($tempPath)) unlink($tempPath);
+        exit;
+    }
+
+    // -------------------------------------------------------------------------
+    // ACTION: OCR REGION (Crop & Recognize)
+    // -------------------------------------------------------------------------
+    if ($action === 'ocr_region') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $docId = $input['doc_id'] ?? null;
+        $rect = $input['rect'] ?? null; // {x, y, w, h} 0-1
+
+        if (!$docId || !$rect) { http_response_code(400); echo json_encode(['success'=>false, 'error'=>'Missing params']); exit; }
+
+        // Fetch Doc & Content (Similar logic as Preview)
+        // Ideally refactor resolveFile logic to helper, but duplicating for speed now
+        // ... (Resolving Local Path)
+        $stmt = $pdo->prepare("SELECT d.*, sp.type as storage_type, sp.configuration 
+                               FROM dms_documents d
+                               LEFT JOIN dms_storage_profiles sp ON d.storage_profile_id = sp.rec_id
+                               WHERE d.rec_id = :id");
+        $stmt->execute([':id' => $docId]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $tempPath = null;
+        $localPath = null;
+
+        if (($doc['storage_type'] ?? 'local') === 'google_drive') {
+             require_once 'helpers/GoogleDriveStorage.php';
+             $config = json_decode($doc['configuration'] ?? '{}', true);
+             $drive = new GoogleDriveStorage(json_encode($config['service_account_json']), $config['folder_id']);
+             $content = $drive->downloadFile($doc['storage_path']);
+             $ext = $doc['file_extension'] ?: 'tmp';
+             $tempPath = sys_get_temp_dir() . '/' . uniqid('ocr_src_') . '.' . $ext;
+             file_put_contents($tempPath, $content);
+             $localPath = $tempPath;
+        } else {
+             $localPath = __DIR__ . '/../' . $doc['storage_path'];
+             if (!file_exists($localPath)) $localPath = __DIR__ . '/../uploads/dms/' . basename($doc['storage_path']);
+        }
+
+        // Prepare Image Source for Cropping
+        $imagePath = $localPath;
+        $tempImg = null;
+
+        if ($doc['mime_type'] === 'application/pdf') {
+             // Convert Page 1 to JPEG for cropping
+             $tempImg = sys_get_temp_dir() . '/' . uniqid('crop_src_') . '.jpg';
+             // Default to pdftoppm if available for speed
+             $cmd = "pdftoppm -jpeg -f 1 -l 1 -singlefile " . escapeshellarg($localPath) . " " . escapeshellarg(str_replace('.jpg','',$tempImg));
+             exec($cmd);
+             if (!file_exists($tempImg)) {
+                 // Try Imagick
+                 if (class_exists('Imagick')) {
+                     try {
+                         $im = new Imagick();
+                         $im->setResolution(300, 300); // Higher res for OCR
+                         $im->readImage($localPath . '[0]');
+                         $im->setImageFormat('jpeg');
+                         $im->writeImage($tempImg);
+                         $im->clear();
+                     } catch(Exception $e) {}
+                 }
+             }
+             $imagePath = $tempImg;
+        }
+
+        if (!file_exists($imagePath)) {
+             if ($tempPath) unlink($tempPath);
+             echo json_encode(['success'=>false, 'error'=>'Failed to prepare image for OCR']); 
+             exit;
+        }
+
+        // CROP using GD
+        $info = getimagesize($imagePath);
+        $srcW = $info[0];
+        $srcH = $info[1];
+        $type = $info[2];
+
+        $cropX = floor($rect['x'] * $srcW);
+        $cropY = floor($rect['y'] * $srcH);
+        $cropW = floor($rect['w'] * $srcW);
+        $cropH = floor($rect['h'] * $srcH);
+
+        // Validations
+        if ($cropW < 1) $cropW = 1; if ($cropH < 1) $cropH = 1;
+
+        $srcImg = null;
+        switch ($type) {
+            case IMAGETYPE_JPEG: $srcImg = imagecreatefromjpeg($imagePath); break;
+            case IMAGETYPE_PNG: $srcImg = imagecreatefrompng($imagePath); break;
+            case IMAGETYPE_GIF: $srcImg = imagecreatefromgif($imagePath); break;
+        }
+
+        if (!$srcImg) {
+             echo json_encode(['success'=>false, 'error'=>'GD failed to load image']);
+             exit;
+        }
+
+        $destImg = imagecreatetruecolor($cropW, $cropH);
+        imagecopy($destImg, $srcImg, 0, 0, $cropX, $cropY, $cropW, $cropH);
+
+        // Save Crop
+        $cropFile = sys_get_temp_dir() . '/' . uniqid('crop_out_') . '.jpg';
+        imagejpeg($destImg, $cropFile, 90);
+        
+        imagedestroy($srcImg);
+        imagedestroy($destImg);
+
+        // RUN TESSERACT
+        $cmd = "tesseract " . escapeshellarg($cropFile) . " stdout -l ces+eng --psm 6"; // PSM 6 = Block of text
+        $output = [];
+        exec($cmd, $output);
+        $text = trim(implode("\n", $output));
+
+        // Cleanup
+        if ($tempPath) unlink($tempPath);
+        if ($tempImg && file_exists($tempImg)) unlink($tempImg);
+        if (file_exists($cropFile)) unlink($cropFile);
+
+        echo json_encode(['success' => true, 'text' => $text]);
+        exit;
+    }
+
+    // -------------------------------------------------------------------------
     // ACTION: VIEW RAW (For iframe)
     // -------------------------------------------------------------------------
     if ($action === 'view' || $action === 'view_raw') {

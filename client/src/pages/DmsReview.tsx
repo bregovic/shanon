@@ -127,6 +127,9 @@ export const DmsReview: React.FC = () => {
     const [loadingAttrs, setLoadingAttrs] = useState(false);
     const [saving, setSaving] = useState(false);
 
+    const [zonesMap, setZonesMap] = useState<Record<string, { x: number, y: number, w: number, h: number }>>({});
+    const [saveTemplate, setSaveTemplate] = useState(false);
+
     // DRAWING HANDLERS
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!imageRef.current || !activeField) return;
@@ -181,6 +184,9 @@ export const DmsReview: React.FC = () => {
 
         const fieldCode = activeField;
         const currentCode = fieldCode; // capture for closure
+
+        // Save Zone
+        setZonesMap(prev => ({ ...prev, [fieldCode]: rectPct }));
 
         setFormData(prev => ({ ...prev, [fieldCode]: t('common.loading') }));
 
@@ -271,6 +277,7 @@ export const DmsReview: React.FC = () => {
         // Interactive Zoom Setup
         setImageUrl(null);
         setActiveField(null);
+        setZonesMap({}); // Reset zones
 
         // Always try to load a preview image (Page 1 for PDFs, or the Image itself)
         // This enables the "Rossum-like" interactive selection.
@@ -320,11 +327,30 @@ export const DmsReview: React.FC = () => {
         if (!currentDoc) return;
         setSaving(true);
         try {
+            // 1. Save Metadata
             await axios.post('/api/api-dms.php?action=update_metadata', {
                 id: currentDoc.rec_id,
                 attributes: formData,
                 status: markVerified ? 'verified' : undefined
             });
+
+            // 2. Save Template if requested
+            if (saveTemplate && Object.keys(zonesMap).length > 0) {
+                const tplName = "Auto: " + formData['SUPPLIER_NAME'] + " - " + (currentDoc.doc_type_name || 'Doc');
+                const zones = Object.entries(zonesMap).map(([code, rect]) => ({
+                    attribute_code: code,
+                    x: rect.x, y: rect.y, width: rect.w, height: rect.h,
+                    data_type: 'text' // default
+                }));
+
+                await axios.post('/api/api-ocr-templates.php?action=save', {
+                    name: tplName,
+                    doc_type_id: currentDoc.doc_type_id,
+                    anchor_text: formData['OR_ANCHOR'] || '', // could be improved
+                    sample_doc_id: currentDoc.rec_id,
+                    zones: zones
+                });
+            }
 
             if (markVerified) {
                 const newDocs = docs.filter(d => d.rec_id !== currentDoc.rec_id);
@@ -410,7 +436,7 @@ export const DmsReview: React.FC = () => {
                                     icon={<ScanThumbUp24Regular />}
                                     onClick={() => navigate(`/dms/ocr-designer/new?doc_id=${currentDoc.rec_id}`)}
                                 >
-                                    Vytvořit otisk (šablonu)
+                                    Vytvořit otisk (šablonu) manuálně
                                 </Button>
                             </div>
                         </div>
@@ -470,36 +496,40 @@ export const DmsReview: React.FC = () => {
                             </div>
                         )}
 
-                        <div className={styles.actions}>
-                            <Button
-                                appearance="secondary"
-                                icon={<Save24Regular />}
-                                onClick={() => handleSave(false)}
-                                disabled={saving}
-                            >
-                                {t('dms.review.save')}
-                            </Button>
-                            <Button
-                                appearance="primary"
-                                icon={<Checkmark24Regular />}
-                                onClick={() => handleSave(true)}
-                                disabled={saving}
-                            >
-                                {t('dms.review.approve')}
-                            </Button>
+                        <div className={styles.actions} style={{ flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="chkSaveTpl"
+                                    checked={saveTemplate}
+                                    onChange={e => setSaveTemplate(e.target.checked)}
+                                />
+                                <label htmlFor="chkSaveTpl" style={{ fontSize: '13px', cursor: 'pointer' }}>Uložit naučené oblasti jako šablonu</label>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Button
+                                    appearance="secondary"
+                                    icon={<Save24Regular />}
+                                    onClick={() => handleSave(false)}
+                                    disabled={saving}
+                                >
+                                    {t('dms.review.save')}
+                                </Button>
+                                <Button
+                                    appearance="primary"
+                                    icon={<Checkmark24Regular />}
+                                    onClick={() => handleSave(true)}
+                                    disabled={saving}
+                                >
+                                    {t('dms.review.approve')}
+                                </Button>
+                            </div>
                         </div>
                     </div>
 
                     {/* RIGHT SIDE: PREVIEW */}
                     <div className={styles.viewer}>
-                        {currentDoc.mime_type === 'application/pdf' ? (
-                            <iframe
-                                src={`/api/api-dms.php?action=view_raw&id=${currentDoc.rec_id}`}
-                                className={styles.iframe}
-                                title="Document Preview"
-                                style={{ width: '100%', height: '100%', border: 'none' }}
-                            />
-                        ) : (
+                        {(currentDoc.mime_type !== 'application/pdf' || activeField || Object.keys(zonesMap).length > 0) ? (
                             imageUrl ? (
                                 <div
                                     style={{ position: 'relative', overflow: 'auto', maxHeight: '100%', display: 'flex', justifyContent: 'center', backgroundColor: '#333', height: '100%' }}
@@ -529,16 +559,40 @@ export const DmsReview: React.FC = () => {
                                         />
                                     )}
                                     {activeField && !isDrawing && (
-                                        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none' }}>
-                                            {t('dms.review.select_region')} {currentAttributes.find(a => a.code === activeField)?.name}
+                                        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none', zIndex: 10 }}>
+                                            Vyberte oblast pro: {currentAttributes.find(a => a.code === activeField)?.name}
                                         </div>
                                     )}
+                                    {/* Visualize Already Selected Zones */}
+                                    {Object.entries(zonesMap).map(([code, rect]) => (
+                                        <div
+                                            key={code}
+                                            style={{
+                                                position: 'absolute',
+                                                left: (rect.x * 100) + '%',
+                                                top: (rect.y * 100) + '%',
+                                                width: (rect.w * 100) + '%',
+                                                height: (rect.h * 100) + '%',
+                                                border: '2px solid ' + (activeField === code ? 'red' : 'blue'),
+                                                backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                                                pointerEvents: 'none'
+                                            }}
+                                            title={code}
+                                        />
+                                    ))}
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#888' }}>
                                     Preview not available
                                 </div>
                             )
+                        ) : (
+                            <iframe
+                                src={`/api/api-dms.php?action=view_raw&id=${currentDoc.rec_id}`}
+                                className={styles.iframe}
+                                title="Document Preview"
+                                style={{ width: '100%', height: '100%', border: 'none' }}
+                            />
                         )}
                     </div>
                 </div>
