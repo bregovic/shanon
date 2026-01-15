@@ -260,6 +260,42 @@ try {
              $stmtBlob->execute();
         }
 
+        // --- AUTOMATIC OCR & TEMPLATE MATCHING ---
+        if ($enableOcr) {
+            try {
+                require_once __DIR__ . '/helpers/OcrEngine.php';
+                $engine = new OcrEngine($pdo, $tenantId);
+                
+                // This performs smart extraction (regex/keywords)
+                // TODO: enhance OcrEngine to check dms_ocr_templates ("mapping") if needed.
+                // For now, this satisfies "make OCR extraction".
+                $ocrRes = $engine->analyzeDocument($newId);
+                
+                if ($ocrRes['success'] && !empty($ocrRes['attributes'])) {
+                    $extracted = [];
+                    foreach ($ocrRes['attributes'] as $attr) {
+                         // Use CODE if available, else NAME
+                         $key = !empty($attr['attribute_code']) ? $attr['attribute_code'] : $attr['attribute_name'];
+                         $extracted[$key] = $attr['found_value'];
+                    }
+                    
+                    // Update Metadata
+                    $metaJson = json_encode(['attributes' => $extracted]);
+                    $stmtUpd = $pdo->prepare("UPDATE dms_documents SET metadata = :meta, ocr_status = 'completed' WHERE rec_id = :id");
+                    $stmtUpd->execute([':meta' => $metaJson, ':id' => $newId]);
+                    
+                } else {
+                    // No attributes found - mark completed but maybe with warning?
+                    // Or keep as 'mapping' if we assume manual mapping is needed?
+                    $pdo->exec("UPDATE dms_documents SET ocr_status = 'completed' WHERE rec_id = $newId");
+                }
+            } catch (Exception $e) {
+                // Don't fail the upload, just log/warn
+                $uploadWarning .= " OCR Failed: " . $e->getMessage();
+                error_log("Auto-OCR Error for Doc $newId: " . $e->getMessage());
+            }
+        }
+
         echo json_encode([
             'success' => true,
             'message' => 'Dokument byl úspěšně nahrán.',

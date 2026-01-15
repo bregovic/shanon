@@ -144,10 +144,11 @@ export const DmsDashboard: React.FC = () => {
                         display: 'block',
                         marginBottom: '16px'
                     }}>
-                        Úlohy
+                        Integrace
                     </Text>
 
-                    <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
+                    <MenuSection id="tasks" title="Integrace" icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
+                        <MenuItem label="Import dokumentů" onClick={() => navigate('/dms/import')} />
                         <MenuItem label="Konfigurace Google Disk" onClick={() => navigate('/dms/google-setup')} />
                     </MenuSection>
                 </div>
