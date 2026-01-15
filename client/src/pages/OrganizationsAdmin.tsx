@@ -27,7 +27,8 @@ import {
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
-import { SmartDataGrid, ExtendedTableColumnDefinition } from '../components/SmartDataGrid';
+import { SmartDataGrid } from '../components/SmartDataGrid';
+import type { ExtendedTableColumnDefinition } from '../components/SmartDataGrid';
 import { useTranslation } from '../context/TranslationContext';
 import { ActionBar } from '../components/ActionBar';
 import { useAuth } from '../context/AuthContext';
