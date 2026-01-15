@@ -42,6 +42,7 @@ export const DmsImport: React.FC = () => {
     const [displayName, setDisplayName] = useState('');
 
     const [enableOcr, setEnableOcr] = useState(true);
+    const [manualMap, setManualMap] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
     const [warning, setWarning] = useState('');
@@ -157,6 +158,7 @@ export const DmsImport: React.FC = () => {
             formData.append('display_name', nameToSend);
             formData.append('doc_type_id', selectedType);
             formData.append('enable_ocr', enableOcr ? '1' : '0');
+            formData.append('force_manual', manualMap ? '1' : '0');
 
             try {
                 const res = await fetch('/api/api-dms.php?action=upload', {
@@ -325,8 +327,20 @@ export const DmsImport: React.FC = () => {
 
                     <Checkbox
                         checked={enableOcr}
-                        onChange={(_, data) => setEnableOcr(!!data.checked)}
-                        label="Provést OCR u všech souborů"
+                        onChange={(_, data) => {
+                            setEnableOcr(!!data.checked);
+                            if (data.checked) setManualMap(false);
+                        }}
+                        label="Provést automatické vytěžení dat (OCR)"
+                    />
+
+                    <Checkbox
+                        checked={manualMap}
+                        onChange={(_, data) => {
+                            setManualMap(!!data.checked);
+                            if (data.checked) setEnableOcr(false);
+                        }}
+                        label="Jen připravit k revizi (status Mapování)"
                     />
                 </div>
 

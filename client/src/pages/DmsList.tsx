@@ -17,7 +17,12 @@ import {
     Divider,
     TableCellLayout,
     TableColumnDefinition,
-    createTableColumn
+    createTableColumn,
+    Menu,
+    MenuTrigger,
+    MenuList,
+    MenuItem,
+    MenuPopover
 } from '@fluentui/react-components';
 import {
     Add24Regular,
@@ -25,7 +30,8 @@ import {
     Document24Regular,
     ScanText24Regular,
     Dismiss24Regular,
-    Delete24Regular
+    Delete24Regular,
+    Edit24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
@@ -162,6 +168,24 @@ export const DmsList: React.FC = () => {
         }
     };
 
+
+    const handleBatchStatusChange = async (status: string, ocrStatus?: string) => {
+        if (selectedIds.size === 0) return;
+        if (!confirm('Opravdu změnit stav vybraných dokumentů?')) return;
+
+        try {
+            await fetch('/api/api-dms.php?action=update_status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ids: Array.from(selectedIds),
+                    status: status,
+                    ocr_status: ocrStatus
+                })
+            });
+            fetchData();
+        } catch (e) { console.error(e); }
+    };
 
     // Column definitions
     const columns: TableColumnDefinition<DmsDocument>[] = [
@@ -313,6 +337,24 @@ export const DmsList: React.FC = () => {
                     </Button>
 
                     <div style={{ width: '1px', backgroundColor: '#e0e0e0', margin: '0 8px', height: '20px' }} />
+
+
+                    <Menu>
+                        <MenuTrigger disableButtonEnhancement>
+                            <Button icon={<Edit24Regular />} disabled={loading || selectedIds.size === 0}>
+                                Změnit stav
+                            </Button>
+                        </MenuTrigger>
+                        <MenuPopover>
+                            <MenuList>
+                                <MenuItem onClick={() => handleBatchStatusChange('review', 'mapping')}>Otevřít k mapování (Revize)</MenuItem>
+                                <MenuItem onClick={() => handleBatchStatusChange('verified')}>Schváleno (Verified)</MenuItem>
+                                <MenuItem onClick={() => handleBatchStatusChange('rejected')}>Zamítnuto</MenuItem>
+                                <Divider />
+                                <MenuItem onClick={() => handleBatchStatusChange('new', 'pending')}>Reset na Nový</MenuItem>
+                            </MenuList>
+                        </MenuPopover>
+                    </Menu>
 
                     <Button
                         appearance="secondary"

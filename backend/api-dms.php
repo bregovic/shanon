@@ -71,6 +71,35 @@ try {
     }
 
     // -------------------------------------------------------------------------
+    // ACTION: UPDATE STATUS (Batch)
+    // -------------------------------------------------------------------------
+    if ($action === 'update_status') {
+         $input = json_decode(file_get_contents('php://input'), true);
+         $ids = $input['ids'] ?? [];
+         $status = $input['status'] ?? null;
+         $ocrStatus = $input['ocr_status'] ?? null;
+         
+         if (empty($ids) || (!$status && !$ocrStatus)) throw new Exception("Invalid params");
+         
+         // Build Query
+         $sets = [];
+         $params = [];
+         if ($status) { $sets[] = "status = ?"; $params[] = $status; }
+         if ($ocrStatus) { $sets[] = "ocr_status = ?"; $params[] = $ocrStatus; }
+         
+         // IDs placeholders
+         $inQuery = implode(',', array_fill(0, count($ids), '?'));
+         foreach($ids as $id) $params[] = $id;
+         
+         $sql = "UPDATE dms_documents SET " . implode(', ', $sets) . " WHERE rec_id IN ($inQuery)";
+         $stmt = $pdo->prepare($sql);
+         $stmt->execute($params);
+         
+         echo json_encode(['success' => true]);
+         exit;
+    }
+
+    // -------------------------------------------------------------------------
     // ACTION: DOC TYPES
     // -------------------------------------------------------------------------
     if ($action === 'types' || $action === 'doc_types') {
@@ -347,6 +376,15 @@ try {
         $docTypeId = $_POST['doc_type_id'] ?? null;
         $displayName = $_POST['display_name'] ?? $file['name'];
         $autoOcr = filter_var($_POST['auto_ocr'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $forceManual = filter_var($_POST['force_manual'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        $initialStatus = 'new';
+        $initialOcrStatus = 'pending';
+
+        if ($forceManual && !$autoOcr) {
+             $initialStatus = 'review';
+             $initialOcrStatus = 'mapping';
+        }
 
         // 1. Get Active Default Storage Profile
         $stmt = $pdo->prepare("SELECT * FROM dms_storage_profiles WHERE is_active = true AND is_default = true LIMIT 1");
@@ -414,8 +452,8 @@ try {
         }
 
         // DB Insert
-        $sql = "INSERT INTO dms_documents (tenant_id, display_name, original_filename, file_extension, file_size_bytes, mime_type, doc_type_id, storage_path, storage_profile_id, created_by, status)
-                VALUES (:tid, :dname, :oname, :ext, :size, :mime, :dtid, :path, :spid, :uid, 'new')
+        $sql = "INSERT INTO dms_documents (tenant_id, display_name, original_filename, file_extension, file_size_bytes, mime_type, doc_type_id, storage_path, storage_profile_id, created_by, status, ocr_status)
+                VALUES (:tid, :dname, :oname, :ext, :size, :mime, :dtid, :path, :spid, :uid, :status, :ocrstats)
                 RETURNING rec_id";
         
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -431,7 +469,9 @@ try {
             ':dtid' => $docTypeId ?: null,
             ':path' => $storagePath,
             ':spid' => $profile['rec_id'],
-            ':uid' => $userId
+            ':uid' => $userId,
+            ':status' => $initialStatus,
+            ':ocrstats' => $initialOcrStatus
         ]);
         
         $newId = $stmt->fetchColumn();
