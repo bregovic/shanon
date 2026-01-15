@@ -32,6 +32,32 @@ Centralized ID generation service.
 | `last_number`| INT | The counter value |
 | `reset_period`| VARCHAR(20)| `never`, `year`, `month` |
 
+### `sys_organizations`
+Multi-Organization (Company/Legal Entity) registry. Implements D365-style DataAreaId concept.
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `org_id` | CHAR(5) (PK) | No | Organization Code (e.g., `VACKR`) |
+| `tenant_id` | UUID | No | Tenant isolation key |
+| `display_name` | VARCHAR(100) | No | Full name (e.g., "Bc. Václav Král") |
+| `address` | TEXT | Yes | Registered address |
+| `reg_no` | VARCHAR(20) | Yes | Registration Number (IČO) |
+| `tax_no` | VARCHAR(20) | Yes | Tax ID (DIČ) |
+| `is_active` | BOOLEAN | No | Soft delete (Default: true) |
+| `created_at` | TIMESTAMP | No | Creation timestamp |
+| `updated_at` | TIMESTAMP | No | Last update timestamp |
+
+### `sys_user_org_access`
+Links users to organizations they can access.
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `user_id` | INT (FK) | No | Reference to `sys_users.rec_id` |
+| `org_id` | CHAR(5) (FK) | No | Reference to `sys_organizations.org_id` |
+| `is_default` | BOOLEAN | No | User's default organization (Default: false) |
+| `assigned_at` | TIMESTAMP | No | When access was granted |
+| **PK** | `(user_id, org_id)` | | Composite primary key |
+
+**Note:** Users with `ADMIN` role can access ALL active organizations regardless of entries in this table.
+
 ---
 
 ## 2. Change Management & Development
@@ -83,6 +109,7 @@ The header table for all stored files.
 | Column | Type | Description |
 | :--- | :--- | :--- |
 | `rec_id` | SERIAL (PK) | Document ID |
+| `org_id` | CHAR(5) (FK) | Organization scope (Multi-Org isolation) |
 | `doc_type_id`| INT (FK) | Link to `dms_doc_types` |
 | `display_name`| VARCHAR | User facing filename |
 | `ocr_status` | VARCHAR(20) | `pending`, `processing`, `done` |

@@ -88,13 +88,28 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
              $orgTableExists = $pdo->query("SELECT to_regclass('sys_organizations')")->fetchColumn();
              
              if ($orgTableExists) {
-                 $stmt = $pdo->prepare("
-                     SELECT o.org_id, o.display_name, a.is_default
-                     FROM sys_user_org_access a
-                     JOIN sys_organizations o ON a.org_id = o.org_id
-                     WHERE a.user_id = :uid AND o.is_active = true
-                     ORDER BY o.display_name
-                 ");
+                 // Admin Override: Admins see ALL organizations
+                 $isAdmin = in_array('ADMIN', $roleCodes ?? []);
+                 
+                 if ($isAdmin) {
+                     $sql = "
+                        SELECT o.org_id, o.display_name, COALESCE(a.is_default, false) as is_default
+                        FROM sys_organizations o
+                        LEFT JOIN sys_user_org_access a ON o.org_id = a.org_id AND a.user_id = :uid
+                        WHERE o.is_active = true
+                        ORDER BY o.display_name
+                     ";
+                 } else {
+                     $sql = "
+                        SELECT o.org_id, o.display_name, a.is_default
+                        FROM sys_user_org_access a
+                        JOIN sys_organizations o ON a.org_id = o.org_id
+                        WHERE a.user_id = :uid AND o.is_active = true
+                        ORDER BY o.display_name
+                     ";
+                 }
+                 
+                 $stmt = $pdo->prepare($sql);
                  $stmt->execute([':uid' => $user['rec_id']]);
                  $availableOrgs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
