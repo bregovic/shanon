@@ -535,10 +535,20 @@ export const DmsReview: React.FC = () => {
 
                     {/* RIGHT SIDE: PREVIEW */}
                     <div className={styles.viewer}>
-                        {(currentDoc.mime_type !== 'application/pdf' || activeField || Object.keys(zonesMap).length > 0) ? (
-                            imageUrl ? (
+                        {imageUrl ? (
+                            <div
+                                style={{
+                                    overflow: 'auto',
+                                    maxHeight: '100%',
+                                    width: '100%',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#333',
+                                    height: '100%'
+                                }}
+                            >
                                 <div
-                                    style={{ position: 'relative', overflow: 'auto', maxHeight: '100%', display: 'flex', justifyContent: 'center', backgroundColor: '#333', height: '100%' }}
+                                    style={{ position: 'relative', width: 'max-content', height: 'max-content' }}
                                     onMouseDown={handleMouseDown}
                                     onMouseMove={handleMouseMove}
                                     onMouseUp={handleMouseUp}
@@ -547,7 +557,7 @@ export const DmsReview: React.FC = () => {
                                         ref={imageRef}
                                         src={imageUrl}
                                         alt="Review"
-                                        style={{ maxWidth: '100%', display: 'block', cursor: activeField ? 'crosshair' : 'default', alignSelf: 'start' }}
+                                        style={{ display: 'block', cursor: activeField ? 'crosshair' : 'default', maxWidth: 'none' }}
                                         draggable={false}
                                     />
                                     {currentDrawRect && (
@@ -565,11 +575,10 @@ export const DmsReview: React.FC = () => {
                                         />
                                     )}
                                     {activeField && !isDrawing && (
-                                        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none', zIndex: 10 }}>
+                                        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none', zIndex: 10, whiteSpace: 'nowrap' }}>
                                             Vyberte oblast pro: {currentAttributes.find(a => a.code === activeField)?.name}
                                         </div>
                                     )}
-                                    {/* Visualize Already Selected Zones */}
                                     {Object.entries(zonesMap).map(([code, rect]) => (
                                         <div
                                             key={code}
@@ -587,11 +596,7 @@ export const DmsReview: React.FC = () => {
                                         />
                                     ))}
                                 </div>
-                            ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#888' }}>
-                                    Preview not available
-                                </div>
-                            )
+                            </div>
                         ) : (
                             <iframe
                                 src={`/api/api-dms.php?action=view_raw&id=${currentDoc.rec_id}`}
