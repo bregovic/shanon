@@ -183,8 +183,8 @@ try {
     // -------------------------------------------------------------------------
     // ACTION: ATTRIBUTES (For Type)
     // -------------------------------------------------------------------------
-    if ($action === 'attributes') {
-        $typeId = $_GET['type_id'] ?? null;
+    if ($action === 'attributes' || $action === 'doc_type_attributes') {
+        $typeId = $_GET['type_id'] ?? $_GET['id'] ?? null;
         if (!$typeId) {
             // Return all attributes if no type specified ? Or just common?
             // Let's return all.
@@ -470,7 +470,25 @@ try {
     // -------------------------------------------------------------------------
     if ($action === 'view_preview') {
         $id = $_GET['id'] ?? null;
-        if (!$id) die("ID missing");
+        
+        // Helper for Error Image
+        $sendErrorImg = function($msg) {
+            if (function_exists('imagecreate')) {
+                $im = imagecreate(800, 600); // Bigger canvas
+                $bg = imagecolorallocate($im, 240, 240, 240);
+                $red = imagecolorallocate($im, 200, 0, 0);
+                imagestring($im, 5, 20, 280, "Preview Error: $msg", $red);
+                header("Content-Type: image/png");
+                imagepng($im);
+                imagedestroy($im);
+            } else {
+                 header("HTTP/1.0 404 Not Found");
+                 echo "Error: $msg";
+            }
+            exit;
+        };
+
+        if (!$id) $sendErrorImg("ID missing");
 
         // 1. Fetch Doc
         $stmt = $pdo->prepare("SELECT d.*, sp.type as storage_type, sp.configuration 
@@ -479,7 +497,7 @@ try {
                                WHERE d.rec_id = :id");
         $stmt->execute([':id' => $id]);
         $doc = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$doc) die("Doc not found");
+        if (!$doc) $sendErrorImg("Doc not found in DB");
 
         // 2. Resolve Path (Local or Drive)
         $tempPath = null;
@@ -500,7 +518,7 @@ try {
                 $localPath = $tempPath;
             } catch (Throwable $e) {
                 error_log("Google Drive Preview Error: " . $e->getMessage());
-                die("Remote File Access Failed: " . $e->getMessage());
+                $sendErrorImg("Drive Access Failed: " . $e->getMessage());
             }
         } else {
             $localPath = __DIR__ . '/../' . $doc['storage_path'];
@@ -508,7 +526,7 @@ try {
                  // Try relative fix
                  $localPath = __DIR__ . '/../uploads/dms/' . basename($doc['storage_path']);
             }
-            if (!file_exists($localPath)) die("File access failed locally");
+            if (!file_exists($localPath)) $sendErrorImg("File not found locally");
         }
 
         // 3. Convert/Serve
@@ -551,11 +569,10 @@ try {
             }
 
             if (!$converted) {
-                 header("Content-Type: image/jpeg");
-                 die("Preview generation capabilities missing (Imagick/Poppler)");
+                 $sendErrorImg("Converter (Imagick/Poppler) failed or missing");
             }
         } else {
-            die("Unsupported preview type");
+            $sendErrorImg("Unsupported file type: $mime");
         }
 
         // Cleanup
