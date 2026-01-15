@@ -1,11 +1,17 @@
 <?php
 // backend/api-dms.php
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Keep 0 for JSON API, but use log if possible.
+// Actually, if we want to see the error in the response body (invalid json but visible text), set to 1 temporarily.
+ini_set('display_errors', 1); 
+
 require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
 require_once 'helpers/OcrEngine.php';
 // GoogleDriveStorage loaded on demand
 
+// Ensure no output before this:
 header("Content-Type: application/json");
 
 $action = $_GET['action'] ?? 'list';
