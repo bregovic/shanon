@@ -158,6 +158,9 @@ try {
                 
                 $drive = new GoogleDriveStorage($creds, $folderId);
                 $result = $drive->testConnection();
+                if (($result['success'] ?? false) && !isset($result['message'])) {
+                    $result['message'] = 'Připojení úspěšné. Složka: ' . ($result['folderName'] ?? 'Neznámá');
+                }
                 
                 echo json_encode($result);
             } catch (Exception $e) {
