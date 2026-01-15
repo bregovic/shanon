@@ -3,10 +3,10 @@
 require_once 'cors.php'; 
 require_once 'session_init.php';
 
-// PERFORMANCE FIX: 
-// Okamžitě uzavřít session pro zápis. Tím uvolníme zámek pro ostatní skripty (jako login nebo další requesty).
-// Protože zde session data jen ČTEME a neměníme, je to bezpečné a výrazně to zrychlí souběžné požadavky.
-session_write_close();
+// PERFORMANCE NOTE: 
+// Previously had session_write_close() here for performance.
+// Removed because Multi-Org context may need to write to DB (auto-assign fallback).
+// If performance issues arise, reconsider architecture.
 
 header("Content-Type: application/json");
 
