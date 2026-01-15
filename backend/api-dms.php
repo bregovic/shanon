@@ -570,8 +570,7 @@ try {
         imagedestroy($im);
         exit;
     }
-        exit;
-    }
+
 
     // ===== OCR ANALYZE DOCUMENT (BATCH SUPPORT) =====
     if ($action === 'analyze_doc') {
