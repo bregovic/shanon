@@ -140,6 +140,7 @@ interface SystemData {
         is_https: boolean;
         remote_addr: string;
     };
+    dms_checks?: Record<string, { label: string, value: string, status?: 'success' | 'danger' | 'warning' }>;
 }
 
 export const SystemConfig: React.FC = () => {
@@ -332,6 +333,20 @@ export const SystemConfig: React.FC = () => {
                         />
                         <StatusRow label="system.php_version" value={data?.overview.php_version} />
                         <StatusRow label="system.server_time" value={data?.overview.server_time} />
+                    </div>
+                </Card>
+
+                <Card className={styles.card}>
+                    <CardHeader header={<Text weight="semibold">DMS & Modules Health</Text>} />
+                    <div>
+                        {data?.dms_checks && Object.values(data.dms_checks).map((check: any, i) => (
+                            <StatusRow
+                                key={i}
+                                label={check.label}
+                                value={check.value}
+                                status={check.status}
+                            />
+                        ))}
                     </div>
                 </Card>
             </div>

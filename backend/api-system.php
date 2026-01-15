@@ -78,15 +78,45 @@ try {
                 'remote_addr' => $_SERVER['REMOTE_ADDR']
             ],
             'dms_checks' => (function($pdo) {
+                $checks = [];
+                
+                // 1. Database Tables
                 try {
-                     return [
-                         'doc_types_count' => $pdo->query("SELECT COUNT(*) FROM dms_doc_types")->fetchColumn(),
-                         'storage_profiles_count' => $pdo->query("SELECT COUNT(*) FROM dms_storage_profiles")->fetchColumn(),
-                         'documents_count' => $pdo->query("SELECT COUNT(*) FROM dms_documents")->fetchColumn()
-                     ];
+                     $checks['doc_types'] = ['label' => 'Document Types', 'value' => $pdo->query("SELECT COUNT(*) FROM dms_doc_types")->fetchColumn() . ' records', 'status' => 'success'];
+                     $checks['documents'] = ['label' => 'Documents stored', 'value' => $pdo->query("SELECT COUNT(*) FROM dms_documents")->fetchColumn() . ' files', 'status' => 'success'];
                 } catch (Exception $e) {
-                    return ['error' => 'DMS Tables missing or queries failed'];
+                    $checks['db_tables'] = ['label' => 'DMS Tables', 'value' => 'Missing or Error', 'status' => 'danger'];
                 }
+
+                // 2. File Storage
+                $uploadDir = __DIR__ . '/../uploads/dms';
+                if (!is_dir($uploadDir)) {
+                     $checks['storage_dir'] = ['label' => 'Upload Directory', 'value' => 'Missing', 'status' => 'danger'];
+                } elseif (!is_writable($uploadDir)) {
+                     $checks['storage_dir'] = ['label' => 'Upload Directory', 'value' => 'Not Writable', 'status' => 'danger'];
+                } else {
+                     $checks['storage_dir'] = ['label' => 'Upload Directory', 'value' => 'OK (Writable)', 'status' => 'success'];
+                }
+
+                // 3. OCR Engine
+                if (file_exists(__DIR__ . '/helpers/OcrEngine.php')) {
+                    require_once __DIR__ . '/helpers/OcrEngine.php'; // Ensure loaded
+                    if (class_exists('OcrEngine')) {
+                        // Test Tesseract presence via shell
+                        $tess = shell_exec('tesseract --version 2>&1');
+                        if ($tess && (strpos($tess, 'tesseract') !== false)) {
+                             $checks['ocr_engine'] = ['label' => 'OCR Engine', 'value' => 'Ready (Tesseract found)', 'status' => 'success'];
+                        } else {
+                             $checks['ocr_engine'] = ['label' => 'OCR Engine', 'value' => 'Binary missed (tesseract)', 'status' => 'warning'];
+                        }
+                    } else {
+                         $checks['ocr_engine'] = ['label' => 'OCR Engine', 'value' => 'Class check failed', 'status' => 'danger'];
+                    }
+                } else {
+                    $checks['ocr_engine'] = ['label' => 'OCR Engine', 'value' => 'File missing', 'status' => 'danger'];
+                }
+
+                return $checks;
             })($pdo)
         ];
 
