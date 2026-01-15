@@ -19,6 +19,7 @@ import {
     Dismiss24Regular
 } from "@fluentui/react-icons";
 import axios from "axios";
+import { useTranslation } from "react-i18next";
 import { PageLayout, PageHeader, PageContent } from "../components/PageLayout";
 
 const useStyles = makeStyles({
@@ -81,7 +82,7 @@ interface DmsDocument {
     doc_type_id: number;
     doc_type_name?: string;
     display_name: string;
-    ocr_status: string; // 'pending', 'processing', 'completed', 'verified'
+    ocr_status: string; // 'pending', 'processing', 'completed', 'verified', 'mapping'
     status?: string;
     storage_path: string;
     mime_type: string;
@@ -100,6 +101,7 @@ interface LinkedAttribute {
 }
 
 export const DmsReview: React.FC = () => {
+    const { t } = useTranslation();
     const styles = useStyles();
     const [docs, setDocs] = useState<DmsDocument[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -177,7 +179,7 @@ export const DmsReview: React.FC = () => {
         const fieldCode = activeField;
         const currentCode = fieldCode; // capture for closure
 
-        setFormData(prev => ({ ...prev, [fieldCode]: 'Načítám...' }));
+        setFormData(prev => ({ ...prev, [fieldCode]: t('common.loading') }));
 
         try {
             const res = await axios.post('/api/api-dms.php?action=ocr_region', {
@@ -189,16 +191,17 @@ export const DmsReview: React.FC = () => {
                 // AUTO ADVANCE
                 handleSkip(currentCode);
             } else {
-                alert('OCR Error: ' + res.data.error);
+                alert(t('common.error') + ': ' + res.data.error);
                 setFormData(prev => ({ ...prev, [fieldCode]: '' }));
             }
         } catch (e) {
             console.error(e);
-            alert('Connection Error');
+            alert(t('common.error'));
         } finally {
             setIsDrawing(false); setStartPos(null); setCurrentDrawRect(null);
         }
     };
+
 
     // 1. Fetch Documents to Review
     useEffect(() => {
@@ -206,11 +209,14 @@ export const DmsReview: React.FC = () => {
             try {
                 const res = await axios.get('/api/api-dms.php?action=list');
                 const all = res.data.data;
-                // Filter: OCR is done but not yet "Verified"
-                // Assuming 'verified' status creates a distinction. 
-                // Using new 'status' column if available, else ocr_status.
+                // Filter documents needing review or mapping
+                // status 'mapping' means no template matched / needs manual extraction
+                // status 'done'/'completed' means OCR finished but needs verification
                 const toReview = all.filter((d: DmsDocument) =>
-                    d.ocr_status === 'done' || d.ocr_status === 'completed'
+                    d.ocr_status === 'done' ||
+                    d.ocr_status === 'completed' ||
+                    d.ocr_status === 'mapping' ||
+                    (d.status !== 'verified' && d.ocr_status !== 'pending' && d.ocr_status !== 'processing')
                 );
 
                 setDocs(toReview);
@@ -237,7 +243,6 @@ export const DmsReview: React.FC = () => {
         }
 
         const loadAttrs = async () => {
-            // ... existing loadAttrs logic ...
             setLoadingAttrs(true);
             try {
                 if (currentDoc.doc_type_id) {
@@ -284,41 +289,40 @@ export const DmsReview: React.FC = () => {
             await axios.post('/api/api-dms.php?action=update_metadata', {
                 id: currentDoc.rec_id,
                 attributes: formData,
-                status: markVerified ? 'verified' : undefined // Trigger status update if needed
+                status: markVerified ? 'verified' : undefined
             });
 
             if (markVerified) {
-                // Remove from list
                 const newDocs = docs.filter(d => d.rec_id !== currentDoc.rec_id);
                 setDocs(newDocs);
                 if (newDocs.length > 0) {
-                    // Adjust index if needed
                     if (currentIndex >= newDocs.length) setCurrentIndex(newDocs.length - 1);
                 }
             } else {
-                alert('Uloženo (Rozpracováno)');
+                // Just save draft
+                alert(t('common.success'));
             }
         } catch (e) {
             console.error(e);
-            alert('Chyba při ukládání');
+            alert(t('common.error'));
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) return <PageLayout><PageContent><Spinner label="Načítám frontu..." /></PageContent></PageLayout>;
+    if (loading) return <PageLayout><PageContent><Spinner label={t('dms.loading_queue')} /></PageContent></PageLayout>;
 
     if (!currentDoc) {
         return (
             <PageLayout>
                 <PageHeader>
-                    <Text size={500} weight="semibold">Revidovat a Vytěžit</Text>
+                    <Text size={500} weight="semibold">{t('dms.review.title')}</Text>
                 </PageHeader>
                 <PageContent>
                     <div style={{ textAlign: 'center', marginTop: '100px', opacity: 0.6 }}>
                         <Checkmark24Regular style={{ fontSize: '48px', color: 'green' }} />
-                        <Text size={500} block>Vše zkontrolováno!</Text>
-                        <Text>Ve frontě nejsou žádné dokumenty k revizi.</Text>
+                        <Text size={500} block>{t('dms.review.all_done')}</Text>
+                        <Text>{t('dms.review.no_docs')}</Text>
                     </div>
                 </PageContent>
             </PageLayout>
@@ -332,7 +336,7 @@ export const DmsReview: React.FC = () => {
             <PageHeader>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <Text weight="semibold">Revize dokumentu</Text>
+                        <Text weight="semibold">{t('dms.review.title')}</Text>
                         <Badge appearance="tint">{currentIndex + 1} / {docs.length}</Badge>
                     </div>
                     <div>
@@ -342,7 +346,7 @@ export const DmsReview: React.FC = () => {
                             onClick={handlePrev}
                             icon={<ArrowLeft24Regular />}
                         >
-                            Předchozí
+                            {t('dms.review.prev')}
                         </Button>
                         <Button
                             appearance="subtle"
@@ -351,7 +355,7 @@ export const DmsReview: React.FC = () => {
                             icon={<ArrowRight24Regular />}
                             iconPosition="after"
                         >
-                            Další
+                            {t('dms.review.next')}
                         </Button>
                     </div>
                 </div>
@@ -378,7 +382,7 @@ export const DmsReview: React.FC = () => {
                                             required={attr.is_linked_required}
                                             style={{ color: activeField === attr.code ? tokens.colorBrandForeground1 : 'inherit', fontWeight: activeField === attr.code ? 'bold' : 'normal' }}
                                         >
-                                            {attr.name} {activeField === attr.code && '(Vyberte na obrázku)'}
+                                            {attr.name} {activeField === attr.code && `(${t('common.edit')})`}
                                         </Label>
                                         <div style={{ display: 'flex', gap: '4px' }}>
                                             <Input
@@ -396,7 +400,7 @@ export const DmsReview: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 handleSkip(attr.code);
                                                             }}
-                                                            title="Přeskočit na další"
+                                                            title={t('dms.review.skip_tooltip')}
                                                         />
                                                         : null
                                                 }
@@ -407,7 +411,7 @@ export const DmsReview: React.FC = () => {
                                 {currentAttributes.length === 0 && (
                                     <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fff4f4', border: '1px solid #fed9cc', borderRadius: '4px' }}>
                                         <Text style={{ color: tokens.colorPaletteRedForeground1 }} block>
-                                            Tento typ dokumentu nemá definované žádné atributy.
+                                            {t('dms.review.no_layout')}
                                         </Text>
                                         <Button
                                             appearance="transparent"
@@ -415,7 +419,7 @@ export const DmsReview: React.FC = () => {
                                             style={{ paddingLeft: 0, color: tokens.colorBrandForegroundLink }}
                                             onClick={() => window.open('/dms/settings', '_blank')}
                                         >
-                                            Spravovat atributy v Nastavení
+                                            {t('dms.review.manage_attributes')}
                                         </Button>
                                     </div>
                                 )}
@@ -429,7 +433,7 @@ export const DmsReview: React.FC = () => {
                                 onClick={() => handleSave(false)}
                                 disabled={saving}
                             >
-                                Uložit
+                                {t('dms.review.save')}
                             </Button>
                             <Button
                                 appearance="primary"
@@ -437,12 +441,11 @@ export const DmsReview: React.FC = () => {
                                 onClick={() => handleSave(true)}
                                 disabled={saving}
                             >
-                                Schválit
+                                {t('dms.review.approve')}
                             </Button>
                         </div>
                     </div>
 
-                    {/* RIGHT SIDE: PREVIEW */}
                     {/* RIGHT SIDE: PREVIEW */}
                     <div className={styles.viewer}>
                         {imageUrl ? (
@@ -475,7 +478,7 @@ export const DmsReview: React.FC = () => {
                                 )}
                                 {activeField && !isDrawing && (
                                     <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', pointerEvents: 'none' }}>
-                                        Vyberte oblast pro: {currentAttributes.find(a => a.code === activeField)?.name}
+                                        {t('dms.review.select_region')} {currentAttributes.find(a => a.code === activeField)?.name}
                                     </div>
                                 )}
                             </div>
