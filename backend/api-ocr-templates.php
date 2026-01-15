@@ -1,128 +1,160 @@
 <?php
-// backend/api-ocr-templates.php
-require_once 'cors.php';
-require_once 'session_init.php';
-require_once 'db.php';
+require_once 'auth.php'; // Handle CORS, Session, DB connection
 
-header("Content-Type: application/json");
-
-// Auth check
-if (!isset($_SESSION['loggedin'])) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-    exit;
-}
+// Ensure User is Admin or has rights
+// if (!isset($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['error' => 'Unauthorized']); exit; }
 
 $action = $_GET['action'] ?? 'list';
-$pdo = DB::connect();
+$tenantId = $_SESSION['tenant_id'] ?? 1;
+
+header('Content-Type: application/json');
 
 try {
-    // === LIST TEMPLATES ===
+    
+    // -------------------------------------------------------------------------
+    // ACTION: LIST
+    // -------------------------------------------------------------------------
     if ($action === 'list') {
         $stmt = $pdo->prepare("
-            SELECT t.*, d.name as doc_type_name 
+            SELECT t.*, dt.name as doc_type_name, 
+                   (SELECT COUNT(*) FROM dms_ocr_template_zones z WHERE z.template_id = t.rec_id) as zone_count
             FROM dms_ocr_templates t
-            LEFT JOIN dms_doc_types d ON t.doc_type_id = d.rec_id
-            WHERE t.is_active = true
-            ORDER BY t.name
+            LEFT JOIN dms_doc_types dt ON t.doc_type_id = dt.rec_id
+            WHERE t.tenant_id = :tid OR t.tenant_id IS NULL
+            ORDER BY t.created_at DESC
         ");
-        $stmt->execute();
+        $stmt->execute([':tid' => $tenantId]);
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
 
-    // === GET TEMPLATE DETAILS (Zones) ===
+    // -------------------------------------------------------------------------
+    // ACTION: GET
+    // -------------------------------------------------------------------------
     if ($action === 'get') {
-        $id = $_GET['id'] ?? 0;
-        
-        // Template info
-        $stmt = $pdo->prepare("SELECT * FROM dms_ocr_templates WHERE rec_id = ?");
-        $stmt->execute([$id]);
-        $template = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$template) {
-            throw new Exception("Template not found");
-        }
+        $id = $_GET['id'] ?? null;
+        if (!$id) throw new Exception("ID required");
 
-        // Zones
-        $stmtZones = $pdo->prepare("SELECT * FROM dms_ocr_zones WHERE template_id = ?");
-        $stmtZones->execute([$id]);
+        $stmt = $pdo->prepare("SELECT * FROM dms_ocr_templates WHERE rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $template = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$template) throw new Exception("Template not found");
+
+        // Fetch zones
+        $stmtZones = $pdo->prepare("SELECT * FROM dms_ocr_template_zones WHERE template_id = :tid");
+        $stmtZones->execute([':tid' => $id]);
         $zones = $stmtZones->fetchAll(PDO::FETCH_ASSOC);
 
-        // Sample Doc URL (if creating frontend preview)
-        $sampleUrl = null;
-        if ($template['sample_doc_id']) {
-            // In a real app, generate a secure token or link
-            // For now, allow download via existing DMS API
-            $sampleUrl = "/api/api-dms.php?action=download&id=" . $template['sample_doc_id'];
-        }
+        // Map zones for frontend
+        $mappedZones = array_map(function($z) {
+            return [
+                'id' => 'db_' . $z['rec_id'],
+                'attribute_code' => $z['attribute_code'],
+                'x' => (float)$z['rect_x'],
+                'y' => (float)$z['rect_y'],
+                'width' => (float)$z['rect_w'],
+                'height' => (float)$z['rect_h'],
+                'data_type' => $z['data_type'],
+                'regex_pattern' => $z['regex_pattern']
+            ];
+        }, $zones);
 
-        echo json_encode(['success' => true, 'data' => [
-            'template' => $template,
-            'zones' => $zones,
-            'sample_url' => $sampleUrl
-        ]]);
+        echo json_encode(['success' => true, 'data' => ['template' => $template, 'zones' => $mappedZones]]);
         exit;
     }
 
-    // === SAVE TEMPLATE ===
-    if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-        $data = json_decode(file_get_contents('php://input'), true);
-        
-        $tenantId = '00000000-0000-0000-0000-000000000001';
-        $name = $data['name'];
-        $docTypeId = $data['doc_type_id'] ?: null;
-        $anchorText = $data['anchor_text'] ?? '';
-        $sampleDocId = $data['sample_doc_id'] ?: null;
-        $zones = $data['zones'] ?? [];
+    // -------------------------------------------------------------------------
+    // ACTION: SAVE (Create/Update)
+    // -------------------------------------------------------------------------
+    if ($action === 'save') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input) throw new Exception("Invalid input");
+
+        $id = $input['rec_id'] ?? $input['id'] ?? null;
+        $name = $input['name'] ?? 'Unnamed Template';
+        $docTypeId = $input['doc_type_id'] ?? null;
+        $anchorText = $input['anchor_text'] ?? '';
+        $sampleDocId = $input['sample_doc_id'] ?? null;
+        $zones = $input['zones'] ?? [];
 
         $pdo->beginTransaction();
 
-        // 1. Upsert Template
-        if (isset($data['rec_id']) && $data['rec_id'] > 0) {
-            $id = $data['rec_id'];
-            $stmt = $pdo->prepare("UPDATE dms_ocr_templates SET name=?, doc_type_id=?, anchor_text=?, sample_doc_id=? WHERE rec_id=?");
-            $stmt->execute([$name, $docTypeId, $anchorText, $sampleDocId, $id]);
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO dms_ocr_templates (tenant_id, name, doc_type_id, anchor_text, sample_doc_id) VALUES (?, ?, ?, ?, ?) RETURNING rec_id");
-            $stmt->execute([$tenantId, $name, $docTypeId, $anchorText, $sampleDocId]);
-            $id = $stmt->fetchColumn();
+        try {
+            if ($id) {
+                // UPDATE
+                $sql = "UPDATE dms_ocr_templates SET name=:name, doc_type_id=:dtid, anchor_text=:anchor, sample_doc_id=:sdoc, updated_at=NOW() WHERE rec_id=:id";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':name' => $name, 
+                    ':dtid' => $docTypeId ?: null, 
+                    ':anchor' => $anchorText, 
+                    ':sdoc' => $sampleDocId ?: null,
+                    ':id' => $id
+                ]);
+                
+                // Replace zones (simplest strategy: delete all for this template and re-insert)
+                $pdo->prepare("DELETE FROM dms_ocr_template_zones WHERE template_id = :tid")->execute([':tid' => $id]);
+                $templateId = $id;
+
+            } else {
+                // INSERT
+                $sql = "INSERT INTO dms_ocr_templates (tenant_id, name, doc_type_id, anchor_text, sample_doc_id) VALUES (:tid, :name, :dtid, :anchor, :sdoc) RETURNING rec_id";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':tid' => $tenantId,
+                    ':name' => $name, 
+                    ':dtid' => $docTypeId ?: null, 
+                    ':anchor' => $anchorText,
+                    ':sdoc' => $sampleDocId ?: null
+                ]);
+                $templateId = $stmt->fetchColumn();
+            }
+
+            // Insert Zones
+            if (!empty($zones)) {
+                $sqlZone = "INSERT INTO dms_ocr_template_zones (template_id, attribute_code, rect_x, rect_y, rect_w, rect_h, data_type, regex_pattern) VALUES (:tid, :code, :x, :y, :w, :h, :dtype, :regex)";
+                $stmtZone = $pdo->prepare($sqlZone);
+
+                foreach ($zones as $zone) {
+                    $stmtZone->execute([
+                        ':tid' => $templateId,
+                        ':code' => $zone['attribute_code'],
+                        ':x' => $zone['x'],
+                        ':y' => $zone['y'],
+                        ':w' => $zone['width'],
+                        ':h' => $zone['height'],
+                        ':dtype' => $zone['data_type'] ?? 'text',
+                        ':regex' => $zone['regex_pattern'] ?? ''
+                    ]);
+                }
+            }
+
+            $pdo->commit();
+            echo json_encode(['success' => true, 'id' => $templateId]);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
         }
-
-        // 2. Refresh Zones (Delete all & Insert new)
-        // Simplest strategy for editing
-        $pdo->prepare("DELETE FROM dms_ocr_zones WHERE template_id = ?")->execute([$id]);
-
-        $stmtZone = $pdo->prepare("INSERT INTO dms_ocr_zones (template_id, attribute_code, x, y, width, height, data_type, regex_pattern) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        
-        foreach ($zones as $z) {
-            $stmtZone->execute([
-                $id,
-                $z['attribute_code'],
-                $z['x'],
-                $z['y'],
-                $z['width'],
-                $z['height'],
-                $z['data_type'] ?? 'text',
-                $z['regex_pattern'] ?? ''
-            ]);
-        }
-
-        $pdo->commit();
-        echo json_encode(['success' => true, 'rec_id' => $id]);
         exit;
     }
 
-    // === DELETE TEMPLATE ===
+    // -------------------------------------------------------------------------
+    // ACTION: DELETE
+    // -------------------------------------------------------------------------
     if ($action === 'delete') {
-        $id = $_GET['id'] ?? 0;
-        $pdo->prepare("UPDATE dms_ocr_templates SET is_active = false WHERE rec_id = ?")->execute([$id]);
-        echo json_encode(['success' => true]);
-        exit;
+         $input = json_decode(file_get_contents('php://input'), true);
+         $id = $input['id'] ?? null;
+         if (!$id) throw new Exception("ID required");
+
+         $pdo->prepare("DELETE FROM dms_ocr_templates WHERE rec_id = :id")->execute([':id' => $id]);
+         echo json_encode(['success' => true]);
+         exit;
     }
+
+    throw new Exception("Unknown action");
 
 } catch (Exception $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

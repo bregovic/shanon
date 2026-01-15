@@ -11,12 +11,14 @@ import {
     ProgressBar,
     Badge
 } from "@fluentui/react-components";
+import { useNavigate } from 'react-router-dom';
 import {
     Save24Regular,
     Checkmark24Regular,
     ArrowRight24Regular,
     ArrowLeft24Regular,
-    Dismiss24Regular
+    Dismiss24Regular,
+    ScanThumbUp24Regular
 } from "@fluentui/react-icons";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
@@ -102,6 +104,7 @@ interface LinkedAttribute {
 
 export const DmsReview: React.FC = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const styles = useStyles();
     const [docs, setDocs] = useState<DmsDocument[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -400,6 +403,16 @@ export const DmsReview: React.FC = () => {
                             <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
                                 {currentDoc.doc_type_name || 'Neurčený typ'}
                             </Text>
+                            <div style={{ marginTop: '8px' }}>
+                                <Button
+                                    size="small"
+                                    appearance="outline"
+                                    icon={<ScanThumbUp24Regular />}
+                                    onClick={() => navigate(`/dms/ocr-designer/new?doc_id=${currentDoc.rec_id}`)}
+                                >
+                                    Vytvořit otisk (šablonu)
+                                </Button>
+                            </div>
                         </div>
 
                         {loadingAttrs ? (

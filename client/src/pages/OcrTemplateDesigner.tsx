@@ -20,107 +20,27 @@ import {
     Save24Regular,
     Delete24Regular
 } from '@fluentui/react-icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
 
-const useStyles = makeStyles({
-    designerContainer: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 320px',
-        height: 'calc(100vh - 180px)', // Adjust based on header/layout
-        ...shorthands.gap('16px'),
-    },
-    canvasArea: {
-        backgroundColor: tokens.colorNeutralBackground2,
-        ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke1),
-        ...shorthands.borderRadius('8px'),
-        position: 'relative',
-        overflow: 'hidden', // Scroll is handled inside if needed, or scale to fit
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        userSelect: 'none',
-    },
-    sidebar: {
-        display: 'flex',
-        flexDirection: 'column',
-        ...shorthands.gap('12px'),
-        overflowY: 'auto',
-        ...shorthands.padding('4px'), // gutter
-    },
-    zoneItem: {
-        ...shorthands.padding('8px'),
-        ...shorthands.borderLeft('4px', 'solid', tokens.colorBrandBackground),
-        display: 'flex',
-        flexDirection: 'column',
-        ...shorthands.gap('8px'),
-        backgroundColor: tokens.colorNeutralBackground1,
-    },
-    imageOverlay: {
-        position: 'relative',
-        boxShadow: tokens.shadow16,
-        cursor: 'crosshair',
-    },
-    zoneBox: {
-        position: 'absolute',
-        backgroundColor: 'rgba(0, 120, 212, 0.2)', // Fluent Brand Blue transparent
-        border: `2px solid ${tokens.colorBrandStroke1}`,
-        cursor: 'move',
-        ':hover': {
-            backgroundColor: 'rgba(0, 120, 212, 0.3)',
-        }
-    },
-    zoneBoxSelected: {
-        backgroundColor: 'rgba(0, 120, 212, 0.4)',
-        border: `2px solid ${tokens.colorPaletteRedBorderActive}`,
-        zIndex: 10,
-    },
-    zoneLabel: {
-        position: 'absolute',
-        top: '-20px',
-        left: '0',
-        backgroundColor: tokens.colorBrandBackground,
-        color: tokens.colorNeutralForegroundOnBrand,
-        padding: '2px 4px',
-        fontSize: '10px',
-        borderRadius: '2px',
-        whiteSpace: 'nowrap',
-    }
-});
-
-interface OCRZone {
-    id: string; // temp id for UI
-    attribute_code: string;
-    x: number; // percentage 0-1
-    y: number;
-    width: number;
-    height: number;
-    data_type: 'text' | 'number' | 'date' | 'currency';
-    regex_pattern: string;
-}
-
-interface OCRTemplate {
-    rec_id?: number;
-    name: string;
-    doc_type_id: number | null;
-    anchor_text: string;
-    sample_doc_id: number | null;
-}
+// ... (previous imports and styles remain same until Line 110)
 
 export const OcrTemplateDesigner = () => {
     const styles = useStyles();
     const navigate = useNavigate();
-    const { id: paramId } = useParams(); // if editing existing
+    const { id: paramId } = useParams();
+    const [searchParams] = useSearchParams();
+    const sourceDocId = searchParams.get('doc_id');
 
     // State
-    const [template, setTemplate] = useState<OCRTemplate>({ name: 'Nová šablona', doc_type_id: null, anchor_text: '', sample_doc_id: null });
+    const [template, setTemplate] = useState<OCRTemplate>({ name: 'Nová šablona', doc_type_id: null, anchor_text: '', sample_doc_id: sourceDocId ? parseInt(sourceDocId) : null });
     const [zones, setZones] = useState<OCRZone[]>([]);
     const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
     const [docTypes, setDocTypes] = useState<any[]>([]);
     const [availableAttributes, setAvailableAttributes] = useState<any[]>([]);
 
     // UI State
-    const [imageUrl, setImageUrl] = useState<string | null>(null); // URL of the sample blob
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Drawing State
@@ -129,34 +49,69 @@ export const OcrTemplateDesigner = () => {
     const [currentDrawRect, setCurrentDrawRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
     const imageRef = useRef<HTMLImageElement>(null);
 
-    // Mock Data Load (Replace with real API)
+    // Data Load
     useEffect(() => {
-        // Fetch Dictionary Data
-        const fetchDicts = async () => {
-            // Mock Doc Types
-            setDocTypes([
-                { rec_id: 1, name: 'Faktura přijatá' },
-                { rec_id: 2, name: 'Smlouva' },
-                { rec_id: 3, name: 'Účtenka' }
-            ]);
+        const fetchData = async () => {
+            try {
+                // 1. Fetch Dicts
+                const [resTypes, resAttrs] = await Promise.all([
+                    fetch('/api/api-dms.php?action=doc_types').then(r => r.json()),
+                    fetch('/api/api-dms.php?action=attributes').then(r => r.json())
+                ]);
 
-            // Mock Attributes (Sync with your dms_attributes table)
-            setAvailableAttributes([
-                { code: 'TOTAL_AMOUNT', name: 'Celková částka' },
-                { code: 'ISSUE_DATE', name: 'Datum vystavení' },
-                { code: 'DUE_DATE', name: 'Datum splatnosti' },
-                { code: 'VS', name: 'Variabilní symbol' },
-                { code: 'SUPPLIER_ICO', name: 'IČ Dodavatele' },
-                { code: 'SUPPLIER_NAME', name: 'Název Dodavatele' }
-            ]);
+                if (resTypes.success) setDocTypes(resTypes.data);
+                if (resAttrs.success) setAvailableAttributes(resAttrs.data);
+
+                // 2. Load Template if editing
+                if (paramId && paramId !== 'new') {
+                    const resTpl = await fetch(`/api/api-ocr-templates.php?action=get&id=${paramId}`).then(r => r.json());
+                    if (resTpl.success) {
+                        const t = resTpl.data.template;
+                        setTemplate({
+                            rec_id: t.rec_id,
+                            name: t.name,
+                            doc_type_id: t.doc_type_id,
+                            anchor_text: t.anchor_text || '',
+                            sample_doc_id: t.sample_doc_id
+                        });
+                        setZones(resTpl.data.zones || []);
+
+                        // If we have a sample doc, load it
+                        if (t.sample_doc_id) {
+                            loadDocumentImage(t.sample_doc_id);
+                        }
+                    }
+                }
+                // 3. Or New with Source Doc
+                else if (sourceDocId) {
+                    loadDocumentImage(parseInt(sourceDocId));
+                }
+
+            } catch (e) {
+                console.error(e);
+            }
         };
-        fetchDicts();
 
-        // If ID provided, load template
-        if (paramId && paramId !== 'new') {
-            // fetchTemplate(paramId);
+        fetchData();
+    }, [paramId, sourceDocId]);
+
+    const loadDocumentImage = async (docId: number) => {
+        try {
+            setLoading(true);
+            const res = await fetch(`/api/api-dms.php?action=view&id=${docId}`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                setImageUrl(url);
+            } else {
+                console.error("Failed to load document image");
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
         }
-    }, [paramId]);
+    };
 
     // DRAWING LOGIC
     const handleMouseDown = (e: React.MouseEvent) => {
