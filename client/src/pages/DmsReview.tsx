@@ -268,9 +268,10 @@ export const DmsReview: React.FC = () => {
         // Interactive Zoom Setup
         setImageUrl(null);
         setActiveField(null);
-        if (currentDoc.mime_type.startsWith('image/')) {
-            setImageUrl(`/api/api-dms.php?action=view&id=${currentDoc.rec_id}`);
-        }
+
+        // Always try to load a preview image (Page 1 for PDFs, or the Image itself)
+        // This enables the "Rossum-like" interactive selection.
+        setImageUrl(`/api/api-dms.php?action=view_preview&id=${currentDoc.rec_id}`);
 
         const loadAttrs = async () => {
             setLoadingAttrs(true);

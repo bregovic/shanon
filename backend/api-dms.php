@@ -445,24 +445,30 @@ try {
 
         if (!$doc) throw new Exception('Document not found');
 
-        // Resolve Path (reuse OcrEngine logic concept)
+        // Resolve Path (reuse logic)
         $filepath = $doc['storage_path'];
-        if (!file_exists($filepath)) {
-            $baseDir = __DIR__;
-            $filepath = $baseDir . '/' . ltrim($doc['storage_path'], '/');
+        // If relative...
+        if (!file_exists($filepath) && file_exists(__DIR__ . '/' . $filepath)) {
+            $filepath = __DIR__ . '/' . $filepath;
         }
 
-        // Only support Images for now
-        if (strpos($doc['mime_type'], 'image/') !== 0) {
-             echo json_encode(['success' => false, 'error' => 'Interaktivní zónování je dostupné pouze pro obrázky. (Mime: '.$doc['mime_type'].')']);
-             exit;
-        }
+        require_once __DIR__ . '/helpers/PdfRenderer.php';
 
         try {
             // Load Image
             $srcImg = null;
-            if ($doc['mime_type'] === 'image/jpeg' || $doc['file_extension'] === 'jpg') $srcImg = @imagecreatefromjpeg($filepath);
-            elseif ($doc['mime_type'] === 'image/png' || $doc['file_extension'] === 'png') $srcImg = @imagecreatefrompng($filepath);
+            $isPdf = $doc['mime_type'] === 'application/pdf' || $doc['file_extension'] === 'pdf';
+
+            if ($isPdf) {
+                // Render PDF to Image first
+                $imgBlob = PdfRenderer::renderPage($filepath, 0);
+                if (!$imgBlob) throw new Exception('Nelze převést PDF na obrázek (chybí Imagick/Ghostscript).');
+                $srcImg = imagecreatefromstring($imgBlob);
+            } else {
+                // Standard Image
+                if ($doc['mime_type'] === 'image/jpeg' || $doc['file_extension'] === 'jpg') $srcImg = @imagecreatefromjpeg($filepath);
+                elseif ($doc['mime_type'] === 'image/png' || $doc['file_extension'] === 'png') $srcImg = @imagecreatefrompng($filepath);
+            }
             
             if (!$srcImg) throw new Exception('Nepodařilo se načíst obrázek (GD Library error).');
 
@@ -487,15 +493,13 @@ try {
             $crop = imagecrop($srcImg, ['x' => $x, 'y' => $y, 'width' => $w, 'height' => $h]);
             
             if ($crop !== false) {
-                // Resize for better OCR? (Optional, Tesseract handles scaling usually, but enlarging small text helps)
-                // Let's just save
                 $tempFile = sys_get_temp_dir() . '/ocr_crop_' . uniqid() . '.png';
                 imagepng($crop, $tempFile);
                 imagedestroy($crop);
                 imagedestroy($srcImg);
 
                 // Run Tesseract
-                $cmd = "tesseract " . escapeshellarg($tempFile) . " stdout -l ces+eng --psm 7"; // PSM 7 = Single text line, typically best for fields
+                $cmd = "tesseract " . escapeshellarg($tempFile) . " stdout -l ces+eng --psm 7";
                 $output = [];
                 $ret = 0;
                 exec($cmd, $output, $ret);
@@ -514,6 +518,58 @@ try {
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
+        exit;
+    }
+
+    // ===== PREVIEW IMAGE (For PDF/Image interactive zoning) =====
+    if ($action === 'view_preview') {
+        $id = $_GET['id'] ?? 0;
+        if (!$id) { http_response_code(400); exit; }
+
+        $stmt = $pdo->prepare("SELECT storage_path, mime_type FROM dms_documents WHERE rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$doc) { http_response_code(404); exit; }
+
+        $filepath = $doc['storage_path'];
+        if (!file_exists($filepath) && file_exists(__DIR__ . '/' . $filepath)) {
+            $filepath = __DIR__ . '/' . $filepath;
+        }
+
+        require_once __DIR__ . '/helpers/PdfRenderer.php';
+
+        $isPdf = $doc['mime_type'] === 'application/pdf'; // or extension check
+        
+        if ($isPdf) {
+            $blob = PdfRenderer::renderPage($filepath, 0);
+            if ($blob) {
+                header('Content-Type: image/jpeg');
+                echo $blob;
+                exit;
+            }
+        } else {
+             // If it's already an image, redirect to view or output it
+             // Let's output it via GD to ensure consistent orient/type, or just readfile
+             if (file_exists($filepath)) {
+                 $mime = mime_content_type($filepath);
+                 header('Content-Type: ' . $mime);
+                 readfile($filepath);
+                 exit;
+             }
+        }
+        
+        // Fallback: Return a placeholder image
+        $im = imagecreate(800, 1000);
+        $bg = imagecolorallocate($im, 240, 240, 240);
+        $text_color = imagecolorallocate($im, 200, 0, 0);
+        imagestring($im, 5, 50, 50,  'Preview not available', $text_color);
+        imagestring($im, 3, 50, 80,  'Imagick/Ghostscript missing on server', $text_color);
+        header('Content-Type: image/png');
+        imagepng($im);
+        imagedestroy($im);
+        exit;
+    }
         exit;
     }
 
