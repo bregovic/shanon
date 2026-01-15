@@ -8,15 +8,18 @@ class DbSessionHandler implements SessionHandlerInterface {
         $this->pdo = $pdo;
     }
 
-    public function open($savePath, $sessionName): bool {
+    #[\ReturnTypeWillChange]
+    public function open($savePath, $sessionName) {
         return true;
     }
 
-    public function close(): bool {
+    #[\ReturnTypeWillChange]
+    public function close() {
         return true;
     }
 
-    public function read($id): string|false {
+    #[\ReturnTypeWillChange]
+    public function read($id) {
         $stmt = $this->pdo->prepare("SELECT data FROM sys_sessions WHERE id = :id");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -27,7 +30,8 @@ class DbSessionHandler implements SessionHandlerInterface {
         return '';
     }
 
-    public function write($id, $data): bool {
+    #[\ReturnTypeWillChange]
+    public function write($id, $data) {
         $access = time();
         // Upsert logic (PostgreSQL)
         $sql = "INSERT INTO sys_sessions (id, data, access) 
@@ -42,12 +46,14 @@ class DbSessionHandler implements SessionHandlerInterface {
         ]);
     }
 
-    public function destroy($id): bool {
+    #[\ReturnTypeWillChange]
+    public function destroy($id) {
         $stmt = $this->pdo->prepare("DELETE FROM sys_sessions WHERE id = :id");
         return $stmt->execute([':id' => $id]);
     }
 
-    public function gc($max_lifetime): int|false {
+    #[\ReturnTypeWillChange]
+    public function gc($max_lifetime) {
         $old = time() - $max_lifetime;
         $stmt = $this->pdo->prepare("DELETE FROM sys_sessions WHERE access < :old");
         $stmt->execute([':old' => $old]);
