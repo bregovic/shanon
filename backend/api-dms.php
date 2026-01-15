@@ -50,6 +50,27 @@ try {
     }
 
     // -------------------------------------------------------------------------
+    // ACTION: GET (Single Doc Details including OCR Data)
+    // -------------------------------------------------------------------------
+    if ($action === 'get') {
+        $id = $_GET['id'] ?? null;
+        if (!$id) throw new Exception("ID missing");
+
+        $stmt = $pdo->prepare("SELECT * FROM dms_documents WHERE rec_id = :id");
+        $stmt->execute([':id' => $id]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$doc) throw new Exception("Document not found");
+
+        // Decode JSON fields
+        $doc['ocr_data'] = json_decode($doc['ocr_data'] ?? '[]', true);
+        $doc['metadata'] = json_decode($doc['metadata'] ?? '[]', true);
+        
+        echo json_encode(['success' => true, 'data' => $doc]);
+        exit;
+    }
+
+    // -------------------------------------------------------------------------
     // ACTION: DOC TYPES
     // -------------------------------------------------------------------------
     if ($action === 'types' || $action === 'doc_types') {
@@ -511,10 +532,14 @@ try {
                  // Preserve existing metadata?
                  // Simple overwrite for OCR results usually safer to avoid stale data mixing
                  
-                 $pdo->prepare("UPDATE dms_documents SET ocr_status = 'completed', status = 'review', metadata = :meta, ocr_text_content = :txt WHERE rec_id = :id")
+                 // Store OCR Data (hOCR/TSV structured) if available
+                 $ocrDataJson = isset($res['ocr_data']) ? json_encode($res['ocr_data'], JSON_INVALID_UTF8_SUBSTITUTE) : null;
+
+                 $pdo->prepare("UPDATE dms_documents SET ocr_status = 'completed', status = 'review', metadata = :meta, ocr_text_content = :txt, ocr_data = :odata WHERE rec_id = :id")
                      ->execute([
                          ':meta' => json_encode($meta, JSON_INVALID_UTF8_SUBSTITUTE),
                          ':txt' => $res['raw_text_preview'],
+                         ':odata' => $ocrDataJson,
                          ':id' => $id
                      ]);
                  

@@ -861,7 +861,8 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         '036_dms_storage' => null,
         '037_dms_doc_storage_link' => null,
         '038_dms_ocr_templates' => null,
-        '039_dms_attribute_options' => null
+        '039_dms_attribute_options' => null,
+        '040_dms_ocr_data' => null
     ];
 
 

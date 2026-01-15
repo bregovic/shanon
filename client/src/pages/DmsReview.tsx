@@ -81,6 +81,12 @@ const useStyles = makeStyles({
     }
 });
 
+interface OcrWord {
+    text: string;
+    rect: { x: number, y: number, w: number, h: number };
+    conf: number;
+}
+
 interface DmsDocument {
     rec_id: number;
     doc_type_id: number;
@@ -94,6 +100,7 @@ interface DmsDocument {
         attributes?: Record<string, string>;
         zones?: Record<string, { x: number, y: number, w: number, h: number }>;
     };
+    ocr_data?: OcrWord[]; // Structured OCR data
 }
 
 interface LinkedAttribute {
@@ -130,6 +137,10 @@ export const DmsReview: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [loadingAttrs, setLoadingAttrs] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Smart Suggestion State
+    const [ocrData, setOcrData] = useState<OcrWord[]>([]);
+    const [highlightRects, setHighlightRects] = useState<{ x: number, y: number, w: number, h: number }[]>([]);
 
     const [zonesMap, setZonesMap] = useState<Record<string, { x: number, y: number, w: number, h: number }>>({});
     const [saveTemplate, setSaveTemplate] = useState(false);
@@ -218,6 +229,40 @@ export const DmsReview: React.FC = () => {
         }
     };
 
+    const handleSmartHighlight = (attr: LinkedAttribute) => {
+        if (!ocrData || ocrData.length === 0) {
+            setHighlightRects([]);
+            return;
+        }
+
+        const keywords = [attr.name];
+
+        const matches = ocrData.filter(word => {
+            if (word.conf < 50) return false;
+            const wText = word.text.toLowerCase().replace(/[:.,]/g, '');
+
+            return keywords.some(k => {
+                const kText = k.toLowerCase();
+
+                // 1. Full contains
+                if (wText.includes(kText)) return true;
+
+                // 2. Multi-word decomposition (e.g. "Datum splatnosti" -> "splatnosti")
+                const parts = kText.split(' ');
+                if (parts.length > 1) {
+                    return parts.some(p => p.length > 3 && wText.includes(p));
+                }
+
+                // 3. Prefix match (first 4 chars)
+                if (kText.length > 3 && wText.startsWith(kText.substring(0, 4))) return true;
+
+                return false;
+            });
+        });
+
+        setHighlightRects(matches.slice(0, 10).map(m => m.rect));
+    };
+
 
     // 1. Fetch Documents to Review
     useEffect(() => {
@@ -289,6 +334,17 @@ export const DmsReview: React.FC = () => {
         // Always try to load a preview image (Page 1 for PDFs, or the Image itself)
         // This enables the "Rossum-like" interactive selection.
         setImageUrl(`/api/api-dms.php?action=view_preview&id=${currentDoc.rec_id}`);
+
+        // Reset & Load Smart Suggestion Data
+        setOcrData([]);
+        setHighlightRects([]);
+        axios.get(`/api/api-dms.php?action=get&id=${currentDoc.rec_id}`)
+            .then(res => {
+                if (res.data.success && res.data.data.ocr_data) {
+                    setOcrData(res.data.data.ocr_data);
+                }
+            })
+            .catch(e => console.error("Could not load OCR data", e));
 
         const loadAttrs = async () => {
             setLoadingAttrs(true);
@@ -401,7 +457,7 @@ export const DmsReview: React.FC = () => {
         );
     }
 
-    const docUrl = `/api/api-dms.php?action=view&id=${currentDoc.rec_id}`;
+
 
     return (
         <PageLayout>
@@ -474,7 +530,12 @@ export const DmsReview: React.FC = () => {
                                                     onOptionSelect={(_e, d) => setFormData({ ...formData, [attr.code]: d.optionValue || '' })}
                                                     style={{ flexGrow: 1, minWidth: 0, borderColor: activeField === attr.code ? tokens.colorBrandStroke1 : undefined }}
                                                     placeholder={attr.data_type === 'date' ? 'DD.MM.RRRR' : 'Vyberte hodnotu'}
-                                                    onFocus={() => { if (imageUrl) setActiveField(attr.code); }}
+                                                    onFocus={() => {
+                                                        if (imageUrl) {
+                                                            setActiveField(attr.code);
+                                                            handleSmartHighlight(attr);
+                                                        }
+                                                    }}
                                                 >
                                                     {attr.options.map((opt) => (
                                                         <Option key={opt} value={opt}>{opt}</Option>
@@ -487,7 +548,12 @@ export const DmsReview: React.FC = () => {
                                                     onChange={(_e, d) => setFormData({ ...formData, [attr.code]: d.value })}
                                                     style={{ flexGrow: 1, borderColor: activeField === attr.code ? tokens.colorBrandStroke1 : undefined }}
                                                     placeholder={attr.data_type === 'date' ? 'DD.MM.RRRR' : ''}
-                                                    onFocus={() => { if (imageUrl) setActiveField(attr.code); }}
+                                                    onFocus={() => {
+                                                        if (imageUrl) {
+                                                            setActiveField(attr.code);
+                                                            handleSmartHighlight(attr);
+                                                        }
+                                                    }}
                                                     contentAfter={
                                                         activeField === attr.code ?
                                                             <Dismiss24Regular
@@ -614,6 +680,23 @@ export const DmsReview: React.FC = () => {
                                                 pointerEvents: 'none'
                                             }}
                                             title={code}
+                                        />
+                                    ))}
+                                    {/* Smart Suggestion Highlights */}
+                                    {highlightRects.map((rect, i) => (
+                                        <div
+                                            key={'hl-' + i}
+                                            style={{
+                                                position: 'absolute',
+                                                left: (rect.x * 100) + '%',
+                                                top: (rect.y * 100) + '%',
+                                                width: (rect.w * 100) + '%',
+                                                height: (rect.h * 100) + '%',
+                                                backgroundColor: 'rgba(255, 255, 0, 0.25)',
+                                                border: '2px dashed rgba(255, 200, 0, 0.8)',
+                                                pointerEvents: 'none',
+                                                zIndex: 5
+                                            }}
                                         />
                                     ))}
                                 </div>

@@ -59,6 +59,19 @@ class OcrEngine {
         // 3. Extract Full Text (Context)
         $rawText = $this->extractText($localPath, $doc['mime_type']);
         
+        // 3b. Extract Structured Data (Words + Positions)
+        $ocrData = [];
+        try {
+            $tsImage = $this->prepareImageForCropping($localPath, $doc['mime_type']);
+            if ($tsImage && file_exists($tsImage)) {
+                 $ocrData = $this->runTesseractFull($tsImage);
+                 // Cleanup if temp
+                 if ($tsImage !== $localPath && file_exists($tsImage)) unlink($tsImage);
+            }
+        } catch (Exception $e) {
+            error_log("OCR Structured Data Failed: " . $e->getMessage());
+        }
+
         // 4. Try Template Matching FIRST
         $templateResults = $this->applyTemplates($doc, $localPath, $rawText);
         
@@ -81,7 +94,8 @@ class OcrEngine {
             'doc_id' => $docId,
             'raw_text_preview' => substr($rawText, 0, 500) . '...',
             'strategy_used' => $strategy,
-            'attributes' => $foundAttributes
+            'attributes' => $foundAttributes,
+            'ocr_data' => $ocrData
         ];
     }
 
@@ -645,5 +659,55 @@ class OcrEngine {
         if (strlen($text) < 100) error_log("OcrEngine: Text preview: " . $text);
         
         return $text;
+    }
+    /**
+     * Helper: Run Tesseract with TSV output to get word positions
+     */
+    private function runTesseractFull($imagePath) {
+        $info = @getimagesize($imagePath);
+        $imgW = $info[0] ?? 1;
+        $imgH = $info[1] ?? 1;
+
+        // tesseract [input] stdout -l ces+eng tsv
+        $cmd = "tesseract " . escapeshellarg($imagePath) . " stdout -l ces+eng tsv";
+        $output = [];
+        $code = 0;
+        exec($cmd, $output, $code);
+        
+        $data = [];
+
+        if ($code === 0) {
+            foreach ($output as $line) {
+                // TSV Header: level page_num block_num par_num line_num word_num left top width height conf text
+                if (strpos($line, 'level') === 0) continue;
+                
+                $cols = explode("\t", $line);
+                if (count($cols) < 12) continue;
+                
+                $conf = (int)$cols[10];
+                $txt = isset($cols[11]) ? trim($cols[11]) : '';
+                
+                // Filter noise
+                if ($conf > 20 && $txt !== '') {
+                    $l = (int)$cols[6];
+                    $t = (int)$cols[7];
+                    $wd = (int)$cols[8];
+                    $ht = (int)$cols[9];
+                    
+                    $data[] = [
+                        'text' => $txt,
+                        'rect' => [
+                            'x' => round($l / $imgW, 4),
+                            'y' => round($t / $imgH, 4),
+                            'w' => round($wd / $imgW, 4),
+                            'h' => round($ht / $imgH, 4)
+                        ],
+                        'conf' => $conf
+                    ];
+                }
+            }
+        }
+        
+        return $data;
     }
 }
