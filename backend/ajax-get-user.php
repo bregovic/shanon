@@ -16,8 +16,11 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
     $user = $_SESSION['user'] ?? null;
     $permissions = [];
     $rolesList = [];
+    
+    // Get user ID - support both 'id' and 'rec_id' field names
+    $userId = $user['rec_id'] ?? $user['id'] ?? null;
 
-    if ($user && isset($user['rec_id'])) {
+    if ($user && $userId) {
         try {
             $pdo = DB::connect();
             
@@ -57,7 +60,7 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
                     GROUP BY obj.identifier
                 ";
 
-                $params = array_merge($roleCodes, [$user['rec_id']]);
+                $params = array_merge($roleCodes, [$userId]);
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
             
@@ -89,10 +92,11 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
              
              if ($orgTableExists) {
                  // Admin Override: Admins see ALL organizations
-                 // Check both session roles and roleCodes
-                 $userRoles = $_SESSION['user']['roles'] ?? [];
-                 $isAdmin = in_array('admin', array_map('strtolower', (array)$userRoles)) 
-                         || in_array('ADMIN', $roleCodes ?? []);
+                 // Check session role (admin, superadmin) and roleCodes
+                 $userRole = strtolower($_SESSION['user']['role'] ?? '');
+                 $isAdmin = in_array($userRole, ['admin', 'superadmin']) 
+                         || in_array('ADMIN', $roleCodes ?? [])
+                         || in_array('SUPERADMIN', $roleCodes ?? []);
                  
                  if ($isAdmin) {
                      $sql = "
@@ -113,7 +117,7 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
                  }
                  
                  $stmt = $pdo->prepare($sql);
-                 $stmt->execute([':uid' => $user['rec_id']]);
+                 $stmt->execute([':uid' => $userId]);
                  $availableOrgs = $stmt->fetchAll(PDO::FETCH_ASSOC);
                  
                  // Fallback: If no orgs found and user is logged in, assign them to first available org
@@ -125,7 +129,7 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
                      if ($fallbackOrg) {
                          // Auto-assign user to this org
                          $pdo->prepare("INSERT INTO sys_user_org_access (user_id, org_id, is_default) VALUES (:uid, :oid, true) ON CONFLICT DO NOTHING")
-                             ->execute([':uid' => $user['rec_id'], ':oid' => $fallbackOrg['org_id']]);
+                             ->execute([':uid' => $userId, ':oid' => $fallbackOrg['org_id']]);
                          $fallbackOrg['is_default'] = true;
                          $availableOrgs = [$fallbackOrg];
                      }
