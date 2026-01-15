@@ -336,17 +336,46 @@ export const OrganizationsAdmin: React.FC = () => {
 
             <PageContent>
                 {viewMode === 'list' ? (
-                    loading ? <div style={{ padding: 20 }}><Spinner /></div> :
-                        <SmartDataGrid
-                            items={items}
-                            columns={columns}
-                            getRowId={(i) => i.org_id}
-                            selectionMode="multiselect"
-                            selectedItems={selectedIds}
-                            onSelectionChange={(e, d) => setSelectedIds(d.selectedItems)}
-                            onRowClick={handleEdit}
-                        />
-                ) : (
+                    loading ? <div style={{ padding: 20 }}><Spinner /></div> : (
+                        // DEBUG: Temporary replacement for SmartDataGrid
+                        <div style={{ padding: 20 }}>
+                            <p>Počet záznamů: {items.length}</p>
+                            {/* <SmartDataGrid
+                                items={items}
+                                columns={columns}
+                                getRowId={(i) => i.org_id}
+                                selectionMode="multiselect"
+                                selectedItems={selectedIds}
+                                onSelectionChange={(e, d) => setSelectedIds(d.selectedItems)}
+                                onRowClick={handleEdit}
+                            /> */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ textAlign: 'left' }}>ID</th>
+                                        <th style={{ textAlign: 'left' }}>Název</th>
+                                        <th style={{ textAlign: 'left' }}>IČO</th>
+                                        <th style={{ textAlign: 'left' }}>Město</th>
+                                        <th style={{ textAlign: 'left' }}>Status</th>
+                                        <th>Akce</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {items.map(item => (
+                                        <tr key={item.org_id} style={{ borderBottom: '1px solid #ccc' }}>
+                                            <td>{item.org_id}</td>
+                                            <td>{item.display_name}</td>
+                                            <td>{item.reg_no}</td>
+                                            <td>{item.city}</td>
+                                            <td>{item.is_active ? 'Aktivní' : 'Ne'}</td>
+                                            <td><Button size="small" onClick={() => handleEdit(item)}>Upravit</Button></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                ) : ( // Detail Form
                     renderForm()
                 )}
             </PageContent>
