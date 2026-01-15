@@ -84,8 +84,20 @@ try {
         
         $id = $input['rec_id'] ?? $input['id'] ?? null;
         $name = $input['name'] ?? 'New Profile';
-        $type = $input['type'] ?? 'local';
-        $config = json_encode($input['configuration'] ?? $input['config'] ?? [], JSON_INVALID_UTF8_SUBSTITUTE);
+        $type = $input['type'] ?? $input['storage_type'] ?? 'local';
+        
+        // Map legacy fields to configuration if needed
+        $configData = $input['configuration'] ?? $input['config'] ?? [];
+        if (empty($configData)) {
+            if ($type === 'google_drive') {
+                 $configData = [
+                     'folder_id' => $input['base_path'] ?? '',
+                     'service_account_json' => $input['connection_string'] ?? ''
+                 ];
+            }
+        }
+
+        $config = json_encode($configData, JSON_INVALID_UTF8_SUBSTITUTE);
         $isActive = filter_var($input['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN);
         $isDefault = filter_var($input['is_default'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
@@ -95,9 +107,9 @@ try {
         }
 
         if ($id) {
-            $sql = "UPDATE dms_storage_profiles SET name=:name, configuration=:config, is_active=:active, is_default=:def WHERE rec_id=:id";
+            $sql = "UPDATE dms_storage_profiles SET name=:name, type=:type, configuration=:config, is_active=:active, is_default=:def WHERE rec_id=:id";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([':name'=>$name, ':config'=>$config, ':active'=>$isActive? 'true':'false', ':def'=>$isDefault?'true':'false', ':id'=>$id]);
+            $stmt->execute([':name'=>$name, ':type'=>$type, ':config'=>$config, ':active'=>$isActive? 'true':'false', ':def'=>$isDefault?'true':'false', ':id'=>$id]);
         } else {
             $sql = "INSERT INTO dms_storage_profiles (name, type, configuration, is_active, is_default) VALUES (:name, :type, :config, :active, :def)";
             $stmt = $pdo->prepare($sql);
@@ -113,8 +125,6 @@ try {
         $id = $input['id'] ?? null;
         
         if (!$id) throw new Exception("ID required");
-
-        // Protect system profiles if needed, or rely on UI warning.
         
         $stmt = $pdo->prepare("DELETE FROM dms_storage_profiles WHERE rec_id = :id");
         $stmt->execute([':id' => $id]);
@@ -126,7 +136,7 @@ try {
     if ($action === 'storage_profile_test') {
         $input = json_decode(file_get_contents('php://input'), true);
         
-        $type = $input['type'] ?? 'local';
+        $type = $input['type'] ?? $input['storage_type'] ?? 'local';
         $config = $input['configuration'] ?? $input['config'] ?? [];
         
         // Ensure config is array
@@ -137,8 +147,9 @@ try {
         if ($type === 'google_drive') {
             require_once 'helpers/GoogleDriveStorage.php';
             try {
-                $folderId = $config['folder_id'] ?? '';
-                $creds = $config['service_account_json'] ?? ''; 
+                // Fallback for frontend legacy structure
+                $folderId = $config['folder_id'] ?? $input['base_path'] ?? '';
+                $creds = $config['service_account_json'] ?? $input['connection_string'] ?? ''; 
                 
                 // If creds is array, json_encode it back for the constructor
                 if (is_array($creds)) {
@@ -161,7 +172,7 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Adresář uploads/dms není zapisovatelný.']);
              }
         } else {
-             echo json_encode(['success' => false, 'error' => 'Unknown storage type']);
+             echo json_encode(['success' => false, 'error' => 'Unknown storage type (' . $type . ')']);
         }
         exit;
     }
