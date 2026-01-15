@@ -25,6 +25,92 @@ import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
 
 // ... (previous imports and styles remain same until Line 110)
 
+interface OCRZone {
+    id: string;
+    attribute_code: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    data_type: 'text' | 'number' | 'date' | 'currency';
+    regex_pattern?: string;
+}
+
+interface OCRTemplate {
+    rec_id?: number;
+    name: string;
+    doc_type_id: number | null;
+    anchor_text: string;
+    sample_doc_id: number | null;
+}
+
+const useStyles = makeStyles({
+    designerContainer: {
+        display: 'flex',
+        flexDirection: 'row',
+        height: 'calc(100vh - 160px)',
+        gap: '16px',
+        marginTop: '16px',
+    },
+    canvasArea: {
+        flexGrow: 1,
+        backgroundColor: tokens.colorNeutralBackground2,
+        borderRadius: tokens.borderRadiusMedium,
+        overflow: 'auto',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'start',
+        position: 'relative',
+        border: `1px solid ${tokens.colorNeutralStroke1}`,
+    },
+    sidebar: {
+        width: '320px',
+        minWidth: '320px',
+        display: 'flex',
+        flexDirection: 'column',
+        overflowY: 'auto'
+    },
+    imageOverlay: {
+        position: 'relative',
+        display: 'inline-block',
+        userSelect: 'none',
+    },
+    zoneBox: {
+        position: 'absolute',
+        border: '2px solid rgba(0, 120, 212, 0.5)',
+        backgroundColor: 'rgba(0, 120, 212, 0.1)',
+        cursor: 'pointer',
+        ':hover': {
+            border: '2px solid rgba(0, 120, 212, 1)',
+            backgroundColor: 'rgba(0, 120, 212, 0.2)',
+        }
+    },
+    zoneBoxSelected: {
+        border: '2px solid #d13438', // Red for selected
+        backgroundColor: 'rgba(209, 52, 56, 0.2)',
+        zIndex: 10,
+    },
+    zoneLabel: {
+        position: 'absolute',
+        top: '-20px',
+        left: '0',
+        backgroundColor: tokens.colorBrandBackground,
+        color: tokens.colorNeutralForegroundOnBrand,
+        padding: '2px 4px',
+        fontSize: '10px',
+        borderRadius: '2px',
+        whiteSpace: 'nowrap',
+    },
+    zoneItem: {
+        padding: '8px',
+        border: `1px solid ${tokens.colorNeutralStroke2}`,
+        borderRadius: tokens.borderRadiusMedium,
+        borderLeft: `4px solid ${tokens.colorNeutralStroke2}`,
+        marginBottom: '8px',
+        backgroundColor: tokens.colorNeutralBackground1
+    }
+});
+
 export const OcrTemplateDesigner = () => {
     const styles = useStyles();
     const navigate = useNavigate();
