@@ -88,10 +88,7 @@ export const OrganizationsAdmin: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<string>('general');
 
-    // Security Check
-    if (!hasPermission('mod_orgs', 'view') && !hasPermission('mod_system', 'view')) { // Fallback for transition
-        return <div style={{ padding: 24 }}>Access Denied (mod_orgs)</div>;
-    }
+    // Security check moved to render to prevent hook violation
 
     // --- FETCHING ---
     const fetchData = async () => {
@@ -301,6 +298,11 @@ export const OrganizationsAdmin: React.FC = () => {
             )}
         </div>
     );
+
+    // Security Check (Moved to render to avoid hook violation)
+    if (!hasPermission('mod_orgs', 'view') && !hasPermission('mod_system', 'view')) {
+        return <div style={{ padding: 24 }}>Access Denied (mod_orgs)</div>;
+    }
 
     // --- MAIN RENDER ---
     return (
