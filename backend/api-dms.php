@@ -156,17 +156,38 @@ try {
         $autoOcr = filter_var($_POST['auto_ocr'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         // Upload Dir
-        $uploadDir = __DIR__ . '/../uploads/dms';
-        if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+        $baseDir = dirname(__DIR__); // Root of project
+        $uploadDir = $baseDir . '/uploads/dms';
+        
+        // Ensure directory exists
+        if (!is_dir($uploadDir)) {
+            // Try to create recursively
+            if (!@mkdir($uploadDir, 0777, true)) {
+                $err = error_get_last();
+                throw new Exception("Failed to create upload directory '$uploadDir'. Error: " . ($err['message'] ?? 'Unknown'));
+            }
+        }
+        
+        // Ensure writable
+        if (!is_writable($uploadDir)) {
+            // Try to fix permissions
+            @chmod($uploadDir, 0777);
+            if (!is_writable($uploadDir)) {
+                 throw new Exception("Upload directory '$uploadDir' is not writable.");
+            }
+        }
 
         // Generate Filename
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        // Sanitize filename for storage (avoid utf8 issues on filesystem)
         $storageName = uniqid() . '.' . $ext;
         $targetPath = $uploadDir . '/' . $storageName;
         $relPath = 'uploads/dms/' . $storageName; // Relative for DB
 
         if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-            throw new Exception("Failed to move uploaded file");
+            $err = error_get_last();
+            // Provide detail: Source -> Target
+            throw new Exception("Failed to move uploaded file from '{$file['tmp_name']}' to '$targetPath'. PHP Error: " . ($err['message'] ?? 'None'));
         }
 
         // DB Insert
