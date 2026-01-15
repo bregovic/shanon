@@ -10,6 +10,12 @@ type User = {
     assigned_tasks_count?: number;
 };
 
+export type Organization = {
+    org_id: string;
+    display_name: string;
+    is_default: boolean;
+};
+
 type AuthContextType = {
     user: User | null;
     permissions: Record<string, number>;
@@ -17,6 +23,9 @@ type AuthContextType = {
     login: (username: string, pass: string) => Promise<boolean>;
     logout: () => void;
     hasPermission: (objectId: string, minLevel?: number) => boolean;
+    organizations: Organization[];
+    currentOrgId: string | null;
+    switchOrg: (orgId: string) => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,6 +35,9 @@ const AuthContext = createContext<AuthContextType>({
     login: async () => false,
     logout: () => { },
     hasPermission: () => false,
+    organizations: [],
+    currentOrgId: null,
+    switchOrg: async () => false
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -33,6 +45,8 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [permissions, setPermissions] = useState<Record<string, number>>({});
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     // FIX: Set correct API path for Shanon (Nginx maps /api -> Backend)
@@ -79,6 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
                 });
                 setPermissions(data.permissions || {});
+                setOrganizations(data.organizations || []);
+                setCurrentOrgId(data.current_org_id || null);
             } else {
                 setUser(null);
                 setPermissions({});
@@ -129,10 +145,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fetch(`${API_BASE}/ajax-logout.php`);
         setUser(null);
         setPermissions({});
+        setOrganizations([]);
+        setCurrentOrgId(null);
+    };
+
+    const switchOrg = async (orgId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/ajax-set-org.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ org_id: orgId })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setCurrentOrgId(orgId);
+                // Hard reload to ensure all components fetch correct data
+                window.location.reload();
+                return true;
+            }
+        } catch (e) { console.error(e); }
+        return false;
     };
 
     return (
-        <AuthContext.Provider value={{ user, permissions, isLoading, login, logout, hasPermission }}>
+        <AuthContext.Provider value={{ user, permissions, isLoading, login, logout, hasPermission, organizations, currentOrgId, switchOrg }}>
 
             {children}
         </AuthContext.Provider>

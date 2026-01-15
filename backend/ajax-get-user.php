@@ -78,13 +78,49 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
             // Log error silently, return basic user info
             error_log("RBAC Error: " . $e->getMessage());
         }
+        
+        // 2. Multi-Org Context
+        $availableOrgs = [];
+        $currentOrgId = $_SESSION['current_org_id'] ?? null;
+        
+        try {
+             // Check if tables exist (robustness against partial migration)
+             $orgTableExists = $pdo->query("SELECT to_regclass('sys_organizations')")->fetchColumn();
+             
+             if ($orgTableExists) {
+                 $stmt = $pdo->prepare("
+                     SELECT o.org_id, o.display_name, a.is_default
+                     FROM sys_user_org_access a
+                     JOIN sys_organizations o ON a.org_id = o.org_id
+                     WHERE a.user_id = :uid AND o.is_active = true
+                     ORDER BY o.display_name
+                 ");
+                 $stmt->execute([':uid' => $user['rec_id']]);
+                 $availableOrgs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                 // Determine effective current Org (Transient default if session empty)
+                 if (!$currentOrgId && !empty($availableOrgs)) {
+                      foreach ($availableOrgs as $org) {
+                          if ($org['is_default']) {
+                              $currentOrgId = $org['org_id'];
+                              break;
+                          }
+                      }
+                      if (!$currentOrgId) $currentOrgId = $availableOrgs[0]['org_id'];
+                 }
+             }
+        } catch (Exception $e) {
+             error_log("Multi-Org Error: " . $e->getMessage());
+        }
     }
 
     echo json_encode([
         'success' => true,
         'is_logged_in' => true,
         'user' => $user,
-        'permissions' => $permissions
+        'permissions' => $permissions,
+        'organizations' => $availableOrgs,
+        'current_org_id' => $currentOrgId
     ]);
 
 } else {

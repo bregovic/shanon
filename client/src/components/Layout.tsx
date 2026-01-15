@@ -6,7 +6,12 @@ import {
     Image,
     Avatar,
     Button,
-    Tooltip
+    Tooltip,
+    Menu,
+    MenuTrigger,
+    MenuList,
+    MenuItem,
+    MenuPopover
 } from '@fluentui/react-components';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +24,9 @@ import {
     Home24Regular,
 
     DocumentData24Regular,
-    ClipboardTextEdit24Regular
+    ClipboardTextEdit24Regular,
+    BuildingBank24Regular,
+    Checkmark24Regular
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
 import { FeedbackModal } from './FeedbackModal';
@@ -95,7 +102,7 @@ const Layout: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, logout, hasPermission } = useAuth();
+    const { user, logout, hasPermission, organizations, currentOrgId, switchOrg } = useAuth();
     const { t } = useTranslation();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
     const [feedbackOpen, setFeedbackOpen] = React.useState(false);
@@ -150,6 +157,39 @@ const Layout: React.FC = () => {
                 <div style={{ flex: 1, minWidth: '16px' }} />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+
+                    {/* Multi-Org Switcher */}
+                    <Menu>
+                        <MenuTrigger disableButtonEnhancement>
+                            <Button
+                                appearance="subtle"
+                                icon={<BuildingBank24Regular />}
+                                style={{ fontWeight: '600', minWidth: 'auto' }}
+                            >
+                                {currentOrgId || '-'}
+                            </Button>
+                        </MenuTrigger>
+                        <MenuPopover>
+                            <MenuList>
+                                {organizations.map(org => (
+                                    <MenuItem
+                                        key={org.org_id}
+                                        onClick={() => switchOrg(org.org_id)}
+                                        icon={currentOrgId === org.org_id ? <Checkmark24Regular /> : undefined}
+                                    >
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontWeight: 'bold' }}>{org.org_id}</span>
+                                            <span style={{ fontSize: '12px', color: 'gray' }}>{org.display_name}</span>
+                                        </div>
+                                    </MenuItem>
+                                ))}
+                                {organizations.length === 0 && <MenuItem disabled>Žádné společnosti</MenuItem>}
+                            </MenuList>
+                        </MenuPopover>
+                    </Menu>
+
+                    <div style={{ width: '1px', backgroundColor: '#e0e0e0', height: '20px', margin: '0 8px' }} />
+
                     <Tooltip content="Upozornění" relationship="label">
                         <Button icon={<Alert24Regular />} appearance="subtle" />
                     </Tooltip>
