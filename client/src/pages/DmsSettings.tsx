@@ -813,18 +813,18 @@ export const DmsSettings: React.FC = () => {
                 onOpenChange={setIsAttrSelectorOpen}
                 currentDocTypeId={editingDocType?.rec_id || 0}
                 onSave={() => {
-                    // Refresh Doc Types list to update the "count" column if we added it to SmartDataGrid or just consistency
                     fetch('/api/api-dms.php?action=doc_types').then(r => r.json()).then(j => {
-                        if (j.success) setDocTypes(j.data);
-                    });
+                        if (j.success) {
+                            const newTypes = j.data;
+                            setDocTypes(newTypes);
 
-                    // Also if we want to update the local "editingDocType" with new count, we can do that,
-                    // but the dialog is mainly separate.
-                    // The "manage" button is inside "DocType Dialog", so when we return, we might want to refresh the text there?
-                    // Actually the text "Aktuálně přiřazeno: X" uses editingDocType.attr_count.
-                    // We should update editingDocType too.
-                    // But usually we just close/reopen or force refresh.
-                    // Let's at least refetch the doc type list.
+                            // Update the editing dialog state if open
+                            if (editingDocType) {
+                                const updated = newTypes.find((d: DocType) => d.rec_id === editingDocType.rec_id);
+                                if (updated) setEditingDocType(updated);
+                            }
+                        }
+                    });
                 }}
             />
 

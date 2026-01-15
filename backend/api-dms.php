@@ -595,7 +595,10 @@ try {
 
     // ===== ADMIN: DOCUMENT TYPES =====
     if ($action === 'doc_types') {
-        $sql = "SELECT t.*, s.name as number_series_name 
+        $sql = "SELECT t.*, s.name as number_series_name,
+                (SELECT COUNT(*) FROM dms_doc_type_attributes da 
+                 JOIN dms_attributes a ON da.attribute_id = a.rec_id 
+                 WHERE da.doc_type_id = t.rec_id) as attr_count
                 FROM dms_doc_types t
                 LEFT JOIN sys_number_series s ON t.number_series_id = s.rec_id
                 ORDER BY t.name";

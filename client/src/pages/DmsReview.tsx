@@ -144,6 +144,21 @@ export const DmsReview: React.FC = () => {
         setCurrentDrawRect({ x, y, w, h });
     };
 
+    // Helper to find next field
+    const getNextField = (currentCode: string) => {
+        const idx = currentAttributes.findIndex(a => a.code === currentCode);
+        if (idx >= 0 && idx < currentAttributes.length - 1) {
+            return currentAttributes[idx + 1].code;
+        }
+        return null; // or loop back? usually stop.
+    };
+
+    const handleSkip = (currentCode: string) => {
+        const next = getNextField(currentCode);
+        if (next) setActiveField(next);
+        else setActiveField(null); // finish
+    };
+
     const handleMouseUp = async () => {
         if (!isDrawing || !currentDrawRect || !imageRef.current || !activeField) {
             setIsDrawing(false); setStartPos(null); setCurrentDrawRect(null); return;
@@ -160,6 +175,8 @@ export const DmsReview: React.FC = () => {
         };
 
         const fieldCode = activeField;
+        const currentCode = fieldCode; // capture for closure
+
         setFormData(prev => ({ ...prev, [fieldCode]: 'Načítám...' }));
 
         try {
@@ -169,6 +186,8 @@ export const DmsReview: React.FC = () => {
             });
             if (res.data.success) {
                 setFormData(prev => ({ ...prev, [fieldCode]: res.data.text }));
+                // AUTO ADVANCE
+                handleSkip(currentCode);
             } else {
                 alert('OCR Error: ' + res.data.error);
                 setFormData(prev => ({ ...prev, [fieldCode]: '' }));
@@ -178,10 +197,8 @@ export const DmsReview: React.FC = () => {
             alert('Connection Error');
         } finally {
             setIsDrawing(false); setStartPos(null); setCurrentDrawRect(null);
-            // activeField remains set
         }
     };
-
 
     // 1. Fetch Documents to Review
     useEffect(() => {
@@ -373,7 +390,14 @@ export const DmsReview: React.FC = () => {
                                                 onFocus={() => { if (imageUrl) setActiveField(attr.code); }}
                                                 contentAfter={
                                                     activeField === attr.code ?
-                                                        <Dismiss24Regular style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setActiveField(null); }} />
+                                                        <Dismiss24Regular
+                                                            style={{ cursor: 'pointer' }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSkip(attr.code);
+                                                            }}
+                                                            title="Přeskočit na další"
+                                                        />
                                                         : null
                                                 }
                                             />
