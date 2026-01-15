@@ -36,7 +36,13 @@ try {
         $stmt->execute();
         $docs = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        echo json_encode(['success' => true, 'data' => $docs]);
+        $json = json_encode(['success' => true, 'data' => $docs], JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'JSON Encoding Error: ' . json_last_error_msg()]);
+        } else {
+            echo $json;
+        }
         exit;
     }
 
