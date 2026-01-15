@@ -66,7 +66,7 @@ try {
         // Hardcoded for now as per previous implementation logic
         $profiles = [
             ['rec_id' => 1, 'name' => 'Lokální úložiště (Default)', 'type' => 'local', 'is_default' => true],
-            // ['rec_id' => 2, 'name' => 'Google Drive (Dev)', 'type' => 'google_drive', 'is_default' => false]
+            ['rec_id' => 2, 'name' => 'Google Drive (BETA)', 'type' => 'google_drive', 'is_default' => false]
         ];
         echo json_encode(['success' => true, 'data' => $profiles]);
         exit;
