@@ -89,7 +89,10 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
              
              if ($orgTableExists) {
                  // Admin Override: Admins see ALL organizations
-                 $isAdmin = in_array('ADMIN', $roleCodes ?? []);
+                 // Check both session roles and roleCodes
+                 $userRoles = $_SESSION['user']['roles'] ?? [];
+                 $isAdmin = in_array('admin', array_map('strtolower', (array)$userRoles)) 
+                         || in_array('ADMIN', $roleCodes ?? []);
                  
                  if ($isAdmin) {
                      $sql = "
@@ -112,6 +115,21 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
                  $stmt = $pdo->prepare($sql);
                  $stmt->execute([':uid' => $user['rec_id']]);
                  $availableOrgs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                 
+                 // Fallback: If no orgs found and user is logged in, assign them to first available org
+                 if (empty($availableOrgs)) {
+                     // Try to get any active organization
+                     $stmt = $pdo->query("SELECT org_id, display_name, false as is_default FROM sys_organizations WHERE is_active = true ORDER BY org_id LIMIT 1");
+                     $fallbackOrg = $stmt->fetch(PDO::FETCH_ASSOC);
+                     
+                     if ($fallbackOrg) {
+                         // Auto-assign user to this org
+                         $pdo->prepare("INSERT INTO sys_user_org_access (user_id, org_id, is_default) VALUES (:uid, :oid, true) ON CONFLICT DO NOTHING")
+                             ->execute([':uid' => $user['rec_id'], ':oid' => $fallbackOrg['org_id']]);
+                         $fallbackOrg['is_default'] = true;
+                         $availableOrgs = [$fallbackOrg];
+                     }
+                 }
 
                  // Determine effective current Org (Transient default if session empty)
                  if (!$currentOrgId && !empty($availableOrgs)) {
