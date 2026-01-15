@@ -1,6 +1,7 @@
 
+import { useEffect } from 'react';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
-import { RouterProvider, createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter, Navigate, Outlet, useParams, useNavigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
 import { DmsDashboard } from './pages/DmsDashboard';
@@ -31,6 +32,36 @@ const RequireAuth = () => {
     return <Outlet />;
 };
 
+const RootRedirect = () => {
+    const { currentOrgId, isLoading } = useAuth();
+    if (isLoading) return null;
+    return <Navigate to={`/${currentOrgId || 'VACKR'}/dashboard`} replace />;
+};
+
+const OrgGuard = () => {
+    const { orgId } = useParams();
+    const { currentOrgId, switchOrg, isLoading, organizations } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (!isLoading && orgId && orgId !== currentOrgId) {
+            const isValid = organizations.some(o => o.org_id === orgId);
+            if (isValid) {
+                switchOrg(orgId, true); // true = prevent reload
+            } else if (organizations.length > 0) {
+                // Invalid org, redirect to first valid or root
+                navigate('/');
+            }
+        }
+    }, [orgId, currentOrgId, isLoading, organizations, switchOrg, navigate]);
+
+    if (isLoading) return null;
+    // Optional: visual loading while switching
+    if (orgId && orgId !== currentOrgId) return <div style={{ padding: 20 }}>Načítání společnosti...</div>;
+
+    return <Layout />;
+};
+
 const router = createBrowserRouter([
     {
         path: "/login",
@@ -45,10 +76,14 @@ const router = createBrowserRouter([
         element: <RequireAuth />,
         children: [
             {
-                path: "/",
-                element: <Layout />,
+                index: true,
+                element: <RootRedirect />
+            },
+            {
+                path: ":orgId",
+                element: <OrgGuard />,
                 children: [
-                    { index: true, element: <Navigate to="/dashboard" replace /> },
+                    { index: true, element: <Navigate to="dashboard" replace /> },
                     { path: "dashboard", element: <DashboardPage /> },
                     { path: "dms", element: <DmsDashboard /> },
                     { path: "dms/list", element: <DmsList /> },
@@ -62,7 +97,7 @@ const router = createBrowserRouter([
                     { path: "system/testing", element: <SystemTestingList /> },
                     { path: "system/testing/:id", element: <SystemTestingDetail /> },
                     { path: "dms/ocr-designer/:id", element: <OcrTemplateDesigner /> },
-                    { path: "dms/ocr-designer", element: <OcrTemplateDesigner /> }, // For new templates
+                    { path: "dms/ocr-designer", element: <OcrTemplateDesigner /> },
                     { path: "dms/google-setup", element: <DmsGoogleSetup /> },
                 ]
             }

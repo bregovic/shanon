@@ -23,6 +23,14 @@ if (!isset($_SESSION['loggedin'])) {
 
 $userId = $_SESSION['user']['rec_id'] ?? null;
 $tenantId = $_SESSION['user']['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+$currentOrgId = $_SESSION['current_org_id'] ?? null;
+
+if (!$currentOrgId) {
+    if ($action !== 'list') { // Allow list to just return empty to prevent UI crashes if context missing
+        // For strict actions, error out
+        // echo json_encode(['success'=>false, 'error'=>'No Organization Selected']); exit;
+    }
+}
 
 try {
     $pdo = DB::connect();
@@ -36,10 +44,11 @@ try {
                 FROM dms_documents d
                 LEFT JOIN dms_doc_types t ON d.doc_type_id = t.rec_id
                 LEFT JOIN sys_users u ON d.created_by = u.rec_id
+                WHERE d.org_id = :oid
                 ORDER BY d.created_at DESC LIMIT 100";
         
         $stmt = $pdo->prepare($sql);
-        $stmt->execute();
+        $stmt->execute([':oid' => $currentOrgId]);
         $docs = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Fix JSON UTF-8
@@ -56,8 +65,8 @@ try {
         $id = $_GET['id'] ?? null;
         if (!$id) throw new Exception("ID missing");
 
-        $stmt = $pdo->prepare("SELECT * FROM dms_documents WHERE rec_id = :id");
-        $stmt->execute([':id' => $id]);
+        $stmt = $pdo->prepare("SELECT * FROM dms_documents WHERE rec_id = :id AND org_id = :oid");
+        $stmt->execute([':id' => $id, ':oid' => $currentOrgId]);
         $doc = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$doc) throw new Exception("Document not found");
@@ -91,7 +100,11 @@ try {
          $inQuery = implode(',', array_fill(0, count($ids), '?'));
          foreach($ids as $id) $params[] = $id;
          
-         $sql = "UPDATE dms_documents SET " . implode(', ', $sets) . " WHERE rec_id IN ($inQuery)";
+
+         // Add Org Security Filter
+         $sql = "UPDATE dms_documents SET " . implode(', ', $sets) . " WHERE rec_id IN ($inQuery) AND org_id = ?";
+         $params[] = $currentOrgId;
+
          $stmt = $pdo->prepare($sql);
          $stmt->execute($params);
          
@@ -452,8 +465,8 @@ try {
         }
 
         // DB Insert
-        $sql = "INSERT INTO dms_documents (tenant_id, display_name, original_filename, file_extension, file_size_bytes, mime_type, doc_type_id, storage_path, storage_profile_id, created_by, status, ocr_status)
-                VALUES (:tid, :dname, :oname, :ext, :size, :mime, :dtid, :path, :spid, :uid, :status, :ocrstats)
+        $sql = "INSERT INTO dms_documents (tenant_id, org_id, display_name, original_filename, file_extension, file_size_bytes, mime_type, doc_type_id, storage_path, storage_profile_id, created_by, status, ocr_status)
+                VALUES (:tid, :oid, :dname, :oname, :ext, :size, :mime, :dtid, :path, :spid, :uid, :status, :ocrstats)
                 RETURNING rec_id";
         
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -461,6 +474,7 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':tid' => $tenantId,
+            ':oid' => $currentOrgId,
             ':dname' => $displayName,
             ':oname' => $file['name'],
             ':ext' => $ext,

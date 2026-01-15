@@ -107,15 +107,17 @@ const Layout: React.FC = () => {
     const [settingsOpen, setSettingsOpen] = React.useState(false);
     const [feedbackOpen, setFeedbackOpen] = React.useState(false);
 
+    const orgPrefix = `/${currentOrgId || 'VACKR'}`;
+
     const modules = [
-        { label: t('modules.dashboard'), path: '/dashboard', icon: <Home24Regular />, securityId: 'mod_dashboard' },
-        { label: t('modules.dms'), path: '/dms', icon: <DocumentData24Regular />, securityId: 'mod_dms' },
-        { label: t('modules.requests'), path: '/requests', icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests' },
-        { label: t('modules.system'), path: '/system', icon: <Settings24Regular />, securityId: 'mod_system' },
+        { label: t('modules.dashboard'), path: `${orgPrefix}/dashboard`, icon: <Home24Regular />, securityId: 'mod_dashboard' },
+        { label: t('modules.dms'), path: `${orgPrefix}/dms`, icon: <DocumentData24Regular />, securityId: 'mod_dms' },
+        { label: t('modules.requests'), path: `${orgPrefix}/requests`, icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests' },
+        { label: t('modules.system'), path: `${orgPrefix}/system`, icon: <Settings24Regular />, securityId: 'mod_system' },
     ].sort((a, b) => {
 
-        if (a.path === '/dashboard') return -1;
-        if (b.path === '/dashboard') return 1;
+        if (a.path.endsWith('/dashboard')) return -1;
+        if (b.path.endsWith('/dashboard')) return 1;
         return a.label.localeCompare(b.label);
     });
 
@@ -135,7 +137,7 @@ const Layout: React.FC = () => {
     return (
         <div className={styles.root}>
             <header className={styles.header}>
-                <div className={styles.logoSection} onClick={() => navigate('/dashboard')}>
+                <div className={styles.logoSection} onClick={() => navigate(`${orgPrefix}/dashboard`)}>
                     <Image src="/logo.png" height={28} fit="contain" alt="Shanon" />
                 </div>
 
@@ -174,7 +176,7 @@ const Layout: React.FC = () => {
                                 {organizations.map(org => (
                                     <MenuItem
                                         key={org.org_id}
-                                        onClick={() => switchOrg(org.org_id)}
+                                        onClick={() => navigate(`/${org.org_id}/dashboard`)}
                                         icon={currentOrgId === org.org_id ? <Checkmark24Regular /> : undefined}
                                     >
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>

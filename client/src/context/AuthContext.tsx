@@ -25,7 +25,7 @@ type AuthContextType = {
     hasPermission: (objectId: string, minLevel?: number) => boolean;
     organizations: Organization[];
     currentOrgId: string | null;
-    switchOrg: (orgId: string) => Promise<boolean>;
+    switchOrg: (orgId: string, preventReload?: boolean) => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentOrgId(null);
     };
 
-    const switchOrg = async (orgId: string) => {
+    const switchOrg = async (orgId: string, preventReload: boolean = false) => {
         try {
             const res = await fetch(`${API_BASE}/ajax-set-org.php`, {
                 method: 'POST',
@@ -159,8 +159,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const json = await res.json();
             if (json.success) {
                 setCurrentOrgId(orgId);
-                // Hard reload to ensure all components fetch correct data
-                window.location.reload();
+                // Hard reload only if not handled by routing
+                if (!preventReload) window.location.reload();
                 return true;
             }
         } catch (e) { console.error(e); }
