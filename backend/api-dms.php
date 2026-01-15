@@ -263,45 +263,77 @@ try {
         $displayName = $_POST['display_name'] ?? $file['name'];
         $autoOcr = filter_var($_POST['auto_ocr'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-        // Upload Dir
-        $baseDir = dirname(__DIR__); // Root of project
-        $uploadDir = $baseDir . '/uploads/dms';
-        
-        // Ensure directory exists
-        if (!is_dir($uploadDir)) {
-            // Try to create recursively
-            if (!@mkdir($uploadDir, 0777, true)) {
-                $err = error_get_last();
-                throw new Exception("Failed to create upload directory '$uploadDir'. Error: " . ($err['message'] ?? 'Unknown'));
-            }
+        // 1. Get Active Default Storage Profile
+        $stmt = $pdo->prepare("SELECT * FROM dms_storage_profiles WHERE is_active = true AND is_default = true LIMIT 1");
+        $stmt->execute();
+        $profile = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$profile) {
+            // Fallback to local if no profile defined (Backward Compatibility)
+            // But usually we should have at least the seeded local one.
+            $profile = ['rec_id' => null, 'type' => 'local', 'configuration' => '{}'];
         }
-        
-        // Ensure writable
-        if (!is_writable($uploadDir)) {
-            // Try to fix permissions
-            @chmod($uploadDir, 0777);
+
+        $storageType = $profile['type'];
+        $config = json_decode($profile['configuration'] ?? '{}', true);
+
+        $storagePath = ''; // Will hold either RelPath (Local) or FileID (Drive)
+
+        if ($storageType === 'google_drive') {
+            require_once 'helpers/GoogleDriveStorage.php';
+            // Config mapping
+            $creds = $config['service_account_json'] ?? '';
+            $folderId = $config['folder_id'] ?? '';
+            
+            if (!$creds || !$folderId) throw new Exception("Google Drive profile is missing credentials or folder ID");
+
+            if (is_array($creds)) $creds = json_encode($creds);
+
+            $drive = new GoogleDriveStorage($creds, $folderId);
+            
+            // Upload
+            $remoteName = uniqid() . '_' . $file['name'];
+            $driveFile = $drive->uploadFile($file['tmp_name'], $remoteName, $file['type']);
+            
+            if (!isset($driveFile['id'])) {
+                throw new Exception("Google Drive upload failed: " . json_encode($driveFile));
+            }
+            $storagePath = $driveFile['id'];
+
+        } else {
+            // LOCAL STORAGE
+            $baseDir = dirname(__DIR__); 
+            $uploadDir = $baseDir . '/uploads/dms';
+            
+            if (!is_dir($uploadDir)) {
+                if (!@mkdir($uploadDir, 0777, true)) {
+                    $err = error_get_last();
+                    throw new Exception("Failed to create upload directory. Server Error: " . ($err['message'] ?? 'Unknown'));
+                }
+            }
             if (!is_writable($uploadDir)) {
-                 throw new Exception("Upload directory '$uploadDir' is not writable.");
+                @chmod($uploadDir, 0777);
+                if (!is_writable($uploadDir)) throw new Exception("Upload directory is not writable.");
             }
-        }
 
-        // Generate Filename
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        // Sanitize filename for storage (avoid utf8 issues on filesystem)
-        $storageName = uniqid() . '.' . $ext;
-        $targetPath = $uploadDir . '/' . $storageName;
-        $relPath = 'uploads/dms/' . $storageName; // Relative for DB
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $storageName = uniqid() . '.' . $ext;
+            $targetPath = $uploadDir . '/' . $storageName;
+            $relPath = 'uploads/dms/' . $storageName;
 
-        if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-            $err = error_get_last();
-            // Provide detail: Source -> Target
-            throw new Exception("Failed to move uploaded file from '{$file['tmp_name']}' to '$targetPath'. PHP Error: " . ($err['message'] ?? 'None'));
+            if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+                $err = error_get_last();
+                throw new Exception("Failed to move uploaded file. PHP Error: " . ($err['message'] ?? 'None'));
+            }
+            $storagePath = $relPath;
         }
 
         // DB Insert
-        $sql = "INSERT INTO dms_documents (tenant_id, display_name, original_filename, file_extension, file_size_bytes, mime_type, doc_type_id, storage_path, created_by, status)
-                VALUES (:tid, :dname, :oname, :ext, :size, :mime, :dtid, :path, :uid, 'new')
+        $sql = "INSERT INTO dms_documents (tenant_id, display_name, original_filename, file_extension, file_size_bytes, mime_type, doc_type_id, storage_path, storage_profile_id, created_by, status)
+                VALUES (:tid, :dname, :oname, :ext, :size, :mime, :dtid, :path, :spid, :uid, 'new')
                 RETURNING rec_id";
+        
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -311,25 +343,23 @@ try {
             ':ext' => $ext,
             ':size' => $file['size'],
             ':mime' => $file['type'],
-            ':dtid' => $docTypeId ?: null, // Can be null initially
-            ':path' => $relPath,
+            ':dtid' => $docTypeId ?: null,
+            ':path' => $storagePath,
+            ':spid' => $profile['rec_id'],
             ':uid' => $userId
         ]);
         
         $newId = $stmt->fetchColumn();
 
-        // Trigger OCR?
+        // Trigger OCR (Background) - Same as before
         if ($autoOcr && $newId) {
              $ocr = new OcrEngine($pdo, $tenantId);
              try {
                  $ocrResult = $ocr->analyzeDocument($newId);
-                 // Update doc with results
                  $meta = ['attributes' => []];
                  foreach ($ocrResult['attributes'] as $attr) {
                      $meta['attributes'][$attr['attribute_code']] = $attr['found_value'];
                  }
-                 
-                 // Update DB
                  $upd = $pdo->prepare("UPDATE dms_documents SET ocr_status = 'completed', status = 'review', metadata = :meta, ocr_text_content = :txt WHERE rec_id = :id");
                  $upd->execute([
                      ':meta' => json_encode($meta, JSON_INVALID_UTF8_SUBSTITUTE),
@@ -337,7 +367,6 @@ try {
                      ':id' => $newId
                  ]);
              } catch (Exception $e) {
-                 // Log OCR error check but don't fail upload
                  error_log("AutoOCR Failed: " . $e->getMessage());
                  $pdo->exec("UPDATE dms_documents SET ocr_status = 'failed' WHERE rec_id = $newId");
              }
@@ -423,17 +452,53 @@ try {
         $id = $_GET['id'] ?? null;
         if (!$id) die("ID missing");
 
-        $stmt = $pdo->prepare("SELECT storage_path, mime_type, original_filename FROM dms_documents WHERE rec_id = :id");
+        // Fetch doc AND storage profile info
+        $sql = "SELECT d.*, sp.type as storage_type, sp.configuration 
+                FROM dms_documents d
+                LEFT JOIN dms_storage_profiles sp ON d.storage_profile_id = sp.rec_id
+                WHERE d.rec_id = :id";
+        
+        $stmt = $pdo->prepare($sql);
         $stmt->execute([':id' => $id]);
         $doc = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$doc) die("Document not found");
 
-        $path = __DIR__ . '/../' . $doc['storage_path'];
-        if (!file_exists($path)) die("File not found on server");
-
         header("Content-Type: " . $doc['mime_type']);
-        header("Content-Disposition: inline; filename=\"" . $doc['original_filename'] . "\"");
+        header("Content-Disposition: inline; filename=\"" . ($doc['original_filename'] ?: 'document') . "\"");
+
+        $type = $doc['storage_type'] ?? 'local'; 
+        
+        // Handle Google Drive
+        if ($type === 'google_drive') {
+            require_once 'helpers/GoogleDriveStorage.php';
+            $config = json_decode($doc['configuration'] ?? '{}', true);
+            $creds = $config['service_account_json'] ?? '';
+            $folderId = $config['folder_id'] ?? ''; // Not needed for download but constructor needs it?
+
+            // If creds missing, we can't download
+            if (!$creds) die("Storage credentials missing");
+
+            if (is_array($creds)) $creds = json_encode($creds);
+
+            try {
+                $drive = new GoogleDriveStorage($creds, $folderId);
+                $content = $drive->downloadFile($doc['storage_path']); // storage_path is File ID
+                echo $content;
+            } catch (Exception $e) {
+                http_response_code(500);
+                echo "Error downloading file from Drive: " . $e->getMessage();
+            }
+            exit;
+        }
+
+        // Handle Local
+        $path = __DIR__ . '/../' . $doc['storage_path'];
+        if (!file_exists($path)) {
+            // Try fallback? No.
+            die("File not found on server");
+        }
+
         readfile($path);
         exit;
     }
