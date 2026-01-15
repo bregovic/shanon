@@ -32,7 +32,8 @@ import {
     Document24Regular,
     DocumentPdf24Regular,
     TaskListSquareLtr24Regular,
-    Desktop24Regular
+    Desktop24Regular,
+    Beaker24Regular
 } from '@fluentui/react-icons';
 
 import { ActionBar } from '../components/ActionBar';
@@ -435,6 +436,11 @@ export const SystemConfig: React.FC = () => {
 
                 {/* Column 2 */}
                 <div className={styles.scrollColumn}>
+                    {/* TEST MANAGEMENT */}
+                    <MenuSection id="testing" title="Testování (QA)" icon={<Beaker24Regular />} isOpen={expandedSections.has('testing')} onToggle={toggleSection}>
+                        <MenuItem label="Testovací scénáře" onClick={() => navigate('/system/testing')} />
+                    </MenuSection>
+
                     {/* 4. REPORTS */}
                     <MenuSection id="reports" title={t('system.menu.reports')} icon={<DocumentPdf24Regular />} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.audit_log')} onClick={() => alert(t('common.working'))} />

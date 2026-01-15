@@ -9,6 +9,8 @@ import { DmsImport } from './pages/DmsImport';
 import { DmsReview } from './pages/DmsReview';
 import { DmsSettings } from './pages/DmsSettings';
 import RequestsPage from './pages/RequestsPage';
+import { SystemTestingList } from "./pages/SystemTestingList";
+import { SystemTestingDetail } from "./pages/SystemTestingDetail";
 import SecurityRoles from './pages/SecurityRoles';
 import { SystemConfig } from './pages/SystemConfig';
 import { SystemTranslations } from './pages/SystemTranslations';
@@ -57,6 +59,8 @@ const router = createBrowserRouter([
                     { path: "system", element: <SystemConfig /> },
                     { path: "system/security-roles", element: <SecurityRoles /> },
                     { path: "system/translations", element: <SystemTranslations /> },
+                    { path: "system/testing", element: <SystemTestingList /> },
+                    { path: "system/testing/:id", element: <SystemTestingDetail /> },
                     { path: "dms/ocr-designer/:id", element: <OcrTemplateDesigner /> },
                     { path: "dms/ocr-designer", element: <OcrTemplateDesigner /> }, // For new templates
                     { path: "dms/google-setup", element: <DmsGoogleSetup /> },
