@@ -12,6 +12,7 @@ export const translations = {
         'common.success': 'Úspěch',
         'common.modules': 'Moduly',
         'common.back': 'Zpět',
+        'common.warning': 'Upozornění',
 
         // DMS Settings
         'dms.settings.title': 'Nastavení DMS',
@@ -127,6 +128,10 @@ export const translations = {
         'system.item.run_indexing': 'Spustit indexaci',
         'system.item.global_params': 'Globální parametry',
 
+        'system.audit.title': 'Centrum kvality kódu',
+        'system.audit.desc': 'Automatická analýza zdrojového kódu pro detekci technického dluhu.',
+        'system.audit.no_source': 'Nebyly nalezeny žádné zdrojové kódy (produkční server). Použijte Localhost.',
+
         'system.update_db.confirm': 'Opravdu chcete spustit aktualizaci databáze?',
         'system.expand_all': 'Rozbalit vše',
         'system.collapse_all': 'Sbalit vše',
@@ -161,6 +166,7 @@ export const translations = {
         'common.success': 'Success',
         'common.modules': 'Modules',
         'common.back': 'Back',
+        'common.warning': 'Warning',
 
         // DMS Settings
         'dms.settings.title': 'DMS Settings',
@@ -268,6 +274,10 @@ export const translations = {
         'system.item.cron_jobs': 'Scheduled Tasks (Cron)',
         'system.item.run_indexing': 'Run Indexing',
         'system.item.global_params': 'Global Parameters',
+
+        'system.audit.title': 'Code Quality Center',
+        'system.audit.desc': 'Automatic source code analysis for technical debt detection.',
+        'system.audit.no_source': 'No source code found (production server). Use Localhost.',
 
         'system.diag.db_persisted': 'Persisted in DB',
         'system.diag.yes': 'YES',
