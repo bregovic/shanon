@@ -207,6 +207,82 @@ export const translations = {
 
         'loading_data': 'Načítám data...',
         'no_data': 'Žádná data k dispozici.',
+
+        // Balance Page
+        'col_avg_cost_orig': 'Prům. náklady (Orig)',
+        'col_value_czk': 'Hodnota (CZK)',
+        'col_pnl_orig': 'Zisk/Ztráta (Orig)',
+        'col_pnl_pct_orig': 'Z/Z % (Orig)',
+        'col_fx_pnl': 'FX Zisk',
+        'col_pnl_czk': 'Zisk/Ztráta (CZK)',
+        'loading_balances': 'Načítám zůstatky...',
+        'summary_total_value': 'Celková hodnota',
+        'summary_buy_cost': 'Nákupní cena',
+        'summary_pnl_czk': 'Celkový Zisk (CZK)',
+        'summary_count': 'Počet',
+
+        // Dividends Page
+        'type_dividend': 'Dividenda',
+        'type_tax': 'Daň',
+        'col_czk_gross_tax': 'CZK (Hrubá/Daň)',
+        'loading_dividends': 'Načítám dividendy...',
+        'div_gross': 'Hrubá Div',
+        'div_tax': 'Daň',
+        'div_net': 'Čistá Div',
+        'div_count': 'Počet',
+        'no_dividends': 'Žádné dividendy nenalezeny.',
+
+        // Market Page
+        'trend_ema': 'EMA Trend',
+        'add_ticker_title': 'Přidat nový ticker',
+        'btn_adding': 'Přidávám...',
+        'btn_update_prices': 'Aktualizovat ceny',
+        'filter_watched_on': 'Sledované',
+        'filter_watched_off': 'Vše',
+
+        // PnL Page
+        'col_gross_profit': 'Hrubý zisk',
+        'col_net_profit': 'Čistý zisk',
+        'col_tax_test': 'Daňový test',
+        'test_passed': 'Splněno',
+        'test_failed': 'Nesplněno',
+        'col_days': 'Dny',
+        'loading_pnl': 'Načítám P&L...',
+        'pnl_net_profit': 'Čistý zisk',
+        'pnl_winning': 'Ziskové obchody',
+        'trades_count': 'Obchody',
+        'pnl_losing': 'Ztrátové obchody',
+        'pnl_tax_free': 'Osvobozeno',
+        'no_sales': 'Žádné uzavřené obchody.',
+        'col_qty': 'Množství',
+
+        // Portfolio Page
+        'col_prices_unit': 'Jedn. cena',
+        'col_total_orig': 'Celkem (Orig)',
+        'col_rate': 'Kurz',
+        'col_total_czk': 'Celkem (CZK)',
+        'loading_transactions': 'Načítám transakce...',
+
+        // Rates Page
+        'btn_add_rate': 'Přidat kurz',
+        'btn_import_cnb': 'Import ČNB',
+        'filter_currency': 'Měna',
+        'all': 'Vše',
+        'loading_rates': 'Načítám kurzy...',
+        'col_rate_czk': 'Kurz CZK',
+        'col_unit': 'Jednotka',
+        'col_source': 'Zdroj',
+        'add_rate_title': 'Přidat směnný kurz',
+        'import_cnb_title': 'Import z ČNB',
+        'select_year': 'Vyberte rok',
+        'import_cnb_desc': 'Import oficiálních kurzů z České národní banky.',
+        'btn_importing': 'Importuji...',
+        'btn_import': 'Importovat',
+
+        // Common
+        'common.working': 'Pracuji...',
+        'common.new': 'Nový',
+        'common.delete': 'Smazat',
     },
 
     en: {
@@ -422,5 +498,81 @@ export const translations = {
 
         'loading_data': 'Loading data...',
         'no_data': 'No data available.',
+
+        // Balance Page
+        'col_avg_cost_orig': 'Avg Cost (Orig)',
+        'col_value_czk': 'Value (CZK)',
+        'col_pnl_orig': 'P&L (Orig)',
+        'col_pnl_pct_orig': 'P&L % (Orig)',
+        'col_fx_pnl': 'FX P&L',
+        'col_pnl_czk': 'P&L (CZK)',
+        'loading_balances': 'Loading balances...',
+        'summary_total_value': 'Total Value',
+        'summary_buy_cost': 'Buy Cost',
+        'summary_pnl_czk': 'Total P&L (CZK)',
+        'summary_count': 'Count',
+
+        // Dividends Page
+        'type_dividend': 'Dividend',
+        'type_tax': 'Tax',
+        'col_czk_gross_tax': 'CZK (Gross/Tax)',
+        'loading_dividends': 'Loading dividends...',
+        'div_gross': 'Gross Div',
+        'div_tax': 'Tax',
+        'div_net': 'Net Div',
+        'div_count': 'Count',
+        'no_dividends': 'No dividends found.',
+
+        // Market Page
+        'trend_ema': 'EMA Trend',
+        'add_ticker_title': 'Add New Ticker',
+        'btn_adding': 'Adding...',
+        'btn_update_prices': 'Update Prices',
+        'filter_watched_on': 'Watched',
+        'filter_watched_off': 'All',
+
+        // PnL Page
+        'col_gross_profit': 'Gross Profit',
+        'col_net_profit': 'Net Profit',
+        'col_tax_test': 'Tax Test',
+        'test_passed': 'Passed',
+        'test_failed': 'Failed',
+        'col_days': 'Days',
+        'loading_pnl': 'Loading P&L...',
+        'pnl_net_profit': 'Net Profit',
+        'pnl_winning': 'Winning Trades',
+        'trades_count': 'Trades',
+        'pnl_losing': 'Losing Trades',
+        'pnl_tax_free': 'Tax Free',
+        'no_sales': 'No completed trades.',
+        'col_qty': 'Qty',
+
+        // Portfolio Page
+        'col_prices_unit': 'Unit Price',
+        'col_total_orig': 'Total (Orig)',
+        'col_rate': 'Rate',
+        'col_total_czk': 'Total (CZK)',
+        'loading_transactions': 'Loading transactions...',
+
+        // Rates Page
+        'btn_add_rate': 'Add Rate',
+        'btn_import_cnb': 'Import CNB',
+        'filter_currency': 'Currency',
+        'all': 'All',
+        'loading_rates': 'Loading rates...',
+        'col_rate_czk': 'Rate CZK',
+        'col_unit': 'Unit',
+        'col_source': 'Source',
+        'add_rate_title': 'Add Exchange Rate',
+        'import_cnb_title': 'Import from CNB',
+        'select_year': 'Select Year',
+        'import_cnb_desc': 'Import official exchange rates from Czech National Bank.',
+        'btn_importing': 'Importing...',
+        'btn_import': 'Import',
+
+        // Common
+        'common.working': 'Working...',
+        'common.new': 'New',
+        'common.delete': 'Delete',
     }
 };
