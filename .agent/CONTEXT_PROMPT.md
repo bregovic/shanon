@@ -70,12 +70,21 @@
 *   **Database:**
     *   Avoid `SELECT *` on tables with many columns. Select only what you need.
     *   Ensure Foreign Keys are indexed.
+    *   Use transactions (`DB::transaction`) for multi-step operations.
 *   **Session Management:**
     *   Use `session_write_close()` immediately in PHP read-only endpoints to prevent session locking.
 *   **ID Mapping:**
     *   **Internal:** Use `rec_id` (int) or `id` (uuid) for code logic.
     *   **External:** Display friendly codes (e.g., `DOC-2024-001`) to users.
     *   **API:** APIs should accept `rec_id` but validate it strongly.
+
+### E. Code Reusability & Architecture (Strict DRY)
+*   **Component-First Mindset:** Before writing inline code, check `src/components` and `src/hooks`.
+*   **Rule of Three:** If a UI pattern or logic is used **>2 times**, it MUST be refactored into a reusable component or hook.
+*   **Common Objects:**
+    *   Use shared helper functions for formatting (Dates, Currencies) in `src/utils`.
+    *   Wrap repeating FluentUI patterns (e.g., specific Button styles, Status Badges) into small generic components.
+*   **Styling:** Avoid inline `style={{...}}` for complex layouts. Use `makeStyles` or standard layout components.
 
 ### D. Documentation & History
 *   **Self-Documenting:** Code must generally explain itself, but complex logic needs comments.
