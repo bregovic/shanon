@@ -1,19 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-    Button,
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbButton,
     BreadcrumbDivider,
     TabList,
     Tab,
-    SelectTabData,
     Spinner,
     Badge,
     Title3
 } from '@fluentui/react-components';
+import type { SelectTabData, TableColumnDefinition } from '@fluentui/react-components';
 import {
-    CheckmarkCircle24Regular,
     Warning24Regular,
     ErrorCircle24Regular,
     DocumentSearch24Regular
@@ -27,6 +25,12 @@ const API_BASE = import.meta.env.DEV
     ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
     : '/api';
 
+interface AuditData {
+    missing_translations: { key: string; files: string[] }[];
+    unused_translations: { key: string; value: string }[];
+    hardcoded_candidates: { file: string; text: string }[];
+}
+
 export const CodeAuditPage: React.FC = () => {
     const navigate = useNavigate();
     const { currentOrgId } = useAuth();
@@ -35,11 +39,7 @@ export const CodeAuditPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [selectedTab, setSelectedTab] = useState<string>('missing');
 
-    const [data, setData] = useState<{
-        missing_translations: any[];
-        unused_translations: any[];
-        hardcoded_candidates: any[];
-    }>({
+    const [data, setData] = useState<AuditData>({
         missing_translations: [],
         unused_translations: [],
         hardcoded_candidates: []
@@ -70,19 +70,49 @@ export const CodeAuditPage: React.FC = () => {
 
     // --- Columns ---
 
-    const missingColumns = useMemo(() => [
-        { columnId: 'key', renderHeaderCell: () => 'Klíč', renderCell: (i: any) => <strong>{i.key}</strong> },
-        { columnId: 'files', renderHeaderCell: () => 'Soubory', renderCell: (i: any) => i.files.join(', ') },
+    const missingColumns: TableColumnDefinition<AuditData['missing_translations'][0]>[] = useMemo(() => [
+        {
+            columnId: 'key',
+            compare: (a, b) => a.key.localeCompare(b.key),
+            renderHeaderCell: () => 'Klíč',
+            renderCell: (i) => <strong>{i.key}</strong>
+        },
+        {
+            columnId: 'files',
+            compare: (a, b) => a.files.length - b.files.length,
+            renderHeaderCell: () => 'Soubory',
+            renderCell: (i) => i.files.join(', ')
+        },
     ], []);
 
-    const unusedColumns = useMemo(() => [
-        { columnId: 'key', renderHeaderCell: () => 'Klíč', renderCell: (i: any) => i.key },
-        { columnId: 'value', renderHeaderCell: () => 'Hodnota', renderCell: (i: any) => i.value },
+    const unusedColumns: TableColumnDefinition<AuditData['unused_translations'][0]>[] = useMemo(() => [
+        {
+            columnId: 'key',
+            compare: (a, b) => a.key.localeCompare(b.key),
+            renderHeaderCell: () => 'Klíč',
+            renderCell: (i) => i.key
+        },
+        {
+            columnId: 'value',
+            compare: (a, b) => a.value.localeCompare(b.value),
+            renderHeaderCell: () => 'Hodnota',
+            renderCell: (i) => i.value
+        },
     ], []);
 
-    const hardcodedColumns = useMemo(() => [
-        { columnId: 'text', renderHeaderCell: () => 'Text', renderCell: (i: any) => <strong>{i.text}</strong> },
-        { columnId: 'file', renderHeaderCell: () => 'Soubor', renderCell: (i: any) => i.file },
+    const hardcodedColumns: TableColumnDefinition<AuditData['hardcoded_candidates'][0]>[] = useMemo(() => [
+        {
+            columnId: 'text',
+            compare: (a, b) => a.text.localeCompare(b.text),
+            renderHeaderCell: () => 'Text',
+            renderCell: (i) => <strong>{i.text}</strong>
+        },
+        {
+            columnId: 'file',
+            compare: (a, b) => a.file.localeCompare(b.file),
+            renderHeaderCell: () => 'Soubor',
+            renderCell: (i) => i.file
+        },
     ], []);
 
     return (
@@ -114,13 +144,13 @@ export const CodeAuditPage: React.FC = () => {
                         Chybějící překlady
                         <Badge appearance="filled" color="danger" style={{ marginLeft: 5 }}>{data.missing_translations.length}</Badge>
                     </Tab>
-                    <Tab value="hardcoded" icon={<TextGrammarError24Regular />}>
+                    <Tab value="hardcoded" icon={<DocumentSearch24Regular />}>
                         Hardcoded Texty
                         <Badge appearance="filled" color="warning" style={{ marginLeft: 5 }}>{data.hardcoded_candidates.length}</Badge>
                     </Tab>
                     <Tab value="unused" icon={<Warning24Regular />}>
                         Nepoužité klíče
-                        <Badge appearance="subtle" style={{ marginLeft: 5 }}>{data.unused_translations.length}</Badge>
+                        <Badge appearance="ghost" style={{ marginLeft: 5 }}>{data.unused_translations.length}</Badge>
                     </Tab>
                 </TabList>
             </div>
