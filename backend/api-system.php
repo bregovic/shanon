@@ -5,30 +5,15 @@
 require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
+
 // Ensure Helper is loaded
-if (file_exists('helpers/DataSeeder.php')) {
+if (file_exists(__DIR__ . '/helpers/DataSeeder.php')) {
+    require_once __DIR__ . '/helpers/DataSeeder.php';
+} elseif (file_exists('helpers/DataSeeder.php')) {
     require_once 'helpers/DataSeeder.php';
 }
 
-// ... (lines 9-149 skipped for instruction, but I need to target correctly)
-
-    } elseif ($action === 'get_doc') {
-        $file = $_GET['file'] ?? '';
-        $map = [
-            'manifest' => __DIR__ . '/../.agent/MANIFEST.md',
-            'security' => __DIR__ . '/../.agent/SECURITY.md',
-            'database' => __DIR__ . '/../.agent/DATABASE.md',
-            'form_standard' => __DIR__ . '/../.agent/FORM_STANDARD.md'
-        ];
-
-        if (!isset($map[$file]) || !file_exists($map[$file])) {
-           // Debugging path issue
-           $path = $map[$file] ?? 'unknown';
-           $real = realpath($path) ?: 'false';
-           throw new Exception("Document not found. Key: $file, Path: $path, Real: $real");
-        }
-
-        $content = file_get_contents($map[$file]);
+// PERFORMANCE FIX: Close session lock immediately after start, as we only read or debug.
 session_write_close();
 
 header('Content-Type: application/json');
@@ -68,6 +53,9 @@ try {
 
     // --- SEEDER ACTIONS ---
     if ($action === 'seeders_list') {
+        if (!class_exists('DataSeeder')) {
+            throw new Exception('DataSeeder class not found helper missing');
+        }
         $seeder = new DataSeeder($pdo, $tenantId, $currentOrgId);
         echo json_encode(['success' => true, 'data' => $seeder->getAvailableSeeders()]);
         exit;
@@ -180,7 +168,6 @@ try {
 
         if (!isset($map[$file]) || !file_exists($map[$file])) {
              $path = $map[$file] ?? 'unknown';
-             // Try to resolve path relative to script
              throw new Exception("Document not found ($file). Path: " . $path);
         }
 
@@ -283,11 +270,11 @@ try {
     }
 
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage(),
-        'db_status' => 'Disconnected'
+        'trace' => $e->getTraceAsString()
     ]);
 }
