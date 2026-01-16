@@ -923,6 +923,7 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         '038_dms_ocr_templates' => null,
         '039_dms_attribute_options' => null,
         '040_dms_ocr_data' => null,
+        '041_dms_isolation' => null,
         '050_multi_org_structure' => null
     ];
 

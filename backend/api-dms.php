@@ -116,8 +116,17 @@ try {
     // ACTION: DOC TYPES
     // -------------------------------------------------------------------------
     if ($action === 'types' || $action === 'doc_types') {
-        $stmt = $pdo->prepare("SELECT * FROM dms_doc_types WHERE is_active = true ORDER BY name");
-        $stmt->execute();
+    if ($action === 'types' || $action === 'doc_types') {
+        // Fetch Tenant Defaults + Org Overrides
+        // We want: All records where tenant_id matches AND (org_id matches OR org_id is NULL)
+        $stmt = $pdo->prepare("
+            SELECT * FROM dms_doc_types 
+            WHERE is_active = true 
+              AND tenant_id = :tid 
+              AND (org_id = :oid OR org_id IS NULL)
+            ORDER BY name
+        ");
+        $stmt->execute([':tid' => $tenantId, ':oid' => $currentOrgId]);
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
@@ -129,8 +138,13 @@ try {
     // ACTION: STORAGE PROFILES
     // -------------------------------------------------------------------------
     if ($action === 'storage_profiles') {
-        $stmt = $pdo->prepare("SELECT * FROM dms_storage_profiles ORDER BY rec_id");
-        $stmt->execute();
+        $stmt = $pdo->prepare("
+            SELECT * FROM dms_storage_profiles 
+            WHERE tenant_id = :tid 
+              AND (org_id = :oid OR org_id IS NULL)
+            ORDER BY rec_id
+        ");
+        $stmt->execute([':tid' => $tenantId, ':oid' => $currentOrgId]);
         $profiles = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Decode configuration JSON for frontend
@@ -174,9 +188,18 @@ try {
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':name'=>$name, ':type'=>$type, ':config'=>$config, ':active'=>$isActive? 'true':'false', ':def'=>$isDefault?'true':'false', ':id'=>$id]);
         } else {
-            $sql = "INSERT INTO dms_storage_profiles (name, type, configuration, is_active, is_default) VALUES (:name, :type, :config, :active, :def)";
+            $sql = "INSERT INTO dms_storage_profiles (tenant_id, org_id, name, type, configuration, is_active, is_default) 
+                    VALUES (:tid, :oid, :name, :type, :config, :active, :def)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([':name'=>$name, ':type'=>$type, ':config'=>$config, ':active'=>$isActive?'true':'false', ':def'=>$isDefault?'true':'false']);
+            $stmt->execute([
+                ':tid' => $tenantId,
+                ':oid' => $currentOrgId, // Profiles created via specific org context belong to that org? Usually yes.
+                ':name'=>$name, 
+                ':type'=>$type, 
+                ':config'=>$config, 
+                ':active'=>$isActive?'true':'false', 
+                ':def'=>$isDefault?'true':'false'
+            ]);
         }
         
         echo json_encode(['success' => true]);
@@ -399,9 +422,16 @@ try {
              $initialOcrStatus = 'mapping';
         }
 
-        // 1. Get Active Default Storage Profile
-        $stmt = $pdo->prepare("SELECT * FROM dms_storage_profiles WHERE is_active = true AND is_default = true LIMIT 1");
-        $stmt->execute();
+        // 1. Get Active Default Storage Profile (Org Specific first, then Tenant Default)
+        $stmt = $pdo->prepare("
+            SELECT * FROM dms_storage_profiles 
+            WHERE is_active = true AND is_default = true 
+              AND tenant_id = :tid
+              AND (org_id = :oid OR org_id IS NULL)
+            ORDER BY org_id NULLS LAST
+            LIMIT 1
+        ");
+        $stmt->execute([':tid' => $tenantId, ':oid' => $currentOrgId]);
         $profile = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$profile) {
