@@ -135,6 +135,14 @@ export const CodeAuditPage: React.FC = () => {
                     Automatická analýza zdrojového kódu pro detekci technického dluhu.
                 </p>
 
+                {(data as any).scanned_count === 0 && (
+                    <div style={{ background: '#fff3cd', padding: 15, borderRadius: 4, marginBottom: 20, borderLeft: '4px solid #ffaa00' }}>
+                        <strong>⚠️ Pozor:</strong> Nebyly nalezeny žádné zdrojové kódy ke kontrole.
+                        To je na produkčním serveru normální (jsou zde jen zkompilované soubory).
+                        Tento nástroj používejte na <strong>Localhostu</strong>.
+                    </div>
+                )}
+
                 <TabList
                     selectedValue={selectedTab}
                     onTabSelect={(_, d: SelectTabData) => setSelectedTab(d.value as string)}
