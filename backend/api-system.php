@@ -200,7 +200,20 @@ try {
         $sqlIndex = "CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_translations_unique ON sys_translations (table_name, record_id, language_code, field_name)";
         $pdo->exec($sqlIndex);
 
-        echo json_encode(['success' => true, 'message' => 'System tables setup complete']);
+        // Security / Identity Tables
+        $sqlSec = "CREATE TABLE IF NOT EXISTS sys_user_org_access (
+            rec_id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES sys_users(rec_id) ON DELETE CASCADE,
+            org_id VARCHAR(50) NOT NULL,
+            roles JSONB DEFAULT '[]'::jsonb,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, org_id)
+        )";
+        $pdo->exec($sqlSec);
+
+        echo json_encode(['success' => true, 'message' => 'System tables setup complete (Translations + Security)']);
 
     } elseif ($action === 'translations_list') {
         $where = [];

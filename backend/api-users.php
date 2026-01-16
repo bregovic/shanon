@@ -205,6 +205,99 @@ try {
             echo json_encode(['success' => true, 'message' => 'Heslo změněno']);
             break;
 
+        case 'get_security_details':
+            $targetUserId = $_GET['id'] ?? null;
+            if (!$targetUserId) throw new Exception("Target User ID required");
+
+            // 1. Get User Profile Settings
+            $stmtUser = $pdo->prepare("SELECT settings FROM sys_users WHERE rec_id = :id");
+            $stmtUser->execute([':id' => $targetUserId]);
+            $userRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            $settings = $userRow && $userRow['settings'] ? json_decode($userRow['settings'], true) : [];
+
+            // 2. Get Org Access List using Helper or direct query
+            // We assume sys_organizations table doesn't exist yet as a standalone dict, 
+            // but we have sys_user_org_access. 
+            // TODO: Fetch available organizations from a central place (Config/Env). 
+            // For now, we trust what is in DB or define hardcoded list in Frontend or Config.
+            
+            $stmtAccess = $pdo->prepare("SELECT * FROM sys_user_org_access WHERE user_id = :uid");
+            $stmtAccess->execute([':uid' => $targetUserId]);
+            $accessList = $stmtAccess->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Format roles from JSON string if needed (PDO might fetch as string)
+            foreach($accessList as &$acc) {
+                if (is_string($acc['roles'])) $acc['roles'] = json_decode($acc['roles'], true);
+            }
+
+            echo json_encode([
+                'success' => true, 
+                'settings' => $settings,
+                'org_access' => $accessList
+            ]);
+            break;
+
+        case 'save_security_details':
+            $input = json_decode(file_get_contents('php://input'), true);
+            $targetUserId = $input['user_id'] ?? null;
+            if (!$targetUserId) throw new Exception("Target User ID required");
+
+            DB::transaction(function($pdo) use ($targetUserId, $input) {
+                // 1. Save Settings (Language, Default Org)
+                if (isset($input['settings'])) {
+                    // Fetch existing to merge
+                    $sStmt = $pdo->prepare("SELECT settings FROM sys_users WHERE rec_id = :id");
+                    $sStmt->execute([':id' => $targetUserId]);
+                    $curr = $sStmt->fetch(PDO::FETCH_ASSOC);
+                    $currSettings = $curr && $curr['settings'] ? json_decode($curr['settings'], true) : [];
+                    
+                    // Merge
+                    $newSettings = array_merge($currSettings, $input['settings']);
+                    $pdo->prepare("UPDATE sys_users SET settings = :json, updated_at = NOW() WHERE rec_id = :id")
+                        ->execute([':json' => json_encode($newSettings), ':id' => $targetUserId]);
+                }
+
+                // 2. Save Org Access
+                if (isset($input['org_access']) && is_array($input['org_access'])) {
+                    // Strategy: Delete all and re-insert is easiest for full sync, 
+                    // or upsert. Let's do selective Upsert/Delete.
+                    // For simplicity in this Wizard approach: Sync (Delete missing, Upsert provided)
+                    
+                    // Get current IDs in DB
+                    $existingStmt = $pdo->prepare("SELECT org_id FROM sys_user_org_access WHERE user_id = :uid");
+                    $existingStmt->execute([':uid' => $targetUserId]);
+                    $existingOrgs = $existingStmt->fetchAll(PDO::FETCH_COLUMN);
+
+                    $incomingOrgs = array_column($input['org_access'], 'org_id');
+
+                    // Delete removed
+                    $toDelete = array_diff($existingOrgs, $incomingOrgs);
+                    if (!empty($toDelete)) {
+                        $delPlaceholders = implode(',', array_fill(0, count($toDelete), '?'));
+                        $delStmt = $pdo->prepare("DELETE FROM sys_user_org_access WHERE user_id = ? AND org_id IN ($delPlaceholders)");
+                        $delStmt->execute(array_merge([$targetUserId], $toDelete));
+                    }
+
+                    // Upsert incoming
+                    $upsertSql = "INSERT INTO sys_user_org_access (user_id, org_id, roles, is_active) 
+                                  VALUES (:uid, :oid, :roles, true)
+                                  ON CONFLICT (user_id, org_id) 
+                                  DO UPDATE SET roles = EXCLUDED.roles, updated_at = NOW()";
+                    $upsertStmt = $pdo->prepare($upsertSql);
+
+                    foreach ($input['org_access'] as $item) {
+                        $upsertStmt->execute([
+                            ':uid' => $targetUserId,
+                            ':oid' => $item['org_id'],
+                            ':roles' => json_encode($item['roles'] ?? [])
+                        ]);
+                    }
+                }
+            });
+
+            echo json_encode(['success' => true, 'message' => 'Security details updated']);
+            break;
+
         default:
             throw new Exception("Unknown action: $action");
     }
