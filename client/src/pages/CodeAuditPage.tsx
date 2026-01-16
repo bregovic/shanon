@@ -16,7 +16,7 @@ import {
     CheckmarkCircle24Regular,
     Warning24Regular,
     ErrorCircle24Regular,
-    TextGrammarError24Regular
+    DocumentSearch24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
