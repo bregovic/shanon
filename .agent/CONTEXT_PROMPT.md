@@ -97,6 +97,15 @@
 *   **Self-Documenting:** Code must generally explain itself, but complex logic needs comments.
 *   **Changelog:** Every resolved task MUST be logged in the `development_history` table.
 
+### G. User State Persistence (SysLastValue)
+*   **Objective**: Improve UX by remembering user choices (filters, last folder, grid columns) across sessions.
+*   **When to use**:
+    *   **Grids**: Sort order, hidden columns, complex filters.
+    *   **Context**: Last selected folder (Audit), preferred view mode.
+*   **Implementation**:
+    *   **Server-Side (`sys_user_params`)**: Use for settings that must travel with the user (across devices). API: `sys_param_set` / `sys_param_list`.
+    *   **Client-Side (`IndexedDB`)**: Use for browser-specific objects (FileHandles) or strictly local preferences. Helper: `useLocalLastValue` hook.
+
 ---
 
 ## 3. HOW TO START A TASK
@@ -110,3 +119,11 @@
 - **File Location**: `backend/helpers/DataSeeder.php`.
 - **Rule**: Whenever you create a new configuration table (e.g., `dms_doc_types`, `sys_currencies`, `tax_rates`), you MUST add a corresponding method to `DataSeeder.php` that defines the standard/default values (e.g., `seedDocTypes`, `seedCurrencies`).
 - **Usage**: These seeders are exposed via `api-system.php` -> `action=run_seeders` and are available in the System Administration UI for bulk initialization.
+
+## 7. Project Scope & Exceptions (Shanon vs. Broker)
+- **Monorepo Structure**: This repository contains code for two distinct but related projects: **Shanon** (DMS/CRM/System) and **Broker** (Investment Portfolio).
+- **Shared Code**: The `client/src/locales`, `components`, and some `pages` may contain code for both.
+- **Context Separation**:
+    - **Shanon**: Focuses on `Dms*`, `System*`, `Organizations*`, `Requests*`.
+    - **Broker**: Focuses on `Market*`, `Portfolio*`, `Balance*`, `Dividends*`, `Rates*`.
+- **Audit Rules**: When performing audits or refactoring, be aware that "unused" components or translations might belong to the *other* project (Broker) if you are currently focused on Shanon. However, since they share the same `translations.ts`, it is acceptable to maintain them together.
