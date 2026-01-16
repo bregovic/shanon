@@ -215,30 +215,42 @@ try {
             $userRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
             $settings = $userRow && $userRow['settings'] ? json_decode($userRow['settings'], true) : [];
 
-            // 2. Get Org Access List using Helper or direct query
-            // We assume sys_organizations table doesn't exist yet as a standalone dict, 
-            // but we have sys_user_org_access. 
-            // TODO: Fetch available organizations from a central place (Config/Env). 
-            // For now, we trust what is in DB or define hardcoded list in Frontend or Config.
+            // 2. Get Org Access Matrix (All Orgs + User Status)
+            // We fetch ALL active organizations and join with user access
+            $sqlMatrix = "
+                SELECT 
+                    o.org_id, 
+                    o.display_name,
+                    ua.roles,
+                    ua.is_active,
+                    (ua.user_id IS NOT NULL) as is_assigned
+                FROM sys_organizations o
+                LEFT JOIN sys_user_org_access ua ON o.org_id = ua.org_id AND ua.user_id = :uid
+                WHERE o.is_active = true
+                ORDER BY o.display_name ASC
+            ";
             
-            $stmtAccess = $pdo->prepare("SELECT * FROM sys_user_org_access WHERE user_id = :uid");
-            $stmtAccess->execute([':uid' => $targetUserId]);
-            $accessList = $stmtAccess->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Format roles from JSON string if needed (PDO might fetch as string)
-            foreach($accessList as &$acc) {
-                if (is_string($acc['roles'])) {
-                    $decoded = json_decode($acc['roles'], true);
-                    $acc['roles'] = is_array($decoded) ? $decoded : [];
-                } elseif (is_null($acc['roles'])) {
-                    $acc['roles'] = [];
+            $stmtMatrix = $pdo->prepare($sqlMatrix);
+            $stmtMatrix->execute([':uid' => $targetUserId]);
+            $matrix = $stmtMatrix->fetchAll(PDO::FETCH_ASSOC);
+
+            // Normalize roles
+            foreach($matrix as &$row) {
+                if ($row['roles'] && is_string($row['roles'])) {
+                    $decoded = json_decode($row['roles'], true);
+                    $row['roles'] = is_array($decoded) ? $decoded : [];
+                } else {
+                    $row['roles'] = [];
                 }
+                // Ensure booleans
+                $row['is_assigned'] = (bool)$row['is_assigned'];
+                $row['is_active'] = (bool)$row['is_active'];
             }
 
             echo json_encode([
                 'success' => true, 
                 'settings' => $settings,
-                'org_access' => $accessList
+                'matrix' => $matrix
             ]);
             break;
 

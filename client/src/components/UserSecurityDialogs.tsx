@@ -139,7 +139,15 @@ export const UserSettingsDialog: React.FC<{
     );
 };
 
-// --- User Org Access Wizard ---
+// --- User Access Drawer (Matrix) ---
+
+interface OrgMatrixItem {
+    org_id: string;
+    display_name: string;
+    roles: string[];
+    is_assigned: boolean;
+    is_active: boolean;
+}
 
 const AVAILABLE_ROLES = [
     { value: 'ADMIN', label: 'Administrátor' },
@@ -149,19 +157,23 @@ const AVAILABLE_ROLES = [
     { value: 'GUEST', label: 'Host' },
 ];
 
-export const UserOrgWizard: React.FC<{
+export const UserAccessDrawer: React.FC<{
     open: boolean;
     userId: number;
     userName: string;
     onClose: () => void;
 }> = ({ open, userId, userName, onClose }) => {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
-    const [accessList, setAccessList] = useState<OrgAccess[]>([]);
-    const [availableOrgs, setAvailableOrgs] = useState<{ org_id: string, display_name: string }[]>([]);
+    const [matrix, setMatrix] = useState<OrgMatrixItem[]>([]);
 
-    // Add New state
-    const [newOrgId, setNewOrgId] = useState<string>('');
-    const comboId = useId('combo-org');
+    // UI State
+    const [filterAssigned, setFilterAssigned] = useState(false);
+    const [selectedOrgs, setSelectedOrgs] = useState<Set<string>>(new Set());
+
+    // Bulk Role Edit State
+    const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+    const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
     useEffect(() => {
         if (open && userId) loadData();
@@ -170,171 +182,233 @@ export const UserOrgWizard: React.FC<{
     const loadData = async () => {
         setLoading(true);
         try {
-            // Get User Data
-            const resUser = await fetch(`${API_BASE}/api-users.php?action=get_security_details&id=${userId}`, { credentials: 'include' });
-            const jsonUser = await resUser.json();
-            if (jsonUser.success) {
-                setAccessList(jsonUser.org_access || []);
-            }
-
-            // Get All Orgs (We need a way to list all system orgs)
-            // Currently using a hack: getting logged user context usually returns available orgs, 
-            // but we need ALL orgs to assign. Assuming admin can see all.
-            // Let's reuse ajax-get-user logic or assume sys_organizations exists and we need an endpoint.
-            // Fallback: Manually add org ID if list not available or implement 'list_organizations' in api-system.
-            // Let's assumes api-system.php?action=list_organizations exists or we add it. 
-            // For now, I'll Mock or fetch what I can.
-
-            // Temporary: Fetch current user's orgs and hope Admin has all.
-            const resMe = await fetch(`${API_BASE}/ajax-get-user.php`, { credentials: 'include' });
-            const jsonMe = await resMe.json();
-            if (jsonMe.success && jsonMe.organizations) {
-                setAvailableOrgs(jsonMe.organizations);
+            const res = await fetch(`${API_BASE}/api-users.php?action=get_security_details&id=${userId}`, { credentials: 'include' });
+            const json = await res.json();
+            if (json.success) {
+                setMatrix(json.matrix || []);
             }
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSave = async () => {
+    const handleSave = async (updatedMatrix: OrgMatrixItem[]) => {
         setLoading(true);
+        // Transform matrix back to expected save format (only assigned items)
+        const payload = updatedMatrix
+            .filter(item => item.is_assigned)
+            .map(item => ({
+                org_id: item.org_id,
+                roles: item.roles,
+                is_active: true
+            }));
+
         try {
             await fetch(`${API_BASE}/api-users.php?action=save_security_details`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: userId,
-                    org_access: accessList
+                    org_access: payload
                 }),
                 credentials: 'include'
             });
-            onClose();
+            // Reload to confirm state
+            await loadData();
         } finally {
             setLoading(false);
         }
     };
 
-    const addOrg = () => {
-        if (!newOrgId) return;
-        if (accessList.find(a => a.org_id === newOrgId)) return; // Already exists
+    // --- Bulk Operations ---
 
-        setAccessList([...accessList, {
-            user_id: userId,
-            org_id: newOrgId,
-            roles: ['USER'], // Default
-            is_active: true
-        }]);
-        setNewOrgId('');
+    const handleBulkAssign = () => {
+        // Open Role Picker
+        setSelectedRoles([]); // Reset or prefill? Reset is safer for bulk.
+        setRoleDialogOpen(true);
     };
 
-    const removeOrg = (orgId: string) => {
-        setAccessList(accessList.filter(a => a.org_id !== orgId));
+    const applyBulkRoles = () => {
+        const newMatrix = matrix.map(item => {
+            if (selectedOrgs.has(item.org_id)) {
+                return {
+                    ...item,
+                    is_assigned: true, // Auto-assign if we set roles
+                    roles: selectedRoles
+                };
+            }
+            return item;
+        });
+        setMatrix(newMatrix);
+        setRoleDialogOpen(false);
+        handleSave(newMatrix); // Auto-save on apply
     };
 
-    const toggleRole = (orgId: string, roleCode: string) => {
-        setAccessList(accessList.map(a => {
-            if (a.org_id !== orgId) return a;
-            const hasRole = a.roles.includes(roleCode);
-            const newRoles = hasRole
-                ? a.roles.filter(r => r !== roleCode)
-                : [...a.roles, roleCode];
-            return { ...a, roles: newRoles };
-        }));
+    const handleBulkRemove = () => {
+        if (!confirm('Opravdu odebrat vybrané organizace?')) return;
+        const newMatrix = matrix.map(item => {
+            if (selectedOrgs.has(item.org_id)) {
+                return { ...item, is_assigned: false, roles: [] };
+            }
+            return item;
+        });
+        setMatrix(newMatrix);
+        handleSave(newMatrix);
     };
+
+    // --- Columns ---
+    // Note: We build a simple table or grid here. For "SmartDataGrid" inside a Drawer, 
+    // we need to make sure it doesn't conflict with parent page logic. 
+    // Since SmartDataGrid is robust, we can use it, but simple mapping is often faster for drawers.
+    // However, user requested "Filtrovat", so let's stick to a clean UI list with ActionBar.
+
+    const filteredItems = matrix.filter(item => {
+        if (filterAssigned && !item.is_assigned) return false;
+        return true;
+    });
 
     return (
-        <Dialog open={open} onOpenChange={(_, data) => !data.open && onClose()}>
-            <DialogSurface aria-label="Editor oprávnění" style={{ minWidth: '600px' }}>
-                <DialogBody>
-                    <DialogTitle>Organizace a Role: {userName}</DialogTitle>
-                    <DialogContent>
-                        <p style={{ marginBottom: 10, color: '#666' }}>
-                            Přiřaďte uživateli přístup do organizací a definujte jeho role v každé z nich.
-                        </p>
+        <Drawer
+            type="overlay"
+            position="end"
+            size="large" // Wider drawer for matrix
+            open={open}
+            onOpenChange={(_, data) => !data.open && onClose()}
+        >
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 20 }}>
+                {/* Header */}
+                <div style={{ marginBottom: 20 }}>
+                    <h2 style={{ margin: 0 }}>Oprávnění v organizacích</h2>
+                    <div style={{ color: '#666' }}>Uživatel: <strong>{userName}</strong></div>
+                </div>
 
-                        {/* List */}
-                        <div style={{ border: '1px solid #e0e0e0', borderRadius: 4, overflow: 'hidden' }}>
-                            <Table size="small">
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHeaderCell>Organizace</TableHeaderCell>
-                                        <TableHeaderCell>Role</TableHeaderCell>
-                                        <TableHeaderCell>Akce</TableHeaderCell>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {accessList.map(item => (
-                                        <TableRow key={item.org_id}>
-                                            <TableCell>
-                                                <strong>{availableOrgs.find(o => o.org_id === item.org_id)?.display_name || item.org_id}</strong>
-                                                <div style={{ fontSize: '0.8em', color: '#888' }}>{item.org_id}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                                                    {AVAILABLE_ROLES.map(role => {
-                                                        const active = (item.roles || []).includes(role.value);
-                                                        return (
-                                                            <Badge
-                                                                key={role.value}
-                                                                appearance={active ? 'filled' : 'outline'}
-                                                                color={active ? 'brand' : 'secondary'}
-                                                                style={{ cursor: 'pointer' }}
-                                                                onClick={() => toggleRole(item.org_id, role.value)}
-                                                            >
-                                                                {role.label}
-                                                            </Badge>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button icon={<Delete24Regular />} appearance="subtle" onClick={() => removeOrg(item.org_id)} />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {accessList.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={3} style={{ textAlign: 'center', padding: 20 }}>
-                                                Žádné přiřazené organizace. Uživatel nebude mít přístup nikam.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-
-                        {/* Add New */}
-                        <div style={{ marginTop: 20, display: 'flex', gap: 10, alignItems: 'end' }}>
-                            <div style={{ flexGrow: 1 }}>
-                                <Label htmlFor={comboId}>Přidat přístup do organizace</Label>
-                                <div style={{ display: 'flex', gap: 5 }}>
-                                    <Dropdown
-                                        aria-labelledby={comboId}
-                                        placeholder="Vyberte organizaci"
-                                        onOptionSelect={(_, d) => setNewOrgId(d.optionValue || '')}
-                                        value={availableOrgs.find(o => o.org_id === newOrgId)?.display_name || newOrgId}
-                                        style={{ flexGrow: 1 }}
-                                    >
-                                        {availableOrgs.filter(o => !accessList.find(a => a.org_id === o.org_id)).map(org => (
-                                            <Option key={org.org_id} value={org.org_id} text={org.display_name}>
-                                                {org.display_name} ({org.org_id})
-                                            </Option>
-                                        ))}
-                                    </Dropdown>
-                                    <Button icon={<Add24Regular />} onClick={addOrg} disabled={!newOrgId}>Přidat</Button>
-                                </div>
-                            </div>
-                        </div>
-
-                    </DialogContent>
-                    <DialogActions>
-                        <Button appearance="primary" icon={<Save24Regular />} onClick={handleSave} disabled={loading}>
-                            {loading ? <Spinner size="tiny" /> : 'Uložit změny'}
+                {/* Toolbar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid #ccc' }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <Switch
+                            label={filterAssigned ? "Jen přiřazené" : "Všechny organizace"}
+                            checked={filterAssigned}
+                            onChange={(_, d) => setFilterAssigned(d.checked)}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                        <Button
+                            icon={<Add24Regular />}
+                            disabled={selectedOrgs.size === 0}
+                            onClick={handleBulkAssign}
+                        >
+                            Nastavit role
                         </Button>
-                        <Button appearance="secondary" onClick={onClose}>Zavřít</Button>
-                    </DialogActions>
-                </DialogBody>
-            </DialogSurface>
-        </Dialog>
+                        <Button
+                            icon={<Delete24Regular />}
+                            disabled={selectedOrgs.size === 0}
+                            onClick={handleBulkRemove}
+                        >
+                            Odebrat
+                        </Button>
+                    </div>
+                </div>
+
+                {/* List / Grid */}
+                <div style={{ flexGrow: 1, overflowY: 'auto', marginTop: 10 }}>
+                    {loading && <Spinner />}
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHeaderCell style={{ width: 40 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedOrgs.size === filteredItems.length && filteredItems.length > 0}
+                                        onChange={(e) => {
+                                            if (e.target.checked) setSelectedOrgs(new Set(filteredItems.map(i => i.org_id)));
+                                            else setSelectedOrgs(new Set());
+                                        }}
+                                    />
+                                </TableHeaderCell>
+                                <TableHeaderCell>Organizace</TableHeaderCell>
+                                <TableHeaderCell>Stav</TableHeaderCell>
+                                <TableHeaderCell>Role</TableHeaderCell>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredItems.map(item => (
+                                <TableRow key={item.org_id} onClick={() => {
+                                    // Toggle selection on row click
+                                    const newSet = new Set(selectedOrgs);
+                                    newSet.has(item.org_id) ? newSet.delete(item.org_id) : newSet.add(item.org_id);
+                                    setSelectedOrgs(newSet);
+                                }} style={{ cursor: 'pointer', background: selectedOrgs.has(item.org_id) ? '#f0f0f0' : 'transparent' }}>
+                                    <TableCell>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedOrgs.has(item.org_id)}
+                                            readOnly
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <strong>{item.display_name}</strong>
+                                        <div style={{ fontSize: '0.8em', color: '#888' }}>{item.org_id}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {item.is_assigned
+                                            ? <Badge appearance="filled" color="success">Přiřazeno</Badge>
+                                            : <Badge appearance="ghost">Nepřiřazeno</Badge>
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                            {item.roles.map(r => (
+                                                <Badge key={r} appearance="outline">{r}</Badge>
+                                            ))}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            {filteredItems.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} style={{ textAlign: 'center', padding: 20 }}>Nic nenalezeno</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+
+                {/* Footer */}
+                <div style={{ marginTop: 10, textAlign: 'right' }}>
+                    <Button onClick={onClose}>Zavřít</Button>
+                </div>
+            </div>
+
+            {/* Role Picker Dialog (Internal) */}
+            <Dialog open={roleDialogOpen} onOpenChange={(_, d) => !d.open && setRoleDialogOpen(false)}>
+                <DialogSurface>
+                    <DialogBody>
+                        <DialogTitle>Nastavit role pro {selectedOrgs.size} organizací</DialogTitle>
+                        <DialogContent>
+                            <p>Vyberte role, které budou hromadně nastaveny:</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                {AVAILABLE_ROLES.map(role => (
+                                    <div key={role.value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <Switch
+                                            checked={selectedRoles.includes(role.value)}
+                                            onChange={(_, d) => {
+                                                if (d.checked) setSelectedRoles([...selectedRoles, role.value]);
+                                                else setSelectedRoles(selectedRoles.filter(r => r !== role.value));
+                                            }}
+                                        />
+                                        <span>{role.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button appearance="primary" onClick={applyBulkRoles}>Použít</Button>
+                            <Button appearance="secondary" onClick={() => setRoleDialogOpen(false)}>Zrušit</Button>
+                        </DialogActions>
+                    </DialogBody>
+                </DialogSurface>
+            </Dialog>
+
+        </Drawer>
     );
 };

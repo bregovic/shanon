@@ -39,7 +39,7 @@ import { SmartDataGrid } from '../components/SmartDataGrid';
 import { useTranslation } from '../context/TranslationContext';
 import { ActionBar } from '../components/ActionBar';
 import { useAuth } from '../context/AuthContext';
-import { UserSettingsDialog, UserOrgWizard } from '../components/UserSecurityDialogs';
+import { UserSettingsDialog, UserAccessDrawer } from '../components/UserSecurityDialogs';
 
 const API_BASE = import.meta.env.DEV
     ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
@@ -488,7 +488,7 @@ export const UsersAdmin: React.FC = () => {
                         userId={targetUser.rec_id}
                         onClose={() => setSettingsOpen(false)}
                     />
-                    <UserOrgWizard
+                    <UserAccessDrawer
                         open={securityOpen}
                         userId={targetUser.rec_id}
                         userName={targetUser.full_name || targetUser.email}
