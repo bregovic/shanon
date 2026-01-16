@@ -32,7 +32,7 @@ try {
     
     switch ($action) {
         case 'list':
-            $stmt = $pdo->query("
+            $stmt = $pdo->prepare("
                 SELECT 
                     rec_id,
                     tenant_id,
