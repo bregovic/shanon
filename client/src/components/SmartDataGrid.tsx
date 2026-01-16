@@ -75,7 +75,10 @@ const useStyles = makeStyles({
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        display: 'block', // Required for textOverflow to work in some flex contexts
+        // CHANGE: Use flex to vertically align with Selection Checkbox
+        display: 'flex',
+        alignItems: 'center',
+
         '@media (max-width: 768px)': {
             paddingLeft: '4px',
             paddingRight: '4px',
