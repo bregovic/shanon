@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { makeStyles, tokens, Button, Tooltip } from '@fluentui/react-components';
-import { Filter24Regular, ChevronDown24Regular, ChevronUp24Regular, Building24Regular } from '@fluentui/react-icons';
+import { Filter24Regular, ChevronDown24Regular, ChevronUp24Regular } from '@fluentui/react-icons';
 import { useAuth } from '../context/AuthContext';
 
 // --- Context ---
@@ -77,7 +77,6 @@ const useHeaderStyles = makeStyles({
 export const PageHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const styles = useHeaderStyles();
     const { hasFilters, isFiltersOpen, toggleFilters } = useContext(PageLayoutContext);
-    const { currentOrgId } = useAuth();
 
     return (
         <div className={styles.root}>
