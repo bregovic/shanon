@@ -34,9 +34,24 @@ function getDirContents($dir, &$results = []) {
 
 switch($action) {
     case 'audit_translations':
-        $files = getDirContents($clientPath);
+        $files = [];
         $usedKeys = [];
         $hardcodedCandidates = [];
+        
+        // Safety check: Does client source exist? (It might not on prod build)
+        if (is_dir($clientPath)) {
+            $files = getDirContents($clientPath);
+        } else {
+             // Return empty success so UI can show "0 scanned" warning instead of crashing
+            echo json_encode([
+                'success' => true,
+                'scanned_count' => 0,
+                'missing_translations' => [],
+                'unused_translations' => [],
+                'hardcoded_candidates' => []
+            ]);
+            exit;
+        }
         
         // Regex patterns
         $tPattern = "/t\(['\"]([^'\"]+)['\"]\)/";

@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
 import { SmartDataGrid } from '../components/SmartDataGrid';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/TranslationContext';
 
 const API_BASE = import.meta.env.DEV
     ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
@@ -33,6 +34,7 @@ interface AuditData {
 
 export const CodeAuditPage: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const { currentOrgId } = useAuth();
     const orgPrefix = `/${currentOrgId || 'VACKR'}`;
 
