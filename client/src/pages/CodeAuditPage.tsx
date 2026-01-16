@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import {
     Breadcrumb,
@@ -15,7 +16,10 @@ import type { SelectTabData, TableColumnDefinition } from '@fluentui/react-compo
 import {
     Warning24Regular,
     ErrorCircle24Regular,
-    DocumentSearch24Regular
+    DocumentSearch24Regular,
+    Copy24Regular,
+    ClipboardCode24Regular,
+    ArrowDownload24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
@@ -28,9 +32,12 @@ const API_BASE = import.meta.env.DEV
     : '/api';
 
 interface AuditData {
+    scanned_count?: number;
     missing_translations: { key: string; files: string[] }[];
-    unused_translations: { key: string; value: string }[];
+    unused_translations: { key: string; files: string[] }[];
     hardcoded_candidates: { file: string; text: string }[];
+    duplicate_values: { value: string; keys: string[] }[];
+    code_smells: { type: 'console' | 'todo' | 'fixme'; file: string; line: number; content: string }[];
 }
 
 export const CodeAuditPage: React.FC = () => {
@@ -45,7 +52,9 @@ export const CodeAuditPage: React.FC = () => {
     const [data, setData] = useState<AuditData>({
         missing_translations: [],
         unused_translations: [],
-        hardcoded_candidates: []
+        hardcoded_candidates: [],
+        duplicate_values: [],
+        code_smells: []
     });
 
     useEffect(() => {
@@ -58,7 +67,9 @@ export const CodeAuditPage: React.FC = () => {
                     setData({
                         missing_translations: json.missing_translations || [],
                         unused_translations: json.unused_translations || [],
-                        hardcoded_candidates: json.hardcoded_candidates || []
+                        hardcoded_candidates: json.hardcoded_candidates || [],
+                        duplicate_values: [],
+                        code_smells: []
                     });
                 }
             } catch (e) {
@@ -96,10 +107,10 @@ export const CodeAuditPage: React.FC = () => {
             renderCell: (i) => i.key
         },
         {
-            columnId: 'value',
-            compare: (a, b) => a.value.localeCompare(b.value),
-            renderHeaderCell: () => 'Hodnota',
-            renderCell: (i) => i.value
+            columnId: 'status',
+            compare: (a, b) => 0,
+            renderHeaderCell: () => 'Status',
+            renderCell: (i) => <Badge appearance="ghost">Nepoužito</Badge>
         },
     ], []);
 
@@ -117,6 +128,52 @@ export const CodeAuditPage: React.FC = () => {
             renderCell: (i) => i.file
         },
     ], []);
+
+    const duplicateColumns: TableColumnDefinition<AuditData['duplicate_values'][0]>[] = useMemo(() => [
+        {
+            columnId: 'value',
+            compare: (a, b) => a.value.localeCompare(b.value),
+            renderHeaderCell: () => 'Hodnota Duplicity',
+            renderCell: (i) => <strong>{i.value}</strong>
+        },
+        {
+            columnId: 'keys',
+            compare: (a, b) => a.keys.length - b.keys.length,
+            renderHeaderCell: () => 'Klíče',
+            renderCell: (i) => <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{i.keys.map(k => <Badge key={k} size="small">{k}</Badge>)}</div>
+        },
+    ], []);
+
+    const smellColumns: TableColumnDefinition<AuditData['code_smells'][0]>[] = useMemo(() => [
+        {
+            columnId: 'type',
+            compare: (a, b) => a.type.localeCompare(b.type),
+            renderHeaderCell: () => 'Typ',
+            renderCell: (i) => <Badge color={i.type === 'console' ? 'warning' : 'danger'}>{i.type.toUpperCase()}</Badge>
+        },
+        {
+            columnId: 'file',
+            compare: (a, b) => a.file.localeCompare(b.file),
+            renderHeaderCell: () => 'Soubor : Řádek',
+            renderCell: (i) => <span>{i.file}:{i.line}</span>
+        },
+        {
+            columnId: 'content',
+            compare: (a, b) => a.content.localeCompare(b.content),
+            renderHeaderCell: () => 'Obsah',
+            renderCell: (i) => <code>{i.content}</code>
+        },
+    ], []);
+
+    const handleExport = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "audit_report.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    };
 
     return (
         <PageLayout>
@@ -139,9 +196,16 @@ export const CodeAuditPage: React.FC = () => {
                         {t('system.audit.desc') || 'Automatická analýza zdrojového kódu pro detekci technického dluhu.'}
                     </p>
                 </div>
-                <Badge appearance="outline" color={(data as any).scanned_count > 0 ? 'success' : 'warning'}>
-                    Files Scanned: {(data as any).scanned_count ?? 'N/A'}
-                </Badge>
+                <div style={{ display: 'flex', gap: 10 }}>
+                    {(data as any).scanned_count > 0 && (
+                        <Button icon={<ArrowDownload24Regular />} onClick={handleExport}>
+                            Export Report
+                        </Button>
+                    )}
+                    <Badge appearance="outline" color={(data as any).scanned_count > 0 ? 'success' : 'warning'}>
+                        Files Scanned: {(data as any).scanned_count ?? 'N/A'}
+                    </Badge>
+                </div>
             </div>
 
             {/* SOURCE SELECTION */}
@@ -170,6 +234,7 @@ export const CodeAuditPage: React.FC = () => {
                                     const { runLocalAudit } = await import('../utils/localAuditScanner');
                                     const result = await runLocalAudit(dirHandle);
 
+                                    // @ts-ignore - Type mismatch in legacy
                                     setData(result);
                                 } catch (e: any) {
                                     if (e.name !== 'AbortError') {
@@ -203,6 +268,14 @@ export const CodeAuditPage: React.FC = () => {
                     Nepoužité klíče
                     <Badge appearance="ghost" style={{ marginLeft: 5 }}>{data.unused_translations.length}</Badge>
                 </Tab>
+                <Tab value="duplicates" icon={<Copy24Regular />}>
+                    Duplicity
+                    <Badge appearance="ghost" style={{ marginLeft: 5 }}>{data.duplicate_values?.length || 0}</Badge>
+                </Tab>
+                <Tab value="smells" icon={<ClipboardCode24Regular />}>
+                    Best Practices
+                    <Badge appearance="ghost" style={{ marginLeft: 5 }}>{data.code_smells?.length || 0}</Badge>
+                </Tab>
             </TabList>
 
 
@@ -233,9 +306,28 @@ export const CodeAuditPage: React.FC = () => {
                         {selectedTab === 'unused' && (
                             <SmartDataGrid
                                 items={data.unused_translations}
-                                columns={unusedColumns}
+                                columns={unusedColumns as any}
                                 getRowId={(i) => i.key}
                             />
+                        )}
+                        {selectedTab === 'duplicates' && (
+                            <SmartDataGrid
+                                items={data.duplicate_values || []}
+                                columns={duplicateColumns as any}
+                                getRowId={(i) => i.value}
+                            />
+                        )}
+                        {selectedTab === 'smells' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div style={{ background: '#e0f7ff', padding: 10, borderRadius: 4 }}>
+                                    💡 Zde najdete zapomenuté <code>console.log</code> a <code>TODO/FIXME</code> komentáře.
+                                </div>
+                                <SmartDataGrid
+                                    items={data.code_smells || []}
+                                    columns={smellColumns}
+                                    getRowId={(i) => i.file + i.line}
+                                />
+                            </div>
                         )}
                     </>
                 )}
