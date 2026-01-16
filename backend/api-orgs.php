@@ -89,7 +89,7 @@ try {
             ]);
 
             // Automatically grant access to the creator
-            $currentUserId = $_SESSION['user']['rec_id'] ?? null;
+            $currentUserId = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? null;
             if ($currentUserId) {
                 $accessSql = "INSERT INTO sys_user_org_access (user_id, org_id, is_default) VALUES (:uid, :oid, false) ON CONFLICT DO NOTHING";
                 $pdo->prepare($accessSql)->execute([':uid' => $currentUserId, ':oid' => $orgId]);

@@ -26,8 +26,8 @@ require_once 'db.php';
 
 try {
     $pdo = DB::connect();
-    $userId = $_SESSION['user']['rec_id'];
-    $userRoles = $_SESSION['user']['roles'] ?? [];
+    $userId = $_SESSION['user']['id'] ?? $_SESSION['user_id'];
+    $userRoles = $_SESSION['user']['role'] ?? []; // 'role' key depends on login script, checking login it is 'role' singular or 'roles' depending on version. login says 'role'
     
     // Admin Bypass: ADMIN role can switch to ANY active organization
     $isAdmin = in_array('admin', array_map('strtolower', (array)$userRoles));
