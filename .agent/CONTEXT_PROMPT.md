@@ -21,6 +21,10 @@
 
 ### A. Strict Multi-Tenancy & Global Organization Context
 *   **Database:** Every transactional table MUST have `tenant_id` AND `org_id`. Configuration tables must have `tenant_id`.
+*   **Database Updates:**
+    *   **NO ad-hoc PHP scripts** (e.g. `fix_db.php`) allowed in production.
+    *   All schema changes MUST be sequential SQL files in `backend/migrations/`.
+    *   Use the unified runner (`install-db.php`) or System Admin UI trigger to apply changes.
 *   **Security Context:**
     *   **Backend:** NEVER trust default behavior. Every SQL update/select must explicitly enforce `WHERE tenant_id = :tid AND org_id = :oid` (unless global lookup).
     *   **Frontend:** Every form/list MUST respect the current Organization Context (`useAuth().currentOrgId`).
