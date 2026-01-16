@@ -209,7 +209,7 @@ export const translations = {
         'security.permissions_for': 'Oprávnění uživatele',
         'security.select_role': 'Vyberte roli ze seznamu',
         'security.new_role': 'Nová role',
-        'security.save': 'Uložit',
+
         'security.saving': 'Ukládám...',
         'security.saved': 'Role uložena.',
         'security.search': 'Hledat...',
@@ -413,7 +413,7 @@ export const translations = {
         'import.unsupported.title': 'Unsupported Format',
         'import.unsupported.desc': 'This file could not be recognized. Please check the format or contact support.',
         'import.contact_support': 'Contact Support',
-        'import.upload_btn': 'Import',
+
         'import.add_btn': 'Add more',
         'import.working': 'Working...',
         'import.supported': 'Supported formats',
@@ -481,7 +481,7 @@ export const translations = {
         'security.permissions_for': 'Permissions for role',
         'security.select_role': 'Select a role',
         'security.new_role': 'New role code',
-        'security.save': 'Save',
+
         'security.saving': 'Saving...',
         'security.saved': 'Permissions saved',
         'security.search': 'Search objects...',
@@ -626,6 +626,6 @@ export const translations = {
         'select_year': 'Select Year',
         'import_cnb_desc': 'Import official exchange rates from Czech National Bank.',
         'btn_importing': 'Importing...',
-        'btn_import': 'Import',
+
     }
 };

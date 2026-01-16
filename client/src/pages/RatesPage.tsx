@@ -17,8 +17,7 @@ import {
     DialogActions,
     Input,
     Toolbar,
-    ToolbarButton,
-    ToolbarDivider
+    ToolbarButton
 } from '@fluentui/react-components';
 import { Add24Regular, ArrowClockwise24Regular } from '@fluentui/react-icons';
 import axios from 'axios';
@@ -225,7 +224,7 @@ export const RatesPage = () => {
                             </DialogContent>
                             <DialogActions>
                                 <Button appearance="primary" onClick={handleYearImport} disabled={yearImporting}>
-                                    {yearImporting ? t('btn_importing') : t('btn_import')}
+                                    {yearImporting ? t('btn_importing') : t('common.import')}
                                 </Button>
                                 <Button appearance="secondary" onClick={() => setIsYearOpen(false)}>{t('common.cancel')}</Button>
                             </DialogActions>

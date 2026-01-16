@@ -13,15 +13,13 @@ import {
     ClipboardTaskListLtr24Regular,
     Beaker24Regular,
     Warning24Regular,
-    Delete24Regular,
-    Play24Regular,
-    Document24Regular
+    Delete24Regular
 } from "@fluentui/react-icons";
 import axios from "axios";
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from "../components/PageLayout";
 import { SmartDataGrid } from "../components/SmartDataGrid";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+
 
 interface TestScenario {
     rec_id: number;
@@ -35,10 +33,9 @@ interface TestScenario {
 
 export const SystemTestingList: React.FC = () => {
     const navigate = useNavigate();
-    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('process');
     const [items, setItems] = useState<TestScenario[]>([]);
-    const [loading, setLoading] = useState(false);
+    // const [loading, setLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
     useEffect(() => {
@@ -46,7 +43,7 @@ export const SystemTestingList: React.FC = () => {
     }, [activeTab]);
 
     const loadData = async () => {
-        setLoading(true);
+        // setLoading(true);
         setSelectedIds(new Set()); // Reset selection on tab change
         try {
             const res = await axios.get(`/api/api-system-testing.php?action=list_scenarios&category=${activeTab}`);
@@ -56,11 +53,11 @@ export const SystemTestingList: React.FC = () => {
         } catch (err) {
             console.error(err);
         } finally {
-            setLoading(false);
+            // setLoading(false);
         }
     };
 
-    const handleTabSelect: SelectTabEventHandler = (e, data) => {
+    const handleTabSelect: SelectTabEventHandler = (_e, data) => {
         setActiveTab(data.value as string);
     };
 
@@ -130,7 +127,7 @@ export const SystemTestingList: React.FC = () => {
                             appearance="subtle"
                             icon={<Delete24Regular />}
                             disabled={selectedIds.size === 0}
-                            onClick={handleDelete} // TODO
+                            onClick={handleDelete}
                         >
                             Smazat
                         </Button>
