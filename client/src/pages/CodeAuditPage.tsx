@@ -26,10 +26,38 @@ import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
 import { SmartDataGrid } from '../components/SmartDataGrid';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/TranslationContext';
+import { setLocalLastValue, useLocalLastValue } from '../utils/indexedDB';
 
 const API_BASE = import.meta.env.DEV
     ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
     : '/api';
+
+// ...
+const LastFolderButton: React.FC<{ onLoad: (handle: any) => void }> = ({ onLoad }) => {
+    const { value: lastHandle, loading } = useLocalLastValue<any>('audit_folder_handle');
+
+    if (loading || !lastHandle) return null;
+
+    return (
+        <Button
+            size="small"
+            appearance="subtle"
+            onClick={async () => {
+                // Verify permission
+                if ((await lastHandle.queryPermission({ mode: 'read' })) === 'granted') {
+                    onLoad(lastHandle);
+                } else {
+                    // Request permission
+                    if ((await lastHandle.requestPermission({ mode: 'read' })) === 'granted') {
+                        onLoad(lastHandle);
+                    }
+                }
+            }}
+        >
+            Použít naposledy vybranou složku ({lastHandle.name})
+        </Button>
+    );
+};
 
 interface AuditData {
     scanned_count?: number;
@@ -221,32 +249,49 @@ export const CodeAuditPage: React.FC = () => {
                                 Pro spuštění auditu vyberte složku <code>client/src</code> na vašem počítači.
                             </div>
                         </div>
-                        <Button
-                            appearance="primary"
-                            size="large"
-                            onClick={async () => {
-                                try {
-                                    // @ts-ignore - File System Access API
-                                    const dirHandle = await window.showDirectoryPicker();
-                                    setLoading(true);
 
-                                    // Dynamic import to avoid Top-Level await issues if bundler is old, though direct import is fine usually.
-                                    const { runLocalAudit } = await import('../utils/localAuditScanner');
-                                    const result = await runLocalAudit(dirHandle);
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <Button
+                                appearance="primary"
+                                size="large"
+                                onClick={async () => {
+                                    try {
+                                        // @ts-ignore - File System Access API
+                                        const dirHandle = await window.showDirectoryPicker();
 
-                                    // @ts-ignore - Type mismatch in legacy
-                                    setData(result);
-                                } catch (e: any) {
-                                    if (e.name !== 'AbortError') {
-                                        alert('Nepodařilo se načíst složku: ' + e.message);
+                                        // Save handle to IDB (SysLastValue Pattern)
+                                        await setLocalLastValue('audit_folder_handle', dirHandle);
+
+                                        setLoading(true);
+                                        const { runLocalAudit } = await import('../utils/localAuditScanner');
+                                        const result = await runLocalAudit(dirHandle);
+                                        // @ts-ignore
+                                        setData(result);
+                                    } catch (e: any) {
+                                        if (e.name !== 'AbortError') {
+                                            alert('Nepodařilo se načíst složku: ' + e.message);
+                                        }
+                                    } finally {
+                                        setLoading(false);
                                     }
+                                }}
+                            >
+                                Vybrat novou složku
+                            </Button>
+
+                            {/* Reuse Last Handle Button */}
+                            <LastFolderButton onLoad={async (handle: any) => {
+                                setLoading(true);
+                                try {
+                                    const { runLocalAudit } = await import('../utils/localAuditScanner');
+                                    const result = await runLocalAudit(handle);
+                                    // @ts-ignore
+                                    setData(result);
                                 } finally {
                                     setLoading(false);
                                 }
-                            }}
-                        >
-                            Vybrat složku src
-                        </Button>
+                            }} />
+                        </div>
                     </div>
                 )}
             </div>

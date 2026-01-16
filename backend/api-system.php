@@ -288,6 +288,39 @@ try {
         }
         echo json_encode(['success' => true]);
 
+    } elseif ($action === 'sys_param_list') {
+        // Get all user params
+        $stmt = $pdo->prepare("SELECT param_key, param_value FROM sys_user_params WHERE user_id = :uid");
+        $stmt->execute([':uid' => $userId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $params = [];
+        foreach ($rows as $r) {
+            $params[$r['param_key']] = $r['param_value'];
+        }
+        
+        echo json_encode(['success' => true, 'data' => $params]);
+        exit;
+
+    } elseif ($action === 'sys_param_set' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $key = $input['key'] ?? null;
+        $value = $input['value'] ?? null;
+        
+        if (!$key) throw new Exception("Key is required");
+        
+        // Upsert
+        $sql = "INSERT INTO sys_user_params (user_id, param_key, param_value, updated_at)
+                VALUES (:uid, :key, :val, NOW())
+                ON CONFLICT (user_id, param_key) 
+                DO UPDATE SET param_value = EXCLUDED.param_value, updated_at = NOW()";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':uid' => $userId, ':key' => $key, ':val' => $value]);
+        
+        echo json_encode(['success' => true]);
+        exit;
+
     } else {
         throw new Exception("Unknown action: $action");
     }
