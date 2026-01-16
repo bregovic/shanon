@@ -131,15 +131,30 @@ export const CodeAuditPage: React.FC = () => {
                 </Breadcrumb>
             </PageHeader>
 
-            <div style={{ padding: '0 20px' }}>
-                <Title3>{t('system.audit.title') || 'Centrum kvality kódu'}</Title3>
-                <p style={{ color: '#666', marginBottom: 20 }}>
-                    {t('system.audit.desc') || 'Automatická analýza zdrojového kódu pro detekci technického dluhu.'}
-                </p>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 20}}>
+                    <div>
+                        <Title3>{t('system.audit.title') || 'Centrum kvality kódu'}</Title3>
+                        <p style={{ color: '#666', margin: 0 }}>
+                            {t('system.audit.desc') || 'Automatická analýza zdrojového kódu pro detekci technického dluhu.'}
+                        </p>
+                    </div>
+                     <Badge appearance="outline" color={ (data as any).scanned_count > 0 ? 'success' : 'warning' }>
+                        Files Scanned: {(data as any).scanned_count ?? 'N/A'}
+                    </Badge>
+                </div>
 
-                {(data as any).scanned_count === 0 && (
-                    <div style={{ background: '#fff3cd', padding: 15, borderRadius: 4, marginBottom: 20, borderLeft: '4px solid #ffaa00' }}>
-                        <strong>⚠️ {t('common.warning') || 'Pozor'}:</strong> {t('system.audit.no_source') || 'Nebyly nalezeny žádné zdrojové kódy (produkční server). Použijte Localhost.'}
+                {/* PROD WARNING */}
+                {(!import.meta.env.DEV || (data as any).scanned_count === 0) && (
+                    <div style={{ background: '#fff4ce', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid #ffd335', display:'flex', gap: 12 }}>
+                        <div style={{fontSize: 24}}>⚠️</div>
+                        <div>
+                            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Produkční režim detekován</div>
+                            <div>
+                                Tento nástroj vyžaduje přístup ke zdrojovým souborům <code>(.tsx, .php)</code>, které na produkčním serveru (Railway) obvykle nejsou.
+                                <br/>
+                                <strong>Prosím spusťte tento audit na svém lokálním počítači (Localhost), kde máte zdrojové kódy.</strong>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -197,6 +212,6 @@ export const CodeAuditPage: React.FC = () => {
                     </>
                 )}
             </PageContent>
-        </PageLayout>
+        </PageLayout >
     );
 };
