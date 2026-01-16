@@ -428,6 +428,86 @@ export const SystemConfig: React.FC = () => {
     const expandAll = () => setExpandedSections(new Set(SECTION_IDS));
     const collapseAll = () => setExpandedSections(new Set());
 
+    // --- SEEDER LOGIC ---
+    const [seeders, setSeeders] = useState<any[]>([]);
+    const [selectedSeeders, setSelectedSeeders] = useState<Set<string>>(new Set());
+    const [seeding, setSeeding] = useState(false);
+
+    const fetchSeeders = async () => {
+        try {
+            const res = await fetch('/api/api-system.php?action=seeders_list');
+            const json = await res.json();
+            if (json.success) setSeeders(json.data);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const runSeeding = async () => {
+        if (selectedSeeders.size === 0) return;
+        setSeeding(true);
+        try {
+            const res = await fetch('/api/api-system.php?action=run_seeders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selectedSeeders) })
+            });
+            const json = await res.json();
+            if (json.success) {
+                alert('Data úspěšně naplněna');
+                // Could show detailed report
+            } else {
+                alert('Chyba: ' + json.error);
+            }
+        } catch (e) {
+            alert('Chyba sítě');
+        } finally {
+            setSeeding(false);
+        }
+    };
+
+    const renderSeeders = () => (
+        <Card className={styles.card} style={{ maxWidth: 800 }}>
+            <CardHeader header={<Title3>Inicializace standardních dat (Seeders)</Title3>} />
+            <Text>Vyberte sady dat, které chcete nahrát do aktuální organizace. Existující klíče nebudou přepsány.</Text>
+            <Divider style={{ margin: '12px 0' }} />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {seeders.map(s => {
+                    const isSelected = selectedSeeders.has(s.id);
+                    return (
+                        <Card key={s.id}
+                            onClick={() => {
+                                const next = new Set(selectedSeeders);
+                                if (isSelected) next.delete(s.id); else next.add(s.id);
+                                setSelectedSeeders(next);
+                            }}
+                            style={{
+                                cursor: 'pointer',
+                                border: isSelected ? `2px solid ${tokens.colorBrandBackground}` : '1px solid #eee',
+                                padding: 12
+                            }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <Text weight="semibold">{s.name}</Text>
+                                    <div style={{ fontSize: '12px', color: '#666' }}>{s.description}</div>
+                                </div>
+                                {isSelected && <Badge appearance="filled" color="brand">Vybráno</Badge>}
+                            </div>
+                        </Card>
+                    );
+                })}
+            </div>
+
+            <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button appearance="primary" disabled={seeding || selectedSeeders.size === 0} onClick={runSeeding}>
+                    {seeding ? 'Provádím...' : `Naplnit vybrané (${selectedSeeders.size})`}
+                </Button>
+            </div>
+        </Card>
+    );
+
+
     const renderDashboard = () => (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* 3-Column Layout (Responsive Flex with Mobile Scroll) */}
@@ -489,6 +569,11 @@ export const SystemConfig: React.FC = () => {
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.global_params')} onClick={() => alert('Settings')} />
                         <MenuItem label="Překlady" onClick={() => navigate(orgPrefix + '/system/translations')} />
+                        <MenuItem label="Inicializace dat (Seeders)" onClick={() => {
+                            setActiveView('seeders');
+                            setViewTitle('Inicializace dat');
+                            fetchSeeders();
+                        }} />
                     </MenuSection>
                 </div>
 
@@ -574,6 +659,7 @@ export const SystemConfig: React.FC = () => {
                 {activeView === 'schema' && renderSchema()}
                 {activeView === 'doc_viewer' && renderDocView()}
                 {activeView === 'history_viewer' && renderHistoryView()}
+                {activeView === 'seeders' && renderSeeders()}
             </div>
         </div>
     );

@@ -32,10 +32,36 @@ if (!$isDebugAuth && (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !==
     exit;
 }
 
-$action = $_GET['action'] ?? 'diagnostics';
+$action = $_GET['action'] ?? 'list';
 
 try {
     $pdo = DB::connect();
+    $userId = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? null;
+    $tenantId = $_SESSION['user']['tenant_id'];
+    $currentOrgId = $_SESSION['current_org_id'] ?? null;
+
+    if (!$currentOrgId && $action !== 'users' && $action !== 'sys_vars') {
+        // Some actions might need org context
+    }
+
+    // --- SEEDER ACTIONS ---
+    if ($action === 'seeders_list') {
+        $seeder = new DataSeeder($pdo, $tenantId, $currentOrgId);
+        echo json_encode(['success' => true, 'data' => $seeder->getAvailableSeeders()]);
+        exit;
+    }
+
+    if ($action === 'run_seeders') {
+        if (!$currentOrgId) throw new Exception("Musíte být v kontextu organizace.");
+        $input = json_decode(file_get_contents('php://input'), true);
+        $ids = $input['ids'] ?? [];
+        
+        $seeder = new DataSeeder($pdo, $tenantId, $currentOrgId);
+        $results = $seeder->run($ids);
+        
+        echo json_encode(['success' => true, 'results' => $results]);
+        exit;
+    }
 
     if ($action === 'diagnostics') {
         // 1. Session Diagnostics
