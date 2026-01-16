@@ -798,6 +798,19 @@ END $$;",
                 END IF;
             END $$;
         ",
+        '032_add_roles_to_org_access' => "
+            DO $$ 
+            BEGIN 
+                -- Add roles column to sys_user_org_access for per-org RBA
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_user_org_access' AND column_name='roles') THEN
+                    ALTER TABLE sys_user_org_access ADD COLUMN roles JSONB DEFAULT '[]'::jsonb;
+                END IF;
+            END $$;
+            
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT CURRENT_DATE, 'Org Access Roles', 'Added roles column to sys_user_org_access to support organization-specific permissions.', 'Feature', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Org Access Roles' AND date = CURRENT_DATE);
+        ",
         '025_add_scan_direction' => "
             DO $$
             BEGIN
