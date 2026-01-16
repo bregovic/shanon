@@ -209,6 +209,8 @@ try {
             $targetUserId = $_GET['id'] ?? null;
             if (!$targetUserId) throw new Exception("Target User ID required");
 
+            $sessionTenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+
             // 1. Get User Profile Settings
             $stmtUser = $pdo->prepare("SELECT settings FROM sys_users WHERE rec_id = :id");
             $stmtUser->execute([':id' => $targetUserId]);
@@ -216,7 +218,14 @@ try {
             $settings = $userRow && $userRow['settings'] ? json_decode($userRow['settings'], true) : [];
 
             // 2. Get Org Access Matrix (All Orgs + User Status)
-            // We fetch ALL active organizations and join with user access
+            // Rule 2A: Explicitly enforce WHERE tenant_id = :tid
+            $tenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? null;
+            if (!$tenantId) {
+                // Fallback or error? For listing, we might default to a safe-fail or the default tenant if configured.
+                // Assuming '00000000-0000-0000-0000-000000000001' is the dev/default one.
+                $tenantId = '00000000-0000-0000-0000-000000000001';
+            }
+
             $sqlMatrix = "
                 SELECT 
                     o.org_id, 
@@ -226,31 +235,54 @@ try {
                     (ua.user_id IS NOT NULL) as is_assigned
                 FROM sys_organizations o
                 LEFT JOIN sys_user_org_access ua ON o.org_id = ua.org_id AND ua.user_id = :uid
-                WHERE o.is_active = true
+                WHERE o.tenant_id = :tid AND o.is_active = true
                 ORDER BY o.display_name ASC
             ";
             
             $stmtMatrix = $pdo->prepare($sqlMatrix);
-            $stmtMatrix->execute([':uid' => $targetUserId]);
+            $stmtMatrix->execute([
+                ':uid' => $targetUserId,
+                ':tid' => $tenantId
+            ]);
             $matrix = $stmtMatrix->fetchAll(PDO::FETCH_ASSOC);
 
             // Normalize roles
             foreach($matrix as &$row) {
-                if ($row['roles'] && is_string($row['roles'])) {
-                    $decoded = json_decode($row['roles'], true);
-                    $row['roles'] = is_array($decoded) ? $decoded : [];
+                // If it's a JSON string from DB, decode it. If it's already an array (unlikely with PDO/MySQL default), keep it.
+                if (isset($row['roles'])) { // check if exists
+                     if (is_string($row['roles'])) {
+                        $decoded = json_decode($row['roles'], true);
+                        $row['roles'] = is_array($decoded) ? $decoded : [];
+                    } elseif (!is_array($row['roles'])) {
+                        $row['roles'] = [];
+                    }
                 } else {
                     $row['roles'] = [];
                 }
+                
                 // Ensure booleans
                 $row['is_assigned'] = (bool)$row['is_assigned'];
                 $row['is_active'] = (bool)$row['is_active'];
             }
 
+            // Extract org_access from matrix for compatibility with Frontend UserSettingsDialog
+            $org_access = [];
+            foreach ($matrix as $m) {
+                if ($m['is_assigned']) {
+                    $org_access[] = [
+                        'user_id' => $targetUserId,
+                        'org_id'  => $m['org_id'],
+                        'roles'   => $m['roles'],
+                        'is_active' => $m['is_active']
+                    ];
+                }
+            }
+
             echo json_encode([
                 'success' => true, 
                 'settings' => $settings,
-                'matrix' => $matrix
+                'matrix' => $matrix,
+                'org_access' => $org_access
             ]);
             break;
 
