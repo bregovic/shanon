@@ -529,6 +529,7 @@ export const SystemConfig: React.FC = () => {
                     <MenuSection id="docs" title={t('system.group.docs')} icon={<Document24Regular />} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.db_docs')} onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }} />
                         <MenuItem label={t('system.item.manifest')} onClick={() => fetchDoc('manifest', 'system.item.manifest')} />
+                        <MenuItem label="UI/UX Standardy" onClick={() => fetchDoc('form_standard', 'Standardy Formulářů')} />
                         <MenuItem label={t('system.item.security')} onClick={() => fetchDoc('security', 'system.item.security')} />
                         <MenuItem label={t('system.item.history')} onClick={() => fetchHistory()} />
                         <MenuItem label={t('system.item.help')} onClick={() => alert(t('common.working'))} />

@@ -152,7 +152,8 @@ try {
         $map = [
             'manifest' => __DIR__ . '/../.agent/MANIFEST.md',
             'security' => __DIR__ . '/../.agent/SECURITY.md',
-            'database' => __DIR__ . '/../.agent/DATABASE.md'
+            'database' => __DIR__ . '/../.agent/DATABASE.md',
+            'form_standard' => __DIR__ . '/../.agent/FORM_STANDARD.md'
         ];
 
         if (!isset($map[$file]) || !file_exists($map[$file])) {
