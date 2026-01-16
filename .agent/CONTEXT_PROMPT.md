@@ -65,6 +65,8 @@
         *   **Right:** "Refresh", "Delete" (Destructive, Disabled if no selection).
 *   **Dialogs:** Use `Drawer` (Overlay) for editing side-panels, `Dialog` for modals.
 *   **Feedback:** Use `Toast` or `MessageBar` for success/error messages. Never use `alert()`.
+*   **Table Alignment:** Table content MUST be vertically center-aligned (use `display: flex; align-items: center` for cells). Vertical alignment with checkboxes is critical.
+*   **Forms:** Place form actions (Save/Cancel) at the bottom right of drawers/dialogs.
 
 ### D. Performance & Technical Best Practices
 *   **Database:**
