@@ -116,7 +116,7 @@ try {
     // ACTION: DOC TYPES
     // -------------------------------------------------------------------------
     if ($action === 'types' || $action === 'doc_types') {
-    if ($action === 'types' || $action === 'doc_types') {
+
         // Fetch Tenant Defaults + Org Overrides
         // We want: All records where tenant_id matches AND (org_id matches OR org_id is NULL)
         $stmt = $pdo->prepare("
