@@ -201,6 +201,16 @@ try {
         $pdo->exec($sqlIndex);
 
         // Security / Identity Tables
+        $sqlOrg = "CREATE TABLE IF NOT EXISTS sys_organizations (
+            rec_id SERIAL PRIMARY KEY,
+            tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
+            org_id VARCHAR(50) NOT NULL UNIQUE, 
+            display_name VARCHAR(255) NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )";
+        $pdo->exec($sqlOrg);
+        
         $sqlSec = "CREATE TABLE IF NOT EXISTS sys_user_org_access (
             rec_id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES sys_users(rec_id) ON DELETE CASCADE,
@@ -213,7 +223,7 @@ try {
         )";
         $pdo->exec($sqlSec);
 
-        echo json_encode(['success' => true, 'message' => 'System tables setup complete (Translations + Security)']);
+        echo json_encode(['success' => true, 'message' => 'System tables setup complete (Translations + Security + Orgs)']);
 
     } elseif ($action === 'translations_list') {
         $where = [];
