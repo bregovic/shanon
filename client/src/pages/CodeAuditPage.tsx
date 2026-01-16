@@ -132,16 +132,14 @@ export const CodeAuditPage: React.FC = () => {
             </PageHeader>
 
             <div style={{ padding: '0 20px' }}>
-                <Title3>Centrum kvality kódu</Title3>
+                <Title3>{t('system.audit.title') || 'Centrum kvality kódu'}</Title3>
                 <p style={{ color: '#666', marginBottom: 20 }}>
-                    Automatická analýza zdrojového kódu pro detekci technického dluhu.
+                    {t('system.audit.desc') || 'Automatická analýza zdrojového kódu pro detekci technického dluhu.'}
                 </p>
 
                 {(data as any).scanned_count === 0 && (
                     <div style={{ background: '#fff3cd', padding: 15, borderRadius: 4, marginBottom: 20, borderLeft: '4px solid #ffaa00' }}>
-                        <strong>⚠️ Pozor:</strong> Nebyly nalezeny žádné zdrojové kódy ke kontrole.
-                        To je na produkčním serveru normální (jsou zde jen zkompilované soubory).
-                        Tento nástroj používejte na <strong>Localhostu</strong>.
+                        <strong>⚠️ {t('common.warning') || 'Pozor'}:</strong> {t('system.audit.no_source') || 'Nebyly nalezeny žádné zdrojové kódy (produkční server). Použijte Localhost.'}
                     </div>
                 )}
 
