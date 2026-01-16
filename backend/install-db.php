@@ -811,6 +811,21 @@ END $$;",
             SELECT CURRENT_DATE, 'Org Access Roles', 'Added roles column to sys_user_org_access to support organization-specific permissions.', 'Feature', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'Org Access Roles' AND date = CURRENT_DATE);
         ",
+        '033_sys_user_params' => "
+            CREATE TABLE IF NOT EXISTS sys_user_params (
+                rec_id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES sys_users(rec_id) ON DELETE CASCADE,
+                param_key VARCHAR(100) NOT NULL,
+                param_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, param_key)
+            );
+            
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT CURRENT_DATE, 'System User Params', 'Implemented sys_user_params table for storing persistable user state (SysLastValue pattern).', 'Feature', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'System User Params' AND date = CURRENT_DATE);
+        ",
+
         '025_add_scan_direction' => "
             DO $$
             BEGIN
