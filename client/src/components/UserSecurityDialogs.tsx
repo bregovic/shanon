@@ -272,7 +272,7 @@ export const UserOrgWizard: React.FC<{
                                             <TableCell>
                                                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                                                     {AVAILABLE_ROLES.map(role => {
-                                                        const active = item.roles.includes(role.value);
+                                                        const active = (item.roles || []).includes(role.value);
                                                         return (
                                                             <Badge
                                                                 key={role.value}

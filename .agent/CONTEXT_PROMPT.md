@@ -56,7 +56,17 @@
     *   Design forms as composable **Cards/Sections** (e.g., `<GeneralInfo />`, `<ContactDetails />`).
     *   This enables future reordering of form parts without rewriting logic.
 
-### C. Performance & Technical Best Practices
+### C. UI/UX Standards
+*   **Design System:** Use **Fluent UI Web Components** (React) for all new features.
+*   **Lists & Grids:**
+    *   Use `SmartDataGrid` for all data tables.
+    *   **Action Bar Standard:** Every list MUST have an `ActionBar` above it.
+        *   **Left:** "New" (Primary), Custom Actions (Contextual).
+        *   **Right:** "Refresh", "Delete" (Destructive, Disabled if no selection).
+*   **Dialogs:** Use `Drawer` (Overlay) for editing side-panels, `Dialog` for modals.
+*   **Feedback:** Use `Toast` or `MessageBar` for success/error messages. Never use `alert()`.
+
+### D. Performance & Technical Best Practices
 *   **Database:**
     *   Avoid `SELECT *` on tables with many columns. Select only what you need.
     *   Ensure Foreign Keys are indexed.

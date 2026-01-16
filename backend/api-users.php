@@ -227,7 +227,12 @@ try {
             
             // Format roles from JSON string if needed (PDO might fetch as string)
             foreach($accessList as &$acc) {
-                if (is_string($acc['roles'])) $acc['roles'] = json_decode($acc['roles'], true);
+                if (is_string($acc['roles'])) {
+                    $decoded = json_decode($acc['roles'], true);
+                    $acc['roles'] = is_array($decoded) ? $decoded : [];
+                } elseif (is_null($acc['roles'])) {
+                    $acc['roles'] = [];
+                }
             }
 
             echo json_encode([
