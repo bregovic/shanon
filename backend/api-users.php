@@ -46,7 +46,7 @@ try {
                 WHERE tenant_id = :tid
                 ORDER BY rec_id
             ");
-            $stmt->execute([':tid' => $_SESSION['user']['tenant_id']]);
+            $stmt->execute([':tid' => $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001']);
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             echo json_encode(['success' => true, 'data' => $users]);

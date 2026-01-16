@@ -37,7 +37,7 @@ $action = $_GET['action'] ?? 'list';
 try {
     $pdo = DB::connect();
     $userId = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? null;
-    $tenantId = $_SESSION['user']['tenant_id'];
+    $tenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
     $currentOrgId = $_SESSION['current_org_id'] ?? null;
 
     if (!$currentOrgId && $action !== 'users' && $action !== 'sys_vars') {

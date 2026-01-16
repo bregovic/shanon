@@ -137,6 +137,8 @@ const router = createBrowserRouter([
                     { path: "dms/ocr-designer/:id", element: <OcrTemplateDesigner /> },
                     { path: "dms/ocr-designer", element: <OcrTemplateDesigner /> },
                     { path: "dms/google-setup", element: <DmsGoogleSetup /> },
+                    // Fix for user accessing /import directly
+                    { path: "import", element: <Navigate to="dms/import" replace /> },
                 ]
             }
         ]
