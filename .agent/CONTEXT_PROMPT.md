@@ -86,6 +86,11 @@
     *   Wrap repeating FluentUI patterns (e.g., specific Button styles, Status Badges) into small generic components.
 *   **Styling:** Avoid inline `style={{...}}` for complex layouts. Use `makeStyles` or standard layout components.
 
+### F. Navigation & Routing
+*   **UrL-Driven State:** Never use internal `useState` for full-page views (dashboards vs details). Always use **Routes** or **URL Query Params**.
+    *   *Why?* Enables functional Back button and Deep Linking.
+*   **Module Reset:** Clicking a main module navigation item (e.g., in Top Bar) MUST navigate to the clean module root (clearing all query params), explicitly resetting the view to the Dashboard/Menu.
+
 ### D. Documentation & History
 *   **Self-Documenting:** Code must generally explain itself, but complex logic needs comments.
 *   **Changelog:** Every resolved task MUST be logged in the `development_history` table.

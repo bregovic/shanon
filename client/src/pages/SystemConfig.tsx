@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Title3,
     Card,
@@ -151,12 +151,22 @@ export const SystemConfig: React.FC = () => {
     const { currentOrgId } = useAuth();
     const orgPrefix = `/${currentOrgId || 'VACKR'}`;
 
-    // View State: null = Dashboard, string = specific detail view
-    const [activeView, setActiveView] = useState<string | null>(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Derived State from URL
+    const activeView = searchParams.get('view');
+    const docId = searchParams.get('doc');
+
     const [viewTitle, setViewTitle] = useState<string>("");
 
+    // Helper to switch view updates URL
+    const navigateToView = (view: string, title: string, extraParams: Record<string, string> = {}) => {
+        setViewTitle(t(title));
+        setSearchParams({ view, ...extraParams });
+    };
+
     const [data, setData] = useState<SystemData | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Default false, fetch on mount
     const [error, setError] = useState<string | null>(null);
 
     // DB Update State
@@ -217,15 +227,25 @@ export const SystemConfig: React.FC = () => {
     };
 
     useEffect(() => {
-        // Only fetch if needed (e.g. for dashboard widgets or first load)
-        // But here we mainly use it for Diagnostics detail.
-        // We can fetch it on mount anyway for potential dashboard widgets.
-        fetchData();
-    }, []);
-    const fetchDoc = async (file: string, title: string) => {
+        // Initial Fetch for dashboard widgets
+        if (!activeView) fetchData();
+
+        // Load Specific Data based on URL View
+        if (activeView === 'doc_viewer' && docId) {
+            fetchDoc(docId);
+        }
+        if (activeView === 'history_viewer') {
+            fetchHistory();
+        }
+        if (activeView === 'seeders') {
+            fetchSeeders();
+        }
+    }, [activeView, docId]); // React to URL changes
+
+    const fetchDoc = async (file: string) => {
         setLoading(true);
-        setActiveView('doc_viewer');
-        setViewTitle(t(title)); // Assuming title passed is translation key, or we translate here? Let's pass key.
+        // Title logic: Try to guess title or keep generic
+        if (!viewTitle) setViewTitle(file);
 
         try {
             const res = await fetch(`/api/api-system.php?action=get_doc&file=${file}`);
@@ -238,7 +258,6 @@ export const SystemConfig: React.FC = () => {
 
     const fetchHistory = async () => {
         setLoading(true);
-        setActiveView('history_viewer');
         setViewTitle('Historie změn');
         try {
             const res = await fetch(`/api/api-system.php?action=history`);
@@ -518,7 +537,7 @@ export const SystemConfig: React.FC = () => {
                 <div className={styles.scrollColumn}>
                     {/* 1. ADMIN TOOLS */}
                     <MenuSection id="admin" title={t('system.group.admin')} icon={<Desktop24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
-                        <MenuItem label={t('system.item.diagnostics')} onClick={() => { setActiveView('diagnostics'); setViewTitle(t('system.item.diagnostics')); }} />
+                        <MenuItem label={t('system.item.diagnostics')} onClick={() => navigateToView('diagnostics', 'system.item.diagnostics')} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} />
@@ -527,11 +546,11 @@ export const SystemConfig: React.FC = () => {
 
                     {/* 2. DOCS */}
                     <MenuSection id="docs" title={t('system.group.docs')} icon={<Document24Regular />} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
-                        <MenuItem label={t('system.item.db_docs')} onClick={() => { setActiveView('schema'); setViewTitle(t('system.item.db_docs')); }} />
-                        <MenuItem label={t('system.item.manifest')} onClick={() => fetchDoc('manifest', 'system.item.manifest')} />
-                        <MenuItem label="UI/UX Standardy" onClick={() => fetchDoc('form_standard', 'Standardy Formulářů')} />
-                        <MenuItem label={t('system.item.security')} onClick={() => fetchDoc('security', 'system.item.security')} />
-                        <MenuItem label={t('system.item.history')} onClick={() => fetchHistory()} />
+                        <MenuItem label={t('system.item.db_docs')} onClick={() => navigateToView('schema', 'system.item.db_docs')} />
+                        <MenuItem label={t('system.item.manifest')} onClick={() => navigateToView('doc_viewer', 'system.item.manifest', { doc: 'manifest' })} />
+                        <MenuItem label="UI/UX Standardy" onClick={() => navigateToView('doc_viewer', 'Standardy Formulářů', { doc: 'form_standard' })} />
+                        <MenuItem label={t('system.item.security')} onClick={() => navigateToView('doc_viewer', 'system.item.security', { doc: 'security' })} />
+                        <MenuItem label={t('system.item.history')} onClick={() => navigateToView('history_viewer', 'system.item.history')} />
                         <MenuItem label={t('system.item.help')} onClick={() => alert(t('common.working'))} />
                     </MenuSection>
                 </div>
@@ -571,11 +590,7 @@ export const SystemConfig: React.FC = () => {
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.global_params')} onClick={() => alert('Settings')} />
                         <MenuItem label="Překlady" onClick={() => navigate(orgPrefix + '/system/translations')} />
-                        <MenuItem label="Inicializace dat (Seeders)" onClick={() => {
-                            setActiveView('seeders');
-                            setViewTitle('Inicializace dat');
-                            fetchSeeders();
-                        }} />
+                        <MenuItem label="Inicializace dat (Seeders)" onClick={() => navigateToView('seeders', 'Inicializace dat')} />
                     </MenuSection>
                 </div>
 
@@ -624,7 +639,7 @@ export const SystemConfig: React.FC = () => {
             <ActionBar>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {activeView && (
-                        <Button icon={<ArrowLeft24Regular />} appearance="subtle" onClick={() => { setActiveView(null); setViewTitle(""); }} />
+                        <Button icon={<ArrowLeft24Regular />} appearance="subtle" onClick={() => setSearchParams({})} />
                     )}
                     <Breadcrumb>
                         <BreadcrumbItem>
@@ -632,13 +647,13 @@ export const SystemConfig: React.FC = () => {
                         </BreadcrumbItem>
                         <BreadcrumbDivider />
                         <BreadcrumbItem>
-                            <BreadcrumbButton onClick={() => { setActiveView(null); setViewTitle(""); }}>{t('modules.system')}</BreadcrumbButton>
+                            <BreadcrumbButton onClick={() => setSearchParams({})}>{t('modules.system')}</BreadcrumbButton>
                         </BreadcrumbItem>
                         {activeView && (
                             <>
                                 <BreadcrumbDivider />
                                 <BreadcrumbItem>
-                                    <Text weight="semibold">{viewTitle}</Text>
+                                    <Text weight="semibold">{viewTitle || activeView}</Text>
                                 </BreadcrumbItem>
                             </>
                         )}
