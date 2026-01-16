@@ -25,10 +25,22 @@
     *   **NO ad-hoc PHP scripts** (e.g. `fix_db.php`) allowed in production.
     *   All schema changes MUST be sequential SQL files in `backend/migrations/`.
     *   Use the unified runner (`install-db.php`) or System Admin UI trigger to apply changes.
-*   **Security Context:**
-    *   **Backend:** NEVER trust default behavior. Every SQL update/select must explicitly enforce `WHERE tenant_id = :tid AND org_id = :oid` (unless global lookup).
-    *   **Frontend:** Every form/list MUST respect the current Organization Context (`useAuth().currentOrgId`).
-    *   **Validation:** Verify that the `rec_id` being accessed truly belongs to the requested `tenant_id` + `org_id`.
+### B. Security & Identity Management (User <-> Org <-> Roles)
+*   **Identity Model:**
+    *   **User (`sys_users`):** Global identity within a Tenant. Contains personal settings (`settings` JSON: language, default_org_id).
+    *   **Organization Assignment:** Users are assigned to specific Organizations (`sys_user_org_access`).
+    *   **Contextual Roles:** A User has specific **Roles** within each Organization. (e.g., Admin in Org A, Viewer in Org B).
+    *   **Permissions:** Access is determined by the Roles active in the `currentOrgId`.
+
+*   **Security Context Implementation:**
+    *   **Backend:**
+        *   NEVER trust default behavior. Every SQL update/select must explicitly enforce `WHERE tenant_id = :tid AND org_id = :oid` (unless global lookup).
+        *   Validate that `$_SESSION['current_org_id']` is valid for the user and that they have the required permission for the requested action in THAT Context.
+    *   **Frontend:**
+        *   Every form/list MUST respect the current Organization Context (`useAuth().currentOrgId`).
+        *   **User Detail:** Must provide a "Settings" button (Language, Default Org) and an "Organizations" button (Wizard for assigning Orgs + Roles).
+
+*   **Validation:** Verify that the `rec_id` being accessed truly belongs to the requested `tenant_id` + `org_id`.
 
 ### B. "Enterprise" User Experience & Mobile Optimization
 *   **Mobile Priority:**
