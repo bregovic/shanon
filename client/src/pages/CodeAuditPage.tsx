@@ -131,52 +131,52 @@ export const CodeAuditPage: React.FC = () => {
                 </Breadcrumb>
             </PageHeader>
 
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 20}}>
-                    <div>
-                        <Title3>{t('system.audit.title') || 'Centrum kvality kódu'}</Title3>
-                        <p style={{ color: '#666', margin: 0 }}>
-                            {t('system.audit.desc') || 'Automatická analýza zdrojového kódu pro detekci technického dluhu.'}
-                        </p>
-                    </div>
-                     <Badge appearance="outline" color={ (data as any).scanned_count > 0 ? 'success' : 'warning' }>
-                        Files Scanned: {(data as any).scanned_count ?? 'N/A'}
-                    </Badge>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div>
+                    <Title3>{t('system.audit.title') || 'Centrum kvality kódu'}</Title3>
+                    <p style={{ color: '#666', margin: 0 }}>
+                        {t('system.audit.desc') || 'Automatická analýza zdrojového kódu pro detekci technického dluhu.'}
+                    </p>
                 </div>
+                <Badge appearance="outline" color={(data as any).scanned_count > 0 ? 'success' : 'warning'}>
+                    Files Scanned: {(data as any).scanned_count ?? 'N/A'}
+                </Badge>
+            </div>
 
-                {/* PROD WARNING */}
-                {(!import.meta.env.DEV || (data as any).scanned_count === 0) && (
-                    <div style={{ background: '#fff4ce', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid #ffd335', display:'flex', gap: 12 }}>
-                        <div style={{fontSize: 24}}>⚠️</div>
+            {/* PROD WARNING */}
+            {(!import.meta.env.DEV || (data as any).scanned_count === 0) && (
+                <div style={{ background: '#fff4ce', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid #ffd335', display: 'flex', gap: 12 }}>
+                    <div style={{ fontSize: 24 }}>⚠️</div>
+                    <div>
+                        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Produkční režim detekován</div>
                         <div>
-                            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Produkční režim detekován</div>
-                            <div>
-                                Tento nástroj vyžaduje přístup ke zdrojovým souborům <code>(.tsx, .php)</code>, které na produkčním serveru (Railway) obvykle nejsou.
-                                <br/>
-                                <strong>Prosím spusťte tento audit na svém lokálním počítači (Localhost), kde máte zdrojové kódy.</strong>
-                            </div>
+                            Tento nástroj vyžaduje přístup ke zdrojovým souborům <code>(.tsx, .php)</code>, které na produkčním serveru (Railway) obvykle nejsou.
+                            <br />
+                            <strong>Prosím spusťte tento audit na svém lokálním počítači (Localhost), kde máte zdrojové kódy.</strong>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                <TabList
-                    selectedValue={selectedTab}
-                    onTabSelect={(_, d: SelectTabData) => setSelectedTab(d.value as string)}
-                    style={{ marginBottom: 20 }}
-                >
-                    <Tab value="missing" icon={<ErrorCircle24Regular />}>
-                        Chybějící překlady
-                        <Badge appearance="filled" color="danger" style={{ marginLeft: 5 }}>{data.missing_translations.length}</Badge>
-                    </Tab>
-                    <Tab value="hardcoded" icon={<DocumentSearch24Regular />}>
-                        Hardcoded Texty
-                        <Badge appearance="filled" color="warning" style={{ marginLeft: 5 }}>{data.hardcoded_candidates.length}</Badge>
-                    </Tab>
-                    <Tab value="unused" icon={<Warning24Regular />}>
-                        Nepoužité klíče
-                        <Badge appearance="ghost" style={{ marginLeft: 5 }}>{data.unused_translations.length}</Badge>
-                    </Tab>
-                </TabList>
-            </div>
+            <TabList
+                selectedValue={selectedTab}
+                onTabSelect={(_, d: SelectTabData) => setSelectedTab(d.value as string)}
+                style={{ marginBottom: 20 }}
+            >
+                <Tab value="missing" icon={<ErrorCircle24Regular />}>
+                    Chybějící překlady
+                    <Badge appearance="filled" color="danger" style={{ marginLeft: 5 }}>{data.missing_translations.length}</Badge>
+                </Tab>
+                <Tab value="hardcoded" icon={<DocumentSearch24Regular />}>
+                    Hardcoded Texty
+                    <Badge appearance="filled" color="warning" style={{ marginLeft: 5 }}>{data.hardcoded_candidates.length}</Badge>
+                </Tab>
+                <Tab value="unused" icon={<Warning24Regular />}>
+                    Nepoužité klíče
+                    <Badge appearance="ghost" style={{ marginLeft: 5 }}>{data.unused_translations.length}</Badge>
+                </Tab>
+            </TabList>
+
 
             <PageContent>
                 {loading ? (
