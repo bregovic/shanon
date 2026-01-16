@@ -5,8 +5,30 @@
 require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
+// Ensure Helper is loaded
+if (file_exists('helpers/DataSeeder.php')) {
+    require_once 'helpers/DataSeeder.php';
+}
 
-// PERFORMANCE FIX: Close session lock immediately after start, as we only read or debug.
+// ... (lines 9-149 skipped for instruction, but I need to target correctly)
+
+    } elseif ($action === 'get_doc') {
+        $file = $_GET['file'] ?? '';
+        $map = [
+            'manifest' => __DIR__ . '/../.agent/MANIFEST.md',
+            'security' => __DIR__ . '/../.agent/SECURITY.md',
+            'database' => __DIR__ . '/../.agent/DATABASE.md',
+            'form_standard' => __DIR__ . '/../.agent/FORM_STANDARD.md'
+        ];
+
+        if (!isset($map[$file]) || !file_exists($map[$file])) {
+           // Debugging path issue
+           $path = $map[$file] ?? 'unknown';
+           $real = realpath($path) ?: 'false';
+           throw new Exception("Document not found. Key: $file, Path: $path, Real: $real");
+        }
+
+        $content = file_get_contents($map[$file]);
 session_write_close();
 
 header('Content-Type: application/json');
@@ -157,7 +179,9 @@ try {
         ];
 
         if (!isset($map[$file]) || !file_exists($map[$file])) {
-            throw new Exception("Document not found or access denied.");
+             $path = $map[$file] ?? 'unknown';
+             // Try to resolve path relative to script
+             throw new Exception("Document not found ($file). Path: " . $path);
         }
 
         $content = file_get_contents($map[$file]);
