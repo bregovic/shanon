@@ -12,6 +12,7 @@ export const translations = {
         'common.success': 'Úspěch',
         'common.modules': 'Moduly',
         'common.back': 'Zpět',
+        'common.refresh': 'Obnovit',
         'common.warning': 'Upozornění',
 
         // DMS Settings
@@ -166,6 +167,7 @@ export const translations = {
         'common.success': 'Success',
         'common.modules': 'Modules',
         'common.back': 'Back',
+        'common.refresh': 'Refresh',
         'common.warning': 'Warning',
 
         // DMS Settings
