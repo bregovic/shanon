@@ -8,7 +8,8 @@ import {
     Tab,
     Spinner,
     Badge,
-    Title3
+    Title3,
+    Button
 } from '@fluentui/react-components';
 import type { SelectTabData, TableColumnDefinition } from '@fluentui/react-components';
 import {
@@ -143,20 +144,47 @@ export const CodeAuditPage: React.FC = () => {
                 </Badge>
             </div>
 
-            {/* PROD WARNING */}
-            {(!import.meta.env.DEV || (data as any).scanned_count === 0) && (
-                <div style={{ background: '#fff4ce', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid #ffd335', display: 'flex', gap: 12 }}>
-                    <div style={{ fontSize: 24 }}>⚠️</div>
-                    <div>
-                        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Produkční režim detekován</div>
-                        <div>
-                            Tento nástroj vyžaduje přístup ke zdrojovým souborům <code>(.tsx, .php)</code>, které na produkčním serveru (Railway) obvykle nejsou.
-                            <br />
-                            <strong>Prosím spusťte tento audit na svém lokálním počítači (Localhost), kde máte zdrojové kódy.</strong>
+            {/* SOURCE SELECTION */}
+            <div style={{ marginBottom: 20 }}>
+                {/* PROD WARNING / INFO */}
+                {(!import.meta.env.DEV) && (
+                    <div style={{ background: '#f0f6ff', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid #cce0ff', display: 'flex', gap: 12, alignItems: 'center' }}>
+                        <div style={{ fontSize: 24 }}>📂</div>
+                        <div style={{ flexGrow: 1 }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Lokální Audit (Browser Mode)</div>
+                            <div>
+                                Aplikace běží na serveru, kde nejsou dostupné zdrojové kódy.
+                                Pro spuštění auditu vyberte složku <code>client/src</code> na vašem počítači.
+                            </div>
                         </div>
+                        <Button
+                            appearance="primary"
+                            size="large"
+                            onClick={async () => {
+                                try {
+                                    // @ts-ignore - File System Access API
+                                    const dirHandle = await window.showDirectoryPicker();
+                                    setLoading(true);
+
+                                    // Dynamic import to avoid Top-Level await issues if bundler is old, though direct import is fine usually.
+                                    const { runLocalAudit } = await import('../utils/localAuditScanner');
+                                    const result = await runLocalAudit(dirHandle);
+
+                                    setData(result);
+                                } catch (e: any) {
+                                    if (e.name !== 'AbortError') {
+                                        alert('Nepodařilo se načíst složku: ' + e.message);
+                                    }
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }}
+                        >
+                            Vybrat složku src
+                        </Button>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             <TabList
                 selectedValue={selectedTab}
