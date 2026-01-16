@@ -50,7 +50,8 @@ When writing PHP API endpoints:
     *   No `console.log` or `print_r` left?
 3.  [ ] **Testing**:
     *   Does the build pass (`npm run build`)?
-    *   Did you verify the fix/feature manually?
+    *   **QA Scenario**: Created/Updated test scenario in `.agent/TEST_SCENARIOS.md` for critical features?
+    *   Did you verify the fix/feature manually according to the scenario?
 
 ---
 *Failure to follow these SOPs creates Technical Debt and reduces System Stability.*

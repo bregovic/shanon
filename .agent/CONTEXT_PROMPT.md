@@ -14,6 +14,8 @@
     *   *Rules for:* Role definitions, Access Levels, Permission Identifiers.
 *   🏗️ **TECH MANIFEST:** `.agent/MANIFEST.md`
     *   *Rules for:* Framework usage, Directory structure, Localization.
+*   🧪 **QA SCENARIOS:** `.agent/TEST_SCENARIOS.md`
+    *   *Rules for:* Testing critical user flows and security logic.
 
 ---
 
