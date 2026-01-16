@@ -270,7 +270,7 @@ const ImportPage = () => {
                                     disabled={uploading}
                                     style={{ minWidth: '150px' }}
                                 >
-                                    {uploading ? t('import.working') : `${t('import.upload_btn')} (${files.length})`}
+                                    {uploading ? t('common.working') : `${t('common.import')} (${files.length})`}
                                 </Button>
                             </div>
                         </div>

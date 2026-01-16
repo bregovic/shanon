@@ -256,7 +256,7 @@ export const BalancePage = () => {
                             </Text>
                         </Card>
                         <Card className={styles.statCard}>
-                            <div className={styles.statLabel}>{t('summary_count')}</div>
+                            <div className={styles.statLabel}>{t('common.count')}</div>
                             <div className={styles.statValue}>{summary.count}</div>
                         </Card>
                     </div>

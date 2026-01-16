@@ -136,7 +136,7 @@ export const PnLPage = () => {
             compare: (a: PnLItem, b: PnLItem) => a.profit_czk - b.profit_czk
         },
         {
-            columnId: 'net_profit_czk', renderHeaderCell: () => t('col_net_profit'), renderCell: (item: PnLItem) => (
+            columnId: 'net_profit_czk', renderHeaderCell: () => t('common.net_profit'), renderCell: (item: PnLItem) => (
                 <Text weight="bold" className={item.net_profit_czk >= 0 ? styles.positive : styles.negative}>
                     {item.net_profit_czk.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </Text>
@@ -173,7 +173,7 @@ export const PnLPage = () => {
                 {stats && (
                     <div className={styles.statsContainer}>
                         <Card className={styles.statCard}>
-                            <div className={styles.statLabel}>{t('pnl_net_profit')}</div>
+                            <div className={styles.statLabel}>{t('common.net_profit')}</div>
                             <div className={`${styles.statValue} ${stats.net_profit >= 0 ? styles.positive : styles.negative}`}>
                                 {stats.net_profit?.toLocaleString(undefined, { maximumFractionDigits: 0 })} Kč
                             </div>

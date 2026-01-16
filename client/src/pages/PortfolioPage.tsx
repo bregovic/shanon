@@ -186,7 +186,7 @@ export const PortfolioPage = () => {
         },
         {
             columnId: 'currency',
-            renderHeaderCell: () => t('col_currency'),
+            renderHeaderCell: () => t('common.currency'),
             renderCell: (item: TransactionItem) => <Badge size="small" appearance="tint">{item.currency}</Badge>,
             compare: (a: TransactionItem, b: TransactionItem) => a.currency.localeCompare(b.currency),
         },

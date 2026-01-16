@@ -539,7 +539,7 @@ export const SystemConfig: React.FC = () => {
                     <MenuSection id="admin" title={t('system.group.admin')} icon={<Desktop24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.diagnostics')} onClick={() => navigateToView('diagnostics', 'system.item.diagnostics')} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem label={t('system.item.sequences')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label={t('dms.settings.number_series')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} />
                         <MenuItem label="Organizace a Subjekty" onClick={() => navigate(orgPrefix + '/system/organizations')} />
                     </MenuSection>

@@ -166,7 +166,7 @@ export const DividendsPage = () => {
             compare: (a: DividendItem, b: DividendItem) => a.amount - b.amount
         },
         {
-            columnId: 'currency', renderHeaderCell: () => t('col_currency'), renderCell: (item: DividendItem) => item.currency,
+            columnId: 'currency', renderHeaderCell: () => t('common.currency'), renderCell: (item: DividendItem) => item.currency,
             compare: (a: DividendItem, b: DividendItem) => a.currency.localeCompare(b.currency)
         },
         {
@@ -221,7 +221,7 @@ export const DividendsPage = () => {
                             </div>
                         </Card>
                         <Card className={styles.statCard}>
-                            <div className={styles.statLabel}>{t('div_count')}</div>
+                            <div className={styles.statLabel}>{t('common.count')}</div>
                             <div className={styles.statValue}>{stats.count}</div>
                         </Card>
                     </div>

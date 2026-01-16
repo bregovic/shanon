@@ -31,6 +31,7 @@ import {
 } from '@fluentui/react-icons';
 
 const FilterIcon = bundleIcon(Filter24Filled, Filter24Regular);
+import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
     tableContainer: {
@@ -137,6 +138,7 @@ export function DataGrid<T extends { [key: string]: any }>({
     showPagination = true
 }: DataGridProps<T>) {
     const styles = useStyles();
+    const { t } = useTranslation();
 
     // State
     const [page, setPage] = useState(1);
@@ -221,7 +223,7 @@ export function DataGrid<T extends { [key: string]: any }>({
     if (loading) {
         return (
             <div style={{ padding: '40px', textAlign: 'center' }}>
-                <Spinner label="Načítám data..." />
+                <Spinner label={t('loading_data')} />
             </div>
         );
     }
@@ -273,10 +275,10 @@ export function DataGrid<T extends { [key: string]: any }>({
                     {column.sortable && (
                         <>
                             <div className={styles.menuItem} onClick={() => handleSort(colKey, 'asc')}>
-                                <ArrowSortUp24Regular /> Seřadit A až Z
+                                <ArrowSortUp24Regular /> {t('grid.sort_asc')}
                             </div>
                             <div className={styles.menuItem} onClick={() => handleSort(colKey, 'desc')}>
-                                <ArrowSortDown24Regular /> Seřadit Z až A
+                                <ArrowSortDown24Regular /> {t('grid.sort_desc')}
                             </div>
                             <Divider />
                         </>
@@ -288,21 +290,21 @@ export function DataGrid<T extends { [key: string]: any }>({
 
                         <Dropdown
                             value={
-                                tempOp === 'contains' ? 'Obsahuje' :
-                                    tempOp === 'is_exactly' ? 'Je přesně' :
-                                        tempOp === 'starts_with' ? 'Začíná na' :
-                                            tempOp === 'not_contains' ? 'Neobsahuje' :
-                                                tempOp === 'is_empty' ? 'Je prázdné' : 'Není prázdné'
+                                tempOp === 'contains' ? t('grid.contains') :
+                                    tempOp === 'is_exactly' ? t('grid.equals') :
+                                        tempOp === 'starts_with' ? t('grid.starts_with') :
+                                            tempOp === 'not_contains' ? t('grid.not_contains') :
+                                                tempOp === 'is_empty' ? t('grid.is_empty') : t('grid.is_not_empty')
                             }
                             selectedOptions={[tempOp]}
                             onOptionSelect={(_, d) => setTempOp(d.optionValue || 'contains')}
                         >
-                            <Option value="contains">Obsahuje</Option>
-                            <Option value="is_exactly">Je přesně</Option>
-                            <Option value="starts_with">Začíná na</Option>
-                            <Option value="not_contains">Neobsahuje</Option>
-                            <Option value="is_empty">Je prázdné</Option>
-                            <Option value="is_not_empty">Není prázdné</Option>
+                            <Option value="contains">{t('grid.contains')}</Option>
+                            <Option value="is_exactly">{t('grid.equals')}</Option>
+                            <Option value="starts_with">{t('grid.starts_with')}</Option>
+                            <Option value="not_contains">{t('grid.not_contains')}</Option>
+                            <Option value="is_empty">{t('grid.is_empty')}</Option>
+                            <Option value="is_not_empty">{t('grid.is_not_empty')}</Option>
                         </Dropdown>
 
                         {tempOp !== 'is_empty' && tempOp !== 'is_not_empty' && (
@@ -319,14 +321,14 @@ export function DataGrid<T extends { [key: string]: any }>({
 
                     <div className={styles.footerLayout}>
                         <Button appearance="secondary" onClick={() => handleClearFilter(colKey)} icon={<Delete24Regular />}>
-                            Vymazat
+                            {t('grid.clear')}
                         </Button>
                         <Button
                             appearance="primary"
                             onClick={() => handleApplyFilter(colKey, tempOp, tempVal)}
                             icon={<Checkmark24Regular />}
                         >
-                            Použít
+                            {t('common.apply')}
                         </Button>
                     </div>
                 </PopoverSurface>
@@ -375,7 +377,7 @@ export function DataGrid<T extends { [key: string]: any }>({
                 <div className={styles.pagination}>
                     <div className={styles.paginationInfo}>
                         <Text>
-                            Zobrazeno {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, filteredData.length)} z {filteredData.length}
+                            {t('grid.showing')} {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, filteredData.length)} {t('grid.of')} {filteredData.length}
                         </Text>
                     </div>
                     <div className={styles.paginationButtons}>
@@ -385,7 +387,7 @@ export function DataGrid<T extends { [key: string]: any }>({
                             disabled={page === 1}
                             onClick={() => setPage(p => p - 1)}
                         />
-                        <Text>Strana {page} z {totalPages}</Text>
+                        <Text>{t('grid.page')} {page} {t('grid.of')} {totalPages}</Text>
                         <Button
                             icon={<ChevronRight24Regular />}
                             appearance="subtle"

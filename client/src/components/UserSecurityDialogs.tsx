@@ -18,14 +18,10 @@ import {
     TableBody,
     TableCell,
     Badge,
-    Select,
-    Combobox,
-    useId,
-    Input,
     Drawer,
     Switch
 } from '@fluentui/react-components';
-import { Delete24Regular, Add24Regular, Save24Regular } from '@fluentui/react-icons';
+import { Delete24Regular, Add24Regular } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
 
 const API_BASE = import.meta.env.DEV
@@ -49,6 +45,8 @@ interface UserSettings {
 
 // --- User Settings Dialog ---
 
+// ...
+// ...
 export const UserSettingsDialog: React.FC<{
     open: boolean;
     userId: number;
@@ -103,24 +101,24 @@ export const UserSettingsDialog: React.FC<{
         <Dialog open={open} onOpenChange={(_, data) => !data.open && onClose()}>
             <DialogSurface>
                 <DialogBody>
-                    <DialogTitle>Osobní nastavení uživatele</DialogTitle>
+                    <DialogTitle>{t('settings.user_title')}</DialogTitle>
                     <DialogContent>
                         {loading && <Spinner />}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 10 }}>
                             <div>
-                                <Label>Jazyk rozhraní</Label>
+                                <Label>{t('settings.language_label')}</Label>
                                 <Dropdown
-                                    value={settings.language === 'en' ? 'English' : 'Čeština'}
+                                    value={settings.language === 'en' ? t('settings.language_en') : t('settings.language_cs')}
                                     onOptionSelect={(_, d) => setSettings({ ...settings, language: d.optionValue || 'cs' })}
                                 >
-                                    <Option value="cs">Čeština</Option>
-                                    <Option value="en">English</Option>
+                                    <Option value="cs">{t('settings.language_cs')}</Option>
+                                    <Option value="en">{t('settings.language_en')}</Option>
                                 </Dropdown>
                             </div>
                             <div>
-                                <Label>Výchozí společnost</Label>
+                                <Label>{t('settings.default_org_label')}</Label>
                                 <Dropdown
-                                    placeholder="Vyberte organizaci..."
+                                    placeholder={t('settings.default_org_placeholder')}
                                     value={settings.default_org_id || ''}
                                     onOptionSelect={(_, d) => setSettings({ ...settings, default_org_id: d.optionValue || '' })}
                                 >
@@ -132,8 +130,8 @@ export const UserSettingsDialog: React.FC<{
                         </div>
                     </DialogContent>
                     <DialogActions>
-                        <Button appearance="primary" onClick={handleSave}>Uložit</Button>
-                        <Button appearance="secondary" onClick={onClose}>Zavřít</Button>
+                        <Button appearance="primary" onClick={handleSave}>{t('common.save')}</Button>
+                        <Button appearance="secondary" onClick={onClose}>{t('common.close')}</Button>
                     </DialogActions>
                 </DialogBody>
             </DialogSurface>
@@ -247,7 +245,7 @@ export const UserAccessDrawer: React.FC<{
     };
 
     const handleBulkRemove = () => {
-        if (!confirm('Opravdu odebrat vybrané organizace?')) return;
+        if (!confirm(t('security.bulk_remove_confirm'))) return;
         const newMatrix = matrix.map(item => {
             if (selectedOrgs.has(item.org_id)) {
                 return { ...item, is_assigned: false, roles: [] };
@@ -259,11 +257,6 @@ export const UserAccessDrawer: React.FC<{
     };
 
     // --- Columns ---
-    // Note: We build a simple table or grid here. For "SmartDataGrid" inside a Drawer, 
-    // we need to make sure it doesn't conflict with parent page logic. 
-    // Since SmartDataGrid is robust, we can use it, but simple mapping is often faster for drawers.
-    // However, user requested "Filtrovat", so let's stick to a clean UI list with ActionBar.
-
     const filteredItems = matrix.filter(item => {
         if (filterAssigned && !item.is_assigned) return false;
         return true;
@@ -280,15 +273,15 @@ export const UserAccessDrawer: React.FC<{
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 20 }}>
                 {/* Header */}
                 <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ margin: 0 }}>Oprávnění v organizacích</h2>
-                    <div style={{ color: '#666' }}>Uživatel: <strong>{userName}</strong></div>
+                    <h2 style={{ margin: 0 }}>{t('security.org_access')}</h2>
+                    <div style={{ color: '#666' }}>{t('security.permissions_for')}: <strong>{userName}</strong></div>
                 </div>
 
                 {/* Toolbar */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid #ccc' }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                         <Switch
-                            label={filterAssigned ? "Jen přiřazené" : "Všechny organizace"}
+                            label={filterAssigned ? t('security.org_filter_assigned') : t('security.org_filter_all')}
                             checked={filterAssigned}
                             onChange={(_, d) => setFilterAssigned(d.checked)}
                         />
@@ -299,14 +292,14 @@ export const UserAccessDrawer: React.FC<{
                             disabled={selectedOrgs.size === 0}
                             onClick={handleBulkAssign}
                         >
-                            Nastavit role
+                            {t('security.set_roles')}
                         </Button>
                         <Button
                             icon={<Delete24Regular />}
                             disabled={selectedOrgs.size === 0}
                             onClick={handleBulkRemove}
                         >
-                            Odebrat
+                            {t('security.remove')}
                         </Button>
                     </div>
                 </div>
@@ -327,9 +320,9 @@ export const UserAccessDrawer: React.FC<{
                                         }}
                                     />
                                 </TableHeaderCell>
-                                <TableHeaderCell>Organizace</TableHeaderCell>
-                                <TableHeaderCell>Stav</TableHeaderCell>
-                                <TableHeaderCell>Role</TableHeaderCell>
+                                <TableHeaderCell>{t('security.organizations')}</TableHeaderCell>
+                                <TableHeaderCell>{t('security.status')}</TableHeaderCell>
+                                <TableHeaderCell>{t('security.roles')}</TableHeaderCell>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -353,8 +346,8 @@ export const UserAccessDrawer: React.FC<{
                                     </TableCell>
                                     <TableCell>
                                         {item.is_assigned
-                                            ? <Badge appearance="filled" color="success">Přiřazeno</Badge>
-                                            : <Badge appearance="ghost">Nepřiřazeno</Badge>
+                                            ? <Badge appearance="filled" color="success">{t('security.assigned')}</Badge>
+                                            : <Badge appearance="ghost">{t('security.unassigned')}</Badge>
                                         }
                                     </TableCell>
                                     <TableCell>
@@ -368,7 +361,7 @@ export const UserAccessDrawer: React.FC<{
                             ))}
                             {filteredItems.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={4} style={{ textAlign: 'center', padding: 20 }}>Nic nenalezeno</TableCell>
+                                    <TableCell colSpan={4} style={{ textAlign: 'center', padding: 20 }}>{t('security.no_orgs_found')}</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -377,7 +370,7 @@ export const UserAccessDrawer: React.FC<{
 
                 {/* Footer */}
                 <div style={{ marginTop: 10, textAlign: 'right' }}>
-                    <Button onClick={onClose}>Zavřít</Button>
+                    <Button onClick={onClose}>{t('common.close')}</Button>
                 </div>
             </div>
 
@@ -385,9 +378,9 @@ export const UserAccessDrawer: React.FC<{
             <Dialog open={roleDialogOpen} onOpenChange={(_, d) => !d.open && setRoleDialogOpen(false)}>
                 <DialogSurface>
                     <DialogBody>
-                        <DialogTitle>Nastavit role pro {selectedOrgs.size} organizací</DialogTitle>
+                        <DialogTitle>{t('security.bulk_roles_title')}</DialogTitle>
                         <DialogContent>
-                            <p>Vyberte role, které budou hromadně nastaveny:</p>
+                            <p>{t('security.select_roles_desc')}</p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                                 {AVAILABLE_ROLES.map(role => (
                                     <div key={role.value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -404,8 +397,8 @@ export const UserAccessDrawer: React.FC<{
                             </div>
                         </DialogContent>
                         <DialogActions>
-                            <Button appearance="primary" onClick={applyBulkRoles}>Použít</Button>
-                            <Button appearance="secondary" onClick={() => setRoleDialogOpen(false)}>Zrušit</Button>
+                            <Button appearance="primary" onClick={applyBulkRoles}>{t('security.apply')}</Button>
+                            <Button appearance="secondary" onClick={() => setRoleDialogOpen(false)}>{t('common.cancel')}</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>

@@ -33,6 +33,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { VisualEditor } from "./VisualEditor";
 import { SmartDataGrid } from "./SmartDataGrid";
+import { useTranslation } from "../context/TranslationContext";
 import { useAuth } from "../context/AuthContext";
 import type { TableColumnDefinition } from "@fluentui/react-components";
 import { createTableColumn } from "@fluentui/react-components";
@@ -101,6 +102,7 @@ interface FeedbackModalProps {
 export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackModalProps, 'user'> & { user?: any }) => {
 
     const styles = useStyles();
+    const { t } = useTranslation();
     const { user } = useAuth();
     const [tab, setTab] = useState<'report' | 'history' | 'manage'>('report');
     const isAdmin = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'developer';
@@ -202,7 +204,7 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
             await axios.post(getApiUrl('api-changerequests.php?action=update'), { id, status });
             loadManageData(); // Reload
         } catch (e) {
-            alert("Chyba při změně stavu");
+            alert(t('feedback.alert_status_error'));
         }
     };
 
@@ -211,7 +213,7 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
             await axios.post(getApiUrl('api-changerequests.php?action=update'), { id, priority });
             loadManageData(); // Reload
         } catch (e) {
-            alert("Chyba při změně priority");
+            alert(t('feedback.alert_priority_error'));
         }
     };
 
@@ -226,19 +228,19 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
         createTableColumn<any>({
             columnId: 'subject',
             compare: (a, b) => a.subject.localeCompare(b.subject),
-            renderHeaderCell: () => 'Předmět',
+            renderHeaderCell: () => t('feedback.subject'),
             renderCell: (item) => <Text weight="semibold">{item.subject}</Text>
         }),
         createTableColumn<any>({
             columnId: 'user',
             compare: (a, b) => (a.username || '').localeCompare(b.username || ''),
-            renderHeaderCell: () => 'Zadal',
+            renderHeaderCell: () => t('feedback.col_user'),
             renderCell: (item) => <Text>{item.username || '-'}</Text>
         }),
         createTableColumn<any>({
             columnId: 'priority',
             compare: (a, b) => a.priority.localeCompare(b.priority),
-            renderHeaderCell: () => 'Priorita',
+            renderHeaderCell: () => t('feedback.priority'),
             renderCell: (item) => (
                 <Dropdown
                     size="small"
@@ -247,16 +249,16 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                     onOptionSelect={(_, d) => handleUpdatePriority(item.id, d.optionValue || 'medium')}
                     style={{ minWidth: '100px' }}
                 >
-                    <Option value="low">Low</Option>
-                    <Option value="medium">Medium</Option>
-                    <Option value="high">High</Option>
+                    <Option value="low">{t('priority.low')}</Option>
+                    <Option value="medium">{t('priority.medium')}</Option>
+                    <Option value="high">{t('priority.high')}</Option>
                 </Dropdown>
             )
         }),
         createTableColumn<any>({
             columnId: 'status',
             compare: (a, b) => a.status.localeCompare(b.status),
-            renderHeaderCell: () => 'Stav',
+            renderHeaderCell: () => t('feedback.col_status'),
             renderCell: (item) => (
                 <Dropdown
                     size="small"
@@ -265,19 +267,19 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                     onOptionSelect={(_, d) => handleUpdateStatus(item.id, d.optionValue || 'New')}
                     style={{ minWidth: '130px' }}
                 >
-                    <Option value="New">Nový</Option>
-                    <Option value="Approved">Schváleno</Option>
-                    <Option value="Development">Vývoj</Option>
-                    <Option value="Testing">Testování</Option>
-                    <Option value="Completed">Hotovo</Option>
-                    <Option value="Rejected">Zamítnuto</Option>
+                    <Option value="New">{t('feedback.status_new')}</Option>
+                    <Option value="Approved">{t('feedback.status_approved')}</Option>
+                    <Option value="Development">{t('feedback.status_development')}</Option>
+                    <Option value="Testing">{t('feedback.status_testing')}</Option>
+                    <Option value="Completed">{t('feedback.status_completed')}</Option>
+                    <Option value="Rejected">{t('feedback.status_rejected')}</Option>
                 </Dropdown>
             )
         }),
         createTableColumn<any>({
             columnId: 'assigned',
             compare: (a, b) => (a.assigned_username || '').localeCompare(b.assigned_username || ''),
-            renderHeaderCell: () => 'Řešitel',
+            renderHeaderCell: () => t('feedback.col_solver'),
             renderCell: (item) => <Text>{item.assigned_username || '-'}</Text>
         })
     ];
@@ -335,11 +337,11 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
 
     const handleSubmit = async () => {
         if (!subject.trim()) {
-            alert("Vyplňte předmět.");
+            alert(t('feedback.fill_subject'));
             return;
         }
         if (!description.trim()) {
-            alert("Vyplňte popis.");
+            alert(t('feedback.fill_desc'));
             return;
         }
         setSending(true);
@@ -362,15 +364,15 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                 setDescription("");
                 setFiles([]);
                 setPriority("medium");
-                alert("Požadavek odeslán!");
+                alert(t('feedback.success'));
                 onOpenChange(false);
                 onSuccess?.();
 
             } else {
-                alert("Chyba: " + (res.data.error || 'Neznámá chyba'));
+                alert(t('common.error') + ": " + (res.data.error || 'Neznámá chyba'));
             }
         } catch (e: any) {
-            alert("Chyba spojení: " + e.message);
+            alert(t('feedback.alert_conn_error') + e.message);
         } finally {
             setSending(false);
         }
@@ -391,9 +393,9 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                 <DialogBody style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
                     <DialogTitle>
                         <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as any)}>
-                            <Tab value="report">Nahlásit chybu</Tab>
-                            <Tab value="history">Historie vývoje</Tab>
-                            {isAdmin && <Tab value="manage">Správa požadavků</Tab>}
+                            <Tab value="report">{t('feedback.report_bug')}</Tab>
+                            <Tab value="history">{t('feedback.history')}</Tab>
+                            {isAdmin && <Tab value="manage">{t('feedback.manage')}</Tab>}
                         </TabList>
                     </DialogTitle>
 
@@ -401,44 +403,48 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                         {tab === 'report' ? (
                             <div onPaste={handlePaste} style={{ minHeight: '100%' }}>
                                 <p style={{ marginBottom: '15px' }}>
-                                    Našli jste chybu nebo máte nápad? <br />
+                                    {t('feedback.subtitle')} <br />
                                     <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                                        (Tip: Screenshoty můžete vložit přímo pomocí Ctrl+V)
+                                        {t('feedback.screenshot_tip')}
                                     </Text>
                                 </p>
 
                                 <div className={styles.formRow}>
-                                    <Label required>Předmět</Label>
+                                    <Label required>{t('feedback.subject')}</Label>
                                     <Input
                                         value={subject}
                                         onChange={(_e, d) => setSubject(d.value)}
-                                        placeholder="Krátký název problému"
+                                        placeholder={t('feedback.subject_placeholder')}
                                     />
                                 </div>
                                 <div className={styles.formRow}>
-                                    <Label required>Popis</Label>
+                                    <Label required>{t('feedback.description')}</Label>
                                     <VisualEditor
                                         initialContent={description}
                                         onChange={setDescription}
                                         getApiUrl={getApiUrl}
-                                        placeholder="Popište problém co nejpřesněji, můžete vkládat i obrázky (Ctrl+V)..."
+                                        placeholder={t('feedback.desc_placeholder')}
                                     />
                                 </div>
                                 <div className={styles.formRow}>
-                                    <Label>Priorita</Label>
+                                    <Label>{t('feedback.priority')}</Label>
                                     <Dropdown
-                                        value={priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                        value={
+                                            priority === 'low' ? t('priority.low') :
+                                                priority === 'high' ? t('priority.high') :
+                                                    t('priority.medium')
+                                        }
                                         selectedOptions={[priority]}
                                         onOptionSelect={(_, d) => setPriority(d.optionValue || 'medium')}
                                     >
-                                        <Option value="low">Low</Option>
-                                        <Option value="medium">Medium</Option>
-                                        <Option value="high">High</Option>
+                                        <Option value="low">{t('priority.low')}</Option>
+                                        <Option value="medium">{t('priority.medium')}</Option>
+                                        <Option value="high">{t('priority.high')}</Option>
                                     </Dropdown>
                                 </div>
 
                                 <div className={styles.formRow}>
-                                    <Label>Přílohy</Label>
+                                    <Label>{t('feedback.attachments')}</Label>
                                     <div
                                         className={`${styles.dropZone} ${isDragging ? styles.dropZoneActive : ''}`}
                                         onDragOver={handleDragOver}
@@ -448,10 +454,10 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                                     >
                                         <Attach24Regular style={{ fontSize: '32px', color: tokens.colorBrandForeground1 }} />
                                         <div>
-                                            <Text weight="semibold">Klikněte pro výběr nebo přetáhněte soubory sem</Text>
+                                            <Text weight="semibold">{t('feedback.drag_drop')}</Text>
                                             <br />
                                             <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                                                Podpora obrázků, logů, PDF, ZIP a dalších...
+                                                {t('feedback.attachments_desc')}
                                             </Text>
                                         </div>
                                         <input
@@ -491,13 +497,13 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                                 <div style={{ marginBottom: '15px' }}>
                                     <Input
                                         contentBefore={<Search24Regular />}
-                                        placeholder="Hledat v historii změn..."
+                                        placeholder={t('feedback.search_history')}
                                         value={searchQuery}
                                         onChange={(_e, d) => setSearchQuery(d.value)}
                                         style={{ width: '100%' }}
                                     />
                                 </div>
-                                {loadingHistory ? <Spinner label="Načítám historii..." /> : (
+                                {loadingHistory ? <Spinner label={t('feedback.loading_history')} /> : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                         {filteredHistory.map(month => {
                                             // Group by day
@@ -610,13 +616,13 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                                                 </div>
                                             );
                                         })}
-                                        {historyData.length === 0 && <Text>Zatím žádná historie.</Text>}
+                                        {historyData.length === 0 && <Text>{t('feedback.no_history')}</Text>}
                                     </div>
                                 )}
                             </div>
                         ) : tab === 'manage' && isAdmin ? (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                                {loadingManage ? <Spinner label="Načítám požadavky..." /> : (
+                                {loadingManage ? <Spinner label={t('feedback.loading_requests')} /> : (
                                     <SmartDataGrid
                                         items={manageData}
                                         columns={manageColumns}
@@ -630,11 +636,11 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                     <DialogActions>
                         {tab === 'report' && (
                             <Button appearance="primary" onClick={handleSubmit} disabled={sending}>
-                                {sending ? "Odesílám..." : "Odeslat"}
+                                {sending ? t('feedback.sending') : t('feedback.send')}
                             </Button>
                         )}
                         <DialogTrigger disableButtonEnhancement>
-                            <Button appearance="secondary">Zavřít</Button>
+                            <Button appearance="secondary">{t('common.close')}</Button>
                         </DialogTrigger>
                     </DialogActions>
                 </DialogBody>
@@ -642,3 +648,4 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
         </Dialog >
     );
 };
+

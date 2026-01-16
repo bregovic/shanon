@@ -38,7 +38,7 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
     const styles = useStyles();
     const { t } = useTranslation();
     const { language, setLanguage, saveSettings } = useSettings();
-    const { organizations, currentOrgId } = useAuth();
+    const { organizations } = useAuth();
     const [saving, setSaving] = useState(false);
     const [selectedDefaultOrg, setSelectedDefaultOrg] = useState<string | null>(null);
 
@@ -107,6 +107,8 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
         onOpenChange(false);
     };
 
+
+    // ...
     return (
         <Dialog open={open} onOpenChange={(_, data) => onOpenChange(data.open)}>
             <DialogSurface>
@@ -124,20 +126,20 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
 
                         {/* Language Setting */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                            <Label>{t('settings.language')}</Label>
+                            <Label>{t('settings.language_label')}</Label>
                             <Dropdown
-                                value={language === 'cs' ? 'Čeština' : 'English'}
+                                value={language === 'cs' ? t('settings.language_cs') : t('settings.language_en')}
                                 onOptionSelect={(_, data) => setLanguage(data.optionValue as any)}
                             >
-                                <Option value="cs" text="Čeština">Čeština</Option>
-                                <Option value="en" text="English">English</Option>
+                                <Option value="cs" text={t('settings.language_cs')}>{t('settings.language_cs')}</Option>
+                                <Option value="en" text={t('settings.language_en')}>{t('settings.language_en')}</Option>
                             </Dropdown>
                         </div>
 
                         {/* Default Organization Setting */}
                         {organizations.length > 0 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                <Label>{t('settings.defaultOrganization') || 'Výchozí společnost'}</Label>
+                                <Label>{t('settings.default_org_label')}</Label>
                                 <Dropdown
                                     value={organizations.find(o => o.org_id === effectiveDefault)?.display_name || effectiveDefault}
                                     onOptionSelect={(_, data) => setSelectedDefaultOrg(data.optionValue as string)}
@@ -149,17 +151,17 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                     ))}
                                 </Dropdown>
                                 <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
-                                    {t('settings.defaultOrgHint') || 'Tato společnost bude automaticky vybrána po přihlášení.'}
+                                    {t('settings.defaultOrgHint')}
                                 </Text>
                             </div>
                         )}
 
                         {/* Password Change */}
                         <div style={{ marginTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: '16px' }}>
-                            <Text weight="semibold" style={{ marginBottom: '8px', display: 'block' }}>Změna hesla</Text>
+                            <Text weight="semibold" style={{ marginBottom: '8px', display: 'block' }}>{t('settings.password_change')}</Text>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <div>
-                                    <Label>Nové heslo</Label>
+                                    <Label>{t('settings.new_password')}</Label>
                                     <Input
                                         type="password"
                                         value={newPassword}
@@ -168,7 +170,7 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                     />
                                 </div>
                                 <div>
-                                    <Label>Potvrzení hesla</Label>
+                                    <Label>{t('settings.confirm_password')}</Label>
                                     <Input
                                         type="password"
                                         value={confirmPassword}
@@ -186,7 +188,7 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                     </DialogContent>
                     <DialogActions>
                         <Button appearance="primary" onClick={handleSave} disabled={saving}>
-                            {saving ? t('common.loading') : t('common.save')}
+                            {saving ? t('common.working') : t('common.save')}
                         </Button>
                         <Button appearance="secondary" onClick={() => onOpenChange(false)}>
                             {t('common.cancel')}
@@ -197,3 +199,4 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
         </Dialog>
     );
 };
+
