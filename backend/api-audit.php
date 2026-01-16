@@ -114,6 +114,7 @@ switch($action) {
 
         echo json_encode([
             'success' => true,
+            'scanned_count' => count($files),
             'missing_translations' => $missing,
             'unused_translations' => $unused,
             'hardcoded_candidates' => array_slice($hardcodedCandidates, 0, 100) // Limit response

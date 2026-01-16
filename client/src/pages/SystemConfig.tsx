@@ -553,6 +553,7 @@ export const SystemConfig: React.FC = () => {
                     <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label="Kvalita kódu & Audit" onClick={() => navigate(orgPrefix + '/system/audit')} />
                         <MenuItem label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
                     </MenuSection>
                 </div>
