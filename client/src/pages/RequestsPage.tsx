@@ -18,6 +18,10 @@ import {
     PopoverTrigger,
     PopoverSurface,
     Badge,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbButton,
+    BreadcrumbDivider,
     Divider,
     Title3
 } from "@fluentui/react-components";
@@ -744,7 +748,22 @@ const RequestsPage = () => {
                         {t('common.back')}
                     </Button>
                     <div style={{ width: '16px' }} />
-                    <Title3>#{selectedRequest.id}</Title3>
+                    <Breadcrumb>
+                        <BreadcrumbItem>
+                            <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
+                        </BreadcrumbItem>
+                        <BreadcrumbDivider />
+                        <BreadcrumbItem>
+                            <BreadcrumbButton onClick={() => {
+                                setSelectedRequest(null);
+                                setSelectedItems(new Set());
+                            }}>{t('modules.requests')}</BreadcrumbButton>
+                        </BreadcrumbItem>
+                        <BreadcrumbDivider />
+                        <BreadcrumbItem>
+                            <BreadcrumbButton current>{`#${selectedRequest.id}`}</BreadcrumbButton>
+                        </BreadcrumbItem>
+                    </Breadcrumb>
                     <div style={{ flex: 1 }} />
                     <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(selectedRequest.id)}>Obnovit</Button>
                 </ActionBar>
@@ -1085,7 +1104,15 @@ const RequestsPage = () => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <ActionBar>
-                <Title3>{t('modules.requests')}</Title3>
+                <Breadcrumb>
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    <BreadcrumbDivider />
+                    <BreadcrumbItem>
+                        <BreadcrumbButton current>{t('modules.requests')}</BreadcrumbButton>
+                    </BreadcrumbItem>
+                </Breadcrumb>
                 <div style={{ flex: 1 }} />
 
                 <Button appearance="primary" icon={<Add24Regular />} onClick={() => setFeedbackOpen(true)}>
