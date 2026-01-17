@@ -291,9 +291,9 @@ export const SharedOrgsPage: React.FC = () => {
         <PageLayout>
             <PageHeader>
                 <Breadcrumb>
-                    <BreadcrumbItem><BreadcrumbButton onClick={() => navigate(`${orgPrefix}/system`)}>Systém</BreadcrumbButton></BreadcrumbItem>
+                    <BreadcrumbItem><BreadcrumbButton onClick={() => navigate(`${orgPrefix}/system`)}>{t('system.title') || 'Systém'}</BreadcrumbButton></BreadcrumbItem>
                     <BreadcrumbDivider />
-                    <BreadcrumbItem><BreadcrumbButton current>Sdílené společnosti</BreadcrumbButton></BreadcrumbItem>
+                    <BreadcrumbItem><BreadcrumbButton current>{t('shared_orgs.title') || 'Sdílené společnosti'}</BreadcrumbButton></BreadcrumbItem>
                 </Breadcrumb>
             </PageHeader>
 
@@ -307,7 +307,7 @@ export const SharedOrgsPage: React.FC = () => {
                     </MenuTrigger>
                     <MenuPopover>
                         <MenuList>
-                            <MenuItem icon={<Add24Regular />} onClick={handleOpenCreate}>{t('common.new') || 'Nová skupina'}</MenuItem>
+                            <MenuItem icon={<Add24Regular />} onClick={handleOpenCreate}>{t('common.new')}</MenuItem>
                             <MenuItem
                                 icon={<Edit24Regular />}
                                 disabled={selectedIds.size !== 1}
@@ -318,7 +318,7 @@ export const SharedOrgsPage: React.FC = () => {
                             >
                                 {t('common.edit') || 'Upravit'}
                             </MenuItem>
-                            <MenuItem icon={<Delete24Regular />} disabled={selectedIds.size === 0} onClick={handleDelete}>{t('common.delete') || 'Smazat'}</MenuItem>
+                            <MenuItem icon={<Delete24Regular />} disabled={selectedIds.size === 0} onClick={handleDelete}>{t('common.delete')}</MenuItem>
                         </MenuList>
                     </MenuPopover>
                 </Menu>
@@ -336,7 +336,7 @@ export const SharedOrgsPage: React.FC = () => {
                     disabled={selectedIds.size !== 1}
                     onClick={openMembersDialog}
                 >
-                    Členové skupiny
+                    {t('shared_orgs.members')}
                 </Button>
                 <Button
                     appearance="subtle"
@@ -344,7 +344,7 @@ export const SharedOrgsPage: React.FC = () => {
                     disabled={selectedIds.size !== 1}
                     onClick={openTablesDialog}
                 >
-                    Sdílené tabulky
+                    {t('shared_orgs.tables')}
                 </Button>
             </ActionBar>
 
@@ -375,7 +375,7 @@ export const SharedOrgsPage: React.FC = () => {
                         action={<Button appearance="subtle" icon={<Dismiss24Regular />} onClick={() => setIsDrawerOpen(false)} />}
                     >
                         <BuildingMultiple24Regular style={{ marginRight: 8 }} />
-                        {drawerMode === 'create' ? 'Nová skupina' : 'Upravit skupinu'}
+                        {drawerMode === 'create' ? t('common.new') : t('common.edit')}
                     </DrawerHeaderTitle>
                 </DrawerHeader>
                 <DrawerBody>
@@ -383,7 +383,7 @@ export const SharedOrgsPage: React.FC = () => {
                         {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
 
                         <div>
-                            <Label required>ID Skupiny (max 5 znaků)</Label>
+                            <Label required>{t('common.id')}</Label>
                             <Input
                                 value={formData.org_id}
                                 disabled={drawerMode === 'edit'}
@@ -393,7 +393,7 @@ export const SharedOrgsPage: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <Label required>Název Skupiny</Label>
+                            <Label required>{t('shared_orgs.group_name')}</Label>
                             <Input
                                 value={formData.display_name}
                                 onChange={(_, d) => setFormData(p => ({ ...p, display_name: d.value }))}
@@ -404,7 +404,7 @@ export const SharedOrgsPage: React.FC = () => {
                             <Switch
                                 checked={formData.is_active}
                                 onChange={(_, d) => setFormData(p => ({ ...p, is_active: d.checked }))}
-                                label="Aktivní"
+                                label={t('common.active')}
                             />
                         </div>
 
@@ -426,7 +426,7 @@ export const SharedOrgsPage: React.FC = () => {
             <Dialog open={membersDialogOpen} onOpenChange={(_, d) => setMembersDialogOpen(d.open)}>
                 <DialogSurface style={{ minWidth: '600px', maxWidth: '90vw' }}>
                     <DialogBody>
-                        <DialogTitle>Členové skupiny {formData.display_name}</DialogTitle>
+                        <DialogTitle>{t('shared_orgs.members')} - {formData.display_name}</DialogTitle>
                         <DialogContent style={{ height: '60vh', maxHeight: 600 }}>
                             <TransferList
                                 availableTitle="Dostupné společnosti"
@@ -448,7 +448,7 @@ export const SharedOrgsPage: React.FC = () => {
             <Dialog open={tablesDialogOpen} onOpenChange={(_, d) => setTablesDialogOpen(d.open)}>
                 <DialogSurface style={{ minWidth: '800px', maxWidth: '95vw' }}>
                     <DialogBody>
-                        <DialogTitle>Sdílené tabulky pro {formData.display_name}</DialogTitle>
+                        <DialogTitle>{t('shared_orgs.tables')} - {formData.display_name}</DialogTitle>
                         <DialogContent style={{ height: '60vh', maxHeight: 600 }}>
                             <TransferList
                                 availableTitle="Dostupné tabulky"

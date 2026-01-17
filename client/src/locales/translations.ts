@@ -436,6 +436,36 @@ export const translations = {
         'priority.low': 'Nízká',
         'priority.medium': 'Střední',
         'priority.high': 'Vysoká',
+        // Shared Orgs
+        'shared_orgs.title': 'Sdílené společnosti',
+        'shared_orgs.members': 'Členové skupiny',
+        'shared_orgs.tables': 'Sdílené tabulky',
+        'shared_orgs.group_name': 'Název skupiny',
+
+        // Missing / Aliases
+        'refresh': 'Obnovit',
+        'loading_pnl': 'Načítám P&L analýzu...',
+        'pnl_winning': 'Ziskové',
+        'dms.attributes.required': 'Povinné',
+        'dms.attributes.searchable': 'Vyhledávatelné',
+        'dms.attributes.default_val': 'Výchozí hodnota',
+        'common.translations': 'Překlady',
+        'dms.settings.new_ocr_template': 'Nová OCR šablona',
+        'dms.settings.no_templates': 'Žádné šablony',
+        'dms.attributes.edit': 'Upravit atribut',
+        'dms.attributes.new': 'Nový atribut',
+        'dms.attributes.add_option_ph': 'Přidat možnost...',
+        'common.required_fields': 'Povinná pole',
+        'common.confirm_delete': 'Opravdu smazat vybrané záznamy?',
+        'users.settings': 'Nastavení uživatelů',
+        'users.organizations': 'Organizace uživatele',
+
+        // System Hardcoded
+        'system.dev_history': 'Historie vývoje',
+        'system.recent_requests': 'Nedávné požadavky',
+        'system.db_schema': 'Dokumentace DB schématu',
+        'common.yes': 'Ano',
+        'common.no': 'Ne',
     },
 
     en: {
@@ -964,5 +994,35 @@ export const translations = {
         'import_cnb_desc': 'Import official exchange rates from Czech National Bank.',
         'btn_importing': 'Importing...',
 
+        // Shared Orgs
+        'shared_orgs.title': 'Shared Companies',
+        'shared_orgs.members': 'Group Members',
+        'shared_orgs.tables': 'Shared Tables',
+        'shared_orgs.group_name': 'Group Name',
+
+        // Missing / Aliases
+        'refresh': 'Refresh',
+        'loading_pnl': 'Loading P&L analysis...',
+        'pnl_winning': 'Winning',
+        'dms.attributes.required': 'Required',
+        'dms.attributes.searchable': 'Searchable',
+        'dms.attributes.default_val': 'Default Value',
+        'common.translations': 'Translations',
+        'dms.settings.new_ocr_template': 'New OCR Template',
+        'dms.settings.no_templates': 'No templates',
+        'dms.attributes.edit': 'Edit Attribute',
+        'dms.attributes.new': 'New Attribute',
+        'dms.attributes.add_option_ph': 'Add option...',
+        'common.required_fields': 'Required fields',
+        'common.confirm_delete': 'Really delete selected items?',
+        'users.settings': 'User Settings',
+        'users.organizations': 'User Organizations',
+
+        // System Hardcoded
+        'system.dev_history': 'Development History',
+        'system.recent_requests': 'Recent Requests',
+        'system.db_schema': 'DB Schema Documentation',
+        'common.yes': 'Yes',
+        'common.no': 'No',
     }
 };

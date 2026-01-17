@@ -368,7 +368,7 @@ export const SystemConfig: React.FC = () => {
     const renderHistoryView = () => (
         <div className={styles.grid}>
             <Card className={styles.card}>
-                <CardHeader header={<Title3>Development History</Title3>} />
+                <CardHeader header={<Title3>{t('system.dev_history')}</Title3>} />
                 <div style={{ maxHeight: '600px', overflow: 'auto' }}>
                     {historyData?.history?.map((h: any) => (
                         <div key={h.id} style={{ borderBottom: '1px solid #eee', padding: '12px 0' }}>
@@ -383,7 +383,7 @@ export const SystemConfig: React.FC = () => {
                 </div>
             </Card>
             <Card className={styles.card}>
-                <CardHeader header={<Title3>Recent Requests</Title3>} />
+                <CardHeader header={<Title3>{t('system.recent_requests')}</Title3>} />
                 <div style={{ maxHeight: '600px', overflow: 'auto' }}>
                     {historyData?.requests?.map((r: any) => (
                         <div key={r.rec_id} style={{ borderBottom: '1px solid #eee', padding: '8px 0' }}>
@@ -491,7 +491,7 @@ export const SystemConfig: React.FC = () => {
 
         return (
             <div>
-                <Title2 style={{ marginBottom: '20px' }}>Database Schema Documentation</Title2>
+                <Title2 style={{ marginBottom: '20px' }}>{t('system.db_schema')}</Title2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                     {schema.map(cat => (
                         <div key={cat.category}>
@@ -573,8 +573,8 @@ export const SystemConfig: React.FC = () => {
                             {editingParam === p.param_key ? (
                                 <>
                                     <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{ flex: 1, padding: 4 }} />
-                                    <Button size="small" appearance="primary" onClick={() => updateParam(p.param_key)}>Save</Button>
-                                    <Button size="small" onClick={() => setEditingParam(null)}>Cancel</Button>
+                                    <Button size="small" appearance="primary" onClick={() => updateParam(p.param_key)}>{t('common.save')}</Button>
+                                    <Button size="small" onClick={() => setEditingParam(null)}>{t('common.cancel')}</Button>
                                 </>
                             ) : (
                                 <>
@@ -710,12 +710,12 @@ export const SystemConfig: React.FC = () => {
                     {/* 1. ADMIN TOOLS */}
                     <MenuSection id="admin" title={t('system.group.admin')} icon={<Desktop24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.diagnostics')} onClick={() => navigateToView('diagnostics', 'system.item.diagnostics')} path={orgPrefix + '/system?view=diagnostics'} />
-                        <MenuItem label="Prohlížeč tabulek" onClick={() => navigate(orgPrefix + '/system/table-browser')} path={orgPrefix + '/system/table-browser'} />
+                        <MenuItem label={t('system.tables_browser') || 'Prohlížeč tabulek'} onClick={() => navigate(orgPrefix + '/system/table-browser')} path={orgPrefix + '/system/table-browser'} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('dms.settings.number_series')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} path={orgPrefix + '/system/users'} />
-                        <MenuItem label="Organizace a Subjekty" onClick={() => navigate(orgPrefix + '/system/organizations')} path={orgPrefix + '/system/organizations'} />
-                        <MenuItem label="Sdílené společnosti" onClick={() => navigate(orgPrefix + '/system/shared-orgs')} path={orgPrefix + '/system/shared-orgs'} />
+                        <MenuItem label={t('users.manage') || 'Správa uživatelů'} onClick={() => navigate(orgPrefix + '/system/users')} path={orgPrefix + '/system/users'} />
+                        <MenuItem label={t('users.organizations') || 'Organizace a Subjekty'} onClick={() => navigate(orgPrefix + '/system/organizations')} path={orgPrefix + '/system/organizations'} />
+                        <MenuItem label={t('shared_orgs.title')} onClick={() => navigate(orgPrefix + '/system/shared-orgs')} path={orgPrefix + '/system/shared-orgs'} />
                     </MenuSection>
 
                     {/* 2. DOCS */}
@@ -763,7 +763,7 @@ export const SystemConfig: React.FC = () => {
                     {/* 6. SETTINGS */}
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.global_params')} onClick={() => navigateToView('parameters', 'system.item.global_params')} path={orgPrefix + '/system?view=parameters'} />
-                        <MenuItem label="Překlady" onClick={() => navigate(orgPrefix + '/system/translations')} path={orgPrefix + '/system/translations'} />
+                        <MenuItem label={t('common.translations')} onClick={() => navigate(orgPrefix + '/system/translations')} path={orgPrefix + '/system/translations'} />
                         <MenuItem label="Inicializace dat (Seeders)" onClick={() => navigateToView('seeders', 'Inicializace dat')} path={orgPrefix + '/system?view=seeders'} />
                     </MenuSection>
                 </div>
@@ -791,7 +791,7 @@ export const SystemConfig: React.FC = () => {
                     backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
                 }}>
                     <Card style={{ maxWidth: '600px', width: '90%', maxHeight: '80vh', padding: '24px', display: 'flex', flexDirection: 'column' }}>
-                        <Title3>Výsledek aktualizace</Title3>
+                        <Title3>{t('system.update_result') || 'Výsledek aktualizace'}</Title3>
                         <Divider style={{ margin: '12px 0' }} />
 
                         <div style={{ overflowY: 'auto', flex: 1, marginBottom: '16px' }}>
