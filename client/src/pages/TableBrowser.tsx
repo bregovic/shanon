@@ -1,21 +1,24 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     makeStyles,
-    shorthands,
     Button,
     Title3,
     Text,
     Spinner,
     createTableColumn,
-    Card,
     Badge,
-    Textarea
+    Textarea,
+    tokens,
+    MessageBar,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbButton,
+    BreadcrumbDivider
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
     ArrowLeft24Regular,
-    Database24Regular,
     Table24Regular,
     ArrowClockwise24Regular,
     Code24Regular,
@@ -27,36 +30,30 @@ import { ActionBar } from '../components/ActionBar';
 import { SmartDataGrid } from '../components/SmartDataGrid';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/TranslationContext';
+import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
 
 const useStyles = makeStyles({
-    root: {
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: '#f5f5f5'
-    },
-    container: {
-        padding: '16px',
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        gap: '16px'
-    },
-    card: {
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        ...shorthands.padding('0')
-    },
     gridContainer: {
-        flex: 1,
-        overflow: 'hidden',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+    },
+    filterBar: {
+        padding: '8px 4px',
+        color: tokens.colorNeutralForeground2,
+        fontSize: '12px',
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+        backgroundColor: tokens.colorNeutralBackground2
     },
     sqlEditor: {
         width: '100%',
         fontFamily: 'monospace',
-        minHeight: '150px'
+        minHeight: '120px',
+        marginBottom: '16px',
+        border: `1px solid ${tokens.colorNeutralStroke1}`,
+        borderRadius: tokens.borderRadiusMedium,
+        padding: '8px'
     }
 });
 
@@ -69,9 +66,11 @@ interface TableInfo {
 
 export const TableBrowser: React.FC = () => {
     const styles = useStyles();
-    const { getApiUrl } = useAuth();
+    const { getApiUrl, currentOrgId } = useAuth();
     const { t } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const orgPrefix = `/${currentOrgId || 'VACKR'}`;
 
     // Navigation State
     const currentTable = searchParams.get('table');
@@ -94,7 +93,9 @@ export const TableBrowser: React.FC = () => {
     // Initial Load & Effects
     useEffect(() => {
         if (currentTable) {
-            setViewMode('data');
+            // Only force data view if not already in SQL/Settings or just navigating
+            if (viewMode !== 'sql' && viewMode !== 'settings') setViewMode('data');
+
             fetchTableData(currentTable);
         } else {
             fetchTables();
@@ -211,147 +212,142 @@ export const TableBrowser: React.FC = () => {
     ];
 
     return (
-        <div className={styles.root}>
+        <PageLayout>
+            <PageHeader>
+                <Breadcrumb>
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => navigate(`${orgPrefix}/system`)}>Systém</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    <BreadcrumbDivider />
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => setSearchParams({})}>Prohlížeč tabulek</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    {currentTable && (
+                        <>
+                            <BreadcrumbDivider />
+                            <BreadcrumbItem>
+                                <BreadcrumbButton current>{currentTable}</BreadcrumbButton>
+                            </BreadcrumbItem>
+                        </>
+                    )}
+                </Breadcrumb>
+            </PageHeader>
+
             <ActionBar>
-                {currentTable ? (
+                {currentTable && (
                     <>
-                        <Button icon={<ArrowLeft24Regular />} onClick={() => setSearchParams({})}>Zpět</Button>
-                        <div style={{ width: 1, height: 24, backgroundColor: '#ccc', margin: '0 8px' }} />
-                        <Title3 style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 16 }}>
-                            <Database24Regular /> {currentTable}
-                        </Title3>
+                        <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => setSearchParams({})}>Zpět</Button>
+                        <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+
                         <Button appearance={viewMode === 'data' ? 'primary' : 'subtle'} icon={<Table24Regular />} onClick={() => setViewMode('data')}>Data</Button>
                         <Button appearance={viewMode === 'settings' ? 'primary' : 'subtle'} icon={<Settings24Regular />} onClick={() => setViewMode('settings')}>Vlastnosti</Button>
                     </>
-                ) : (
-                    <Title3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Database24Regular /> Table Browser
-                    </Title3>
                 )}
 
                 <div style={{ flex: 1 }} />
+
                 <Button appearance={viewMode === 'sql' ? 'primary' : 'subtle'} icon={<Code24Regular />} onClick={() => setViewMode('sql')}>SQL Konzole</Button>
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
                 <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={() => currentTable ? fetchTableData(currentTable) : fetchTables()}>Obnovit</Button>
             </ActionBar>
 
-            <div className={styles.container}>
-                {loading && <div style={{ textAlign: 'center' }}><Spinner label="Pracuji..." /></div>}
-                {error && <div style={{ color: 'red', padding: 10 }}>{error}</div>}
+            <PageContent>
+                {loading && <div style={{ textAlign: 'center', padding: 20 }}><Spinner label="Pracuji..." /></div>}
+                {error && <MessageBar intent="error" style={{ marginBottom: 16 }}>{error}</MessageBar>}
 
-                {/* --- TABLE LIST VIEW --- */}
-                {!currentTable && viewMode !== 'sql' && !loading && (
-                    <Card className={styles.card}>
-                        <div className={styles.gridContainer}>
+                {!loading && !error && (
+                    <>
+                        {/* 1. TABLE LIST */}
+                        {!currentTable && viewMode !== 'sql' && (
                             <SmartDataGrid
                                 items={tables}
                                 columns={tableListColumns}
-                                getRowId={(item) => item.id}
+                                getRowId={(item: any) => item.id}
                                 onRowClick={(item) => setSearchParams({ table: item.id })}
                             />
-                        </div>
-                    </Card>
-                )}
+                        )}
 
-                {/* --- DATA VIEW --- */}
-                {viewMode === 'data' && currentTable && !loading && (
-                    <Card className={styles.card}>
-                        <div style={{ padding: '8px 16px', backgroundColor: '#e1f0fa', fontSize: '12px', borderBottom: '1px solid #cce' }}>
-                            {filterInfo}
-                        </div>
-                        <div className={styles.gridContainer}>
-                            <SmartDataGrid
-                                items={tableData}
-                                columns={dynamicDataColumns}
-                                getRowId={(item) => String(Math.random())}
-                                selectionMode="single"
-                            />
-                        </div>
-                    </Card>
-                )}
-
-                {/* --- SQL CONSOLE VIEW --- */}
-                {viewMode === 'sql' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
-                        <Card>
-                            <Text weight="semibold" style={{ marginBottom: 8 }}>SQL Query</Text>
-                            <Textarea
-                                value={sqlQuery}
-                                onChange={e => setSqlQuery(e.target.value)}
-                                className={styles.sqlEditor}
-                                placeholder="SELECT * FROM sys_users..."
-                            />
-                            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                                <Button appearance="primary" icon={<Play24Regular />} onClick={executeSql} disabled={loading}>Spustit (F9)</Button>
+                        {/* 2. DATA VIEW */}
+                        {currentTable && viewMode === 'data' && (
+                            <div className={styles.gridContainer}>
+                                <div className={styles.filterBar}>
+                                    {filterInfo} &bull; {tableData.length} zobrazeno (limit 500)
+                                </div>
+                                <SmartDataGrid
+                                    items={tableData}
+                                    columns={dynamicDataColumns}
+                                    getRowId={() => String(Math.random())}
+                                    selectionMode="single"
+                                />
                             </div>
-                        </Card>
+                        )}
 
-                        {sqlResult && (
-                            <Card className={styles.card} style={{ flex: 1 }}>
-                                {sqlResult.success ? (
-                                    sqlResult.type === 'SELECT' ? (
-                                        <div className={styles.gridContainer}>
-                                            <SmartDataGrid
-                                                items={sqlResult.data}
-                                                columns={dynamicDataColumns}
-                                                getRowId={() => String(Math.random())}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div style={{ padding: 20, color: 'green', fontWeight: 'bold' }}>
-                                            ✓ {sqlResult.message}
-                                        </div>
-                                    )
-                                ) : (
-                                    <div style={{ padding: 20, color: 'red', fontWeight: 'bold', whiteSpace: 'pre-wrap' }}>
-                                        ERROR: {sqlResult.error}
+                        {/* 3. SQL VIEW */}
+                        {viewMode === 'sql' && (
+                            <div className={styles.gridContainer}>
+                                <Textarea
+                                    value={sqlQuery}
+                                    onChange={e => setSqlQuery(e.target.value)}
+                                    className={styles.sqlEditor}
+                                    placeholder="SELECT * FROM sys_users LIMIT 10..."
+                                />
+                                <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+                                    <Button appearance="primary" icon={<Play24Regular />} onClick={executeSql} disabled={loading}>Spustit SQL (F9)</Button>
+                                </div>
+
+                                {sqlResult && (
+                                    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                        {sqlResult.success ? (
+                                            sqlResult.type === 'SELECT' ? (
+                                                <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                    <SmartDataGrid items={sqlResult.data} columns={dynamicDataColumns} getRowId={() => String(Math.random())} />
+                                                </div>
+                                            ) : (
+                                                <MessageBar intent="success">✓ {sqlResult.message}</MessageBar>
+                                            )
+                                        ) : (
+                                            <MessageBar intent="error">
+                                                <Text style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>ERROR: {sqlResult.error}</Text>
+                                            </MessageBar>
+                                        )}
                                     </div>
                                 )}
-                            </Card>
+                            </div>
                         )}
-                    </div>
-                )}
 
-                {/* --- SETTINGS VIEW --- */}
-                {viewMode === 'settings' && currentTable && !loading && (
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                        <Card style={{ width: '400px', padding: 20 }}>
-                            <Title3>Standardy Tabulky</Title3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
-                                {/* Timestamps */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <Text weight="semibold">Časová razítka</Text>
-                                        <div style={{ fontSize: '11px', color: '#666' }}>created_at, updated_at, created_by...</div>
+                        {/* 4. SETTINGS VIEW */}
+                        {currentTable && viewMode === 'settings' && (
+                            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', padding: '16px 0' }}>
+                                <div style={{ width: '400px', border: `1px solid ${tokens.colorNeutralStroke1}`, padding: 20, borderRadius: tokens.borderRadiusMedium }}>
+                                    <Title3>Standardy Tabulky</Title3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <Text weight="semibold">Časová razítka</Text>
+                                                <div style={{ fontSize: '11px', color: '#666' }}>created_at, updated_at...</div>
+                                            </div>
+                                            {features.has_timestamps ? (
+                                                <Badge color="success">Aktivní</Badge>
+                                            ) : (
+                                                <Button size="small" onClick={() => applyFeature('timestamps')}>Vytvořit</Button>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <Text weight="semibold">Multitenancy</Text>
+                                                <div style={{ fontSize: '11px', color: '#666' }}>tenant_id</div>
+                                            </div>
+                                            <Badge color={features.has_tenant ? 'success' : 'danger'}>
+                                                {features.has_tenant ? 'Ano' : 'Ne'}
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    {features.has_timestamps ? (
-                                        <Badge color="success">Aktivní</Badge>
-                                    ) : (
-                                        <Button size="small" onClick={() => applyFeature('timestamps')}>Vytvořit</Button>
-                                    )}
-                                </div>
-                                {/* Tenant */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <Text weight="semibold">Multitenancy</Text>
-                                        <div style={{ fontSize: '11px', color: '#666' }}>sloupec tenant_id</div>
-                                    </div>
-                                    <Badge color={features.has_tenant ? 'success' : 'danger'}>
-                                        {features.has_tenant ? 'Ano' : 'Ne'}
-                                    </Badge>
-                                </div>
-                                {/* Soft Delete */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <Text weight="semibold">Soft Delete</Text>
-                                        <div style={{ fontSize: '11px', color: '#666' }}>is_deleted = true</div>
-                                    </div>
-                                    <Button size="small" disabled>Nedostupné</Button>
                                 </div>
                             </div>
-                        </Card>
-                    </div>
+                        )}
+                    </>
                 )}
-            </div>
-        </div>
+            </PageContent>
+        </PageLayout>
     );
 };
