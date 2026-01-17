@@ -137,7 +137,15 @@ const Layout: React.FC = () => {
     return (
         <div className={styles.root}>
             <header className={styles.header}>
-                <div className={styles.logoSection} onClick={() => navigate(`${orgPrefix}/dashboard`)}>
+                <div
+                    className={styles.logoSection}
+                    onClick={() => {
+                        // Navigate to current module root (not always dashboard)
+                        const currentModule = visibleModules.find(m => isActive(m.path));
+                        const targetPath = currentModule?.path || `${orgPrefix}/dashboard`;
+                        navigate(targetPath);
+                    }}
+                >
                     <Image src="/logo.png" height={28} fit="contain" alt="Shanon" />
                 </div>
 

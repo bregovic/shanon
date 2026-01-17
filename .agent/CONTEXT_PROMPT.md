@@ -93,6 +93,9 @@
 *   **UrL-Driven State:** Never use internal `useState` for full-page views (dashboards vs details). Always use **Routes** or **URL Query Params**.
     *   *Why?* Enables functional Back button and Deep Linking.
 *   **Module Reset:** Clicking a main module navigation item (e.g., in Top Bar) MUST navigate to the clean module root (clearing all query params), explicitly resetting the view to the Dashboard/Menu.
+*   **Logo Click Behavior:** Clicking the Shanon logo navigates to the **root of the current module** (not always dashboard). This provides better UX when working deeply in a module.
+    *   Example: `/VACKR/dms/list` → logo click → `/VACKR/dms`
+    *   Fallback: If no module detected, navigates to dashboard.
 
 ### D. Documentation & History
 *   **Self-Documenting:** Code must generally explain itself, but complex logic needs comments.
