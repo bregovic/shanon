@@ -35,7 +35,9 @@ const useStyles = makeStyles({
     }
 });
 
-export const MenuItem = ({ icon, label, onClick, disabled }: { icon?: React.ReactNode, label: string, onClick?: () => void, disabled?: boolean }) => {
+import { FavoriteStar } from './FavoriteStar';
+
+export const MenuItem = ({ icon, label, onClick, disabled, path }: { icon?: React.ReactNode, label: string, onClick?: () => void, disabled?: boolean, path?: string }) => {
     const styles = useStyles();
     return (
         <div
@@ -48,6 +50,15 @@ export const MenuItem = ({ icon, label, onClick, disabled }: { icon?: React.Reac
                 <Text weight="medium">{label}</Text>
             </div>
             {disabled && <Spinner size="extra-small" />}
+            {path && (
+                <FavoriteStar
+                    path={path}
+                    title={label}
+                    size="small"
+                    className="fav-star"
+                    style={{ marginLeft: '8px' }}
+                />
+            )}
         </div>
     );
 };

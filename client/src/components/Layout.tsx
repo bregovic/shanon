@@ -30,6 +30,7 @@ import {
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
 import { FeedbackModal } from './FeedbackModal';
+import { FavoritesMenu } from './FavoritesMenu';
 
 
 
@@ -201,6 +202,9 @@ const Layout: React.FC = () => {
                         </MenuList>
                     </MenuPopover>
                 </Menu>
+
+                {/* Favorites Menu */}
+                <FavoritesMenu />
 
                 {/* Spacer to push actions to right, but allows shrinking/overflow */}
                 <div style={{ flex: 1, minWidth: '16px' }} />

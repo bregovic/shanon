@@ -639,20 +639,20 @@ export const SystemConfig: React.FC = () => {
                 <div className={styles.scrollColumn}>
                     {/* 1. ADMIN TOOLS */}
                     <MenuSection id="admin" title={t('system.group.admin')} icon={<Desktop24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
-                        <MenuItem label={t('system.item.diagnostics')} onClick={() => navigateToView('diagnostics', 'system.item.diagnostics')} />
+                        <MenuItem label={t('system.item.diagnostics')} onClick={() => navigateToView('diagnostics', 'system.item.diagnostics')} path={orgPrefix + '/system?view=diagnostics'} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('dms.settings.number_series')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} />
-                        <MenuItem label="Organizace a Subjekty" onClick={() => navigate(orgPrefix + '/system/organizations')} />
+                        <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} path={orgPrefix + '/system/users'} />
+                        <MenuItem label="Organizace a Subjekty" onClick={() => navigate(orgPrefix + '/system/organizations')} path={orgPrefix + '/system/organizations'} />
                     </MenuSection>
 
                     {/* 2. DOCS */}
                     <MenuSection id="docs" title={t('system.group.docs')} icon={<Document24Regular />} isOpen={expandedSections.has('docs')} onToggle={toggleSection}>
-                        <MenuItem label={t('system.item.db_docs')} onClick={() => navigateToView('schema', 'system.item.db_docs')} />
-                        <MenuItem label={t('system.item.manifest')} onClick={() => navigateToView('doc_viewer', 'system.item.manifest', { doc: 'manifest' })} />
-                        <MenuItem label="UI/UX Standardy" onClick={() => navigateToView('doc_viewer', 'Standardy Formulářů', { doc: 'form_standard' })} />
-                        <MenuItem label={t('system.item.security')} onClick={() => navigateToView('doc_viewer', 'system.item.security', { doc: 'security' })} />
-                        <MenuItem label={t('system.item.history')} onClick={() => navigateToView('history_viewer', 'system.item.history')} />
+                        <MenuItem label={t('system.item.db_docs')} onClick={() => navigateToView('schema', 'system.item.db_docs')} path={orgPrefix + '/system?view=schema'} />
+                        <MenuItem label={t('system.item.manifest')} onClick={() => navigateToView('doc_viewer', 'system.item.manifest', { doc: 'manifest' })} path={orgPrefix + '/system?view=doc_viewer&doc=manifest'} />
+                        <MenuItem label="UI/UX Standardy" onClick={() => navigateToView('doc_viewer', 'Standardy Formulářů', { doc: 'form_standard' })} path={orgPrefix + '/system?view=doc_viewer&doc=form_standard'} />
+                        <MenuItem label={t('system.item.security')} onClick={() => navigateToView('doc_viewer', 'system.item.security', { doc: 'security' })} path={orgPrefix + '/system?view=doc_viewer&doc=security'} />
+                        <MenuItem label={t('system.item.history')} onClick={() => navigateToView('history_viewer', 'system.item.history')} path={orgPrefix + '/system?view=history_viewer'} />
                         <MenuItem label={t('system.item.help')} onClick={() => alert(t('common.working'))} />
                     </MenuSection>
                 </div>
@@ -661,7 +661,7 @@ export const SystemConfig: React.FC = () => {
                 <div className={styles.scrollColumn}>
                     {/* TEST MANAGEMENT */}
                     <MenuSection id="testing" title="Testování (QA)" icon={<Beaker24Regular />} isOpen={expandedSections.has('testing')} onToggle={toggleSection}>
-                        <MenuItem label="Testovací scénáře" onClick={() => navigate(orgPrefix + '/system/testing')} />
+                        <MenuItem label="Testovací scénáře" onClick={() => navigate(orgPrefix + '/system/testing')} path={orgPrefix + '/system/testing'} />
                     </MenuSection>
 
                     {/* 4. REPORTS */}
@@ -674,7 +674,7 @@ export const SystemConfig: React.FC = () => {
                     <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem label="Kvalita kódu & Audit" onClick={() => navigate(orgPrefix + '/system/audit')} />
+                        <MenuItem label="Kvalita kódu & Audit" onClick={() => navigate(orgPrefix + '/system/audit')} path={orgPrefix + '/system/audit'} />
                         <MenuItem label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
                     </MenuSection>
                 </div>
@@ -684,15 +684,15 @@ export const SystemConfig: React.FC = () => {
                     {/* 3. SECURITY */}
                     {/* 3. SECURITY */}
                     <MenuSection id="security" title={t('system.group.security')} icon={<Shield24Regular />} isOpen={expandedSections.has('security')} onToggle={toggleSection}>
-                        <MenuItem label="Správa rolí" onClick={() => navigate(orgPrefix + '/system/security-roles')} />
+                        <MenuItem label="Správa rolí" onClick={() => navigate(orgPrefix + '/system/security-roles')} path={orgPrefix + '/system/security-roles'} />
                     </MenuSection>
 
                     {/* 6. SETTINGS */}
                     {/* 6. SETTINGS */}
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem label={t('system.item.global_params')} onClick={() => navigateToView('parameters', 'system.item.global_params')} />
-                        <MenuItem label="Překlady" onClick={() => navigate(orgPrefix + '/system/translations')} />
-                        <MenuItem label="Inicializace dat (Seeders)" onClick={() => navigateToView('seeders', 'Inicializace dat')} />
+                        <MenuItem label={t('system.item.global_params')} onClick={() => navigateToView('parameters', 'system.item.global_params')} path={orgPrefix + '/system?view=parameters'} />
+                        <MenuItem label="Překlady" onClick={() => navigate(orgPrefix + '/system/translations')} path={orgPrefix + '/system/translations'} />
+                        <MenuItem label="Inicializace dat (Seeders)" onClick={() => navigateToView('seeders', 'Inicializace dat')} path={orgPrefix + '/system?view=seeders'} />
                     </MenuSection>
                 </div>
 

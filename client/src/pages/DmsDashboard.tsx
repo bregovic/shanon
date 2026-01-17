@@ -126,8 +126,8 @@ export const DmsDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="documents" title={t('dms.menu.documents')} icon={<Document24Regular />} isOpen={expandedSections.has('documents')} onToggle={toggleSection}>
-                        <MenuItem label={t('dms.menu.all_documents')} onClick={() => navigate(orgPrefix + '/dms/list')} />
-                        <MenuItem label={t('dms.menu.review')} onClick={() => navigate(orgPrefix + '/dms/review')} />
+                        <MenuItem label={t('dms.menu.all_documents')} onClick={() => navigate(orgPrefix + '/dms/list')} path={orgPrefix + '/dms/list'} />
+                        <MenuItem label={t('dms.menu.review')} onClick={() => navigate(orgPrefix + '/dms/review')} path={orgPrefix + '/dms/review'} />
                         <MenuItem label={t('dms.menu.to_approve')} onClick={() => { }} />
                         <MenuItem label={t('dms.menu.my_drafts')} onClick={() => { }} />
                     </MenuSection>
@@ -152,8 +152,8 @@ export const DmsDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="tasks" title={t('dms.integrations')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
-                        <MenuItem label={t('dms.import_documents')} onClick={() => navigate(orgPrefix + '/dms/import')} />
-                        <MenuItem label={t('dms.google_setup')} onClick={() => navigate(orgPrefix + '/dms/google-setup')} />
+                        <MenuItem label={t('dms.import_documents')} onClick={() => navigate(orgPrefix + '/dms/import')} path={orgPrefix + '/dms/import'} />
+                        <MenuItem label={t('dms.google_setup')} onClick={() => navigate(orgPrefix + '/dms/google-setup')} path={orgPrefix + '/dms/google-setup'} />
                     </MenuSection>
                 </div>
 
@@ -171,7 +171,7 @@ export const DmsDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem label={t('dms.settings.parameters')} onClick={() => navigate(orgPrefix + '/dms/settings')} />
+                        <MenuItem label={t('dms.settings.parameters')} onClick={() => navigate(orgPrefix + '/dms/settings')} path={orgPrefix + '/dms/settings'} />
                     </MenuSection>
                 </div>
 

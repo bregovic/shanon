@@ -26,6 +26,7 @@ import { SettingsProvider } from './context/SettingsContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TranslationProvider } from './context/TranslationContext';
 import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
+import { FavoritesProvider } from './context/FavoritesContext';
 
 const BASE_NAME = import.meta.env.BASE_URL || '/';
 
@@ -172,7 +173,9 @@ function App() {
                 <SettingsProvider>
                     <TranslationProvider>
                         <KeyboardShortcutsProvider>
-                            <RouterProvider router={router} />
+                            <FavoritesProvider>
+                                <RouterProvider router={router} />
+                            </FavoritesProvider>
                         </KeyboardShortcutsProvider>
                     </TranslationProvider>
                 </SettingsProvider>
