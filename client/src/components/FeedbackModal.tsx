@@ -267,12 +267,12 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                     onOptionSelect={(_, d) => handleUpdateStatus(item.id, d.optionValue || 'New')}
                     style={{ minWidth: '130px' }}
                 >
-                    <Option value="New">{t('feedback.status_new')}</Option>
-                    <Option value="Approved">{t('feedback.status_approved')}</Option>
+                    <Option value="New">{t('common.status.new')}</Option>
+                    <Option value="Approved">{t('common.status.approved')}</Option>
                     <Option value="Development">{t('feedback.status_development')}</Option>
                     <Option value="Testing">{t('feedback.status_testing')}</Option>
                     <Option value="Completed">{t('feedback.status_completed')}</Option>
-                    <Option value="Rejected">{t('feedback.status_rejected')}</Option>
+                    <Option value="Rejected">{t('common.status.rejected')}</Option>
                 </Dropdown>
             )
         }),
@@ -394,7 +394,7 @@ export const FeedbackModal = ({ open, onOpenChange, onSuccess }: Omit<FeedbackMo
                     <DialogTitle>
                         <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as any)}>
                             <Tab value="report">{t('feedback.report_bug')}</Tab>
-                            <Tab value="history">{t('feedback.history')}</Tab>
+                            <Tab value="history">{t('system.dev_history')}</Tab>
                             {isAdmin && <Tab value="manage">{t('feedback.manage')}</Tab>}
                         </TabList>
                     </DialogTitle>

@@ -167,10 +167,10 @@ export const DmsDashboard: React.FC = () => {
                         display: 'block',
                         marginBottom: '16px'
                     }}>
-                        {t('system.menu.settings')}
+                        {t('common.settings')}
                     </Text>
 
-                    <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
+                    <MenuSection id="settings" title={t('common.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label={t('dms.settings.parameters')} onClick={() => navigate(orgPrefix + '/dms/settings')} path={orgPrefix + '/dms/settings'} />
                     </MenuSection>
                 </div>

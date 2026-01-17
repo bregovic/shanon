@@ -742,7 +742,7 @@ export const DmsSettings: React.FC = () => {
                                 <Label>Možnosti (Alternativy hodnot)</Label>
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', marginTop: '4px' }}>
                                     <Input
-                                        placeholder={t('dms.attributes.add_option_ph')}
+                                        placeholder={t('dms.attributes.add_option')}
                                         value={newOption}
                                         onChange={(_, data) => setNewOption(data.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') handleAddOption(); }}

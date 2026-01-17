@@ -494,7 +494,7 @@ export const DmsReview: React.FC = () => {
                         disabled={currentIndex === docs.length - 1}
                         onClick={handleNext}
                         icon={<ArrowRight24Regular />}
-                        aria-label={t('dms.review.next')}
+                        aria-label={t('common.next')}
                     />
                 </div>
             </ActionBar>

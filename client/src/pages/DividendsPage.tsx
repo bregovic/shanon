@@ -195,7 +195,7 @@ export const DividendsPage = () => {
             <PageHeader>
                 <Toolbar>
                     <ToolbarButton appearance="subtle" icon={<ArrowSync24Regular />} onClick={loadData}>
-                        {t('refresh') || 'Obnovit'}
+                        {t('common.refresh') || 'Obnovit'}
                     </ToolbarButton>
                 </Toolbar>
             </PageHeader>

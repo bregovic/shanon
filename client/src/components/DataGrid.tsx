@@ -301,7 +301,7 @@ export function DataGrid<T extends { [key: string]: any }>({
                         >
                             <Option value="contains">{t('grid.contains')}</Option>
                             <Option value="is_exactly">{t('grid.equals')}</Option>
-                            <Option value="starts_with">{t('grid.starts_with')}</Option>
+                            <Option value="starts_with">{t('grid.op_starts')}</Option>
                             <Option value="not_contains">{t('grid.not_contains')}</Option>
                             <Option value="is_empty">{t('grid.is_empty')}</Option>
                             <Option value="is_not_empty">{t('grid.is_not_empty')}</Option>

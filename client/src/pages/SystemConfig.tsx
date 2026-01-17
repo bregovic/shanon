@@ -761,7 +761,7 @@ export const SystemConfig: React.FC = () => {
 
                     {/* 6. SETTINGS */}
                     {/* 6. SETTINGS */}
-                    <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
+                    <MenuSection id="settings" title={t('common.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.global_params')} onClick={() => navigateToView('parameters', 'system.item.global_params')} path={orgPrefix + '/system?view=parameters'} />
                         <MenuItem label={t('common.translations')} onClick={() => navigate(orgPrefix + '/system/translations')} path={orgPrefix + '/system/translations'} />
                         <MenuItem label="Inicializace dat (Seeders)" onClick={() => navigateToView('seeders', 'Inicializace dat')} path={orgPrefix + '/system?view=seeders'} />

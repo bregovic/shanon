@@ -236,12 +236,12 @@ export const DmsList: React.FC = () => {
             renderHeaderCell: () => t('common.status'),
             renderCell: (item) => {
                 const map: Record<string, string> = {
-                    'new': t('dms.status.new'),
+                    'new': t('common.status.new'),
                     'processing': t('dms.status.processing'),
                     'review': t('dms.status.review'),
-                    'verified': t('dms.status.verified'),
-                    'approved': t('dms.status.approved'),
-                    'rejected': t('dms.status.rejected')
+                    'verified': t('common.status.approved'),
+                    'approved': t('common.status.approved'),
+                    'rejected': t('common.status.rejected')
                 };
                 const colors: Record<string, 'informative' | 'warning' | 'severe' | 'success' | 'danger'> = {
                     'new': 'informative',
@@ -312,7 +312,7 @@ export const DmsList: React.FC = () => {
                         disabled={selectedIds.size === 0}
                         onClick={handleBatchAnalyze}
                     >
-                        {t('dms.list.btn_ocr')} {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
+                        {t('dms.review.ocr_extract')} {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
                     </Button>
 
                     <Button
@@ -352,7 +352,7 @@ export const DmsList: React.FC = () => {
                             <MenuList>
                                 <MenuItem onClick={() => handleBatchStatusChange('review', 'mapping')}>{t('dms.status.set_mapping')}</MenuItem>
                                 <MenuItem onClick={() => handleBatchStatusChange('verified')}>{t('dms.status.set_verified')}</MenuItem>
-                                <MenuItem onClick={() => handleBatchStatusChange('rejected')}>{t('dms.status.rejected')}</MenuItem>
+                                <MenuItem onClick={() => handleBatchStatusChange('rejected')}>{t('common.status.rejected')}</MenuItem>
                                 <Divider />
                                 <MenuItem onClick={() => handleBatchStatusChange('new', 'pending')}>{t('dms.status.set_new')}</MenuItem>
                             </MenuList>
@@ -433,7 +433,7 @@ export const DmsList: React.FC = () => {
                                             {t('common.open')}
                                         </Button>
                                         <Button icon={<ScanText24Regular />} onClick={() => handleAnalyzeSingle(drawerDoc)}>
-                                            {t('dms.list.btn_ocr')}
+                                            {t('dms.review.ocr_extract')}
                                         </Button>
                                         <Button
                                             appearance="secondary"

@@ -260,7 +260,7 @@ const Layout: React.FC = () => {
                         <Button icon={<QuestionCircle24Regular />} appearance="subtle" onClick={() => openHelp(undefined, location.pathname)} />
                     </Tooltip>
 
-                    <Tooltip content={t('system.menu.settings')} relationship="label">
+                    <Tooltip content={t('common.settings')} relationship="label">
 
                         <Button icon={<Settings24Regular />} appearance="subtle" onClick={() => setSettingsOpen(true)} />
                     </Tooltip>

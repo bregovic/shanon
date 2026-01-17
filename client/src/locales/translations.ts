@@ -41,6 +41,9 @@ export const translations = {
         'common.size': 'Velikost',
         'common.author': 'Autor',
         'common.status': 'Stav',
+        'common.status.new': 'Nový',
+        'common.status.approved': 'Schváleno',
+        'common.status.rejected': 'Zamítnuto',
         'common.id': 'ID',
         'common.active': 'Aktivní',
         'common.inactive': 'Neaktivní',
@@ -106,7 +109,7 @@ export const translations = {
         'dms.list.confirm_delete': 'Opravdu smazat dokument "{{name}}"?',
         'dms.list.confirm_status_change': 'Opravdu změnit stav vybraných dokumentů?',
         'dms.list.ocr_done': 'OCR Dokončeno',
-        'dms.list.btn_ocr': 'Vytěžit (OCR)',
+
         'dms.list.btn_review': 'Revidovat frontu',
         'dms.list.btn_detail': 'Detail / Atributy',
         'dms.list.btn_change_status': 'Změnit stav',
@@ -114,12 +117,10 @@ export const translations = {
         'dms.status.set_mapping': 'Otevřít k mapování (Revize)',
         'dms.status.set_verified': 'Schváleno (Verified)',
         'dms.status.set_new': 'Reset na Nový',
-        'dms.status.new': 'Nový',
+
         'dms.status.processing': 'Zpracovává se',
         'dms.status.review': 'Ke kontrole',
-        'dms.status.verified': 'Schváleno',
-        'dms.status.approved': 'Schváleno',
-        'dms.status.rejected': 'Zamítnuto',
+
 
         'dms.detail.title': 'Detail dokumentu',
         'dms.detail.ocr_data': 'Vytěžená data (OCR)',
@@ -184,7 +185,7 @@ export const translations = {
         // Feedback
         'feedback.title': 'Zpětná vazba',
         'feedback.report_bug': 'Nahlásit chybu',
-        'feedback.history': 'Historie vývoje',
+
         'feedback.manage': 'Správa požadavků',
         'feedback.subject': 'Předmět',
         'feedback.description': 'Popis',
@@ -209,12 +210,7 @@ export const translations = {
         'feedback.col_user': 'Zadal',
         'feedback.col_status': 'Stav',
         'feedback.col_solver': 'Řešitel',
-        'feedback.status_new': 'Nový',
-        'feedback.status_approved': 'Schváleno',
-        'feedback.status_development': 'Vývoj',
-        'feedback.status_testing': 'Testování',
-        'feedback.status_completed': 'Hotovo',
-        'feedback.status_rejected': 'Zamítnuto',
+
         'feedback.alert_conn_error': 'Chyba spojení: ',
         'feedback.alert_status_error': 'Chyba při změně stavu',
         'feedback.alert_priority_error': 'Chyba při změně priority',
@@ -225,7 +221,7 @@ export const translations = {
         'dms.review.save': 'Uložit (Rozpracováno)',
         'dms.review.approve': 'Schválit',
         'dms.review.prev': 'Předchozí',
-        'dms.review.next': 'Další',
+
         'dms.review.skip_tooltip': 'Přeskočit na další',
         'dms.review.select_region': 'Vyberte oblast pro:',
         'dms.review.no_layout': 'Tento typ dokumentu nemá definované žádné atributy.',
@@ -307,7 +303,7 @@ export const translations = {
         'system.menu.reports.desc': 'Systémové přehledy a statistiky',
         'system.menu.tasks': 'Úlohy',
         'system.menu.tasks.desc': 'Dávkové zpracování a periodické úlohy',
-        'system.menu.settings': 'Nastavení',
+
         'system.menu.settings.desc': 'Globální konfigurace aplikace',
 
         'system.group.admin': 'Nástroje administrátora',
@@ -365,7 +361,7 @@ export const translations = {
         'security.select_role': 'Vyberte roli ze seznamu',
         'security.new_role': 'Nová role',
 
-        'security.saving': 'Ukládám...',
+
         'security.saved': 'Role uložena.',
         'security.search': 'Hledat...',
         'security.roles.admin': 'Administrátor',
@@ -408,7 +404,7 @@ export const translations = {
         'grid.sort_desc': 'Seřadit Z až A',
         'grid.contains': 'Obsahuje',
         'grid.equals': 'Je přesně',
-        'grid.starts_with': 'Začíná na',
+
         'grid.not_contains': 'Neobsahuje',
         'grid.is_empty': 'Je prázdné',
         'grid.is_not_empty': 'Není prázdné',
@@ -443,7 +439,7 @@ export const translations = {
         'shared_orgs.group_name': 'Název skupiny',
 
         // Missing / Aliases
-        'refresh': 'Obnovit',
+
         'loading_pnl': 'Načítám P&L analýzu...',
         'pnl_winning': 'Ziskové',
         'dms.attributes.required': 'Povinné',
@@ -454,7 +450,7 @@ export const translations = {
         'dms.settings.no_templates': 'Žádné šablony',
         'dms.attributes.edit': 'Upravit atribut',
         'dms.attributes.new': 'Nový atribut',
-        'dms.attributes.add_option_ph': 'Přidat možnost...',
+
         'common.required_fields': 'Povinná pole',
         'common.confirm_delete': 'Opravdu smazat vybrané záznamy?',
         'users.settings': 'Nastavení uživatelů',
@@ -505,6 +501,9 @@ export const translations = {
         'common.size': 'Size',
         'common.author': 'Author',
         'common.status': 'Status',
+        'common.status.new': 'New',
+        'common.status.approved': 'Approved',
+        'common.status.rejected': 'Rejected',
         'common.id': 'ID',
         'common.active': 'Active',
         'common.inactive': 'Inactive',
@@ -570,7 +569,7 @@ export const translations = {
         'dms.list.confirm_delete': 'Really delete document "{{name}}"?',
         'dms.list.confirm_status_change': 'Really change status of selected documents?',
         'dms.list.ocr_done': 'OCR Completed',
-        'dms.list.btn_ocr': 'Extract (OCR)',
+
         'dms.list.btn_review': 'Review Queue',
         'dms.list.btn_detail': 'Detail / Attributes',
         'dms.list.btn_change_status': 'Change Status',
@@ -578,12 +577,10 @@ export const translations = {
         'dms.status.set_mapping': 'Open for Mapping (Review)',
         'dms.status.set_verified': 'Verified',
         'dms.status.set_new': 'Reset to New',
-        'dms.status.new': 'New',
+
         'dms.status.processing': 'Processing',
         'dms.status.review': 'Review',
-        'dms.status.verified': 'Verified',
-        'dms.status.approved': 'Approved',
-        'dms.status.rejected': 'Rejected',
+
 
         'dms.detail.title': 'Document Detail',
         'dms.detail.ocr_data': 'Extracted Data (OCR)',
@@ -648,7 +645,7 @@ export const translations = {
         // Feedback
         'feedback.title': 'Feedback',
         'feedback.report_bug': 'Report Bug',
-        'feedback.history': 'Development History',
+
         'feedback.manage': 'Manage Requests',
         'feedback.subject': 'Subject',
         'feedback.description': 'Description',
@@ -673,12 +670,7 @@ export const translations = {
         'feedback.col_user': 'Reporter',
         'feedback.col_status': 'Status',
         'feedback.col_solver': 'Assignee',
-        'feedback.status_new': 'New',
-        'feedback.status_approved': 'Approved',
-        'feedback.status_development': 'Development',
-        'feedback.status_testing': 'Testing',
-        'feedback.status_completed': 'Completed',
-        'feedback.status_rejected': 'Rejected',
+
         'feedback.alert_conn_error': 'Connection error: ',
         'feedback.alert_status_error': 'Error updating status',
         'feedback.alert_priority_error': 'Error updating priority',
@@ -689,7 +681,7 @@ export const translations = {
         'dms.review.save': 'Save (Draft)',
         'dms.review.approve': 'Approve',
         'dms.review.prev': 'Previous',
-        'dms.review.next': 'Next',
+
         'dms.review.skip_tooltip': 'Skip to next',
         'dms.review.select_region': 'Select region for:',
         'dms.review.no_layout': 'This document type has no attributes defined.',
@@ -771,7 +763,7 @@ export const translations = {
         'system.menu.reports.desc': 'System overviews and statistics',
         'system.menu.tasks': 'Tasks',
         'system.menu.tasks.desc': 'Batch processing and periodic tasks',
-        'system.menu.settings': 'Settings',
+
         'system.menu.settings.desc': 'Global application configuration',
 
         'system.group.admin': 'Admin Tools',
@@ -835,7 +827,7 @@ export const translations = {
         'security.select_role': 'Select a role',
         'security.new_role': 'New role code',
 
-        'security.saving': 'Saving...',
+
         'security.saved': 'Permissions saved',
         'security.search': 'Search objects...',
         'security.access.none': 'None',
@@ -901,7 +893,7 @@ export const translations = {
         'grid.sort_desc': 'Sort Z to A',
         'grid.contains': 'Contains',
         'grid.equals': 'Equals',
-        'grid.starts_with': 'Starts with',
+
         'grid.not_contains': 'Does not contain',
         'grid.is_empty': 'Is empty',
         'grid.is_not_empty': 'Is not empty',
@@ -1001,7 +993,7 @@ export const translations = {
         'shared_orgs.group_name': 'Group Name',
 
         // Missing / Aliases
-        'refresh': 'Refresh',
+
         'loading_pnl': 'Loading P&L analysis...',
         'pnl_winning': 'Winning',
         'dms.attributes.required': 'Required',
@@ -1012,7 +1004,7 @@ export const translations = {
         'dms.settings.no_templates': 'No templates',
         'dms.attributes.edit': 'Edit Attribute',
         'dms.attributes.new': 'New Attribute',
-        'dms.attributes.add_option_ph': 'Add option...',
+
         'common.required_fields': 'Required fields',
         'common.confirm_delete': 'Really delete selected items?',
         'users.settings': 'User Settings',
