@@ -26,7 +26,8 @@ import {
     DocumentData24Regular,
     ClipboardTextEdit24Regular,
     BuildingBank24Regular,
-    Checkmark24Regular
+    Checkmark24Regular,
+    QuestionCircle24Regular
 } from '@fluentui/react-icons';
 import { SettingsDialog } from './SettingsDialog';
 import { FeedbackModal } from './FeedbackModal';
@@ -253,6 +254,10 @@ const Layout: React.FC = () => {
 
                     <Tooltip content={t('layout.fast_request')} relationship="label">
                         <Button icon={<Emoji24Regular />} appearance="subtle" onClick={() => setFeedbackOpen(true)} />
+                    </Tooltip>
+
+                    <Tooltip content={t('system.item.help')} relationship="label">
+                        <Button icon={<QuestionCircle24Regular />} appearance="subtle" onClick={() => openHelp()} />
                     </Tooltip>
 
                     <Tooltip content={t('system.menu.settings')} relationship="label">
