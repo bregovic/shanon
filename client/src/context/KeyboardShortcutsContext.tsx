@@ -5,12 +5,12 @@ import React, { createContext, useContext, useEffect, useCallback, useRef } from
  * 
  * Standard shortcuts:
  * - Esc: Go back / Close modal
- * - Enter: Confirm / Submit (when focus is not in textarea)
- * - Shift+N: New record
- * - Shift+D: Delete selected
- * - Shift+R: Refresh
- * - Shift+S: Save
- * - Shift+F: Toggle filters (Funkce)
+ * - Enter: Confirm (context sensitive)
+ * - Ctrl+S / Alt+S / Ctrl+Enter: Save
+ * - Alt+N: New record
+ * - Alt+D: Delete selected
+ * - Alt+R: Refresh
+ * - Alt+F: Toggle filters
  */
 
 export type ShortcutId =
@@ -44,42 +44,44 @@ export const KeyboardShortcutsProvider: React.FC<{ children: React.ReactNode }> 
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if modifier keys are strictly Ctrl (excluding Enter/S) or Meta
+            // We want to allow Alt
+
             const target = e.target as HTMLElement;
             const isInInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-            // Escape - always works (close modals, go back)
+            // 1. Escape - Global
             if (e.key === 'Escape') {
                 const handler = handlersRef.current.get('escape');
-                if (handler) {
-                    e.preventDefault();
-                    handler();
-                }
-                return;
+                if (handler) { e.preventDefault(); handler(); return; }
             }
 
-            // Don't process other shortcuts when typing in inputs
-            if (isInInput && !e.shiftKey) return;
-
-            // Enter - confirm (only if not in textarea)
-            if (e.key === 'Enter' && !e.shiftKey && target.tagName !== 'TEXTAREA') {
-                const handler = handlersRef.current.get('enter');
-                if (handler) {
-                    e.preventDefault();
-                    handler();
-                }
-                return;
+            // 2. Save (Ctrl+S or Alt+S) - Global
+            if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') || (e.altKey && e.key.toLowerCase() === 's')) {
+                const handler = handlersRef.current.get('save');
+                if (handler) { e.preventDefault(); handler(); return; }
             }
 
-            // Shift + Key combinations
-            if (e.shiftKey) {
+            // 3. Confirm (Ctrl+Enter) - Global (e.g. submit form from textarea)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                // Try 'save' first (often same action), then 'enter'
+                const saveHandler = handlersRef.current.get('save');
+                if (saveHandler) { e.preventDefault(); saveHandler(); return; }
+
+                const enterHandler = handlersRef.current.get('enter');
+                if (enterHandler) { e.preventDefault(); enterHandler(); return; }
+            }
+
+            // 4. Alt Shortcuts (Navigation/Actions)
+            // ONLY when NOT in input mode (to avoid conflicts with typing)
+            // Exclude Ctrl to avoid AltGr conflicts (AltGr = Ctrl+Alt)
+            if (!isInInput && e.altKey && !e.ctrlKey) {
                 let shortcutId: ShortcutId | null = null;
-
-                switch (e.key.toUpperCase()) {
-                    case 'N': shortcutId = 'new'; break;
-                    case 'D': shortcutId = 'delete'; break;
-                    case 'R': shortcutId = 'refresh'; break;
-                    case 'S': shortcutId = 'save'; break;
-                    case 'F': shortcutId = 'toggleFilters'; break;
+                switch (e.key.toLowerCase()) {
+                    case 'n': shortcutId = 'new'; break;
+                    case 'd': shortcutId = 'delete'; break;
+                    case 'r': shortcutId = 'refresh'; break;
+                    case 'f': shortcutId = 'toggleFilters'; break;
                 }
 
                 if (shortcutId) {
@@ -87,7 +89,25 @@ export const KeyboardShortcutsProvider: React.FC<{ children: React.ReactNode }> 
                     if (handler) {
                         e.preventDefault();
                         handler();
+                        return;
                     }
+                }
+            }
+
+            // 5. Context-sensitive single keys (Only when NOT in input)
+            if (!isInInput && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                // Enter
+                if (e.key === 'Enter') {
+                    const handler = handlersRef.current.get('enter');
+                    if (handler) { e.preventDefault(); handler(); return; }
+                }
+
+                // F-Keys
+                if (e.key === 'F2') {
+                    // Rename/Edit logic could go here
+                }
+                if (e.key === 'F9') {
+                    // Run logic could go here
                 }
             }
         };

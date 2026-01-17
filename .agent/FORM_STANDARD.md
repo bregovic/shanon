@@ -111,24 +111,32 @@ We follow the **Microsoft Fluent UI (Investyx/D365)** aesthetic.
 ## 7. Keyboard Shortcuts Standard (CRITICAL)
 **Every page MUST implement standard keyboard shortcuts for accessibility and power users.**
 
-### Global Shortcuts
+### Editing Mode Behavior
+- **When user is typing in `<input>` or `<textarea>`:**
+  - Only `Esc` and `Ctrl+S` / `Ctrl+Enter` are active.
+  - All other shortcuts (`Alt+N`, `Alt+R`, etc.) are IGNORED to prevent conflicts with typing.
+  - `Tab` jumps to the next form field (native browser behavior - do NOT block it).
+
+### Global Shortcuts (Always Active)
 | Shortcut | Action | Notes |
 |----------|--------|-------|
-| `Esc` | Go back / Close modal | Always works, even in inputs |
-| `Shift+R` | Refresh data | Calls current page's refresh function |
+| `Esc` | Go back / Close modal | Works everywhere, even in inputs |
+| `Ctrl+S` / `Alt+S` | Save | Works everywhere, prevents browser "Save Page" |
+| `Ctrl+Enter` | Submit / Save | Works in textareas to submit |
 
-### Grid/List View Shortcuts
+### Grid/List View Shortcuts (Only when NOT in input)
 | Shortcut | Action | Hook Usage |
 |----------|--------|------------|
-| `Shift+N` | New record | `useKeyboardShortcut('new', () => setAddOpen(true))` |
-| `Shift+D` | Delete selected | `useKeyboardShortcut('delete', handleDelete)` |
-| `Shift+F` | Toggle filters (Funkce) | `useKeyboardShortcut('toggleFilters', () => setFiltersOpen(!open))` |
+| `Alt+N` | New record | `useKeyboardShortcut('new', () => setAddOpen(true))` |
+| `Alt+D` | Delete selected | `useKeyboardShortcut('delete', handleDelete)` |
+| `Alt+R` | Refresh data | `useKeyboardShortcut('refresh', () => loadData())` |
+| `Alt+F` | Toggle filters (Funkce) | `useKeyboardShortcut('toggleFilters', () => setFiltersOpen(!open))` |
+| `Enter` | Open selected item | `useKeyboardShortcut('enter', handleOpen)` |
 
 ### Form/Detail View Shortcuts
 | Shortcut | Action | Hook Usage |
 |----------|--------|------------|
-| `Enter` | Confirm / Submit | `useKeyboardShortcut('enter', handleSubmit)` |
-| `Shift+S` | Save | `useKeyboardShortcut('save', handleSave)` |
+| `Ctrl+S` | Save | `useKeyboardShortcut('save', handleSave)` |
 | `Esc` | Cancel / Go back | `useKeyboardShortcut('escape', () => navigate(-1))` |
 
 ### Implementation Example
@@ -145,7 +153,8 @@ const MyGridPage = () => {
 ```
 
 ### Key Rules:
-1. **Shortcuts** are blocked when typing in `<input>` or `<textarea>` (except Esc).
-2. **Enter** is blocked in `<textarea>` to allow multiline.
-3. **Unregistration** is automatic via hook cleanup.
-4. **Handlers** MUST be stable (use useCallback or inline with correct deps).
+1. **Input Mode:** When focused on input/textarea, only Esc and Ctrl+S are processed.
+2. **Tab:** Never block Tab - it must work natively for form navigation.
+3. **Alt Key:** Chosen to avoid Ctrl conflicts (browser shortcuts) and Shift conflicts (uppercase typing).
+4. **AltGr Exclusion:** `Alt+Key` shortcuts check `!e.ctrlKey` to avoid AltGr (Right Alt = Ctrl+Alt) conflicts on Czech keyboards.
+5. **Handlers** MUST be stable (use useCallback or inline with correct deps).
