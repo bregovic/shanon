@@ -274,11 +274,17 @@ export const DmsReview: React.FC = () => {
                 // status 'mapping' means no template matched / needs manual extraction
                 // status 'done'/'completed' means OCR finished but needs verification
                 const toReview = all.filter((d: DmsDocument) =>
+                    d.status === 'new' || // Include newly uploaded files
                     d.ocr_status === 'done' ||
                     d.ocr_status === 'completed' ||
                     d.ocr_status === 'mapping' ||
                     (d.status !== 'verified' && d.ocr_status !== 'pending' && d.ocr_status !== 'processing')
-                );
+                ).sort((a: DmsDocument, b: DmsDocument) => {
+                    // Prioritize NEW documents, then MAPPING
+                    if (a.status === 'new' && b.status !== 'new') return -1;
+                    if (a.status !== 'new' && b.status === 'new') return 1;
+                    return 0;
+                });
 
                 // Check for start ID in URL
                 const params = new URLSearchParams(window.location.search);
