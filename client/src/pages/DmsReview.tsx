@@ -11,7 +11,8 @@ import {
     ProgressBar,
     Badge,
     Dropdown,
-    Option
+    Option,
+    Title3
 } from "@fluentui/react-components";
 import { useNavigate } from 'react-router-dom';
 import {
@@ -24,7 +25,8 @@ import {
 } from "@fluentui/react-icons";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
-import { PageLayout, PageHeader, PageContent } from "../components/PageLayout";
+import { PageLayout, PageContent } from "../components/PageLayout";
+import { ActionBar } from "../components/ActionBar";
 
 const useStyles = makeStyles({
     container: {
@@ -448,53 +450,56 @@ export const DmsReview: React.FC = () => {
 
     if (!currentDoc) {
         return (
-            <PageLayout>
-                <PageHeader>
-                    <Text size={500} weight="semibold">{t('dms.review.title')}</Text>
-                </PageHeader>
-                <PageContent>
-                    <div style={{ textAlign: 'center', marginTop: '100px', opacity: 0.6 }}>
-                        <Checkmark24Regular style={{ fontSize: '48px', color: 'green' }} />
-                        <Text size={500} block>{t('dms.review.all_done')}</Text>
-                        <Text>{t('dms.review.no_docs')}</Text>
-                    </div>
-                </PageContent>
-            </PageLayout>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <ActionBar>
+                    <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms/list')}>
+                        {t('common.back')}
+                    </Button>
+                    <div style={{ width: '24px' }} />
+                    <Title3>{t('dms.review.title')}</Title3>
+                </ActionBar>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.6, paddingBottom: '100px' }}>
+                    <Checkmark24Regular style={{ fontSize: '64px', color: tokens.colorPaletteGreenForeground1, marginBottom: '24px' }} />
+                    <Text size={400} weight="semibold" block>{t('dms.review.all_done')}</Text>
+                    <Text>{t('dms.review.no_docs')}</Text>
+                </div>
+            </div>
         );
     }
 
-
-
     return (
-        <PageLayout>
-            <PageHeader>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <Text weight="semibold">{t('dms.review.title')}</Text>
-                        <Badge appearance="tint">{currentIndex + 1} / {docs.length}</Badge>
-                    </div>
-                    <div>
-                        <Button
-                            appearance="subtle"
-                            disabled={currentIndex === 0}
-                            onClick={handlePrev}
-                            icon={<ArrowLeft24Regular />}
-                        >
-                            {t('dms.review.prev')}
-                        </Button>
-                        <Button
-                            appearance="subtle"
-                            disabled={currentIndex === docs.length - 1}
-                            onClick={handleNext}
-                            icon={<ArrowRight24Regular />}
-                            iconPosition="after"
-                        >
-                            {t('dms.review.next')}
-                        </Button>
-                    </div>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <ActionBar>
+                <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms/list')}>
+                    {t('common.back')}
+                </Button>
+
+                <div style={{ width: '16px' }} />
+                <Title3>{t('dms.review.title')}</Title3>
+
+                <div style={{ flex: 1 }} />
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Badge appearance="tint">{currentIndex + 1} / {docs.length}</Badge>
+                    <div style={{ width: '1px', height: '20px', backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+                    <Button
+                        appearance="subtle"
+                        disabled={currentIndex === 0}
+                        onClick={handlePrev}
+                        icon={<ArrowLeft24Regular />}
+                        aria-label={t('dms.review.prev')}
+                    />
+                    <Button
+                        appearance="subtle"
+                        disabled={currentIndex === docs.length - 1}
+                        onClick={handleNext}
+                        icon={<ArrowRight24Regular />}
+                        aria-label={t('dms.review.next')}
+                    />
                 </div>
-            </PageHeader>
-            <PageContent>
+            </ActionBar>
+
+            <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
                 <div className={styles.container}>
                     {/* LEFT SIDEBAR: ATTRIBUTES */}
                     <div className={styles.sidebar}>
@@ -718,7 +723,7 @@ export const DmsReview: React.FC = () => {
                         )}
                     </div>
                 </div>
-            </PageContent>
-        </PageLayout>
+            </div>
+        </div>
     );
 };
