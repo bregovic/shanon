@@ -52,9 +52,9 @@ if (isset($_GET['code'])) {
     ], 0); // compact json
 
     // Redirect back to React App
-    // We assume the React app is at root / (or /dms/google-setup)
-    // We can use the Referer or hardcode? Best is to redirect to the known setup page.
-    $redirectBack = '/dms/google-setup?result=' . urlencode($finalJson);
+    // Include Org ID and Module Prefix
+    $orgId = $_SESSION['current_org_id'] ?? 'VACKR';
+    $redirectBack = '/' . $orgId . '/dms/google-setup?result=' . urlencode($finalJson);
     header("Location: " . $redirectBack);
     exit;
 }

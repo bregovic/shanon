@@ -84,16 +84,17 @@ const OrgGuard = () => {
 };
 
 // Redirect Helper for non-prefixed routes
-const ContextRedirect = () => {
+const ContextRedirect = ({ prefix }: { prefix?: string }) => {
     const { currentOrgId, isLoading } = useAuth();
     const navigate = useNavigate();
     const { "*": splat } = useParams();
 
     useEffect(() => {
         if (!isLoading) {
-            navigate(`/${currentOrgId || 'VACKR'}/${splat}`, { replace: true });
+            const targetPath = prefix ? `${prefix}/${splat}` : splat;
+            navigate(`/${currentOrgId || 'VACKR'}/${targetPath}`, { replace: true });
         }
-    }, [currentOrgId, isLoading, navigate, splat]);
+    }, [currentOrgId, isLoading, navigate, splat, prefix]);
 
     if (isLoading) return <div>Redirecting...</div>;
     return null;
@@ -149,17 +150,17 @@ const router = createBrowserRouter([
     {
         path: "/dms/*",
         element: <RequireAuth />,
-        children: [{ path: "*", element: <ContextRedirect /> }]
+        children: [{ path: "*", element: <ContextRedirect prefix="dms" /> }]
     },
     {
         path: "/system/*",
         element: <RequireAuth />,
-        children: [{ path: "*", element: <ContextRedirect /> }]
+        children: [{ path: "*", element: <ContextRedirect prefix="system" /> }]
     },
     {
         path: "/requests/*",
         element: <RequireAuth />,
-        children: [{ path: "*", element: <ContextRedirect /> }]
+        children: [{ path: "*", element: <ContextRedirect prefix="requests" /> }]
     }
 ], { basename: BASE_NAME });
 
