@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, type SyntheticEvent } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, type SyntheticEvent } from 'react';
 import {
     Button,
     Breadcrumb,
@@ -20,7 +20,13 @@ import {
     Switch,
     Spinner,
     MessageBar,
-    MessageBarBody
+    MessageBarBody,
+    Menu,
+    MenuTrigger,
+    MenuList,
+    MenuItem,
+    MenuPopover,
+    tokens
 } from '@fluentui/react-components';
 import type { TableColumnDefinition, OnSelectionChangeData, SelectionItemId } from '@fluentui/react-components';
 import {
@@ -31,7 +37,9 @@ import {
     Dismiss24Regular,
     Save24Regular,
     Settings24Regular,
-    BuildingBank24Regular
+    BuildingBank24Regular,
+    ChevronDown24Regular,
+    Edit24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
@@ -40,6 +48,7 @@ import { useTranslation } from '../context/TranslationContext';
 import { ActionBar } from '../components/ActionBar';
 import { useAuth } from '../context/AuthContext';
 import { UserSettingsDialog, UserAccessDrawer } from '../components/UserSecurityDialogs';
+import { useKeyboardShortcut } from '../context/KeyboardShortcutsContext';
 
 const API_BASE = import.meta.env.DEV
     ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
@@ -126,6 +135,15 @@ export const UsersAdmin: React.FC = () => {
         setError(null);
         setIsDrawerOpen(true);
     };
+
+    // --- Keyboard Shortcuts ---
+    const handleRefresh = useCallback(() => fetchData(), []);
+    useKeyboardShortcut('new', () => handleOpenCreate(), []);
+    useKeyboardShortcut('refresh', handleRefresh, []);
+    useKeyboardShortcut('escape', () => {
+        if (isDrawerOpen) setIsDrawerOpen(false);
+        else navigate(`${orgPrefix}/system`);
+    }, [isDrawerOpen, orgPrefix]);
 
     const handleOpenEdit = (user: User) => {
         setFormData({
@@ -322,41 +340,71 @@ export const UsersAdmin: React.FC = () => {
             </PageHeader>
 
             <ActionBar>
-                <Button appearance="primary" icon={<Add24Regular />} onClick={handleOpenCreate}>
-                    {t('common.new') || 'Nový'}
-                </Button>
+                {/* Akce Menu (Primary) */}
+                <Menu>
+                    <MenuTrigger>
+                        <Button appearance="primary" icon={<ChevronDown24Regular />} iconPosition="after">
+                            {t('common.actions') || 'Akce'}
+                        </Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                        <MenuList>
+                            <MenuItem icon={<Add24Regular />} onClick={handleOpenCreate}>
+                                {t('common.new') || 'Nový'}
+                            </MenuItem>
+                            <MenuItem
+                                icon={<Edit24Regular />}
+                                disabled={selectedIds.size !== 1}
+                                onClick={() => {
+                                    const user = users.find(u => selectedIds.has(u.rec_id));
+                                    if (user) handleOpenEdit(user);
+                                }}
+                            >
+                                {t('common.edit') || 'Upravit'}
+                            </MenuItem>
+                            <MenuItem
+                                icon={<Delete24Regular />}
+                                disabled={selectedIds.size === 0}
+                                onClick={handleDelete}
+                            >
+                                {t('common.delete') || 'Smazat'} {selectedIds.size > 0 && `(${selectedIds.size})`}
+                            </MenuItem>
+                        </MenuList>
+                    </MenuPopover>
+                </Menu>
 
-                <Divider vertical style={{ height: 20, margin: '0 10px' }} />
+                {/* Divider */}
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
 
+                {/* Refresh (icon-only) */}
+                <Button
+                    appearance="subtle"
+                    icon={<ArrowClockwise24Regular />}
+                    onClick={fetchData}
+                    title={t('common.refresh') || 'Obnovit'}
+                />
+
+                {/* Divider */}
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+
+                {/* Context Buttons */}
                 <Button
                     appearance="subtle"
                     icon={<Settings24Regular />}
                     disabled={selectedIds.size !== 1}
                     onClick={handleOpenSettings}
+                    title={t('users.settings') || 'Nastavení'}
                 >
-                    Nastavení
+                    {t('users.settings') || 'Nastavení'}
                 </Button>
                 <Button
                     appearance="subtle"
                     icon={<BuildingBank24Regular />}
                     disabled={selectedIds.size !== 1}
                     onClick={handleOpenSecurity}
+                    title={t('users.organizations') || 'Organizace'}
                 >
-                    Organizace
-                </Button>
-
-                <Divider vertical style={{ height: 20, margin: '0 10px' }} />
-
-                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData}>
-                    {t('common.refresh') || 'Obnovit'}
-                </Button>
-                <Button
-                    appearance="subtle"
-                    icon={<Delete24Regular />}
-                    disabled={selectedIds.size === 0}
-                    onClick={handleDelete}
-                >
-                    {t('common.delete') || 'Smazat'} {selectedIds.size > 0 && `(${selectedIds.size})`}
+                    {t('users.organizations') || 'Organizace'}
                 </Button>
             </ActionBar>
 
