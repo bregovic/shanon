@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSettings } from './SettingsContext';
 
 type TranslationContextType = {
-    t: (key: string) => string;
+    t: (key: string, options?: string | Record<string, any>) => string;
     isLoading: boolean;
 };
 
@@ -53,8 +53,25 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         loadTranslations();
     }, [language]);
 
-    const t = (key: string) => {
-        return translations[key] || key;
+    const t = (key: string, options?: string | Record<string, any>) => {
+        let text = translations[key];
+
+        // Handle default value if provided as 2nd arg string
+        if (typeof options === 'string') {
+            if (!text) return options;
+        }
+
+        // Fallback to key if no translation
+        if (!text) return options && typeof options === 'string' ? options : key;
+
+        // Handle interpolation if 2nd arg is object
+        if (options && typeof options === 'object') {
+            Object.entries(options).forEach(([k, v]) => {
+                text = text.replace(`{{${k}}}`, String(v));
+            });
+        }
+
+        return text;
     };
 
     return (

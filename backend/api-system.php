@@ -62,8 +62,15 @@ try {
     }
 
     if ($action === 'run_seeders') {
-        if (!$currentOrgId) throw new Exception("Musíte být v kontextu organizace.");
         $input = json_decode(file_get_contents('php://input'), true);
+        
+        // Allow Client to provide context if session is missing
+        if (!$currentOrgId && !empty($input['org_id'])) {
+            $currentOrgId = $input['org_id'];
+        }
+
+        if (!$currentOrgId) throw new Exception("Musíte být v kontextu organizace.");
+        
         $ids = $input['ids'] ?? [];
         
         $seeder = new DataSeeder($pdo, $tenantId, $currentOrgId);

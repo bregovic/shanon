@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../context/TranslationContext';
 import { PageLayout, PageContent, PageHeader } from '../components/PageLayout';
 import {
     Button,
@@ -81,13 +81,13 @@ interface Attribute {
 }
 
 const STORAGE_TYPES = [
-    { value: 'local', label: 'Lokální úložiště' },
-    { value: 'ftp', label: 'FTP Server' },
-    { value: 'sftp', label: 'SFTP Server' },
-    { value: 'google_drive', label: 'Google Drive' },
-    { value: 'sharepoint', label: 'SharePoint' },
-    { value: 's3', label: 'Amazon S3' },
-    { value: 'azure_blob', label: 'Azure Blob Storage' }
+    { value: 'local', label: 'dms.storage.types.local' },
+    { value: 'ftp', label: 'dms.storage.types.ftp' },
+    { value: 'sftp', label: 'dms.storage.types.sftp' },
+    { value: 'google_drive', label: 'dms.storage.types.google_drive' },
+    { value: 'sharepoint', label: 'dms.storage.types.sharepoint' },
+    { value: 's3', label: 'dms.storage.types.s3' },
+    { value: 'azure_blob', label: 'dms.storage.types.azure_blob' }
 ];
 
 export const DmsSettings: React.FC = () => {
@@ -195,7 +195,7 @@ export const DmsSettings: React.FC = () => {
     };
 
     const handleDeleteAttribute = async (attr: Attribute) => {
-        if (!confirm(`Opravdu smazat atribut "${attr.name}"?`)) return;
+        if (!confirm(t('common.delete') + ' ' + attr.name + '?')) return;
         try {
             await fetch('/api/api-dms.php?action=attribute_delete', {
                 method: 'POST',
@@ -207,7 +207,7 @@ export const DmsSettings: React.FC = () => {
             const json = await res.json();
             if (json.success) setAttributes(json.data);
         } catch (e) {
-            alert('Chyba při mazání');
+            alert(t('error.delete'));
         }
     };
 
@@ -245,7 +245,7 @@ export const DmsSettings: React.FC = () => {
             if (json.success) setAttributes(json.data);
         } catch (e) {
             console.error(e);
-            alert('Chyba při ukládání atributu');
+            alert(t('error.save'));
         }
     };
 
@@ -289,7 +289,7 @@ export const DmsSettings: React.FC = () => {
             if (json.success) setDocTypes(json.data);
         } catch (e) {
             console.error(e);
-            alert('Chyba při ukládání typu dokumentu');
+            alert(t('error.save'));
         }
     };
 
@@ -344,12 +344,12 @@ export const DmsSettings: React.FC = () => {
             }
         } catch (e) {
             console.error(e);
-            alert('Chyba při ukládání úložiště: ' + String(e));
+            alert(t('error.save') + ': ' + String(e));
         }
     };
 
     const handleDeleteStorageProfile = async (sp: StorageProfile) => {
-        if (!confirm(`Opravdu smazat úložiště "${sp.name}"?`)) return;
+        if (!confirm(`${t('common.delete')} "${sp.name}"?`)) return;
         try {
             const res = await fetch('/api/api-dms.php?action=storage_profile_delete', {
                 method: 'POST',
@@ -367,7 +367,7 @@ export const DmsSettings: React.FC = () => {
             }
         } catch (e) {
             console.error(e);
-            alert('Chyba při mazání');
+            alert(t('error.delete'));
         }
     };
 
@@ -392,7 +392,7 @@ export const DmsSettings: React.FC = () => {
             }
         } catch (e) {
             console.error(e);
-            alert('Chyba při testování připojení');
+            alert(t('common.network_error'));
         }
     };
 
@@ -433,28 +433,28 @@ export const DmsSettings: React.FC = () => {
         createTableColumn<DocType>({
             columnId: 'code',
             compare: (a, b) => a.code.localeCompare(b.code),
-            renderHeaderCell: () => 'Kód',
+            renderHeaderCell: () => t('common.code'),
             renderCell: (item) => <Text weight="semibold">{item.code}</Text>
         }),
         createTableColumn<DocType>({
             columnId: 'name',
             compare: (a, b) => a.name.localeCompare(b.name),
-            renderHeaderCell: () => 'Název',
+            renderHeaderCell: () => t('common.name'),
             renderCell: (item) => <Text>{item.name}</Text>
         }),
         createTableColumn<DocType>({
             columnId: 'status',
             compare: (a, b) => (a.is_active ? 1 : 0) - (b.is_active ? 1 : 0),
-            renderHeaderCell: () => 'Stav',
+            renderHeaderCell: () => t('common.status'),
             renderCell: (item) => (
                 <Badge appearance="tint" color={item.is_active ? 'success' : 'danger'}>
-                    {item.is_active ? 'Aktivní' : 'Neaktivní'}
+                    {item.is_active ? t('common.active') : t('common.inactive')}
                 </Badge>
             )
         }),
         createTableColumn<DocType>({
             columnId: 'actions',
-            renderHeaderCell: () => 'Akce',
+            renderHeaderCell: () => t('common.actions'),
             renderCell: (item) => (
                 <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openDocTypeDialog(item)} />
             )
@@ -465,44 +465,44 @@ export const DmsSettings: React.FC = () => {
         createTableColumn<StorageProfile>({
             columnId: 'name',
             compare: (a, b) => a.name.localeCompare(b.name),
-            renderHeaderCell: () => 'Název',
+            renderHeaderCell: () => t('common.name'),
             renderCell: (item) => <Text weight="semibold">{item.name}</Text>
         }),
         createTableColumn<StorageProfile>({
             columnId: 'type',
             compare: (a, b) => a.storage_type.localeCompare(b.storage_type),
-            renderHeaderCell: () => 'Typ',
+            renderHeaderCell: () => t('common.type'),
             renderCell: (item) => (
-                <Text>{STORAGE_TYPES.find(t => t.value === item.storage_type)?.label || item.storage_type}</Text>
+                <Text>{t(STORAGE_TYPES.find(t => t.value === item.storage_type)?.label || item.storage_type)}</Text>
             )
         }),
         createTableColumn<StorageProfile>({
             columnId: 'path',
             compare: (a, b) => (a.base_path || '').localeCompare(b.base_path || ''),
-            renderHeaderCell: () => 'Cesta / IDFolder',
+            renderHeaderCell: () => t('dms.storage.path'),
             renderCell: (item) => <Text>{item.base_path || '-'}</Text>
         }),
         createTableColumn<StorageProfile>({
             columnId: 'default',
             compare: (a, b) => (a.is_default ? 1 : 0) - (b.is_default ? 1 : 0),
-            renderHeaderCell: () => 'Výchozí',
+            renderHeaderCell: () => t('dms.storage.is_default'),
             renderCell: (item) => (
-                item.is_default && <Badge appearance="tint" color="brand">Výchozí</Badge>
+                item.is_default && <Badge appearance="tint" color="brand">{t('dms.storage.is_default')}</Badge>
             )
         }),
         createTableColumn<StorageProfile>({
             columnId: 'status',
             compare: (a, b) => (a.is_active ? 1 : 0) - (b.is_active ? 1 : 0),
-            renderHeaderCell: () => 'Stav',
+            renderHeaderCell: () => t('common.status'),
             renderCell: (item) => (
                 <Badge appearance="tint" color={item.is_active ? 'success' : 'danger'}>
-                    {item.is_active ? 'Aktivní' : 'Neaktivní'}
+                    {item.is_active ? t('common.active') : t('common.inactive')}
                 </Badge>
             )
         }),
         createTableColumn<StorageProfile>({
             columnId: 'actions',
-            renderHeaderCell: () => 'Akce',
+            renderHeaderCell: () => t('common.actions'),
             renderCell: (item) => (
                 <div style={{ display: 'flex', gap: '4px' }}>
                     <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openStorageDialog(item)} />
@@ -522,36 +522,36 @@ export const DmsSettings: React.FC = () => {
         createTableColumn<Attribute>({
             columnId: 'name',
             compare: (a, b) => a.name.localeCompare(b.name),
-            renderHeaderCell: () => 'Název',
+            renderHeaderCell: () => t('common.name'),
             renderCell: (item) => <Text weight="semibold">{item.code ? t(`attribute.${item.code}`, item.name) : item.name}</Text>
         }),
         createTableColumn<Attribute>({
             columnId: 'data_type',
             compare: (a, b) => a.data_type.localeCompare(b.data_type),
-            renderHeaderCell: () => 'Typ dat',
+            renderHeaderCell: () => t('dms.attributes.data_type'),
             renderCell: (item) => <Badge appearance="tint">{item.data_type}</Badge>
         }),
         createTableColumn<Attribute>({
             columnId: 'required',
             compare: (a, b) => (a.is_required ? 1 : 0) - (b.is_required ? 1 : 0),
-            renderHeaderCell: () => 'Povinný',
-            renderCell: (item) => <Text>{item.is_required ? 'Ano' : 'Ne'}</Text>
+            renderHeaderCell: () => t('dms.attributes.required'),
+            renderCell: (item) => <Text>{item.is_required ? t('common.yes') : t('common.no')}</Text>
         }),
         createTableColumn<Attribute>({
             columnId: 'searchable',
             compare: (a, b) => (a.is_searchable ? 1 : 0) - (b.is_searchable ? 1 : 0),
-            renderHeaderCell: () => 'Vyhledávatelný',
-            renderCell: (item) => <Text>{item.is_searchable ? 'Ano' : 'Ne'}</Text>
+            renderHeaderCell: () => t('dms.attributes.searchable'),
+            renderCell: (item) => <Text>{item.is_searchable ? t('common.yes') : t('common.no')}</Text>
         }),
         createTableColumn<Attribute>({
             columnId: 'default',
             compare: (a, b) => (a.default_value || '').localeCompare(b.default_value || ''),
-            renderHeaderCell: () => 'Výchozí hodnota',
+            renderHeaderCell: () => t('dms.attributes.default_val'),
             renderCell: (item) => <Text>{item.default_value || '-'}</Text>
         }),
         createTableColumn<Attribute>({
             columnId: 'actions',
-            renderHeaderCell: () => 'Akce',
+            renderHeaderCell: () => t('common.actions'),
             renderCell: (item) => (
                 <div style={{ display: 'flex', gap: '4px' }}>
                     <Button
@@ -559,14 +559,14 @@ export const DmsSettings: React.FC = () => {
                         appearance="subtle"
                         size="small"
                         onClick={() => openAttrDialog(item)}
-                        title="Upravit"
+                        title={t('common.edit')}
                     />
                     <Button
                         icon={<Translate24Regular />}
                         appearance="subtle"
                         size="small"
                         onClick={() => openTranslations(item)}
-                        title="Překlady"
+                        title={t('common.translations')}
                     />
                     <Button
                         icon={<Delete24Regular />}
@@ -574,7 +574,7 @@ export const DmsSettings: React.FC = () => {
                         size="small"
                         style={{ color: '#d13438' }}
                         onClick={() => handleDeleteAttribute(item)}
-                        title="Smazat"
+                        title={t('common.delete')}
                     />
                 </div>
             )
@@ -606,16 +606,16 @@ export const DmsSettings: React.FC = () => {
                 </TabList>
 
                 {loading ? (
-                    <Spinner label="Načítám..." />
+                    <Spinner label={t('common.loading')} />
                 ) : (
                     <>
                         {/* DOC TYPES TAB */}
                         {activeTab === 'doc_types' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                    <Text weight="semibold" size={400}>Typy dokumentů</Text>
+                                    <Text weight="semibold" size={400}>{t('dms.settings.doc_types')}</Text>
                                     <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openDocTypeDialog()}>
-                                        Nový typ
+                                        {t('dms.settings.new_doc_type')}
                                     </Button>
                                 </div>
                                 <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
@@ -632,9 +632,9 @@ export const DmsSettings: React.FC = () => {
                         {activeTab === 'storage' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                    <Text weight="semibold" size={400}>Úložiště</Text>
+                                    <Text weight="semibold" size={400}>{t('dms.settings.storage')}</Text>
                                     <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openStorageDialog()}>
-                                        Nové úložiště
+                                        {t('dms.settings.new_storage')}
                                     </Button>
                                 </div>
                                 <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
@@ -651,9 +651,9 @@ export const DmsSettings: React.FC = () => {
                         {activeTab === 'attributes' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                    <Text weight="semibold" size={400}>Sledované atributy</Text>
+                                    <Text weight="semibold" size={400}>{t('dms.settings.attributes')}</Text>
                                     <Button appearance="primary" icon={<Add24Regular />} size="small" onClick={() => openAttrDialog()}>
-                                        Nový atribut
+                                        {t('dms.settings.new_attribute')}
                                     </Button>
                                 </div>
                                 <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
@@ -670,13 +670,16 @@ export const DmsSettings: React.FC = () => {
                         {activeTab === 'ocr_templates' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                    <Text weight="semibold" size={400}>OCR Šablony</Text>
+                                    <Text weight="semibold" size={400}>{t('dms.settings.ocr_templates')}</Text>
                                     <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate('/dms/ocr-designer/new')}>
-                                        Nová šablona
+                                        {t('dms.settings.new_ocr_template')}
                                     </Button>
                                 </div>
                                 <div style={{ padding: '32px', textAlign: 'center', color: tokens.colorNeutralForeground3 }}>
-                                    <Text>Zatím zde nejsou žádné šablony. Vytvořte novou kliknutím na tlačítko "Nová šablona".</Text>
+                                    <div style={{ padding: '32px', textAlign: 'center', color: tokens.colorNeutralForeground3 }}>
+                                        <Text>{t('dms.settings.no_templates')}</Text>
+                                        {/* TODO: List existing templates via SmartDataGrid once API action=list_templates is verified */}
+                                    </div>
                                     {/* TODO: List existing templates via SmartDataGrid once API action=list_templates is verified */}
                                 </div>
                             </Card>
@@ -689,7 +692,7 @@ export const DmsSettings: React.FC = () => {
             <Dialog open={isAttrDialogOpen} onOpenChange={(_, data) => setIsAttrDialogOpen(data.open)}>
                 <DialogSurface>
                     <DialogBody>
-                        <DialogTitle>{editingAttr ? 'Upravit atribut' : 'Nový atribut'}</DialogTitle>
+                        <DialogTitle>{editingAttr ? t('dms.attributes.edit') : t('dms.attributes.new')}</DialogTitle>
                         <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <div>
                                 <Label required>Název atributu</Label>
@@ -739,7 +742,7 @@ export const DmsSettings: React.FC = () => {
                                 <Label>Možnosti (Alternativy hodnot)</Label>
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', marginTop: '4px' }}>
                                     <Input
-                                        placeholder="Přidat možnost..."
+                                        placeholder={t('dms.attributes.add_option_ph')}
                                         value={newOption}
                                         onChange={(_, data) => setNewOption(data.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') handleAddOption(); }}
@@ -760,14 +763,14 @@ export const DmsSettings: React.FC = () => {
                                         </Badge>
                                     ))}
                                     {(!attrForm.options || attrForm.options.length === 0) && (
-                                        <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>Žádné definované možnosti.</Text>
+                                        <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>{t('dms.attributes.no_options')}</Text>
                                     )}
                                 </div>
                             </div>
                         </DialogContent>
                         <DialogActions>
-                            <Button appearance="primary" onClick={handleSaveAttribute}>{t('common.save', 'Uložit')}</Button>
-                            <Button appearance="secondary" onClick={() => setIsAttrDialogOpen(false)}>{t('common.cancel', 'Zrušit')}</Button>
+                            <Button appearance="primary" onClick={handleSaveAttribute}>{t('common.save')}</Button>
+                            <Button appearance="secondary" onClick={() => setIsAttrDialogOpen(false)}>{t('common.cancel')}</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>

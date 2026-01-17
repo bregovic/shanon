@@ -12,8 +12,9 @@ import {
     Spinner,
     createTableColumn
 } from '@fluentui/react-components';
-import { CheckmarkCircle24Regular, Dismiss24Regular } from '@fluentui/react-icons';
+import { CheckmarkCircle24Regular } from '@fluentui/react-icons';
 import { SmartDataGrid } from '../components/SmartDataGrid';
+import { useTranslation } from '../context/TranslationContext';
 import type { TableColumnDefinition } from '@fluentui/react-components';
 
 interface Attribute {
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export const AttributeSelectorDialog: React.FC<Props> = ({ open, onOpenChange, currentDocTypeId, onSave }) => {
+    const { t } = useTranslation();
     const [allAttributes, setAllAttributes] = useState<Attribute[]>([]);
     const [linkedIds, setLinkedIds] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(false);
@@ -83,10 +85,10 @@ export const AttributeSelectorDialog: React.FC<Props> = ({ open, onOpenChange, c
                 onSave();
                 onOpenChange(false);
             } else {
-                alert('Chyba: ' + json.error);
+                alert(t('common.error') + ': ' + json.error);
             }
         } catch (e) {
-            alert('Chyba ukládání');
+            alert(t('common.error'));
             console.error(e);
         } finally {
             setSaving(false);
@@ -97,37 +99,37 @@ export const AttributeSelectorDialog: React.FC<Props> = ({ open, onOpenChange, c
         createTableColumn<Attribute>({
             columnId: 'name',
             compare: (a, b) => a.name.localeCompare(b.name),
-            renderHeaderCell: () => 'Název',
+            renderHeaderCell: () => t('common.name'),
             renderCell: (item) => <Text weight="semibold">{item.name}</Text>
         }),
         createTableColumn<Attribute>({
             columnId: 'code',
             compare: (a, b) => (a.code || '').localeCompare(b.code || ''),
-            renderHeaderCell: () => 'Kód',
+            renderHeaderCell: () => t('common.code'),
             renderCell: (item) => <Text>{item.code}</Text>
         }),
         createTableColumn<Attribute>({
             columnId: 'type',
             compare: (a, b) => a.data_type.localeCompare(b.data_type),
-            renderHeaderCell: () => 'Typ',
+            renderHeaderCell: () => t('common.type'),
             renderCell: (item) => <Text>{item.data_type}</Text>
         })
-    ], []);
+    ], [t]);
 
     return (
         <Dialog open={open} onOpenChange={(_, data) => onOpenChange(data.open)}>
             <DialogSurface style={{ minWidth: '800px', height: '80vh' }}>
                 <DialogBody style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                     <DialogTitle>
-                        Správa atributů
+                        {t('dms.attributes.title_manage')}
                         <div style={{ fontSize: '12px', fontWeight: 'normal', marginTop: '4px' }}>
-                            Vyberte atributy, které se mají vytěžovat pro tento typ dokumentu.
+                            {t('dms.attributes.select_desc')}
                         </div>
                     </DialogTitle>
 
                     <DialogContent style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {loading ? (
-                            <Spinner label="Načítám konfiguraci..." />
+                            <Spinner label={t('common.loading_config')} />
                         ) : (
                             <div style={{ flexGrow: 1, overflow: 'hidden' }}>
                                 <SmartDataGrid
@@ -142,7 +144,7 @@ export const AttributeSelectorDialog: React.FC<Props> = ({ open, onOpenChange, c
                             </div>
                         )}
                         <div style={{ padding: '8px', background: '#f0f0f0', borderRadius: '4px' }}>
-                            <Text>Vybráno: {linkedIds.size} atributů</Text>
+                            <Text>{t('dms.attributes.selected_count', { count: linkedIds.size })}</Text>
                         </div>
                     </DialogContent>
 
@@ -153,14 +155,14 @@ export const AttributeSelectorDialog: React.FC<Props> = ({ open, onOpenChange, c
                             onClick={handleSave}
                             disabled={loading || saving}
                         >
-                            {saving ? 'Ukládám...' : 'Uložit změny'}
+                            {saving ? t('common.saving') : t('common.save_changes')}
                         </Button>
                         <Button
                             appearance="secondary"
                             onClick={() => onOpenChange(false)}
                             disabled={saving}
                         >
-                            Zrušit
+                            {t('common.cancel')}
                         </Button>
                     </DialogActions>
                 </DialogBody>

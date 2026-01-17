@@ -34,6 +34,7 @@ import {
     QuestionCircle24Regular,
     ChevronDown24Regular
 } from '@fluentui/react-icons';
+import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
     headerCellContent: {
@@ -170,6 +171,7 @@ const ColumnHeaderMenu = <T,>({
     onApplyFilter: (val: string) => void;
 }) => {
     const styles = useStyles();
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [tempFilter, setTempFilter] = useState(currentFilter);
 
@@ -230,19 +232,19 @@ const ColumnHeaderMenu = <T,>({
                             icon={<ArrowSortUp24Regular />}
                             onClick={() => { onSort(column.columnId, 'ascending'); setOpen(false); }}
                         >
-                            Seřadit vzestupně
+                            {t('grid.sort_asc')}
                         </MenuItem>
                         <MenuItem
                             icon={<ArrowSortDown24Regular />}
                             onClick={() => { onSort(column.columnId, 'descending'); setOpen(false); }}
                         >
-                            Seřadit sestupně
+                            {t('grid.sort_desc')}
                         </MenuItem>
                         <MenuDivider />
                         <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '240px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
                                 <Input
-                                    placeholder={`Filtrovat...`}
+                                    placeholder={t('grid.filter_placeholder')}
                                     value={tempFilter}
                                     onChange={(_, d) => setTempFilter(d.value)}
                                     onKeyDown={handleKeyDown}
@@ -255,30 +257,30 @@ const ColumnHeaderMenu = <T,>({
                                         <Button icon={<QuestionCircle24Regular />} appearance="transparent" size="small" />
                                     </PopoverTrigger>
                                     <PopoverSurface className={styles.helpPopover}>
-                                        <div><strong>Filtrovací operátory:</strong></div>
+                                        <div><strong>{t('grid.filter_operators')}</strong></div>
                                         <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '12px' }}>
-                                            <li><code>text</code> : Přesná shoda</li>
-                                            <li><code>*text*</code> : Obsahuje (Wildcard)</li>
-                                            <li><code>text*</code> : Začíná na</li>
-                                            <li><code>A, B</code> : A nebo B (OR)</li>
-                                            <li><code>!text</code> : Nerovná se / Neobsahuje</li>
-                                            <li><code>15.12</code> : Tento den (v roce {new Date().getFullYear()})</li>
-                                            <li><code>15.12.2023</code> : Konkrétní datum</li>
-                                            <li><code>15.12..</code> : Od data (včetně)</li>
-                                            <li><code>..15.12</code> : Do data (včetně)</li>
-                                            <li><code>01..31</code> : Rozsah (od..do)</li>
-                                            <li><code>&gt; 100</code> : Větší než</li>
-                                            <li><code>&lt; 100</code> : Menší než</li>
+                                            <li><code>text</code> : {t('grid.op_exact')}</li>
+                                            <li><code>*text*</code> : {t('grid.op_contains')}</li>
+                                            <li><code>text*</code> : {t('grid.op_starts')}</li>
+                                            <li><code>A, B</code> : {t('grid.op_or')}</li>
+                                            <li><code>!text</code> : {t('grid.op_not')}</li>
+                                            <li><code>15.12</code> : {t('grid.op_this_day', { year: new Date().getFullYear() })}</li>
+                                            <li><code>15.12.2023</code> : {t('grid.op_specific_date')}</li>
+                                            <li><code>15.12..</code> : {t('grid.op_date_from')}</li>
+                                            <li><code>..15.12</code> : {t('grid.op_date_to')}</li>
+                                            <li><code>01..31</code> : {t('grid.op_range')}</li>
+                                            <li><code>&gt; 100</code> : {t('grid.op_gt')}</li>
+                                            <li><code>&lt; 100</code> : {t('grid.op_lt')}</li>
                                         </ul>
                                     </PopoverSurface>
                                 </Popover>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                                 <Button size="small" appearance="primary" onClick={handleApply} style={{ flex: 1 }}>
-                                    Použít
+                                    {t('common.apply')}
                                 </Button>
                                 <Button size="small" onClick={handleClear} disabled={!currentFilter && !tempFilter}>
-                                    Vymazat
+                                    {t('grid.clear')}
                                 </Button>
                             </div>
                         </div>
@@ -533,7 +535,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
             items={processedItems}
             columns={columns}
             sortable={false}
-            selectionMode={selectionMode}
+            selectionMode={selectionMode === 'none' ? undefined : selectionMode}
             getRowId={getRowId}
             selectedItems={selectedItems}
             onSelectionChange={onSelectionChange}
@@ -566,7 +568,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
             items={itemsToRender}
             columns={columns}
             sortable={false}
-            selectionMode={selectionMode}
+            selectionMode={selectionMode === 'none' ? undefined : selectionMode}
             getRowId={getRowId}
             selectedItems={selectedItems}
             onSelectionChange={onSelectionChange}
@@ -611,7 +613,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                         items={processedItems}
                         columns={columns}
                         sortable={false}
-                        selectionMode={selectionMode}
+                        selectionMode={selectionMode === 'none' ? undefined : selectionMode}
                         getRowId={getRowId}
                         selectedItems={selectedItems}
                         onSelectionChange={onSelectionChange}

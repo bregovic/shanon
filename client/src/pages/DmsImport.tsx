@@ -23,6 +23,7 @@ import {
     Dismiss24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../context/TranslationContext';
 
 interface DocType {
     rec_id: number;
@@ -32,6 +33,7 @@ interface DocType {
 
 export const DmsImport: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [files, setFiles] = useState<File[]>([]);
@@ -77,11 +79,13 @@ export const DmsImport: React.FC = () => {
                     const def = data.data.find((p: any) => p.is_default) || data.data[0];
                     if (def) {
                         setTargetStorage(def.name + (def.provider_type === 'google_drive' ? ' (Google Drive)' : ' (Local)'));
+                    } else {
+                        setTargetStorage(t('dms.import.target_storage') + ' Default');
                     }
                 }
             })
             .catch(() => { });
-    }, []);
+    }, [t]);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selected = e.target.files;
@@ -128,11 +132,11 @@ export const DmsImport: React.FC = () => {
 
     const handleUpload = async () => {
         if (files.length === 0) {
-            setError('Vyberte soubor(y) k nahrání.');
+            setError(t('dms.import.error_no_files'));
             return;
         }
         if (!selectedType) {
-            setError('Vyberte typ dokumentu.');
+            setError(t('dms.import.error_no_type'));
             return;
         }
 
@@ -185,11 +189,11 @@ export const DmsImport: React.FC = () => {
         setDisplayName('');
 
         if (failCount === 0) {
-            setSuccessMsg(`Všechny dokumenty (${successCount}) byly úspěšně nahrány.`);
+            setSuccessMsg(t('dms.import.success_all', { count: successCount }));
             if (lastWarning) setWarning(lastWarning);
             setTimeout(() => navigate('/dms/list'), 1500);
         } else {
-            setError(`Nahráno: ${successCount}, Chyba: ${failCount}. Zkontrolujte prosím konzoli nebo logy.`);
+            setError(t('dms.import.result_status', { success: successCount, fail: failCount }));
             if (lastWarning) setWarning(lastWarning);
         }
     };
@@ -206,15 +210,15 @@ export const DmsImport: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <ActionBar>
                 <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms/list')}>
-                    Zpět
+                    {t('common.back')}
                 </Button>
                 <div style={{ width: '24px' }} />
-                <Title3>Import dokumentů</Title3>
+                <Title3>{t('dms.import_documents')}</Title3>
             </ActionBar>
 
             <div style={{ padding: '24px', maxWidth: '600px' }}>
                 <Text size={200} style={{ marginBottom: '16px', display: 'block', color: tokens.colorNeutralForeground2 }}>
-                    Cílové úložiště: <strong>{targetStorage || 'Zjišťuji...'}</strong>
+                    {t('dms.import.target_storage')} <strong>{targetStorage || t('common.detecting')}</strong>
                 </Text>
 
                 {error && (
@@ -227,7 +231,7 @@ export const DmsImport: React.FC = () => {
                     <MessageBar intent="success" style={{ marginBottom: '16px' }}>
                         <MessageBarBody>
                             {successMsg}
-                            {!warning && !error && ' Přesměrování...'}
+                            {!warning && !error && ` ${t('common.redirecting')}`}
                         </MessageBarBody>
                     </MessageBar>
                 )}
@@ -235,7 +239,7 @@ export const DmsImport: React.FC = () => {
                 {warning && (
                     <MessageBar intent="warning" style={{ marginBottom: '16px' }}>
                         <MessageBarBody>
-                            <strong>Upozornění:</strong> {warning}
+                            <strong>{t('common.warning')}:</strong> {warning}
                         </MessageBarBody>
                     </MessageBar>
                 )}
@@ -265,18 +269,20 @@ export const DmsImport: React.FC = () => {
                         accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt"
                     />
                     <ArrowUpload24Regular style={{ fontSize: '48px', color: tokens.colorBrandForeground1 }} />
-                    <Text block style={{ marginTop: '12px' }}>
-                        Přetáhněte soubory sem (více naráz) nebo klikněte
-                    </Text>
-                    <Text size={200} style={{ color: tokens.colorNeutralForeground4, marginTop: '8px' }}>
-                        PDF, Word, Excel, Obrázky (max 10 MB)
-                    </Text>
+                    <div style={{ marginTop: '12px' }}>
+                        <Text block>
+                            {t('dms.import.drop_zone')}
+                        </Text>
+                        <Text size={200} style={{ color: tokens.colorNeutralForeground4, marginTop: '8px' }}>
+                            {t('dms.import.file_types')}
+                        </Text>
+                    </div>
                 </Card>
 
                 {/* Selected Files List */}
                 {files.length > 0 && (
                     <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <Text weight="medium">Vybrané soubory ({files.length}):</Text>
+                        <Text weight="medium">{t('dms.import.selected_files', { count: files.length })}</Text>
                         {files.map((f, i) => (
                             <Card key={i} style={{ padding: '8px 16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -302,7 +308,7 @@ export const DmsImport: React.FC = () => {
                 {/* Form Fields */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {files.length === 1 && (
-                        <Field label="Název dokumentu (volitelné)">
+                        <Field label={t('dms.import.doc_name_optional')}>
                             <Input
                                 value={displayName}
                                 onChange={(_, data) => setDisplayName(data.value)}
@@ -311,9 +317,9 @@ export const DmsImport: React.FC = () => {
                         </Field>
                     )}
 
-                    <Field label="Typ dokumentů (společný pro všechny)">
+                    <Field label={t('dms.import.doc_type_common')}>
                         <Dropdown
-                            placeholder="Vyberte typ..."
+                            placeholder={t('dms.import.select_type')}
                             value={docTypes.find(t => t.rec_id.toString() === selectedType)?.name || ''}
                             onOptionSelect={(_, data) => setSelectedType(data.optionValue || '')}
                         >
@@ -331,7 +337,7 @@ export const DmsImport: React.FC = () => {
                             setEnableOcr(!!data.checked);
                             if (data.checked) setManualMap(false);
                         }}
-                        label="Provést automatické vytěžení dat (OCR)"
+                        label={t('dms.import.enable_ocr')}
                     />
 
                     <Checkbox
@@ -340,7 +346,7 @@ export const DmsImport: React.FC = () => {
                             setManualMap(!!data.checked);
                             if (data.checked) setEnableOcr(false);
                         }}
-                        label="Jen připravit k revizi (status Mapování)"
+                        label={t('dms.import.manual_map')}
                     />
                 </div>
 
@@ -352,10 +358,10 @@ export const DmsImport: React.FC = () => {
                         onClick={handleUpload}
                         disabled={files.length === 0 || uploading}
                     >
-                        {uploading ? `Nahrávám ${progress} / ${files.length}...` : 'Nahrát vše'}
+                        {uploading ? t('dms.import.uploading_progress', { current: progress, total: files.length }) : t('dms.import.upload_all')}
                     </Button>
                     <Button appearance="secondary" onClick={() => navigate('/dms/list')} disabled={uploading}>
-                        Zrušit
+                        {t('common.cancel')}
                     </Button>
                 </div>
             </div>

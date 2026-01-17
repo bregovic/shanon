@@ -102,7 +102,7 @@ const Layout: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, logout, hasPermission, organizations, currentOrgId, switchOrg } = useAuth();
+    const { user, logout, hasPermission, organizations, currentOrgId } = useAuth();
     const { t } = useTranslation();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
     const [feedbackOpen, setFeedbackOpen] = React.useState(false);
@@ -185,22 +185,22 @@ const Layout: React.FC = () => {
                                         </div>
                                     </MenuItem>
                                 ))}
-                                {organizations.length === 0 && <MenuItem disabled>Žádné společnosti</MenuItem>}
+                                {organizations.length === 0 && <MenuItem disabled>{t('layout.no_orgs')}</MenuItem>}
                             </MenuList>
                         </MenuPopover>
                     </Menu>
 
                     <div style={{ width: '1px', backgroundColor: '#e0e0e0', height: '20px', margin: '0 8px' }} />
 
-                    <Tooltip content="Upozornění" relationship="label">
+                    <Tooltip content={t('common.warning')} relationship="label">
                         <Button icon={<Alert24Regular />} appearance="subtle" />
                     </Tooltip>
 
-                    <Tooltip content="Rychlý požadavek" relationship="label">
+                    <Tooltip content={t('layout.fast_request')} relationship="label">
                         <Button icon={<Emoji24Regular />} appearance="subtle" onClick={() => setFeedbackOpen(true)} />
                     </Tooltip>
 
-                    <Tooltip content="Nastavení" relationship="label">
+                    <Tooltip content={t('system.menu.settings')} relationship="label">
 
                         <Button icon={<Settings24Regular />} appearance="subtle" onClick={() => setSettingsOpen(true)} />
                     </Tooltip>
@@ -213,7 +213,7 @@ const Layout: React.FC = () => {
                         />
                     </div>
 
-                    <Tooltip content="Odhlásit" relationship="label">
+                    <Tooltip content={t('auth.logout')} relationship="label">
                         <Button icon={<SignOut24Regular />} appearance="subtle" onClick={logout} />
                     </Tooltip>
                 </div>

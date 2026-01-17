@@ -37,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
 import { SmartDataGrid } from '../components/SmartDataGrid';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/TranslationContext';
 
 interface DmsDocument {
     rec_id: number;
@@ -53,6 +54,7 @@ interface DmsDocument {
 export const DmsList: React.FC = () => {
     const { currentOrgId } = useAuth();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const [documents, setDocuments] = useState<DmsDocument[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -92,7 +94,7 @@ export const DmsList: React.FC = () => {
 
     const handleBatchAnalyze = async () => {
         if (selectedIds.size === 0) return;
-        if (!confirm(`Spustit vytěžování (OCR) pro ${selectedIds.size} dokumentů?`)) return;
+        if (!confirm(t('dms.list.confirm_batch_ocr', { count: selectedIds.size }))) return;
 
         try {
             const res = await fetch('/api/api-dms.php?action=analyze_doc', {
@@ -103,9 +105,9 @@ export const DmsList: React.FC = () => {
             const json = await res.json();
             if (json.success) {
                 fetchData();
-                alert('Hromadné vytěžování dokončeno.');
+                alert(t('dms.list.batch_ocr_done'));
             } else {
-                alert('Chyba: ' + (json.error || json.message || 'Neznámá chyba'));
+                alert(t('common.error') + ': ' + (json.error || json.message || t('common.error')));
             }
         } catch (e) {
             console.error(e);
@@ -115,7 +117,7 @@ export const DmsList: React.FC = () => {
 
     const handleBatchDelete = async () => {
         if (selectedIds.size === 0) return;
-        if (!confirm(`Opravdu smazat ${selectedIds.size} vybraných dokumentů? Tato akce je nevratná.`)) return;
+        if (!confirm(t('dms.list.confirm_batch_delete', { count: selectedIds.size }))) return;
 
         try {
             const res = await fetch('/api/api-dms.php?action=delete', {
@@ -129,11 +131,11 @@ export const DmsList: React.FC = () => {
                 setSelectedIds(new Set()); // clear selection
                 fetchData();
             } else {
-                alert('Chyba: ' + (json.error || 'Unknown error'));
+                alert(t('common.error') + ': ' + (json.error || 'Unknown error'));
             }
         } catch (e) {
             console.error(e);
-            alert('Chyba sítě');
+            alert(t('common.network_error'));
         }
     };
 
@@ -149,15 +151,15 @@ export const DmsList: React.FC = () => {
         }).then(res => res.json()).then(json => {
             if (json.success) {
                 fetchData();
-                alert('OCR Dokončeno');
+                alert(t('dms.list.ocr_done'));
             } else {
-                alert('Chyba: ' + (json.error || 'Neznámá chyba'));
+                alert(t('common.error') + ': ' + (json.error || t('common.error')));
             }
         });
     };
 
     const handleDeleteSingle = async (doc: DmsDocument) => {
-        if (!confirm(`Opravdu smazat dokument "${doc.display_name}"?`)) return;
+        if (!confirm(t('dms.list.confirm_delete', { name: doc.display_name }))) return;
         const res = await fetch('/api/api-dms.php?action=delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -172,7 +174,7 @@ export const DmsList: React.FC = () => {
 
     const handleBatchStatusChange = async (status: string, ocrStatus?: string) => {
         if (selectedIds.size === 0) return;
-        if (!confirm('Opravdu změnit stav vybraných dokumentů?')) return;
+        if (!confirm(t('dms.list.confirm_status_change'))) return;
 
         try {
             await fetch('/api/api-dms.php?action=update_status', {
@@ -193,14 +195,14 @@ export const DmsList: React.FC = () => {
         createTableColumn<DmsDocument>({
             columnId: 'rec_id',
             compare: (a, b) => a.rec_id - b.rec_id,
-            renderHeaderCell: () => 'ID',
+            renderHeaderCell: () => t('common.id'),
             renderCell: (item) => <Text>{item.rec_id}</Text>
         }),
         {
             ...createTableColumn<DmsDocument>({
                 columnId: 'display_name',
                 compare: (a, b) => a.display_name.localeCompare(b.display_name),
-                renderHeaderCell: () => 'Název',
+                renderHeaderCell: () => t('common.name'),
                 renderCell: (item) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Document24Regular />
@@ -213,33 +215,33 @@ export const DmsList: React.FC = () => {
         createTableColumn<DmsDocument>({
             columnId: 'doc_type_name',
             compare: (a, b) => (a.doc_type_name || '').localeCompare(b.doc_type_name || ''),
-            renderHeaderCell: () => 'Typ',
+            renderHeaderCell: () => t('common.type'),
             renderCell: (item) => <Text>{item.doc_type_name}</Text>
         }),
         createTableColumn<DmsDocument>({
             columnId: 'file_size_bytes',
             compare: (a, b) => a.file_size_bytes - b.file_size_bytes,
-            renderHeaderCell: () => 'Velikost',
+            renderHeaderCell: () => t('common.size'),
             renderCell: (item) => <Text>{formatSize(item.file_size_bytes)}</Text>
         }),
         createTableColumn<DmsDocument>({
             columnId: 'uploaded_by_name',
             compare: (a, b) => (a.uploaded_by_name || '').localeCompare(b.uploaded_by_name || ''),
-            renderHeaderCell: () => 'Autor',
+            renderHeaderCell: () => t('common.author'),
             renderCell: (item) => <Text>{item.uploaded_by_name}</Text>
         }),
         createTableColumn<DmsDocument>({
             columnId: 'status',
             compare: (a, b) => (a.status || '').localeCompare(b.status || ''),
-            renderHeaderCell: () => 'Stav',
+            renderHeaderCell: () => t('common.status'),
             renderCell: (item) => {
                 const map: Record<string, string> = {
-                    'new': 'Nový',
-                    'processing': 'Zpracovává se',
-                    'review': 'Ke kontrole',
-                    'verified': 'Schváleno',
-                    'approved': 'Schváleno',
-                    'rejected': 'Zamítnuto'
+                    'new': t('dms.status.new'),
+                    'processing': t('dms.status.processing'),
+                    'review': t('dms.status.review'),
+                    'verified': t('dms.status.verified'),
+                    'approved': t('dms.status.approved'),
+                    'rejected': t('dms.status.rejected')
                 };
                 const colors: Record<string, 'informative' | 'warning' | 'severe' | 'success' | 'danger'> = {
                     'new': 'informative',
@@ -260,7 +262,7 @@ export const DmsList: React.FC = () => {
         createTableColumn<DmsDocument>({
             columnId: 'created_at',
             compare: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-            renderHeaderCell: () => 'Vytvořeno',
+            renderHeaderCell: () => t('common.created_at'),
             renderCell: (item) => <Text>{new Date(item.created_at).toLocaleString('cs-CZ')}</Text>
         })
     ];
@@ -281,21 +283,21 @@ export const DmsList: React.FC = () => {
             <PageHeader>
                 <Breadcrumb>
                     <BreadcrumbItem>
-                        <BreadcrumbButton onClick={() => navigate('/dms')}>Moduly</BreadcrumbButton>
+                        <BreadcrumbButton onClick={() => navigate('/dms')}>{t('common.modules')}</BreadcrumbButton>
                     </BreadcrumbItem>
                     <BreadcrumbDivider />
                     <BreadcrumbItem>
-                        <BreadcrumbButton onClick={() => navigate('/dms')}>DMS</BreadcrumbButton>
+                        <BreadcrumbButton onClick={() => navigate('/dms')}>{t('modules.dms')}</BreadcrumbButton>
                     </BreadcrumbItem>
                     <BreadcrumbDivider />
                     <BreadcrumbItem>
-                        <BreadcrumbButton current>Všechny dokumenty</BreadcrumbButton>
+                        <BreadcrumbButton current>{t('dms.menu.all_documents')}</BreadcrumbButton>
                     </BreadcrumbItem>
                 </Breadcrumb>
                 <div style={{ flex: 1 }} />
-                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData} aria-label="Obnovit" />
+                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData} aria-label={t('common.refresh')} />
                 <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate(`/${currentOrgId}/dms/import`)}>
-                    Nový dokument
+                    {t('dms.import_documents')}
                 </Button>
             </PageHeader>
 
@@ -310,7 +312,7 @@ export const DmsList: React.FC = () => {
                         disabled={selectedIds.size === 0}
                         onClick={handleBatchAnalyze}
                     >
-                        Vytěžit (OCR) {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
+                        {t('dms.list.btn_ocr')} {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
                     </Button>
 
                     <Button
@@ -318,7 +320,7 @@ export const DmsList: React.FC = () => {
                         icon={<ArrowClockwise24Regular />} // Or specialized icon
                         onClick={() => navigate('/dms/review')}
                     >
-                        Revidovat frontu
+                        {t('dms.list.btn_review')}
                     </Button>
 
                     <Button
@@ -334,7 +336,7 @@ export const DmsList: React.FC = () => {
                             }
                         }}
                     >
-                        Detail / Atributy
+                        {t('dms.list.btn_detail')}
                     </Button>
 
                     <div style={{ width: '1px', backgroundColor: '#e0e0e0', margin: '0 8px', height: '20px' }} />
@@ -343,16 +345,16 @@ export const DmsList: React.FC = () => {
                     <Menu>
                         <MenuTrigger disableButtonEnhancement>
                             <Button icon={<Edit24Regular />} disabled={loading || selectedIds.size === 0}>
-                                Změnit stav
+                                {t('dms.list.btn_change_status')}
                             </Button>
                         </MenuTrigger>
                         <MenuPopover>
                             <MenuList>
-                                <MenuItem onClick={() => handleBatchStatusChange('review', 'mapping')}>Otevřít k mapování (Revize)</MenuItem>
-                                <MenuItem onClick={() => handleBatchStatusChange('verified')}>Schváleno (Verified)</MenuItem>
-                                <MenuItem onClick={() => handleBatchStatusChange('rejected')}>Zamítnuto</MenuItem>
+                                <MenuItem onClick={() => handleBatchStatusChange('review', 'mapping')}>{t('dms.status.set_mapping')}</MenuItem>
+                                <MenuItem onClick={() => handleBatchStatusChange('verified')}>{t('dms.status.set_verified')}</MenuItem>
+                                <MenuItem onClick={() => handleBatchStatusChange('rejected')}>{t('dms.status.rejected')}</MenuItem>
                                 <Divider />
-                                <MenuItem onClick={() => handleBatchStatusChange('new', 'pending')}>Reset na Nový</MenuItem>
+                                <MenuItem onClick={() => handleBatchStatusChange('new', 'pending')}>{t('dms.status.set_new')}</MenuItem>
                             </MenuList>
                         </MenuPopover>
                     </Menu>
@@ -364,7 +366,7 @@ export const DmsList: React.FC = () => {
                         disabled={selectedIds.size === 0}
                         onClick={handleBatchDelete}
                     >
-                        Smazat {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
+                        {t('common.delete')} {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
                     </Button>
                 </div>
             </PageFilterBar>
@@ -403,13 +405,13 @@ export const DmsList: React.FC = () => {
                         action={
                             <Button
                                 appearance="subtle"
-                                aria-label="Close"
+                                aria-label={t('common.close')}
                                 icon={<Dismiss24Regular />}
                                 onClick={() => setIsDrawerOpen(false)}
                             />
                         }
                     >
-                        Detail dokumentu
+                        {t('dms.detail.title')}
                     </DrawerHeaderTitle>
                 </DrawerHeader>
 
@@ -420,37 +422,37 @@ export const DmsList: React.FC = () => {
                                 <CardHeader header={<Text weight="semibold">{drawerDoc.display_name}</Text>} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 16px 16px' }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', fontSize: '13px' }}>
-                                        <Text weight="medium">Typ:</Text> <Text>{drawerDoc.doc_type_name}</Text>
-                                        <Text weight="medium">Velikost:</Text> <Text>{formatSize(drawerDoc.file_size_bytes)}</Text>
-                                        <Text weight="medium">Nahráno:</Text> <Text>{new Date(drawerDoc.created_at).toLocaleString('cs-CZ')}</Text>
-                                        <Text weight="medium">Autor:</Text> <Text>{drawerDoc.uploaded_by_name}</Text>
+                                        <Text weight="medium">{t('common.type')}:</Text> <Text>{drawerDoc.doc_type_name}</Text>
+                                        <Text weight="medium">{t('common.size')}:</Text> <Text>{formatSize(drawerDoc.file_size_bytes)}</Text>
+                                        <Text weight="medium">{t('common.created_at')}:</Text> <Text>{new Date(drawerDoc.created_at).toLocaleString('cs-CZ')}</Text>
+                                        <Text weight="medium">{t('common.author')}:</Text> <Text>{drawerDoc.uploaded_by_name}</Text>
                                     </div>
                                     <Divider />
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                                         <Button appearance="primary" icon={<Document24Regular />} onClick={() => window.open(`/api/api-dms.php?action=view&id=${drawerDoc.rec_id}`, '_blank')}>
-                                            Otevřít
+                                            {t('common.open')}
                                         </Button>
                                         <Button icon={<ScanText24Regular />} onClick={() => handleAnalyzeSingle(drawerDoc)}>
-                                            Vytěžit (OCR)
+                                            {t('dms.list.btn_ocr')}
                                         </Button>
                                         <Button
                                             appearance="secondary"
                                             style={{ color: '#d13438', borderColor: '#d13438' }}
                                             onClick={() => handleDeleteSingle(drawerDoc)}
                                         >
-                                            Smazat
+                                            {t('common.delete')}
                                         </Button>
                                     </div>
                                 </div>
                             </Card>
 
-                            <Title3>Vytěžená data (OCR)</Title3>
+                            <Title3>{t('dms.detail.ocr_data')}</Title3>
                             <Card>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}>
                                     {getMetadataAttributes(drawerDoc) ? (
                                         Object.entries(getMetadataAttributes(drawerDoc)!).map(([key, val]) => (
                                             <div key={key} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f0f0f0', paddingBottom: '4px' }}>
-                                                <Text weight="medium" style={{ color: '#666' }}>{key}</Text>
+                                                <Text weight="medium" style={{ color: '#666' }}>{t(`attribute.${key}`, key)}</Text>
                                                 <Text>{String(val)}</Text>
                                             </div>
                                         ))
@@ -458,10 +460,10 @@ export const DmsList: React.FC = () => {
                                         <div style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
                                             <ScanText24Regular style={{ fontSize: '32px', marginBottom: '8px' }} />
                                             <br />
-                                            <Text>Žádná vytěžená data.</Text>
+                                            <Text>{t('dms.detail.no_data')}</Text>
                                             <div style={{ marginTop: '8px' }}>
-                                                <Button size="small" onClick={() => handleAnalyzeSingle(drawerDoc)}>Spustit OCR</Button>
-                                                <Button size="small" appearance="subtle" onClick={() => navigate(`/dms/review?id=${drawerDoc.rec_id}`)}>Revidovat</Button>
+                                                <Button size="small" onClick={() => handleAnalyzeSingle(drawerDoc)}>{t('dms.detail.run_ocr')}</Button>
+                                                <Button size="small" appearance="subtle" onClick={() => navigate(`/dms/review?id=${drawerDoc.rec_id}`)}>{t('dms.detail.review')}</Button>
                                             </div>
                                         </div>
                                     )}

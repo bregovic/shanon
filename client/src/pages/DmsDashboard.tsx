@@ -106,7 +106,7 @@ export const DmsDashboard: React.FC = () => {
                     <Divider vertical style={{ height: '20px', margin: 'auto 0' }} />
                 </div>
 
-                <Button icon={<ArrowClockwise24Regular />} onClick={() => {/* refresh logic if any */ }}>Obnovit</Button>
+                <Button icon={<ArrowClockwise24Regular />} onClick={() => {/* refresh logic if any */ }}>{t('common.refresh')}</Button>
             </ActionBar>
 
             {/* 3-Column Layout */}
@@ -122,19 +122,19 @@ export const DmsDashboard: React.FC = () => {
                         display: 'block',
                         marginBottom: '16px'
                     }}>
-                        Formuláře
+                        {t('system.menu.forms')}
                     </Text>
 
-                    <MenuSection id="documents" title="Dokumenty" icon={<Document24Regular />} isOpen={expandedSections.has('documents')} onToggle={toggleSection}>
-                        <MenuItem label="Všechny dokumenty" onClick={() => navigate(orgPrefix + '/dms/list')} />
-                        <MenuItem label="Revidovat (OCR)" onClick={() => navigate(orgPrefix + '/dms/review')} />
-                        <MenuItem label="Ke schválení" onClick={() => { }} />
-                        <MenuItem label="Moje koncepty" onClick={() => { }} />
+                    <MenuSection id="documents" title={t('dms.menu.documents')} icon={<Document24Regular />} isOpen={expandedSections.has('documents')} onToggle={toggleSection}>
+                        <MenuItem label={t('dms.menu.all_documents')} onClick={() => navigate(orgPrefix + '/dms/list')} />
+                        <MenuItem label={t('dms.menu.review')} onClick={() => navigate(orgPrefix + '/dms/review')} />
+                        <MenuItem label={t('dms.menu.to_approve')} onClick={() => { }} />
+                        <MenuItem label={t('dms.menu.my_drafts')} onClick={() => { }} />
                     </MenuSection>
 
                     <MenuSection id="reports" title={t('system.menu.reports')} icon={<DocumentPdf24Regular />} isOpen={expandedSections.has('reports')} onToggle={toggleSection}>
-                        <MenuItem label="Statistika nahrávání" onClick={() => { }} />
-                        <MenuItem label="Využití úložiště" onClick={() => { }} />
+                        <MenuItem label={t('dms.reports.upload_stats')} onClick={() => { }} />
+                        <MenuItem label={t('dms.reports.storage_usage')} onClick={() => { }} />
                     </MenuSection>
                 </div>
 
@@ -167,11 +167,11 @@ export const DmsDashboard: React.FC = () => {
                         display: 'block',
                         marginBottom: '16px'
                     }}>
-                        Nastavení
+                        {t('system.menu.settings')}
                     </Text>
 
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem label="Parametry DMS" onClick={() => navigate(orgPrefix + '/dms/settings')} />
+                        <MenuItem label={t('dms.settings.parameters')} onClick={() => navigate(orgPrefix + '/dms/settings')} />
                     </MenuSection>
                 </div>
 

@@ -24,6 +24,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
 import { ActionBar } from '../components/ActionBar';
+import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
     card: {
@@ -55,6 +56,7 @@ const useStyles = makeStyles({
 export const DmsGoogleSetup: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
 
     // Form State
@@ -86,7 +88,7 @@ export const DmsGoogleSetup: React.FC = () => {
 
     const handleConnect = () => {
         if (!clientId || !clientSecret) {
-            alert('Vyplňte prosím Client ID a Client Secret.');
+            alert(t('dms.google.fill_client_info'));
             return;
         }
 
@@ -137,21 +139,21 @@ export const DmsGoogleSetup: React.FC = () => {
                         icon={<ArrowLeft24Regular />}
                         onClick={() => navigate('/dms')}
                     />
-                    <Text size={500} weight="semibold">Konfigurace Google Disk (OAuth)</Text>
+                    <Text size={500} weight="semibold">{t('dms.google.title')}</Text>
                 </div>
             </PageHeader>
             <PageContent>
                 <Card className={styles.card}>
                     <CardHeader
-                        header={<Subtitle2>Generátor přístupových údajů</Subtitle2>}
-                        description={<Text>Získejte Refresh Token pro trvalé připojení k vašemu osobnímu Disku Google.</Text>}
+                        header={<Subtitle2>{t('dms.google.access_generator')}</Subtitle2>}
+                        description={<Text>{t('dms.google.access_desc')}</Text>}
                     />
 
                     <div style={{ padding: '0 16px 16px' }}>
                         {error && (
                             <MessageBar intent="error" style={{ marginBottom: '16px' }}>
                                 <MessageBarBody>
-                                    <MessageBarTitle>Chyba ověření</MessageBarTitle>
+                                    <MessageBarTitle>{t('auth.verification_error')}</MessageBarTitle>
                                     {error}
                                 </MessageBarBody>
                             </MessageBar>
@@ -161,13 +163,13 @@ export const DmsGoogleSetup: React.FC = () => {
                             <>
                                 <MessageBar intent="info" style={{ marginBottom: '24px' }}>
                                     <MessageBarBody>
-                                        Tento nástroj vyžaduje, abyste v <Link href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</Link> měli pro svou aplikaci nastavenou Redirect URI na: <br />
+                                        {t('dms.google.setup_instruction_1')} <Link href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</Link> {t('dms.google.setup_instruction_2')} <br />
                                         <code style={{ fontWeight: 'bold' }}>{window.location.origin}/api/api-setup-google.php</code>
                                     </MessageBarBody>
                                 </MessageBar>
 
                                 <div className={styles.section}>
-                                    <Label required>Client ID</Label>
+                                    <Label required>{t('dms.google.client_id')}</Label>
                                     <Input
                                         value={clientId}
                                         onChange={(e) => setClientId(e.target.value)}
@@ -177,7 +179,7 @@ export const DmsGoogleSetup: React.FC = () => {
                                 </div>
 
                                 <div className={styles.section}>
-                                    <Label required>Client Secret</Label>
+                                    <Label required>{t('dms.google.client_secret')}</Label>
                                     <Input
                                         value={clientSecret}
                                         onChange={(e) => setClientSecret(e.target.value)}
@@ -194,15 +196,15 @@ export const DmsGoogleSetup: React.FC = () => {
                                     onClick={handleConnect}
                                     style={{ width: '100%' }}
                                 >
-                                    Přihlásit se přes Google
+                                    {t('auth.login_google')}
                                 </Button>
                             </>
                         ) : (
                             <div className={styles.section}>
                                 <MessageBar intent="success" style={{ marginBottom: '16px' }}>
                                     <MessageBarBody>
-                                        <MessageBarTitle>Úspěšně propojeno!</MessageBarTitle>
-                                        Níže uvedený JSON kód zkopírujte a vložte v Nastavení DMS do pole <strong>Service Account JSON</strong> pro vaše Google Drive úložiště.
+                                        <MessageBarTitle>{t('dms.google.success')}</MessageBarTitle>
+                                        {t('dms.google.json_instruction_1')} <strong>{t('dms.storage.sa_json')}</strong> {t('dms.google.json_instruction_2')}
                                     </MessageBarBody>
                                 </MessageBar>
 
@@ -217,7 +219,7 @@ export const DmsGoogleSetup: React.FC = () => {
                                     icon={<CheckmarkCircle24Regular />}
                                     style={{ marginTop: '16px' }}
                                 >
-                                    Přejít do nastavení DMS
+                                    {t('dms.google.go_to_settings')}
                                 </Button>
                             </div>
                         )}

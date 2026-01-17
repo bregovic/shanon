@@ -113,7 +113,11 @@ async function deploy() {
                 'setup_auth.php',
                 'api-login.php',
                 'api-register.php',
-                'logout.php'
+                'logout.php',
+                'api-system.php', // Added for System Config
+                'api-dms.php',
+                // Helpers
+                'helpers/DataSeeder.php'
             ];
 
             for (const file of filesToSync) {

@@ -465,21 +465,34 @@ export const SystemConfig: React.FC = () => {
     const runSeeding = async () => {
         if (selectedSeeders.size === 0) return;
         setSeeding(true);
+        setMigrationResult(null);
         try {
             const res = await fetch('/api/api-system.php?action=run_seeders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: Array.from(selectedSeeders) })
+                body: JSON.stringify({
+                    ids: Array.from(selectedSeeders),
+                    org_id: currentOrgId
+                })
             });
             const json = await res.json();
             if (json.success) {
-                alert('Data úspěšně naplněna');
-                // Could show detailed report
+                setMigrationResult({
+                    success: true,
+                    message: `Data úspěšně naplněna (${selectedSeeders.size} sad)`,
+                    details: json.results || []
+                });
             } else {
-                alert('Chyba: ' + json.error);
+                setMigrationResult({
+                    success: false,
+                    error: json.error || 'Neznámá chyba'
+                });
             }
         } catch (e) {
-            alert('Chyba sítě');
+            setMigrationResult({
+                success: false,
+                error: 'Chyba sítě nebo serveru'
+            });
         } finally {
             setSeeding(false);
         }

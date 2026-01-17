@@ -18,6 +18,7 @@ import {
 } from '@fluentui/react-components';
 import { Add24Regular, Delete24Regular } from '@fluentui/react-icons';
 import axios from 'axios';
+import { useTranslation } from '../context/TranslationContext';
 
 const useStyles = makeStyles({
     content: {
@@ -65,6 +66,7 @@ const LANGUAGES = [
 
 export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, title, fieldName = 'name' }: TranslationDialogProps) => {
     const styles = useStyles();
+    const { t } = useTranslation();
     const [translations, setTranslations] = useState<TranslationItem[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -117,14 +119,14 @@ export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, tit
             setNewValue('');
         } catch (e) {
             console.error(e);
-            alert('Failed to save translation');
+            alert(t('error.save_translation'));
         } finally {
             setSaving(false);
         }
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm('Odstranit překlad?')) return;
+        if (!confirm(t('system.translations.delete_confirm'))) return;
         try {
             await axios.post(getApiUrl('api-system.php?action=translation_delete'), { id });
             loadTranslations();
@@ -137,9 +139,9 @@ export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, tit
         <Dialog open={open} onOpenChange={(_e, data) => onOpenChange(data.open)}>
             <DialogSurface>
                 <DialogBody>
-                    <DialogTitle>Překlady: {title}</DialogTitle>
+                    <DialogTitle>{t('system.translations.title', { title })}</DialogTitle>
                     <DialogContent className={styles.content}>
-                        <Text>Zde můžete definovat alternativní názvy pro různé jazyky (např. pro OCR).</Text>
+                        <Text>{t('system.translations.desc')}</Text>
 
                         {loading ? <Spinner /> : (
                             <>
@@ -159,7 +161,7 @@ export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, tit
 
                                 <div className={styles.row}>
                                     <div>
-                                        <Label>Jazyk</Label>
+                                        <Label>{t('settings.language')}</Label>
                                         <Dropdown
                                             value={LANGUAGES.find(l => l.code === newLang)?.name}
                                             selectedOptions={[newLang]}
@@ -171,7 +173,7 @@ export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, tit
                                         </Dropdown>
                                     </div>
                                     <div>
-                                        <Label>Překlad</Label>
+                                        <Label>{t('system.translations.translation')}</Label>
                                         <Input
                                             value={newValue}
                                             onChange={(_e, d) => setNewValue(d.value)}
@@ -184,14 +186,14 @@ export const TranslationDialog = ({ open, onOpenChange, tableName, recordId, tit
                                         disabled={saving || !newValue}
                                         onClick={() => handleSave(newLang, newValue)}
                                     >
-                                        Přidat
+                                        {t('btn_add')}
                                     </Button>
                                 </div>
                             </>
                         )}
                     </DialogContent>
                     <DialogActions>
-                        <Button appearance="secondary" onClick={() => onOpenChange(false)}>Zavřít</Button>
+                        <Button appearance="secondary" onClick={() => onOpenChange(false)}>{t('common.close')}</Button>
                     </DialogActions>
                 </DialogBody>
             </DialogSurface>
