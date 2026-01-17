@@ -18,6 +18,9 @@ import {
     shorthands,
     tokens,
     MessageBar,
+    Dropdown,
+    Option,
+    createTableColumn,
     MessageBarTitle,
     MessageBarBody
 } from '@fluentui/react-components';
@@ -33,10 +36,21 @@ import {
     DocumentPdf24Regular,
     TaskListSquareLtr24Regular,
     Desktop24Regular,
-    Beaker24Regular
+    Beaker24Regular,
+    Add24Regular,
+    Edit24Regular,
+    Translate24Regular,
+    PlugConnected24Regular,
+    Delete24Regular,
+    Dismiss24Regular,
+    Play24Regular
 } from '@fluentui/react-icons';
 
 import { ActionBar } from '../components/ActionBar';
+import { TranslationDialog } from '../components/TranslationDialog';
+import { SmartDataGrid } from '../components/SmartDataGrid';
+import type { ExtendedTableColumnDefinition } from '../components/SmartDataGrid';
+import type { SelectionItemId } from '@fluentui/react-components';
 import { useTranslation } from '../context/TranslationContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -449,7 +463,7 @@ export const SystemConfig: React.FC = () => {
 
     // --- SEEDER LOGIC ---
     const [seeders, setSeeders] = useState<any[]>([]);
-    const [selectedSeeders, setSelectedSeeders] = useState<Set<string>>(new Set());
+    const [selectedSeeders, setSelectedSeeders] = useState<Set<SelectionItemId>>(new Set());
     const [seeding, setSeeding] = useState(false);
 
     const fetchSeeders = async () => {
@@ -461,6 +475,28 @@ export const SystemConfig: React.FC = () => {
             console.error(e);
         }
     };
+
+    const seederColumns: ExtendedTableColumnDefinition<any>[] = [
+        createTableColumn({
+            columnId: 'name',
+            compare: (a, b) => a.name.localeCompare(b.name),
+            renderHeaderCell: () => t('common.name'),
+            renderCell: (item) => <Text weight="semibold">{item.name}</Text>,
+        }),
+        createTableColumn({
+            columnId: 'description',
+            compare: (a, b) => a.description.localeCompare(b.description),
+            renderHeaderCell: () => t('feedback.description'),
+            renderCell: (item) => item.description,
+        }),
+        createTableColumn({
+            columnId: 'id',
+            compare: (a, b) => a.id.localeCompare(b.id),
+            renderHeaderCell: () => 'ID',
+            renderCell: (item) => <Text size={200} font="monospace">{item.id}</Text>,
+        }),
+    ];
+
 
     const runSeeding = async () => {
         if (selectedSeeders.size === 0) return;
@@ -495,49 +531,43 @@ export const SystemConfig: React.FC = () => {
             });
         } finally {
             setSeeding(false);
+            // Optionally clear selection or not
         }
     };
 
     const renderSeeders = () => (
-        <Card className={styles.card} style={{ maxWidth: 800 }}>
-            <Title3>{t('system.menu.seeders', 'Inicializace dat (Seeders)')}</Title3>
-
-            <Divider style={{ margin: '12px 0' }} />
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {seeders.map(s => {
-                    const isSelected = selectedSeeders.has(s.id);
-                    return (
-                        <Card key={s.id}
-                            onClick={() => {
-                                const next = new Set(selectedSeeders);
-                                if (isSelected) next.delete(s.id); else next.add(s.id);
-                                setSelectedSeeders(next);
-                            }}
-                            style={{
-                                cursor: 'pointer',
-                                border: isSelected ? `2px solid ${tokens.colorBrandBackground}` : '1px solid #eee',
-                                padding: 12
-                            }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                    <Text weight="semibold">{s.name}</Text>
-                                    <div style={{ fontSize: '12px', color: '#666' }}>{s.description}</div>
-                                </div>
-                                {isSelected && <Badge appearance="filled" color="brand">Vybráno</Badge>}
-                            </div>
-                        </Card>
-                    );
-                })}
-            </div>
-
-            <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button appearance="primary" disabled={seeding || selectedSeeders.size === 0} onClick={runSeeding}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <ActionBar>
+                <Button
+                    appearance="primary"
+                    disabled={seeding || selectedSeeders.size === 0}
+                    icon={seeding ? <Spinner size="tiny" /> : <Play24Regular />}
+                    onClick={runSeeding}
+                >
                     {seeding ? 'Provádím...' : `Naplnit vybrané (${selectedSeeders.size})`}
                 </Button>
+            </ActionBar>
+
+            <div style={{ flexGrow: 1, padding: '16px', overflow: 'hidden' }}>
+                <SmartDataGrid
+                    items={seeders}
+                    columns={seederColumns}
+                    getRowId={(item) => item.id}
+                    selectionMode="multiselect"
+                    selectedItems={selectedSeeders}
+                    onSelectionChange={(_, data) => setSelectedSeeders(data.selectedItems)}
+                />
             </div>
-        </Card>
+
+            {/* Keeping the migration result/help text just in case, but styled minimally */}
+            <div style={{ padding: '0 16px 16px 16px' }}>
+                <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                    Vyberte sady dat, které chcete nahrát do aktuální organizace. Existující klíče nebudou přepsány.
+                </Text>
+            </div>
+        </div>
     );
+
 
 
     const renderDashboard = () => (
