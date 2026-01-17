@@ -126,14 +126,47 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
                     });
 
                     // Structural Checks for Pages
-                    if (isPage && !hasPageLayout && !name.includes('login') && !name.includes('register') && !name.includes('dashboard')) {
-                        // Relaxed rule: Only warn if it looks like a main page
-                        uniformityIssues.push({
-                            type: 'structure',
-                            file: relativePath,
-                            line: 1,
-                            message: `Page missing <PageLayout> wrapper.`
-                        });
+                    const isGridPage = text.includes('<SmartDataGrid') || text.includes('SmartDataGrid');
+
+                    if (isPage) {
+                        if (!hasPageLayout && !name.includes('login') && !name.includes('register') && !name.includes('dashboard')) {
+                            // Relaxed rule: Only warn if it looks like a main page
+                            uniformityIssues.push({
+                                type: 'structure',
+                                file: relativePath,
+                                line: 1,
+                                message: `Page missing <PageLayout> wrapper.`
+                            });
+                        }
+
+                        // GRID PAGE STANDARDS
+                        if (isGridPage) {
+                            if (!text.includes('useKeyboardShortcut')) {
+                                uniformityIssues.push({
+                                    type: 'structure',
+                                    file: relativePath,
+                                    line: 1,
+                                    message: `Grid Page missing Keyboard Shortcuts implementation (useKeyboardShortcut).`
+                                });
+                            }
+                            if (!text.includes('<ActionBar') && !text.includes('ActionBar')) {
+                                uniformityIssues.push({
+                                    type: 'structure',
+                                    file: relativePath,
+                                    line: 1,
+                                    message: `Grid Page missing <ActionBar> standard component.`
+                                });
+                            }
+                            // DocuRef check - a bit looser, usually part of ActionBar
+                            if (!text.includes('DocuRef')) {
+                                uniformityIssues.push({
+                                    type: 'structure',
+                                    file: relativePath,
+                                    line: 1,
+                                    message: `Grid Page might be missing Document References (DocuRef).`
+                                });
+                            }
+                        }
                     }
 
                     // Full text checks (Regex)
