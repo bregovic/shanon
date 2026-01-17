@@ -302,6 +302,12 @@ try {
                     $creds = json_encode($creds);
                 }
                 
+                // Validation: Check if Folder ID looks like a Client ID (which is a common user error)
+                if (strpos($folderId, '.apps.googleusercontent.com') !== false) {
+                    echo json_encode(['success' => false, 'error' => 'Chyba konfigurace: Do pole "ID Složky" jste pravděpodobně vložili "Client ID". Vložte prosím pouze ID složky (krátký řetězec, např. "19V3digDrRSIk2Bh...").']);
+                    exit;
+                }
+
                 $drive = new GoogleDriveStorage($creds, $folderId);
                 $result = $drive->testConnection();
                 if (($result['success'] ?? false) && !isset($result['message'])) {
