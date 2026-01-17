@@ -188,7 +188,7 @@ const Layout: React.FC = () => {
                                         }
                                         navigate(mod.path);
                                     }}
-                                    icon={isActive(mod.path) ? <Checkmark24Regular /> : undefined}
+                                    icon={isActive(mod.path) ? <Checkmark24Regular /> : <div style={{ width: 24, height: 24 }} />}
                                 >
                                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         {mod.icon}
@@ -224,7 +224,7 @@ const Layout: React.FC = () => {
                                     <MenuItem
                                         key={org.org_id}
                                         onClick={() => navigate(`/${org.org_id}/dashboard`)}
-                                        icon={currentOrgId === org.org_id ? <Checkmark24Regular /> : undefined}
+                                        icon={currentOrgId === org.org_id ? <Checkmark24Regular /> : <div style={{ width: 24, height: 24 }} />}
                                     >
                                         <span style={{ fontWeight: currentOrgId === org.org_id ? 600 : 400 }}>
                                             {org.org_id}
