@@ -218,12 +218,12 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
                                 }
                             }
                         }
-                    } else if (entry.kind === 'directory') {
-                        if (entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'dist' && entry.name !== 'build') {
-                            await scanDir(entry, relativePath);
-                        } else {
-                            console.log(`Skipping ignored directory: ${relativePath}`);
-                        }
+                    }
+                } else if (entry.kind === 'directory') {
+                    if (entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'dist' && entry.name !== 'build') {
+                        await scanDir(entry, relativePath);
+                    } else {
+                        console.log(`Skipping ignored directory: ${relativePath}`);
                     }
                 }
             }
