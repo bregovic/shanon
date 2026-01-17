@@ -23,11 +23,9 @@ import {
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
-    ArrowLeft24Regular,
     Table24Regular,
     ArrowClockwise24Regular,
     Code24Regular,
-    Settings24Regular,
     Play24Regular,
     Filter24Regular,
     ChevronDown24Regular
@@ -39,7 +37,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/TranslationContext';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
 import { useKeyboardShortcut } from '../context/KeyboardShortcutsContext';
-import { useHelp } from '../context/HelpContext';
+// import { useHelp } from '../context/HelpContext'; // Reserved for future context help
 
 const useStyles = makeStyles({
     gridContainer: {
@@ -92,16 +90,80 @@ interface TableInfo {
     description?: string;
 }
 
-// SQL Template Generator
+// SQL Template Generator - Enhanced with realistic sample conditions
 const generateSqlTemplates = (tableName: string, columns: any[]) => {
     const pkCol = columns.find(c => c.column_name === 'id' || c.column_name === 'rec_id')?.column_name || 'id';
     const colNames = columns.map(c => c.column_name).slice(0, 5).join(', ');
 
+    // Find common columns for smart WHERE clause examples
+    const hasCreatedAt = columns.some(c => c.column_name === 'created_at');
+    const hasIsActive = columns.some(c => c.column_name === 'is_active');
+    const hasTenantId = columns.some(c => c.column_name === 'tenant_id');
+    const hasName = columns.find(c => c.column_name.includes('name'))?.column_name;
+
+    // Build smart WHERE clause
+    let whereExamples: string[] = [];
+    if (hasName) whereExamples.push(`  -- AND ${hasName} ILIKE '%search%'`);
+    if (hasIsActive) whereExamples.push(`  -- AND is_active = true`);
+    if (hasCreatedAt) whereExamples.push(`  -- AND created_at > '2024-01-01'`);
+    if (hasTenantId) whereExamples.push(`  -- AND tenant_id = 'your-tenant-id'`);
+
+    const whereClause = whereExamples.length > 0 ? `\n${whereExamples.join('\n')}` : '';
+
     return {
-        select: `SELECT ${colNames}\nFROM "${tableName}"\nWHERE 1=1\nLIMIT 50`,
-        update: `UPDATE "${tableName}"\nSET column_name = 'new_value'\nWHERE ${pkCol} = ?`,
-        insert: `INSERT INTO "${tableName}" (${colNames})\nVALUES (?, ?, ?, ?, ?)`,
-        delete: `DELETE FROM "${tableName}"\nWHERE ${pkCol} = ?`
+        // Basic SELECT
+        select: `-- Základní SELECT pro tabulku ${tableName}
+SELECT ${colNames}
+FROM "${tableName}"
+WHERE 1=1${whereClause}
+ORDER BY ${pkCol} DESC
+LIMIT 50`,
+
+        // SELECT with JOIN example (if has foreign keys)
+        selectJoin: `-- SELECT s JOINem (upravte názvy tabulek)
+SELECT t.${pkCol}, t.${columns[1]?.column_name || 'column1'}
+FROM "${tableName}" t
+-- LEFT JOIN related_table r ON r.id = t.foreign_key_id
+WHERE 1=1
+LIMIT 20`,
+
+        // UPDATE with safe WHERE
+        update: `-- UPDATE záznamů (POZOR: Vždy ověřte WHERE podmínku!)
+UPDATE "${tableName}"
+SET 
+    ${columns[1]?.column_name || 'column_name'} = 'nová hodnota'
+    -- , updated_at = CURRENT_TIMESTAMP
+WHERE ${pkCol} = 123  -- << Změňte na skutečné ID!
+-- RETURNING *`,
+
+        // Bulk UPDATE example
+        updateBulk: `-- Hromadný UPDATE (s podmínkou)
+UPDATE "${tableName}"
+SET is_active = false
+WHERE ${hasCreatedAt ? "created_at < '2023-01-01'" : `${pkCol} IN (1, 2, 3)`}
+-- RETURNING ${pkCol}, is_active`,
+
+        // INSERT
+        insert: `-- INSERT nového záznamu
+INSERT INTO "${tableName}" (
+    ${colNames}
+) VALUES (
+    'hodnota1', 'hodnota2', 'hodnota3', 'hodnota4', 'hodnota5'
+)
+RETURNING *`,
+
+        // DELETE with safe WHERE
+        delete: `-- DELETE záznamu (POZOR: Vždy ověřte WHERE podmínku!)
+DELETE FROM "${tableName}"
+WHERE ${pkCol} = 123  -- << Změňte na skutečné ID!
+-- RETURNING *`,
+
+        // DELETE bulk
+        deleteBulk: `-- Hromadné smazání starých záznamů
+DELETE FROM "${tableName}"
+WHERE ${hasCreatedAt ? "created_at < '2023-01-01'" : `${pkCol} IN (1, 2, 3)`}
+  ${hasIsActive ? "AND is_active = false" : ""}
+-- RETURNING ${pkCol}`
     };
 };
 
@@ -109,7 +171,7 @@ export const TableBrowser: React.FC = () => {
     const styles = useStyles();
     const { getApiUrl, currentOrgId } = useAuth();
     const { t } = useTranslation();
-    const { openHelp } = useHelp();
+    // const { openHelp } = useHelp(); // Reserved for future context help
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const orgPrefix = `/${currentOrgId || 'VACKR'}`;
@@ -359,11 +421,48 @@ export const TableBrowser: React.FC = () => {
                     {/* SQL Templates */}
                     {currentTable && Object.keys(sqlTemplates).length > 0 && (
                         <div className={styles.sqlTemplates}>
-                            <Text size={200}>Šablony:</Text>
-                            <Button size="small" appearance="subtle" onClick={() => setSqlQuery(sqlTemplates.select)}>SELECT</Button>
+                            <Text size={200} weight="semibold" style={{ marginRight: 8 }}>Vzorové příkazy:</Text>
+
+                            {/* SELECT Group */}
+                            <Menu>
+                                <MenuTrigger>
+                                    <Button size="small" appearance="subtle" icon={<ChevronDown24Regular />} iconPosition="after">SELECT</Button>
+                                </MenuTrigger>
+                                <MenuPopover>
+                                    <MenuList>
+                                        <MenuItem onClick={() => setSqlQuery(sqlTemplates.select)}>Základní SELECT</MenuItem>
+                                        <MenuItem onClick={() => setSqlQuery(sqlTemplates.selectJoin)}>SELECT s JOINem</MenuItem>
+                                    </MenuList>
+                                </MenuPopover>
+                            </Menu>
+
                             <Button size="small" appearance="subtle" onClick={() => setSqlQuery(sqlTemplates.insert)}>INSERT</Button>
-                            <Button size="small" appearance="subtle" onClick={() => setSqlQuery(sqlTemplates.update)}>UPDATE</Button>
-                            <Button size="small" appearance="subtle" onClick={() => setSqlQuery(sqlTemplates.delete)}>DELETE</Button>
+
+                            {/* UPDATE Group */}
+                            <Menu>
+                                <MenuTrigger>
+                                    <Button size="small" appearance="subtle" icon={<ChevronDown24Regular />} iconPosition="after">UPDATE</Button>
+                                </MenuTrigger>
+                                <MenuPopover>
+                                    <MenuList>
+                                        <MenuItem onClick={() => setSqlQuery(sqlTemplates.update)}>UPDATE jednoho záznamu</MenuItem>
+                                        <MenuItem onClick={() => setSqlQuery(sqlTemplates.updateBulk)}>Hromadný UPDATE</MenuItem>
+                                    </MenuList>
+                                </MenuPopover>
+                            </Menu>
+
+                            {/* DELETE Group */}
+                            <Menu>
+                                <MenuTrigger>
+                                    <Button size="small" appearance="subtle" icon={<ChevronDown24Regular />} iconPosition="after">DELETE</Button>
+                                </MenuTrigger>
+                                <MenuPopover>
+                                    <MenuList>
+                                        <MenuItem onClick={() => setSqlQuery(sqlTemplates.delete)}>DELETE jednoho záznamu</MenuItem>
+                                        <MenuItem onClick={() => setSqlQuery(sqlTemplates.deleteBulk)}>Hromadné DELETE</MenuItem>
+                                    </MenuList>
+                                </MenuPopover>
+                            </Menu>
                         </div>
                     )}
 
