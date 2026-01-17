@@ -214,7 +214,7 @@ export const UsersAdmin: React.FC = () => {
         setSelectedIds(data.selectedItems);
     };
 
-    const handleRowClick = (item: User) => {
+    const handleRowDoubleClick = (item: User) => {
         handleOpenEdit(item);
     };
 
@@ -423,7 +423,7 @@ export const UsersAdmin: React.FC = () => {
                         selectionMode="multiselect"
                         selectedItems={selectedIds}
                         onSelectionChange={handleSelectionChange}
-                        onRowClick={handleRowClick}
+                        onRowDoubleClick={handleRowDoubleClick}
                     />
                 )}
             </PageContent>

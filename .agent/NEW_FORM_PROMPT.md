@@ -40,10 +40,10 @@ useKeyboardShortcut('save', handleSave);
 - [ ] `getRowId={(item) => item.rec_id}`
 - [ ] `onSelectionChange` pro hromadné akce
 - [ ] Filtrování automaticky přes SmartDataGrid
-- [ ] **Row Click Behavior** (vybrat jednu možnost):
-  - `onRowClick` → Otevřít Drawer pro editaci (jednodušší entity)
-  - `onRowClick` → Navigovat na detail stránku (komplexní entity s podřízenými daty)
-  - Žádný `onRowClick` → Pouze selection (pro hromadné operace)
+- [ ] **Click Behavior (POVINNÉ)**:
+  - **Single click** = Označení řádku (selection)
+  - **Double click** = Otevření detailu/editace
+  - Používej `onRowDoubleClick` (NE `onRowClick`) pro otevření editace!
 
 ### Forms
 - [ ] Validace onBlur (ne jen onSubmit)
