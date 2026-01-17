@@ -305,7 +305,12 @@ const RequestsPage = () => {
     // Manage State
     const [requests, setRequests] = useState<RequestItem[]>([]);
     const [loadingRequests, setLoadingRequests] = useState(false);
+
+    // selectedRequest -> For Toolbar Context, Permissions, etc. (Highlight)
     const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
+    // viewRequest -> For Full Screen Detail View
+    const [viewRequest, setViewRequest] = useState<RequestItem | null>(null);
+
     const [users, setUsers] = useState<UserItem[]>([]);
     const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
     const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -378,6 +383,7 @@ const RequestsPage = () => {
         // Listen for reset events from menu
         const handleReset = () => {
             setSelectedRequest(null);
+            setViewRequest(null);
             setSelectedItems(new Set());
             const mine = new URLSearchParams(window.location.search).get('mine') === '1';
             setShowOnlyMine(mine);
@@ -397,6 +403,7 @@ const RequestsPage = () => {
             });
             setSelectedItems(new Set());
             setSelectedRequest(null);
+            setViewRequest(null);
             loadRequests();
         } catch (e) {
             console.error(e);
@@ -412,10 +419,11 @@ const RequestsPage = () => {
     }, [searchParams]);
 
     useEffect(() => {
-        if (selectedRequest) {
-            loadComments(selectedRequest.id);
-            loadAuditLog(selectedRequest.id);
-            loadAttachments(selectedRequest.id);
+        // Load data when DETAIL view opens
+        if (viewRequest) {
+            loadComments(viewRequest.id);
+            loadAuditLog(viewRequest.id);
+            loadAttachments(viewRequest.id);
             setIsEditingDescription(false);
             setIsEditingSubject(false);
         } else {
@@ -424,7 +432,7 @@ const RequestsPage = () => {
             setAttachments([]);
             setNewComment('');
         }
-    }, [selectedRequest]);
+    }, [viewRequest]);
 
     const loadRequests = async () => {
         setLoadingRequests(true);
@@ -642,6 +650,9 @@ const RequestsPage = () => {
         if (selectedRequest && selectedRequest.id === id) {
             setSelectedRequest(prev => prev ? update(prev) : null);
         }
+        if (viewRequest && viewRequest.id === id) {
+            setViewRequest(prev => prev ? update(prev) : null);
+        }
     };
 
     const handleAddComment = async () => {
@@ -754,13 +765,13 @@ const RequestsPage = () => {
         }
     ];
 
-    if (selectedRequest) {
+    if (viewRequest) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ActionBar>
                     <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => {
-                        setSelectedRequest(null);
-                        setSelectedItems(new Set());
+                        setViewRequest(null);
+                        // We keep selectedRequest/selectedItems to preserve context when going back
                     }}>
                         {t('common.back')}
                     </Button>
@@ -772,24 +783,23 @@ const RequestsPage = () => {
                         <BreadcrumbDivider />
                         <BreadcrumbItem>
                             <BreadcrumbButton onClick={() => {
-                                setSelectedRequest(null);
-                                setSelectedItems(new Set());
+                                setViewRequest(null);
                             }}>{t('modules.requests')}</BreadcrumbButton>
                         </BreadcrumbItem>
                         <BreadcrumbDivider />
                         <BreadcrumbItem>
-                            <BreadcrumbButton current>{`#${selectedRequest.id}`}</BreadcrumbButton>
+                            <BreadcrumbButton current>{`#${viewRequest.id}`}</BreadcrumbButton>
                         </BreadcrumbItem>
                     </Breadcrumb>
                     <div style={{ flex: 1 }} />
-                    <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(selectedRequest.id)}>Obnovit</Button>
+                    <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(viewRequest.id)}>Obnovit</Button>
                 </ActionBar>
 
                 <div style={{ flex: 1, padding: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {/* Detail Header / Title Area */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, marginBottom: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span className={styles.detailId}>#{selectedRequest.id}</span>
+                            <span className={styles.detailId}>#{viewRequest.id}</span>
                             {isEditingSubject ? (
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <input
@@ -813,16 +823,12 @@ const RequestsPage = () => {
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span className={styles.detailTitle}>{selectedRequest.subject}</span>
-                                    <Button
-                                        icon={<Edit24Regular />}
-                                        appearance="subtle"
-                                        size="small"
-                                        onClick={() => {
-                                            setSubjectEditValue(selectedRequest.subject);
+                                    <h1 className={styles.detailTitle} onDoubleClick={() => {
+                                        if (hasPermission('changerequests.manage')) {
+                                            setSubjectEditValue(viewRequest.subject);
                                             setIsEditingSubject(true);
-                                        }}
-                                    />
+                                        }
+                                    }}>{viewRequest.subject}</h1>
                                 </div>
                             )}
                         </div>
@@ -1149,7 +1155,7 @@ const RequestsPage = () => {
                                     if (selectedItems.size === 1) {
                                         const id = Array.from(selectedItems)[0];
                                         const item = requests.find((r: RequestItem) => r.id === id);
-                                        if (item) setSelectedRequest(item);
+                                        if (item) setViewRequest(item);
                                     }
                                 }}
                             >Upravit</MenuItem>
@@ -1236,6 +1242,7 @@ const RequestsPage = () => {
                                 columns={columns}
                                 getRowId={(i: RequestItem) => i.id}
                                 onRowClick={setSelectedRequest}
+                                onRowDoubleClick={setViewRequest}
                                 selectedItems={selectedItems}
                                 onSelectionChange={handleSelectionChange}
                                 selectionMode="multiselect"

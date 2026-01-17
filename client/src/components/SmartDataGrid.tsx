@@ -104,6 +104,7 @@ interface SmartDataGridProps<T> {
     withFilterRow?: boolean;
     onFilteredDataChange?: (filteredItems: T[]) => void;
     onRowClick?: (item: T) => void;
+    onRowDoubleClick?: (item: T) => void;
     selectionMode?: 'single' | 'multiselect' | 'none';
     selectedItems?: Set<SelectionItemId>;
     onSelectionChange?: (e: SyntheticEvent, data: OnSelectionChangeData) => void;
@@ -305,6 +306,7 @@ const ColumnHeaderMenu = <T,>({
 export const SmartDataGrid = <T,>({ items, columns, getRowId,
     onFilteredDataChange,
     onRowClick,
+    onRowDoubleClick,
     selectionMode,
     selectedItems,
     onSelectionChange
@@ -593,6 +595,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                                         cursor: onRowClick ? 'pointer' : undefined
                                     }}
                                     onClick={() => onRowClick?.(item)}
+                                    onDoubleClick={() => onRowDoubleClick?.(item)}
                                     className={styles.cell}
                                 >
                                     {renderCell(item)}
@@ -656,6 +659,7 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                                                     cursor: onRowClick ? 'pointer' : undefined
                                                 }}
                                                 onClick={() => onRowClick?.(item)}
+                                                onDoubleClick={() => onRowDoubleClick?.(item)}
                                                 className={styles.cell}
                                             >
                                                 {renderCell(item)}
