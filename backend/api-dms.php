@@ -132,6 +132,66 @@ try {
     }
 
     // -------------------------------------------------------------------------
+    // ACTION: DOC TYPES MANAGE
+    // -------------------------------------------------------------------------
+    if ($action === 'doc_type_create' || $action === 'doc_type_update') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $id = $input['rec_id'] ?? $input['id'] ?? null;
+        $code = $input['code'] ?? '';
+        $name = $input['name'] ?? '';
+        $description = $input['description'] ?? '';
+        $icon = $input['icon'] ?? 'Document24Regular'; // Default icon
+        
+        if (!$code || !$name) throw new Exception("Code and Name are required");
+
+        if ($action === 'doc_type_create') {
+             // Check existence? Code should be unique per tenant/org
+             // Use ON CONFLICT DO NOTHING or Check first. 
+             // Simple insert for now.
+             $sql = "INSERT INTO dms_doc_types (tenant_id, org_id, code, name, description, icon, is_active) 
+                     VALUES (:tid, :oid, :code, :name, :desc, :icon, true)";
+             $stmt = $pdo->prepare($sql);
+             $stmt->execute([
+                 ':tid' => $tenantId,
+                 ':oid' => $currentOrgId,
+                 ':code' => $code,
+                 ':name' => $name,
+                 ':desc' => $description,
+                 ':icon' => $icon
+             ]);
+        } else {
+             if (!$id) throw new Exception("ID required for update");
+             $sql = "UPDATE dms_doc_types SET code=:code, name=:name, description=:desc, icon=:icon WHERE rec_id=:id";
+             $stmt = $pdo->prepare($sql);
+             $stmt->execute([
+                 ':code' => $code,
+                 ':name' => $name,
+                 ':desc' => $description,
+                 ':icon' => $icon,
+                 ':id' => $id
+             ]);
+        }
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if ($action === 'doc_type_delete') {
+         $input = json_decode(file_get_contents('php://input'), true);
+         $id = $input['id'] ?? null;
+         if (!$id) throw new Exception("ID required");
+
+         // Soft delete or hard? Hard for now unless used.
+         // Better soft delete: UPDATE dms_doc_types SET is_active = false
+         $stmt = $pdo->prepare("UPDATE dms_doc_types SET is_active = false WHERE rec_id = :id");
+         $stmt->execute([':id'=>$id]);
+         
+         echo json_encode(['success' => true]);
+         exit;
+    }
+
+    // -------------------------------------------------------------------------
     // ACTION: STORAGE PROFILES
     // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------
