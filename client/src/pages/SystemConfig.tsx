@@ -221,6 +221,21 @@ export const SystemConfig: React.FC = () => {
         }
     };
 
+    const handleReindex = async () => {
+        if (!confirm('Spustit údržbu databáze (Indexace + Analyze)?')) return;
+        setUpdatingDB(true); // Re-use spinner state
+        setMigrationResult(null);
+        try {
+            const res = await fetch('/api/api-system-maintenance.php?action=reindex');
+            const json = await res.json();
+            setMigrationResult(json);
+        } catch (e: any) {
+            setMigrationResult({ success: false, error: e.message || 'Network Error' });
+        } finally {
+            setUpdatingDB(false);
+        }
+    };
+
 
     const fetchData = async () => {
         setLoading(true);
@@ -674,7 +689,7 @@ export const SystemConfig: React.FC = () => {
                     {/* 5. TASKS */}
                     <MenuSection id="tasks" title={t('system.menu.tasks')} icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('tasks')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
-                        <MenuItem label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
+                        <MenuItem label={t('system.item.run_indexing')} onClick={() => handleReindex()} />
                         <MenuItem label="Kvalita kódu & Audit" onClick={() => navigate(orgPrefix + '/system/audit')} path={orgPrefix + '/system/audit'} />
                         <MenuItem label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} path={orgPrefix + '/system?view=update_db'} />
                     </MenuSection>
