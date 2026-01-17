@@ -6,11 +6,10 @@ require_once 'db.php';
 
 header('Content-Type: application/json');
 
-// SECURITY: Only ADMIN can access table browser
-// strict check
+// SECURITY: ONLY ADMIN
 if (!isset($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'admin') {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Access Denied: Admins only']);
+    echo json_encode(['success' => false, 'error' => 'Access Denied']);
     exit;
 }
 
@@ -20,9 +19,19 @@ $input = json_decode(file_get_contents('php://input'), true);
 try {
     $pdo = DB::connect();
 
+    // -- HELPER: Check columns exists --
+    function getTableColumns($pdo, $table) {
+        $stmt = $pdo->prepare("
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = ?
+        ");
+        $stmt->execute([$table]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     if ($action === 'list_tables') {
-        // List all tables in public schema
-        // Also try to get estimated row count from pg_stats
+        // List tables with size info
         $sql = "
             SELECT 
                 t.table_name,
@@ -35,61 +44,133 @@ try {
         $stmt = $pdo->query($sql);
         $tables = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Add ID for grid
-        foreach ($tables as &$t) {
-            $t['id'] = $t['table_name'];
-        }
+        // Add 'id' for frontend grid
+        foreach ($tables as &$t) $t['id'] = $t['table_name'];
 
         echo json_encode(['success' => true, 'data' => $tables]);
 
     } elseif ($action === 'get_data') {
         $table = $_GET['table'] ?? '';
+        $tenantId = $_SESSION['user']['tenant_id'] ?? null;
         
-        // Sanitize table name strictly to avoid SQL injection
-        // Only allow alphanumeric and underscore
-        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
-            throw new Exception("Invalid table name");
+         // Security: Whitelist chars
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) throw new Exception("Invalid table name");
+
+        // 1. Get Columns
+        $columns = getTableColumns($pdo, $table);
+        if (empty($columns)) throw new Exception("Table not found");
+
+        $hasTenantId = false;
+        foreach ($columns as $c) {
+            if ($c['column_name'] === 'tenant_id') $hasTenantId = true;
         }
 
-        // Check if table exists
-        $check = $pdo->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name = ?");
-        $check->execute([$table]);
-        if (!$check->fetch()) {
-            throw new Exception("Table not found");
+        // 2. Build Query
+        $sql = "SELECT * FROM \"$table\"";
+        $params = [];
+        
+        // Tenant Filtering
+        if ($hasTenantId && $tenantId) {
+            $sql .= " WHERE tenant_id = ?";
+            $params[] = $tenantId;
         }
 
-        // Get Columns Metadata first
-        $colSql = "
-            SELECT column_name, data_type, ordinal_position
-            FROM information_schema.columns 
-            WHERE table_schema = 'public' AND table_name = ?
-            ORDER BY ordinal_position
-        ";
-        $stmtCol = $pdo->prepare($colSql);
-        $stmtCol->execute([$table]);
-        $columns = $stmtCol->fetchAll(PDO::FETCH_ASSOC);
+        $sql .= " LIMIT 500";
 
-        // Hard limit for browser performance
-        $limit = 500; 
-        
-        // Fetch Data
-        // Use quote identifier for table name
-        $dataSql = "SELECT * FROM \"$table\" LIMIT $limit";
-        $stmtData = $pdo->query($dataSql);
-        $rows = $stmtData->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Standardize rows for Grid (ensure all columns exist even if null)
-        // actually fetchAll assoc does this well.
+        // 3. Analyze Features (Status)
+        $features = [
+            'has_tenant' => $hasTenantId,
+            'has_timestamps' => false,
+            'has_audit' => false // Placeholder for trigger check
+        ];
+        // Check for created_at/updated_at
+        $colNames = array_column($columns, 'column_name');
+        if (in_array('created_at', $colNames) && in_array('updated_at', $colNames)) {
+            $features['has_timestamps'] = true;
+        }
 
         echo json_encode([
-            'success' => true, 
+            'success' => true,
             'columns' => $columns,
             'data' => $rows,
-            'meta' => [
-                'limit' => $limit,
-                'total_shown' => count($rows)
-            ]
+            'features' => $features,
+            'filter_active' => ($hasTenantId && $tenantId) ? "Filtered by Tenant: $tenantId" : "Show All (System/Public)"
         ]);
+
+    } elseif ($action === 'execute_sql') {
+        $sql = $input['sql'] ?? '';
+        if (!$sql) throw new Exception("Empty SQL");
+
+        // Execute raw SQL
+        // We use query() specifically. If select, fetch. If update/delete, count.
+        
+        // Detect query type (simple check)
+        $isSelect = stripos(trim($sql), 'SELECT') === 0 || stripos(trim($sql), 'WITH') === 0;
+
+        try {
+            if ($isSelect) {
+                $stmt = $pdo->query($sql);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $count = count($rows);
+                
+                // Get dynamic columns from result/ first row
+                $columns = [];
+                if ($count > 0) {
+                    $keys = array_keys($rows[0]);
+                    foreach($keys as $k) $columns[] = ['column_name' => $k, 'data_type' => 'unknown'];
+                }
+
+                echo json_encode([
+                    'success' => true,
+                    'type' => 'SELECT',
+                    'count' => $count,
+                    'data' => $rows,
+                    'columns' => $columns
+                ]);
+            } else {
+                // UPDATE/INSERT/DDL
+                $affected = $pdo->exec($sql);
+                echo json_encode([
+                    'success' => true,
+                    'type' => 'COMMAND', 
+                    'message' => "Executed successfully. Affected rows: " . ($affected === false ? 'Unknown' : $affected)
+                ]);
+            }
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+
+    } elseif ($action === 'apply_feature') {
+        // Apply standard columns or triggers
+        $table = $input['table'] ?? '';
+        $feature = $input['feature'] ?? '';
+        
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) throw new Exception("Invalid table name");
+
+        $sql = "";
+        if ($feature === 'timestamps') {
+            $sql = "
+                ALTER TABLE \"$table\" 
+                ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS created_by INT,
+                ADD COLUMN IF NOT EXISTS updated_by INT;
+            ";
+        } elseif ($feature === 'soft_delete') {
+            $sql = "ALTER TABLE \"$table\" ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;";
+        } else {
+            throw new Exception("Unknown feature");
+        }
+
+        if ($sql) {
+            $pdo->exec($sql);
+            echo json_encode(['success' => true, 'message' => "Feature $feature applied"]);
+        }
+
     } else {
         throw new Exception("Invalid action");
     }
