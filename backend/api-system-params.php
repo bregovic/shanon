@@ -1,11 +1,13 @@
 <?php
 // api-system-params.php
-require_once 'db.php';
 require_once 'cors.php';
-session_start();
+require_once 'session_init.php';
+require_once 'db.php';
 
-$user_id = $_SESSION['user_id'] ?? null;
-if (!$user_id) {
+header("Content-Type: application/json");
+
+// Auth check
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
