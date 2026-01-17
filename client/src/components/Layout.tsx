@@ -184,10 +184,12 @@ const Layout: React.FC = () => {
                                         onClick={() => navigate(`/${org.org_id}/dashboard`)}
                                         icon={currentOrgId === org.org_id ? <Checkmark24Regular /> : undefined}
                                     >
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontWeight: 'bold' }}>{org.org_id}</span>
-                                            <span style={{ fontSize: '12px', color: 'gray' }}>{org.display_name}</span>
-                                        </div>
+                                        <span style={{ fontWeight: currentOrgId === org.org_id ? 600 : 400 }}>
+                                            {org.org_id}
+                                        </span>
+                                        <span style={{ color: tokens.colorNeutralForeground3, marginLeft: '8px' }}>
+                                            {org.display_name}
+                                        </span>
                                     </MenuItem>
                                 ))}
                                 {organizations.length === 0 && <MenuItem disabled>{t('layout.no_orgs')}</MenuItem>}
