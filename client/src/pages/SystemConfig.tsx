@@ -500,8 +500,8 @@ export const SystemConfig: React.FC = () => {
 
     const renderSeeders = () => (
         <Card className={styles.card} style={{ maxWidth: 800 }}>
-            <CardHeader header={<Title3>Inicializace standardních dat (Seeders)</Title3>} />
-            <Text>Vyberte sady dat, které chcete nahrát do aktuální organizace. Existující klíče nebudou přepsány.</Text>
+            <Title3>{t('system.menu.seeders', 'Inicializace dat (Seeders)')}</Title3>
+
             <Divider style={{ margin: '12px 0' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
