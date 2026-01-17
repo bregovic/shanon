@@ -39,13 +39,15 @@ try {
     }
 
     if ($action === 'list_tables') {
-        // List tables with size info
+        // List tables with size info and description (COMMENT)
         $sql = "
             SELECT 
                 t.table_name,
                 pg_size_pretty(pg_total_relation_size('\"' || t.table_name || '\"')) as size,
-                (SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = t.table_name) as estimated_rows
+                (SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = t.table_name) as estimated_rows,
+                obj_description(c.oid) as description
             FROM information_schema.tables t
+            LEFT JOIN pg_class c ON c.relname = t.table_name AND c.relkind = 'r'
             WHERE t.table_schema = 'public'
             ORDER BY t.table_name
         ";
@@ -101,11 +103,18 @@ try {
             $features['has_timestamps'] = true;
         }
 
+        // 4. Get table description (COMMENT)
+        $descStmt = $pdo->prepare("SELECT obj_description(c.oid) as description FROM pg_class c WHERE c.relname = ? AND c.relkind = 'r'");
+        $descStmt->execute([$table]);
+        $descRow = $descStmt->fetch(PDO::FETCH_ASSOC);
+        $description = $descRow['description'] ?? '';
+
         echo json_encode([
             'success' => true,
             'columns' => $columns,
             'data' => $rows,
             'features' => $features,
+            'description' => $description,
             'filter_active' => ($hasTenantId && $tenantId) ? "Filtered by Tenant: $tenantId" : "Show All (System/Public)"
         ]);
 

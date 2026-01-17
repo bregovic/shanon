@@ -1,6 +1,17 @@
 # Shanon Database Schema & Documentation
-> Version: 1.0.0
-> Last Updated: 2026-01-04
+> Version: 1.0.1
+> Last Updated: 2026-01-17
+
+## Table Documentation Standard (CRITICAL)
+**Every new table MUST have a COMMENT** describing its purpose in English.
+
+```sql
+-- Example migration:
+CREATE TABLE my_new_table (...);
+COMMENT ON TABLE my_new_table IS 'Stores user preferences for dashboard widgets';
+```
+
+The description is visible in Table Browser and helps developers understand the schema.
 
 ## 1. System Core (Identity & Infrastructure)
 
