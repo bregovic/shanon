@@ -1162,7 +1162,7 @@ const RequestsPage = () => {
             </ActionBar>
 
             {isFilterBarOpen && (
-                <PageFilterBar>
+                <div className={styles.filterBar}>
                     <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Switch
@@ -1202,7 +1202,7 @@ const RequestsPage = () => {
                             </PopoverSurface>
                         </Popover>
                     </div>
-                </PageFilterBar>
+                </div>
             )}
 
             <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
