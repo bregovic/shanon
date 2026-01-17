@@ -27,6 +27,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { TranslationProvider } from './context/TranslationContext';
 import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
 import { FavoritesProvider } from './context/FavoritesContext';
+import { HelpProvider } from './context/HelpContext';
+import { HelpModal } from './components/HelpModal';
 
 const BASE_NAME = import.meta.env.BASE_URL || '/';
 
@@ -174,7 +176,10 @@ function App() {
                     <TranslationProvider>
                         <KeyboardShortcutsProvider>
                             <FavoritesProvider>
-                                <RouterProvider router={router} />
+                                <HelpProvider>
+                                    <RouterProvider router={router} />
+                                    <HelpModal />
+                                </HelpProvider>
                             </FavoritesProvider>
                         </KeyboardShortcutsProvider>
                     </TranslationProvider>

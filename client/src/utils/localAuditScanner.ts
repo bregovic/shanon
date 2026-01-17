@@ -122,72 +122,98 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
                             }
                         }
 
+
+                        // Uniformity: Missing Favorites path
+                        if (lineStr.includes('<MenuItem') && !lineStr.includes('path=') && lineStr.includes('onClick')) {
+                            uniformityIssues.push({
+                                type: 'structure',
+                                file: relativePath,
+                                line: lineNum,
+                                message: `MenuItem with logic missing 'path' prop (cannot be Favorited).`
+                            });
+                        }
+
                         if (lineStr.includes('<PageLayout')) hasPageLayout = true;
                     });
 
-                    // Structural Checks for Pages
-                    const isGridPage = text.includes('<SmartDataGrid') || text.includes('SmartDataGrid');
-
+                    // Page Level Context Checks
                     if (isPage) {
-                        if (!hasPageLayout && !name.includes('login') && !name.includes('register') && !name.includes('dashboard')) {
-                            // Relaxed rule: Only warn if it looks like a main page
+                        // Check if Help Context is used in pages that likely need it
+                        if ((text.includes('<ActionBar') || text.includes('ActionBar')) && !text.includes('useHelp') && !text.includes('HelpButton')) {
+                            // Heuristic: If it has an ActionBar, it's a main page -> should have Help context or button
                             uniformityIssues.push({
                                 type: 'structure',
                                 file: relativePath,
                                 line: 1,
-                                message: `Page missing <PageLayout> wrapper.`
+                                message: `Page with ActionBar missing Help System integration (useHelp or HelpButton).`
                             });
                         }
 
-                        // GRID PAGE STANDARDS
-                        if (isGridPage) {
-                            if (!text.includes('useKeyboardShortcut')) {
+
+                        // Structural Checks for Pages
+                        const isGridPage = text.includes('<SmartDataGrid') || text.includes('SmartDataGrid');
+
+                        if (isPage) {
+                            if (!hasPageLayout && !name.includes('login') && !name.includes('register') && !name.includes('dashboard')) {
+                                // Relaxed rule: Only warn if it looks like a main page
                                 uniformityIssues.push({
                                     type: 'structure',
                                     file: relativePath,
                                     line: 1,
-                                    message: `Grid Page missing Keyboard Shortcuts implementation (useKeyboardShortcut).`
+                                    message: `Page missing <PageLayout> wrapper.`
                                 });
                             }
-                            if (!text.includes('<ActionBar') && !text.includes('ActionBar')) {
-                                uniformityIssues.push({
-                                    type: 'structure',
-                                    file: relativePath,
-                                    line: 1,
-                                    message: `Grid Page missing <ActionBar> standard component.`
-                                });
+
+                            // GRID PAGE STANDARDS
+                            if (isGridPage) {
+                                if (!text.includes('useKeyboardShortcut')) {
+                                    uniformityIssues.push({
+                                        type: 'structure',
+                                        file: relativePath,
+                                        line: 1,
+                                        message: `Grid Page missing Keyboard Shortcuts implementation (useKeyboardShortcut).`
+                                    });
+                                }
+                                if (!text.includes('<ActionBar') && !text.includes('ActionBar')) {
+                                    uniformityIssues.push({
+                                        type: 'structure',
+                                        file: relativePath,
+                                        line: 1,
+                                        message: `Grid Page missing <ActionBar> standard component.`
+                                    });
+                                }
+                                // DocuRef check - a bit looser, usually part of ActionBar
+                                if (!text.includes('DocuRef')) {
+                                    uniformityIssues.push({
+                                        type: 'structure',
+                                        file: relativePath,
+                                        line: 1,
+                                        message: `Grid Page might be missing Document References (DocuRef).`
+                                    });
+                                }
                             }
-                            // DocuRef check - a bit looser, usually part of ActionBar
-                            if (!text.includes('DocuRef')) {
-                                uniformityIssues.push({
-                                    type: 'structure',
-                                    file: relativePath,
-                                    line: 1,
-                                    message: `Grid Page might be missing Document References (DocuRef).`
-                                });
+                        }
+
+                        // Full text checks (Regex)
+                        let match;
+                        while ((match = tPattern.exec(text)) !== null) {
+                            const key = match[1];
+                            if (!usedKeys[key]) usedKeys[key] = [];
+                            usedKeys[key].push(relativePath);
+                        }
+
+                        while ((match = hardcodedPattern.exec(text)) !== null) {
+                            const content = match[1].trim();
+                            // Filter out empty, numbers, or template literals
+                            if (content.length > 3 && isNaN(Number(content)) && !content.includes('{') && !content.includes('&nbsp;')) {
+                                hardcodedCandidates.push({ file: relativePath, text: content });
                             }
                         }
                     }
-
-                    // Full text checks (Regex)
-                    let match;
-                    while ((match = tPattern.exec(text)) !== null) {
-                        const key = match[1];
-                        if (!usedKeys[key]) usedKeys[key] = [];
-                        usedKeys[key].push(relativePath);
+                } else if (entry.kind === 'directory') {
+                    if (entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'dist' && entry.name !== 'build') {
+                        await scanDir(entry, relativePath);
                     }
-
-                    while ((match = hardcodedPattern.exec(text)) !== null) {
-                        const content = match[1].trim();
-                        // Filter out empty, numbers, or template literals
-                        if (content.length > 3 && isNaN(Number(content)) && !content.includes('{') && !content.includes('&nbsp;')) {
-                            hardcodedCandidates.push({ file: relativePath, text: content });
-                        }
-                    }
-                }
-            } else if (entry.kind === 'directory') {
-                if (entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'dist' && entry.name !== 'build') {
-                    await scanDir(entry, relativePath);
                 }
             }
         }

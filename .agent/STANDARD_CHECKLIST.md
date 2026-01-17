@@ -39,7 +39,13 @@
 - [ ] **Alignment:** Text=Left, Numbers=Right, Dates=Center.
 - [ ] **Filters:** Are filters working?
 
-## 7. Keyboard Shortcuts Verification
+## 7. Help & Favorites System
+- [ ] **Help Context:** Is `HelpButton` present in the context bar (if applicable)?
+- [ ] **Help Content:** Is there a relevant help topic created/updated for this feature?
+- [ ] **Favorites:** Do navigation items (MenuItem) have the `path` prop enabling the Favorite star?
+
+
+## 8. Keyboard Shortcuts Verification
 - [ ] `Esc` - Go back / Close modal
 - [ ] `Enter` - Confirm / Open detail
 - [ ] `Shift+N` - New record

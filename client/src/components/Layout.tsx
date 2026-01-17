@@ -31,6 +31,7 @@ import {
 import { SettingsDialog } from './SettingsDialog';
 import { FeedbackModal } from './FeedbackModal';
 import { FavoritesMenu } from './FavoritesMenu';
+import { useHelp } from '../context/HelpContext';
 
 
 
@@ -103,6 +104,7 @@ const Layout: React.FC = () => {
     const styles = useStyles();
     const navigate = useNavigate();
     const location = useLocation();
+    const { openHelp } = useHelp();
     const { user, logout, hasPermission, organizations, currentOrgId } = useAuth();
     const { t } = useTranslation();
     const [settingsOpen, setSettingsOpen] = React.useState(false);
