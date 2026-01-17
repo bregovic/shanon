@@ -135,16 +135,19 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
                      }
                  }
 
-                 // Determine effective current Org (Transient default if session empty)
-                 if (!$currentOrgId && !empty($availableOrgs)) {
-                      foreach ($availableOrgs as $org) {
-                          if ($org['is_default']) {
-                              $currentOrgId = $org['org_id'];
-                              break;
-                          }
-                      }
-                      if (!$currentOrgId) $currentOrgId = $availableOrgs[0]['org_id'];
-                 }
+                  // Determine effective current Org (Transient default if session empty)
+                  if (!$currentOrgId && !empty($availableOrgs)) {
+                       foreach ($availableOrgs as $org) {
+                           if ($org['is_default']) {
+                               $currentOrgId = $org['org_id'];
+                               break;
+                           }
+                       }
+                       if (!$currentOrgId) $currentOrgId = $availableOrgs[0]['org_id'];
+                       
+                       // IMPORTANT: Persist this default to session so subsequent API calls (like upload/list) use it!
+                       $_SESSION['current_org_id'] = $currentOrgId;
+                  }
              }
         } catch (Exception $e) {
              error_log("Multi-Org Error: " . $e->getMessage());
