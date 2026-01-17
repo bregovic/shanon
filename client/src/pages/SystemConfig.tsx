@@ -254,6 +254,9 @@ export const SystemConfig: React.FC = () => {
         if (activeView === 'seeders') {
             fetchSeeders();
         }
+        if (activeView === 'parameters') {
+            fetchParams();
+        }
     }, [activeView, docId]); // React to URL changes
 
     const fetchDoc = async (file: string) => {
@@ -461,6 +464,62 @@ export const SystemConfig: React.FC = () => {
     const expandAll = () => setExpandedSections(new Set(SECTION_IDS));
     const collapseAll = () => setExpandedSections(new Set());
 
+    // --- PARAMETERS LOGIC ---
+    const [paramsList, setParamsList] = useState<any[]>([]);
+    const [editingParam, setEditingParam] = useState<string | null>(null);
+    const [editValue, setEditValue] = useState('');
+
+    const fetchParams = async () => {
+        setLoading(true);
+        setViewTitle(t('system.item.global_params'));
+        try {
+            const res = await fetch('/api/api-system-params.php?action=list');
+            const json = await res.json();
+            if (json.success) setParamsList(json.data);
+        } catch (e) { setError('Failed to load parameters'); }
+        setLoading(false);
+    };
+
+    const updateParam = async (key: string) => {
+        try {
+            await fetch('/api/api-system-params.php?action=update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value: editValue })
+            });
+            setEditingParam(null);
+            fetchParams();
+        } catch (e) { alert("Update failed"); }
+    };
+
+    const renderParams = () => (
+        <Card className={styles.card}>
+            <CardHeader header={<Title3>{t('system.item.global_params')}</Title3>} />
+            <div className={styles.grid} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {paramsList.map(p => (
+                    <div key={p.param_key} style={{ padding: 10, borderBottom: '1px solid #eee' }}>
+                        <Text weight="bold">{p.param_key}</Text>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 5, alignItems: 'center' }}>
+                            {editingParam === p.param_key ? (
+                                <>
+                                    <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{ flex: 1, padding: 4 }} />
+                                    <Button size="small" appearance="primary" onClick={() => updateParam(p.param_key)}>Save</Button>
+                                    <Button size="small" onClick={() => setEditingParam(null)}>Cancel</Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Text style={{ flex: 1, fontFamily: 'monospace' }}>{p.param_value}</Text>
+                                    <Button size="small" icon={<Edit24Regular />} onClick={() => { setEditingParam(p.param_key); setEditValue(p.param_value); }} />
+                                </>
+                            )}
+                        </div>
+                        <Text size={200} style={{ color: '#888' }}>{p.description}</Text>
+                    </div>
+                ))}
+            </div>
+        </Card>
+    );
+
     // --- SEEDER LOGIC ---
     const [seeders, setSeeders] = useState<any[]>([]);
     const [selectedSeeders, setSelectedSeeders] = useState<Set<SelectionItemId>>(new Set());
@@ -631,7 +690,7 @@ export const SystemConfig: React.FC = () => {
                     {/* 6. SETTINGS */}
                     {/* 6. SETTINGS */}
                     <MenuSection id="settings" title={t('system.menu.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem label={t('system.item.global_params')} onClick={() => alert('Settings')} />
+                        <MenuItem label={t('system.item.global_params')} onClick={() => navigateToView('parameters', 'system.item.global_params')} />
                         <MenuItem label="Překlady" onClick={() => navigate(orgPrefix + '/system/translations')} />
                         <MenuItem label="Inicializace dat (Seeders)" onClick={() => navigateToView('seeders', 'Inicializace dat')} />
                     </MenuSection>
@@ -719,6 +778,7 @@ export const SystemConfig: React.FC = () => {
                 {activeView === 'schema' && renderSchema()}
                 {activeView === 'doc_viewer' && renderDocView()}
                 {activeView === 'history_viewer' && renderHistoryView()}
+                {activeView === 'parameters' && renderParams()}
                 {activeView === 'seeders' && renderSeeders()}
             </div>
         </div>
