@@ -141,24 +141,58 @@ const Layout: React.FC = () => {
                     <Image src="/logo.png" height={28} fit="contain" alt="Shanon" />
                 </div>
 
-                <nav className={styles.navLinks}>
-                    {visibleModules.map(mod => (
-                        <div
-                            key={mod.path}
-                            className={`${styles.link} ${isActive(mod.path) ? styles.activeLink : ''}`}
-                            onClick={() => {
-                                if (isActive(mod.path) && (mod as any).resetEvent) {
-                                    window.dispatchEvent(new Event((mod as any).resetEvent));
-                                }
-                                navigate(mod.path);
+                {/* Module Picker Dropdown */}
+                <Menu>
+                    <MenuTrigger disableButtonEnhancement>
+                        <Button
+                            appearance="subtle"
+                            style={{
+                                fontWeight: '600',
+                                minWidth: 'auto',
+                                gap: '8px',
+                                marginLeft: '16px'
                             }}
-                            style={{ whiteSpace: 'nowrap' }}
                         >
-                            <span style={{ fontSize: '20px' }}>{mod.icon}</span>
-                            {mod.label}
-                        </div>
-                    ))}
-                </nav>
+                            {(() => {
+                                const current = visibleModules.find(m => isActive(m.path));
+                                return current ? (
+                                    <>
+                                        <span style={{ display: 'flex', alignItems: 'center' }}>{current.icon}</span>
+                                        {current.label}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Home24Regular />
+                                        {t('modules.dashboard')}
+                                    </>
+                                );
+                            })()}
+                        </Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                        <MenuList>
+                            {visibleModules.map(mod => (
+                                <MenuItem
+                                    key={mod.path}
+                                    onClick={() => {
+                                        if (isActive(mod.path) && (mod as any).resetEvent) {
+                                            window.dispatchEvent(new Event((mod as any).resetEvent));
+                                        }
+                                        navigate(mod.path);
+                                    }}
+                                    icon={isActive(mod.path) ? <Checkmark24Regular /> : undefined}
+                                >
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {mod.icon}
+                                        <span style={{ fontWeight: isActive(mod.path) ? 600 : 400 }}>
+                                            {mod.label}
+                                        </span>
+                                    </span>
+                                </MenuItem>
+                            ))}
+                        </MenuList>
+                    </MenuPopover>
+                </Menu>
 
                 {/* Spacer to push actions to right, but allows shrinking/overflow */}
                 <div style={{ flex: 1, minWidth: '16px' }} />
