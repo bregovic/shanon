@@ -18,12 +18,10 @@ import {
     PopoverTrigger,
     PopoverSurface,
     Badge,
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbButton,
-    BreadcrumbDivider,
-    Divider
+    Divider,
+    Title3
 } from "@fluentui/react-components";
+import { ActionBar } from "../components/ActionBar";
 import { Filter24Regular, ArrowUp24Regular, ArrowDown24Regular, Subtract24Regular, Add24Regular } from "@fluentui/react-icons";
 import { useAuth } from "../context/AuthContext";
 import { useTranslation } from "../context/TranslationContext";
@@ -34,7 +32,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
 import type { SelectionItemId, OnSelectionChangeData } from '@fluentui/react-components';
-import { PageLayout, PageContent, PageHeader, PageFilterBar } from "../components/PageLayout";
+import { PageFilterBar } from "../components/PageLayout";
 import { VisualEditor } from "../components/VisualEditor";
 import {
     Attach24Regular,
@@ -737,29 +735,21 @@ const RequestsPage = () => {
 
     if (selectedRequest) {
         return (
-            <PageLayout>
-                <PageHeader>
-                    <Breadcrumb>
-                        <BreadcrumbItem>
-                            <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
-                        </BreadcrumbItem>
-                        <BreadcrumbDivider />
-                        <BreadcrumbItem>
-                            <BreadcrumbButton onClick={() => {
-                                setSelectedRequest(null);
-                                setSelectedItems(new Set());
-                            }}>{t('modules.requests')}</BreadcrumbButton>
-                        </BreadcrumbItem>
-                        <BreadcrumbDivider />
-                        <BreadcrumbItem>
-                            <BreadcrumbButton current>{`#${selectedRequest.id}`}</BreadcrumbButton>
-                        </BreadcrumbItem>
-                    </Breadcrumb>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <ActionBar>
+                    <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => {
+                        setSelectedRequest(null);
+                        setSelectedItems(new Set());
+                    }}>
+                        {t('common.back')}
+                    </Button>
+                    <div style={{ width: '16px' }} />
+                    <Title3>#{selectedRequest.id}</Title3>
                     <div style={{ flex: 1 }} />
                     <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(selectedRequest.id)}>Obnovit</Button>
-                </PageHeader>
+                </ActionBar>
 
-                <PageContent>
+                <div style={{ flex: 1, padding: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {/* Detail Header / Title Area */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`, marginBottom: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -801,7 +791,7 @@ const RequestsPage = () => {
                             )}
                         </div>
                     </div>
-                    <div className={styles.detailLayout}>
+                    <div className={styles.detailLayout} style={{ height: 'auto', flex: 1, minHeight: 0 }}>
                         <div className={styles.mainColumn}>
                             <div className={styles.card}>
                                 <div className={styles.sectionHeader}>
@@ -1079,7 +1069,7 @@ const RequestsPage = () => {
                             </div>
                         </div>
                     </div>
-                </PageContent>
+                </div>
 
                 {lightboxImage && (
                     <Dialog open={true} onOpenChange={() => setLightboxImage(null)}>
@@ -1088,61 +1078,53 @@ const RequestsPage = () => {
                         </DialogSurface>
                     </Dialog>
                 )}
-            </PageLayout>
+            </div>
         );
     }
 
     return (
-        <PageLayout>
-            <PageHeader>
-                <Breadcrumb>
-                    <BreadcrumbItem>
-                        <BreadcrumbButton onClick={() => navigate('/dashboard')}>{t('common.modules')}</BreadcrumbButton>
-                    </BreadcrumbItem>
-                    <BreadcrumbDivider />
-                    <BreadcrumbItem>
-                        <BreadcrumbButton current>{t('modules.requests')}</BreadcrumbButton>
-                    </BreadcrumbItem>
-                </Breadcrumb>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <ActionBar>
+                <Title3>{t('modules.requests')}</Title3>
                 <div style={{ flex: 1 }} />
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
 
-                    {/* Action Lookup */}
-                    <Menu>
-                        <MenuTrigger disableButtonEnhancement>
-                            <Button appearance="outline" iconAfter={<ChevronDown16Regular />}>Akce</Button>
-                        </MenuTrigger>
-                        <MenuPopover>
-                            <MenuList>
-                                <MenuItem icon={<Add24Regular />} onClick={() => setFeedbackOpen(true)}>Nový</MenuItem>
-                                <MenuItem
-                                    icon={<Edit24Regular />}
-                                    disabled={selectedItems.size !== 1}
-                                    onClick={() => {
-                                        if (selectedItems.size === 1) {
-                                            const id = Array.from(selectedItems)[0];
-                                            const item = requests.find((r: RequestItem) => r.id === id);
-                                            if (item) setSelectedRequest(item);
-                                        }
-                                    }}
-                                >Upravit</MenuItem>
-                                <MenuItem
-                                    icon={<Delete20Regular />}
-                                    disabled={selectedItems.size === 0}
-                                    onClick={handleDeleteRequests}
-                                >Smazat</MenuItem>
-                            </MenuList>
-                        </MenuPopover>
-                    </Menu>
+                <Button appearance="primary" icon={<Add24Regular />} onClick={() => setFeedbackOpen(true)}>
+                    Nový
+                </Button>
 
-                    <Divider vertical style={{ height: '20px', margin: '0 8px' }} />
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
 
-                    {/* Standard Icons */}
-                    <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests} title="Obnovit" />
-                    <Button icon={<Attach24Regular />} appearance="subtle" title="Přílohy" />
-                    <Button icon={<Share24Regular />} appearance="subtle" title="Export/Import" />
-                </div>
-            </PageHeader>
+                <Button
+                    appearance="subtle"
+                    icon={<Edit24Regular />}
+                    disabled={selectedItems.size !== 1}
+                    onClick={() => {
+                        if (selectedItems.size === 1) {
+                            const id = Array.from(selectedItems)[0];
+                            const item = requests.find((r: RequestItem) => r.id === id);
+                            if (item) setSelectedRequest(item);
+                        }
+                    }}
+                >
+                    Upravit
+                </Button>
+
+                <Button
+                    appearance="subtle"
+                    icon={<Delete20Regular />}
+                    disabled={selectedItems.size === 0}
+                    onClick={handleDeleteRequests}
+                >
+                    Smazat
+                </Button>
+
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+
+                <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests} title="Obnovit" />
+                <Button icon={<Attach24Regular />} appearance="subtle" title="Přílohy" />
+                <Button icon={<Share24Regular />} appearance="subtle" title="Export/Import" />
+            </ActionBar>
+
             <PageFilterBar>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1184,9 +1166,10 @@ const RequestsPage = () => {
                     </Popover>
                 </div>
             </PageFilterBar>
-            <PageContent noScroll>
-                <div style={{ flex: 1, minHeight: 0, boxShadow: tokens.shadow2, borderRadius: tokens.borderRadiusMedium, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ minWidth: '1000px', height: '100%' }}>
+
+            <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
+                <div style={{ height: '100%', boxShadow: tokens.shadow2, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: tokens.colorNeutralBackground1 }}>
+                    <div style={{ minWidth: '1000px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                         {loadingRequests ? <Spinner /> : (
                             <SmartDataGrid
                                 items={requests}
@@ -1195,13 +1178,14 @@ const RequestsPage = () => {
                                 onRowClick={setSelectedRequest}
                                 selectedItems={selectedItems}
                                 onSelectionChange={handleSelectionChange}
+                                selectionMode="multiselect"
                             />
                         )}
                     </div>
                 </div>
-            </PageContent>
+            </div>
             <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} user={user} onSuccess={() => { loadRequests(); setFeedbackOpen(false); }} />
-        </PageLayout >
+        </div>
     );
 };
 
