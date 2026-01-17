@@ -1135,7 +1135,7 @@ const RequestsPage = () => {
                     </BreadcrumbItem>
                     <BreadcrumbDivider />
                     <BreadcrumbItem>
-                        <BreadcrumbButton current>{t('modules.requests')}</BreadcrumbButton>
+                        <BreadcrumbButton current>{t('modules.requests')} (v2)</BreadcrumbButton>
                     </BreadcrumbItem>
                 </Breadcrumb>
                 <div style={{ flex: 1 }} />
