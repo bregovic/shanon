@@ -347,6 +347,7 @@ const RequestsPage = () => {
 
     // Lightbox
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
 
     // API Helper
     const isDev = import.meta.env.DEV;
@@ -1115,84 +1116,94 @@ const RequestsPage = () => {
                 </Breadcrumb>
                 <div style={{ flex: 1 }} />
 
-                <Button appearance="primary" icon={<Add24Regular />} onClick={() => setFeedbackOpen(true)}>
-                    Nový
-                </Button>
-
-                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
-
-                <Button
-                    appearance="subtle"
-                    icon={<Edit24Regular />}
-                    disabled={selectedItems.size !== 1}
-                    onClick={() => {
-                        if (selectedItems.size === 1) {
-                            const id = Array.from(selectedItems)[0];
-                            const item = requests.find((r: RequestItem) => r.id === id);
-                            if (item) setSelectedRequest(item);
-                        }
-                    }}
-                >
-                    Upravit
-                </Button>
-
-                <Button
-                    appearance="subtle"
-                    icon={<Delete20Regular />}
-                    disabled={selectedItems.size === 0}
-                    onClick={handleDeleteRequests}
-                >
-                    Smazat
-                </Button>
+                {/* Action Lookup (Menu) - Standard per Manifest */}
+                <Menu>
+                    <MenuTrigger disableButtonEnhancement>
+                        <Button appearance="primary" iconAfter={<ChevronDown16Regular />}>Akce</Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                        <MenuList>
+                            <MenuItem icon={<Add24Regular />} onClick={() => setFeedbackOpen(true)}>Nový</MenuItem>
+                            <MenuItem
+                                icon={<Edit24Regular />}
+                                disabled={selectedItems.size !== 1}
+                                onClick={() => {
+                                    if (selectedItems.size === 1) {
+                                        const id = Array.from(selectedItems)[0];
+                                        const item = requests.find((r: RequestItem) => r.id === id);
+                                        if (item) setSelectedRequest(item);
+                                    }
+                                }}
+                            >Upravit</MenuItem>
+                            <MenuItem
+                                icon={<Delete20Regular />}
+                                disabled={selectedItems.size === 0}
+                                onClick={handleDeleteRequests}
+                            >Smazat</MenuItem>
+                        </MenuList>
+                    </MenuPopover>
+                </Menu>
 
                 <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
 
                 <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests} title="Obnovit" />
                 <Button icon={<Attach24Regular />} appearance="subtle" title="Přílohy" />
                 <Button icon={<Share24Regular />} appearance="subtle" title="Export/Import" />
+
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+
+                <Button
+                    appearance={isFilterBarOpen ? "primary" : "subtle"}
+                    icon={<Filter24Regular />}
+                    onClick={() => setIsFilterBarOpen(!isFilterBarOpen)}
+                >
+                    Funkce
+                </Button>
             </ActionBar>
 
-            <PageFilterBar>
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Switch
-                            label="Jen moje"
-                            checked={showOnlyMine}
-                            onChange={(_, data) => {
-                                setShowOnlyMine(!!data.checked);
-                                setSearchParams(prev => {
-                                    if (data.checked) prev.set('mine', '1');
-                                    else prev.delete('mine');
-                                    return prev;
-                                });
-                            }}
-                        />
+            {isFilterBarOpen && (
+                <PageFilterBar>
+                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Switch
+                                label="Jen moje"
+                                checked={showOnlyMine}
+                                onChange={(_, data) => {
+                                    setShowOnlyMine(!!data.checked);
+                                    setSearchParams(prev => {
+                                        if (data.checked) prev.set('mine', '1');
+                                        else prev.delete('mine');
+                                        return prev;
+                                    });
+                                }}
+                            />
+                        </div>
+                        <Popover trapFocus>
+                            <PopoverTrigger disableButtonEnhancement>
+                                <Button icon={<Filter24Regular />}>
+                                    Stavy {selectedStatuses.length < allStatuses.length ? `(${selectedStatuses.length})` : ''}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverSurface>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <Text weight="semibold" style={{ marginBottom: '8px' }}>Filtrovat stavy</Text>
+                                    {allStatuses.map(s => (
+                                        <Checkbox
+                                            key={s}
+                                            label={s}
+                                            checked={selectedStatuses.includes(s)}
+                                            onChange={(_, data) => {
+                                                if (data.checked) setSelectedStatuses(prev => [...prev, s]);
+                                                else setSelectedStatuses(prev => prev.filter(x => x !== s));
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </PopoverSurface>
+                        </Popover>
                     </div>
-                    <Popover trapFocus>
-                        <PopoverTrigger disableButtonEnhancement>
-                            <Button icon={<Filter24Regular />}>
-                                Stavy {selectedStatuses.length < allStatuses.length ? `(${selectedStatuses.length})` : ''}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverSurface>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <Text weight="semibold" style={{ marginBottom: '8px' }}>Filtrovat stavy</Text>
-                                {allStatuses.map(s => (
-                                    <Checkbox
-                                        key={s}
-                                        label={s}
-                                        checked={selectedStatuses.includes(s)}
-                                        onChange={(_, data) => {
-                                            if (data.checked) setSelectedStatuses(prev => [...prev, s]);
-                                            else setSelectedStatuses(prev => prev.filter(x => x !== s));
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </PopoverSurface>
-                    </Popover>
-                </div>
-            </PageFilterBar>
+                </PageFilterBar>
+            )}
 
             <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
                 <div style={{ height: '100%', boxShadow: tokens.shadow2, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: tokens.colorNeutralBackground1 }}>
