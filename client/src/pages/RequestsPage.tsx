@@ -1102,6 +1102,8 @@ const RequestsPage = () => {
         );
     }
 
+    const filteredRequests = requests.filter(r => selectedStatuses.includes(r.status));
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <ActionBar>
@@ -1210,7 +1212,7 @@ const RequestsPage = () => {
                     <div style={{ minWidth: '1000px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                         {loadingRequests ? <Spinner /> : (
                             <SmartDataGrid
-                                items={requests}
+                                items={filteredRequests}
                                 columns={columns}
                                 getRowId={(i: RequestItem) => i.id}
                                 onRowClick={setSelectedRequest}
