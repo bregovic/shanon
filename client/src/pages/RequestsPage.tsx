@@ -803,7 +803,9 @@ const RequestsPage = () => {
                     </Breadcrumb>
                     <div style={{ flex: 1 }} />
                     <DocuRefButton refTable="sys_change_requests" refId={viewRequest.id} />
-                    <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(viewRequest.id)}>Obnovit</Button>
+                    <Tooltip content="Obnovit" relationship="label">
+                        <Button appearance="subtle" icon={<ArrowClockwise24Regular />} aria-label="Obnovit" onClick={() => loadAuditLog(viewRequest.id)} />
+                    </Tooltip>
                 </ActionBar>
 
                 <div style={{ flex: 1, padding: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
