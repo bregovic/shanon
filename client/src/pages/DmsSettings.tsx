@@ -899,14 +899,14 @@ export const DmsSettings: React.FC = () => {
                             <div>
                                 <Label>Typ úložiště</Label>
                                 <Dropdown
-                                    value={STORAGE_TYPES.find(t => t.value === storageForm.storage_type)?.label || storageForm.storage_type}
+                                    value={t(STORAGE_TYPES.find(t => t.value === storageForm.storage_type)?.label || '')}
                                     selectedOptions={[storageForm.storage_type]}
                                     onOptionSelect={(_, data) => setStorageForm({ ...storageForm, storage_type: data.optionValue || 'local' })}
                                     style={{ width: '100%' }}
                                 >
-                                    {STORAGE_TYPES.map(t => (
-                                        <Option key={t.value} value={t.value} text={t.label}>
-                                            {t.label}
+                                    {STORAGE_TYPES.map(item => (
+                                        <Option key={item.value} value={item.value} text={t(item.label)}>
+                                            {t(item.label)}
                                         </Option>
                                     ))}
                                 </Dropdown>
