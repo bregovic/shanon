@@ -112,7 +112,7 @@ const Layout: React.FC = () => {
     const modules = [
         { label: t('modules.dashboard'), path: `${orgPrefix}/dashboard`, icon: <Home24Regular />, securityId: 'mod_dashboard' },
         { label: t('modules.dms'), path: `${orgPrefix}/dms`, icon: <DocumentData24Regular />, securityId: 'mod_dms' },
-        { label: t('modules.requests'), path: `${orgPrefix}/requests`, icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests' },
+        { label: t('modules.requests'), path: `${orgPrefix}/requests`, icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests', resetEvent: 'reset-requests-page' },
         { label: t('modules.system'), path: `${orgPrefix}/system`, icon: <Settings24Regular />, securityId: 'mod_system' },
     ].sort((a, b) => {
 
@@ -146,7 +146,12 @@ const Layout: React.FC = () => {
                         <div
                             key={mod.path}
                             className={`${styles.link} ${isActive(mod.path) ? styles.activeLink : ''}`}
-                            onClick={() => navigate(mod.path)}
+                            onClick={() => {
+                                if (isActive(mod.path) && (mod as any).resetEvent) {
+                                    window.dispatchEvent(new Event((mod as any).resetEvent));
+                                }
+                                navigate(mod.path);
+                            }}
                             style={{ whiteSpace: 'nowrap' }}
                         >
                             <span style={{ fontSize: '20px' }}>{mod.icon}</span>
