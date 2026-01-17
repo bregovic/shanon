@@ -60,9 +60,10 @@
 *   **Design System:** Use **Fluent UI Web Components** (React) for all new features.
 *   **Lists & Grids:**
     *   Use `SmartDataGrid` for all data tables.
-    *   **Action Bar Standard:** Every list MUST have an `ActionBar` above it.
-        *   **Left:** "New" (Primary), Custom Actions (Contextual).
-        *   **Right:** "Refresh", "Delete" (Destructive, Disabled if no selection).
+    *   **Action Bar Standard:** Every page MUST have an `ActionBar`. See **FORM_STANDARD.md → "Action Bar Standard"** for component specs.
+        *   **Grid View:** Akce (Menu) → Divider → Refresh → DocuRef → Export → Divider → Funkce
+        *   **Detail View:** Akce (Menu) → Divider → Refresh → DocuRef
+        *   **Key:** Refresh is ICON-ONLY with `title` attribute, NO text label.
 *   **Dialogs:** Use `Drawer` (Overlay) for editing side-panels, `Dialog` for modals.
 *   **Feedback:** Use `Toast` or `MessageBar` for success/error messages. Never use `alert()`.
 *   **Table Alignment:** Table content MUST be vertically center-aligned (use `display: flex; align-items: center` for cells). Vertical alignment with checkboxes is critical.

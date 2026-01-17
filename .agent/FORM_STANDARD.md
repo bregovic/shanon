@@ -57,6 +57,40 @@ We follow the **Microsoft Fluent UI (Investyx/D365)** aesthetic.
     - Dates/Bool: Center
 - **Filters:** Enabled by default.
 
+### Action Bar Standard (CRITICAL)
+**Every page MUST have an ActionBar.** The components differ based on view type:
+
+#### Grid/List View (přehled záznamů)
+```
+[Breadcrumbs] ─── [flex spacer] ─── [Akce ▼] | [↻] [📎] [↗] | [≡ Funkce]
+```
+| Component | Description | Implementation |
+|-----------|-------------|----------------|
+| **Akce** (Menu) | Primary actions: Nový, Upravit, Smazat | `<Menu><MenuTrigger><Button appearance="primary">Akce</Button></MenuTrigger>...` |
+| **Divider** | Visual separator | `<div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />` |
+| **Refresh** | Icon-only, soft refresh | `<Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={fetchData} title={t('common.refresh')} />` |
+| **DocuRef** | Attachments drawer | `<DocuRefButton refTable="..." refId={selectedItem?.id} disabled={!selectedItem} />` |
+| **Export** | Future: Import/Export | `<Button icon={<Share24Regular />} appearance="subtle" title="Export/Import" />` |
+| **Divider** | Visual separator | (same as above) |
+| **Funkce** | Toggle Filter Bar | `<Button appearance={isOpen ? "primary" : "subtle"} icon={<Filter24Regular />}>Funkce</Button>` |
+
+#### Detail/Form View (jeden záznam)
+```
+[Breadcrumbs] ─── [flex spacer] ─── [Akce ▼] | [↻] [📎]
+```
+| Component | Description | Notes |
+|-----------|-------------|-------|
+| **Akce** (Menu) | Context actions: Upravit, Smazat | Same pattern, fewer items |
+| **Divider** | Visual separator | |
+| **Refresh** | Icon-only, reload detail | Refreshes comments, history, etc. |
+| **DocuRef** | Attachments drawer | `refId={viewItem.id}` (always enabled) |
+
+#### Key Rules:
+1. **Icon-only buttons** use `title` attribute for tooltip (NOT `<Tooltip>` wrapper for consistency).
+2. **Refresh** NEVER has text label, only icon + title.
+3. **Akce menu** is always PRIMARY appearance (blue).
+4. **Order is fixed:** Akce → Divider → Refresh → DocuRef → [Export] → Divider → Funkce
+
 ---
 
 ## 5. Security Context
