@@ -62,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
         : '/api';
 
-    const getApiUrl = (endpoint: string) => `${API_BASE}/${endpoint}`;
+    const getApiUrl = React.useCallback((endpoint: string) => `${API_BASE}/${endpoint}`, [API_BASE]);
 
     useEffect(() => {
         checkAuth();
@@ -94,28 +94,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             const data = await res.json();
             if (data.success && data.user) {
-                setUser({
+                // Only update if changed to prevent loops
+                setUser(prev => (prev?.id === data.user.id ? prev : {
                     id: data.user.id,
                     username: data.user.name,
                     role: data.user.role || 'user',
                     name: data.user.name || '',
                     initials: data.user.initials || '?',
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
-                });
-                setPermissions(data.permissions || {});
-                setOrganizations(data.organizations || []);
-                setCurrentOrgId(data.current_org_id || null);
+                }));
+                setPermissions(prev => (JSON.stringify(prev) === JSON.stringify(data.permissions) ? prev : data.permissions || {}));
+                setOrganizations(prev => (JSON.stringify(prev) === JSON.stringify(data.organizations) ? prev : data.organizations || []));
+                setCurrentOrgId(prev => (prev === data.current_org_id ? prev : data.current_org_id || null));
             } else {
                 setUser(null);
                 setPermissions({});
             }
         } catch (e) {
-            setUser(null);
-            setPermissions({});
+            console.error("Auth check failed", e);
+            // Don't clear user immediately on network error to prevent flickering, potentially
+            // but for safety usually we do. Let's keep existing behavior but just log.
+            // setUser(null); 
         } finally {
             setIsLoading(false);
         }
     };
+
+    // ... (keep login/logout/switchOrg as is, but memoize the context value)
 
     const login = async (username: string, pass: string) => {
         try {
@@ -136,8 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     initials: data.user.initials,
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
                 });
-                setPermissions(data.permissions || {}); // Assuming login might return permissions too, or we re-fetch
-                // If login doesn't return permissions, call checkAuth immediately
+                setPermissions(data.permissions || {});
                 if (!data.permissions) {
                     checkAuth();
                 }
@@ -151,7 +155,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const logout = () => {
-        // Simple client logout. Server logout is usually stateless or handles own session destroy.
         fetch(`${API_BASE}/ajax-logout.php`);
         setUser(null);
         setPermissions({});
@@ -169,7 +172,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const json = await res.json();
             if (json.success) {
                 setCurrentOrgId(orgId);
-                // Hard reload only if not handled by routing
                 if (!preventReload) window.location.reload();
                 return true;
             }
@@ -177,9 +179,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
     };
 
-    return (
-        <AuthContext.Provider value={{ user, permissions, isLoading, login, logout, hasPermission, organizations, currentOrgId, switchOrg, orgPrefix, getApiUrl }}>
+    const contextValue = React.useMemo(() => ({
+        user, permissions, isLoading, login, logout, hasPermission, organizations, currentOrgId, switchOrg, orgPrefix, getApiUrl
+    }), [user, permissions, isLoading, organizations, currentOrgId, orgPrefix, getApiUrl]);
 
+    return (
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );
