@@ -216,7 +216,7 @@ try {
         exit;
     }
 
-    if ($action === 'storage_profile_update') {
+    if ($action === 'storage_profile_create' || $action === 'storage_profile_update') {
         $input = json_decode(file_get_contents('php://input'), true);
         
         $id = $input['rec_id'] ?? $input['id'] ?? null;
