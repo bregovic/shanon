@@ -6,10 +6,17 @@ require_once 'db.php';
 
 header('Content-Type: application/json');
 
-// SECURITY: Only ADMIN
-if (!isset($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'admin') {
+// SECURITY: Only ADMIN, SUPERADMIN, or SYSADMIN
+if (!isset($_SESSION['user'])) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Access Denied: Admins only']);
+    echo json_encode(['success' => false, 'error' => 'Access Denied: Not logged in']);
+    exit;
+}
+
+$role = $_SESSION['user']['role'] ?? '';
+if ($role !== 'admin' && $role !== 'superadmin' && $role !== 'sysadmin') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => "Access Denied: Role '$role' not authorized"]);
     exit;
 }
 
