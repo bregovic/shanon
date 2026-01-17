@@ -503,11 +503,12 @@ const RequestsPage = () => {
     };
 
     const handleUploadAttachment = async (targetFiles: FileList | File[] | null) => {
-        if (!selectedRequest || !targetFiles || targetFiles.length === 0) return;
+        const target = viewRequest || selectedRequest;
+        if (!target || !targetFiles || targetFiles.length === 0) return;
         setUploadingAttachment(true);
         try {
             const formData = new FormData();
-            formData.append('request_id', String(selectedRequest.id));
+            formData.append('request_id', String(target.id));
 
             // Handle multiple files if possible (backend supports it now)
             Array.from(targetFiles).forEach(file => {
@@ -519,8 +520,8 @@ const RequestsPage = () => {
             });
 
             if (res.data.success) {
-                loadAttachments(selectedRequest.id);
-                loadAuditLog(selectedRequest.id);
+                loadAttachments(target.id);
+                loadAuditLog(target.id);
             }
         } catch (e) { console.error(e); alert('Upload failed'); } finally {
             setUploadingAttachment(false);
@@ -545,28 +546,30 @@ const RequestsPage = () => {
     };
 
     const handleSaveDescription = async () => {
-        if (!selectedRequest) return;
+        const target = viewRequest || selectedRequest;
+        if (!target) return;
         try {
             await axios.post(getApiUrl('api-changerequests.php?action=update'), {
-                id: selectedRequest.id,
+                id: target.id,
                 description: descriptionEditValue
             });
-            updateLocalRequest(selectedRequest.id, { description: descriptionEditValue });
+            updateLocalRequest(target.id, { description: descriptionEditValue });
             setIsEditingDescription(false);
-            loadAuditLog(selectedRequest.id);
+            loadAuditLog(target.id);
         } catch (e) { console.error(e); alert('Failed to save description'); }
     }
 
     const handleSaveSubject = async () => {
-        if (!selectedRequest || !subjectEditValue.trim()) return;
+        const target = viewRequest || selectedRequest;
+        if (!target || !subjectEditValue.trim()) return;
         try {
             await axios.post(getApiUrl('api-changerequests.php?action=update'), {
-                id: selectedRequest.id,
+                id: target.id,
                 subject: subjectEditValue
             });
-            updateLocalRequest(selectedRequest.id, { subject: subjectEditValue });
+            updateLocalRequest(target.id, { subject: subjectEditValue });
             setIsEditingSubject(false);
-            loadAuditLog(selectedRequest.id);
+            loadAuditLog(target.id);
         } catch (e) { console.error(e); alert('Failed to save subject'); }
     }
 
@@ -576,7 +579,10 @@ const RequestsPage = () => {
             const formData = new FormData();
             formData.append('id', String(id));
             await axios.post(getApiUrl('api-changerequests.php?action=delete_attachment'), formData);
-            if (selectedRequest) {
+            if (viewRequest) {
+                loadAttachments(viewRequest.id);
+                loadAuditLog(viewRequest.id);
+            } else if (selectedRequest) {
                 loadAttachments(selectedRequest.id);
                 loadAuditLog(selectedRequest.id);
             }
@@ -615,7 +621,8 @@ const RequestsPage = () => {
         try {
             await axios.post(getApiUrl('api-changerequests.php?action=toggle_reaction'), { comment_id: commentId, type });
             // Reload to get real state (sync)
-            if (selectedRequest) loadComments(selectedRequest.id);
+            const target = viewRequest || selectedRequest;
+            if (target) loadComments(target.id);
         } catch (e) { console.error(e); }
     };
 
@@ -632,7 +639,8 @@ const RequestsPage = () => {
                 comment: editCommentValue
             });
             setEditingCommentId(null);
-            if (selectedRequest) loadComments(selectedRequest.id);
+            const target = viewRequest || selectedRequest;
+            if (target) loadComments(target.id);
         } catch (e) { alert('Chyba při ukládání'); }
     };
 
@@ -640,7 +648,8 @@ const RequestsPage = () => {
         if (!confirm('Smazat komentář?')) return;
         try {
             await axios.post(getApiUrl('api-changerequests.php?action=delete_comment'), { id });
-            if (selectedRequest) loadComments(selectedRequest.id);
+            const target = viewRequest || selectedRequest;
+            if (target) loadComments(target.id);
         } catch (e) { alert('Chyba při mazání'); }
     };
 
@@ -656,17 +665,18 @@ const RequestsPage = () => {
     };
 
     const handleAddComment = async () => {
-        if (!selectedRequest || !newComment.trim()) return;
+        const target = viewRequest || selectedRequest;
+        if (!target || !newComment.trim()) return;
         setSendingComment(true);
         try {
             const formData = new FormData();
             formData.append('action', 'add');
-            formData.append('request_id', String(selectedRequest.id));
+            formData.append('request_id', String(target.id));
             formData.append('comment', newComment);
             const res = await axios.post(getApiUrl('api-changerequests.php?action=add_comment'), formData);
             if (res.data.success) {
                 setNewComment('');
-                loadComments(selectedRequest.id);
+                loadComments(target.id);
             }
         } catch (e) { console.error(e); } finally { setSendingComment(false); }
     };
@@ -841,9 +851,9 @@ const RequestsPage = () => {
                                     {!isEditingDescription ? (
                                         <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => {
                                             setDescriptionEditValue(
-                                                selectedRequest.description.includes('<')
-                                                    ? selectedRequest.description
-                                                    : mdToHtml(selectedRequest.description, (p) => getApiUrl(p))
+                                                viewRequest.description.includes('<')
+                                                    ? viewRequest.description
+                                                    : mdToHtml(viewRequest.description, (p) => getApiUrl(p))
                                             );
                                             setIsEditingDescription(true);
                                         }}>Upravit</Button>
@@ -862,7 +872,7 @@ const RequestsPage = () => {
                                         getApiUrl={getApiUrl}
                                     />
                                 ) : (
-                                    renderContent(selectedRequest.description)
+                                    renderContent(viewRequest.description)
                                 )}
                             </div>
 
@@ -987,9 +997,9 @@ const RequestsPage = () => {
                                     <div>
                                         <Label style={{ color: tokens.colorNeutralForeground3, marginBottom: '4px', display: 'block' }}>Stav</Label>
                                         <Dropdown
-                                            value={selectedRequest.status}
-                                            selectedOptions={[selectedRequest.status]}
-                                            onOptionSelect={(_, d) => handleUpdateStatus(selectedRequest.id, d.optionValue || 'New')}
+                                            value={viewRequest.status}
+                                            selectedOptions={[viewRequest.status]}
+                                            onOptionSelect={(_, d) => handleUpdateStatus(viewRequest.id, d.optionValue || 'New')}
                                             style={{ width: '100%' }}
                                         >
                                             {allStatuses.map(s => <Option key={s} value={s}>{s}</Option>)}
@@ -998,9 +1008,9 @@ const RequestsPage = () => {
                                     <div>
                                         <Label style={{ color: tokens.colorNeutralForeground3, marginBottom: '4px', display: 'block' }}>Priorita</Label>
                                         <Dropdown
-                                            value={selectedRequest.priority.charAt(0).toUpperCase() + selectedRequest.priority.slice(1)}
-                                            selectedOptions={[selectedRequest.priority]}
-                                            onOptionSelect={(_, d) => handleUpdatePriority(selectedRequest.id, d.optionValue || 'medium')}
+                                            value={viewRequest.priority.charAt(0).toUpperCase() + viewRequest.priority.slice(1)}
+                                            selectedOptions={[viewRequest.priority]}
+                                            onOptionSelect={(_, d) => handleUpdatePriority(viewRequest.id, d.optionValue || 'medium')}
                                             style={{ width: '100%' }}
                                         >
                                             {['low', 'medium', 'high'].map(p => <Option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</Option>)}
@@ -1010,9 +1020,9 @@ const RequestsPage = () => {
                                         <Label style={{ color: tokens.colorNeutralForeground3, marginBottom: '4px', display: 'block' }}>Řešitel</Label>
                                         <Dropdown
                                             placeholder="Vybrat řešitele"
-                                            value={selectedRequest.assigned_username || "Nepřiřazeno"}
-                                            selectedOptions={selectedRequest.assigned_to ? [String(selectedRequest.assigned_to)] : []}
-                                            onOptionSelect={(_, d) => handleUpdateAssignee(selectedRequest.id, Number(d.optionValue))}
+                                            value={viewRequest.assigned_username || "Nepřiřazeno"}
+                                            selectedOptions={viewRequest.assigned_to ? [String(viewRequest.assigned_to)] : []}
+                                            onOptionSelect={(_, d) => handleUpdateAssignee(viewRequest.id, Number(d.optionValue))}
                                             style={{ width: '100%' }}
                                         >
                                             <Option key="0" value="0">Nepřiřazeno</Option>
@@ -1135,7 +1145,7 @@ const RequestsPage = () => {
                     </BreadcrumbItem>
                     <BreadcrumbDivider />
                     <BreadcrumbItem>
-                        <BreadcrumbButton current>{t('modules.requests')} (v2)</BreadcrumbButton>
+                        <BreadcrumbButton current>{t('modules.requests')}</BreadcrumbButton>
                     </BreadcrumbItem>
                 </Breadcrumb>
                 <div style={{ flex: 1 }} />
