@@ -424,10 +424,10 @@ export const SharedOrgsPage: React.FC = () => {
 
             {/* MEMBERS DIALOG */}
             <Dialog open={membersDialogOpen} onOpenChange={(_, d) => setMembersDialogOpen(d.open)}>
-                <DialogSurface>
+                <DialogSurface style={{ minWidth: '600px', maxWidth: '90vw' }}>
                     <DialogBody>
                         <DialogTitle>Členové skupiny {formData.display_name}</DialogTitle>
-                        <DialogContent style={{ height: 400 }}>
+                        <DialogContent style={{ height: '60vh', maxHeight: 600 }}>
                             <TransferList
                                 availableTitle="Dostupné společnosti"
                                 selectedTitle="Přiřazení členové"
@@ -446,10 +446,10 @@ export const SharedOrgsPage: React.FC = () => {
 
             {/* TABLES DIALOG */}
             <Dialog open={tablesDialogOpen} onOpenChange={(_, d) => setTablesDialogOpen(d.open)}>
-                <DialogSurface>
+                <DialogSurface style={{ minWidth: '800px', maxWidth: '95vw' }}>
                     <DialogBody>
                         <DialogTitle>Sdílené tabulky pro {formData.display_name}</DialogTitle>
-                        <DialogContent style={{ height: 400 }}>
+                        <DialogContent style={{ height: '60vh', maxHeight: 600 }}>
                             <TransferList
                                 availableTitle="Dostupné tabulky"
                                 selectedTitle="Sdílené tabulky"
