@@ -16,6 +16,8 @@
     *   *Rules for:* Framework usage, Directory structure, Localization.
 *   🧪 **QA SCENARIOS:** `.agent/TEST_SCENARIOS.md`
     *   *Rules for:* Testing critical user flows and security logic.
+*   📋 **DEV CHECKLIST:** `.agent/STANDARD_CHECKLIST.md`
+    *   *Rules for:* Quick pre-commit verification of UI/UX/Code standards.
 
 ---
 
