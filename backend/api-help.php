@@ -40,6 +40,50 @@ try {
              echo json_encode(['success' => false, 'error' => 'Topic not found']);
         }
 
+    } elseif ($action === 'resolve_context') {
+        $rawPath = $_GET['path'] ?? '';
+        
+        // Normalize path: /VACKR/system/users -> system/users
+        $path = trim($rawPath, '/');
+        // Heuristic: If first segment is OrgID (usually uppercase alphanumeric), strip it
+        // We assume OrgID > 2 chars. Not perfect but pragmatic.
+        // Actually, let's rely on standard patterns. If the path starts with a known module 
+        // (system, dms, requests), use it. If not, maybe it has OrgID.
+        
+        $parts = explode('/', $path);
+        // Common modules
+        $modules = ['system', 'dms', 'requests', 'dashboard'];
+        if (count($parts) > 1 && !in_array($parts[0], $modules)) {
+            // Assume first part is OrgID
+            array_shift($parts);
+            $path = implode('/', $parts);
+        }
+
+        // Fetch mappings
+        // We check if table exists first to avoid error if migration didn't run (dev safety)
+        try {
+            $stmt = $pdo->query("SELECT * FROM sys_help_context_mapping ORDER BY priority DESC");
+            $mappings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $foundKey = null;
+
+            foreach ($mappings as $map) {
+                if (fnmatch($map['path_pattern'], $path)) {
+                    $foundKey = $map['topic_key'];
+                    break;
+                }
+            }
+
+            echo json_encode([
+                'success' => true, 
+                'topic_key' => $foundKey, 
+                'path_used' => $path
+            ]);
+        } catch (Exception $e) {
+            // Table might not exist yet
+             echo json_encode(['success' => false, 'error' => 'Mapping table not found']);
+        }
+
     } elseif ($action === 'search') {
         $q = $_GET['q'] ?? '';
         $module = $_GET['module'] ?? '';

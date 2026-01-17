@@ -982,7 +982,8 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         ",
         '070_sys_user_favorites' => null,
         '071_sys_help' => null,
-        '072_seed_help' => null
+        '072_seed_help' => null,
+        '073_sys_help_map' => null
     ];
 
 

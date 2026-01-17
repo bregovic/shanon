@@ -257,7 +257,7 @@ const Layout: React.FC = () => {
                     </Tooltip>
 
                     <Tooltip content={t('system.item.help')} relationship="label">
-                        <Button icon={<QuestionCircle24Regular />} appearance="subtle" onClick={() => openHelp()} />
+                        <Button icon={<QuestionCircle24Regular />} appearance="subtle" onClick={() => openHelp(undefined, location.pathname)} />
                     </Tooltip>
 
                     <Tooltip content={t('system.menu.settings')} relationship="label">
