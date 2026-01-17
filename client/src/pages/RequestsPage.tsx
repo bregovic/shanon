@@ -790,8 +790,16 @@ const RequestsPage = () => {
     useKeyboardShortcut('delete', () => handleDeleteRequests(), [selectedItems]);
     useKeyboardShortcut('toggleFilters', () => setIsFilterBarOpen(prev => !prev), []);
     useKeyboardShortcut('escape', () => {
-        if (viewRequest) setViewRequest(null);
-    }, [viewRequest]);
+        if (feedbackOpen) {
+            setFeedbackOpen(false);
+            return;
+        }
+        if (viewRequest) {
+            setViewRequest(null);
+            return;
+        }
+        navigate('/dashboard');
+    }, [viewRequest, feedbackOpen]);
     useKeyboardShortcut('enter', () => {
         if (!viewRequest && selectedRequest) {
             setViewRequest(selectedRequest);
