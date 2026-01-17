@@ -979,7 +979,9 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
             INSERT INTO sys_parameters (param_key, param_value, description)
             VALUES ('DOCUREF_STORAGE_PATH', 'uploads/docuref', 'Default storage path for attachments')
             ON CONFLICT (param_key) DO NOTHING;
-        "
+        ",
+        '070_sys_user_favorites' => null,
+        '071_sys_help' => null
     ];
 
 
