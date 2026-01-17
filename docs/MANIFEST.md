@@ -18,6 +18,8 @@
     - **Header & Navigace:** Na mobilu preferujeme "Unified Horizontal Scroll" (celý řádek s logem i akcemi se posouvá) před skrýváním prvků.
     - **Dashboardy & Sloupce:** Používat `scroll-snap` a horizontální posun pro sekce, místo nekonečného vertikálního stackování.
     - **Žádné skákání:** Layout musí být stabilní při expanzi/kolapsu sekcí.
+  - **Module Navigation Standard:**
+    - **Tab Reset:** Kliknutí na záložku již aktivního modulu v hlavním menu musí vrátit uživatele na výchozí obrazovku modulu (resetovat stav/detail/filtry).
   - **Dashboard UI Standard:**
     - **Akční lišta (ActionBar):** Globální akce (Refresh, Expand/Collapse) musí být v `ActionBar` (vpravo).
     - **Expand/Collapse:** Pokud má modul sekce, tlačítka "Expand all" a "Collapse all" jsou v Action Baru nalevo od "Obnovit" jako `appearance="subtle"`.
