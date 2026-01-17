@@ -28,15 +28,32 @@ try {
     
     switch ($action) {
         case 'list':
-            // Standard List Query with Tenant Isolation
-            $stmt = $pdo->prepare("
-                SELECT * 
-                FROM sys_organizations 
-                WHERE tenant_id = :tid 
-                ORDER BY org_id
-            ");
-            $stmt->execute([':tid' => $tenantId]);
+            // Support filtering by virtual type
+            $type = $_GET['type'] ?? null; // 'virtual', 'standard', or null (all)
+            
+            $sql = "SELECT * FROM sys_organizations WHERE tenant_id = :tid";
+            $params = [':tid' => $tenantId];
+
+            if ($type === 'virtual') {
+                $sql .= " AND is_virtual_group = true";
+            } elseif ($type === 'standard') {
+                // Compatible with existing frontend which doesn't know about virtual groups yet
+                // or explicit standard check
+                $sql .= " AND (is_virtual_group = false OR is_virtual_group IS NULL)";
+            }
+
+            $sql .= " ORDER BY org_id";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Normalize boolean
+            foreach ($data as &$row) {
+                $row['is_active'] = (bool)$row['is_active'];
+                $row['is_virtual_group'] = !empty($row['is_virtual_group']);
+            }
+
             echo json_encode(['success' => true, 'data' => $data]);
             break;
 
@@ -50,9 +67,9 @@ try {
             }
             if (empty($input['display_name'])) throw new Exception("Název společnosti je povinný.");
 
-            // Check duplicities within Tenant (or globally since OrgID is PK? It's PK char(5), so global uniqueness required currently)
-            // TODO: In future, composite PK (tenant_id, org_id) would be better, but for now strict 5 char is global or we assume small deployment.
-            // Let's check DB.
+            $isVirtual = !empty($input['is_virtual_group']);
+
+            // Check duplicities within Tenant
             $check = $pdo->prepare("SELECT 1 FROM sys_organizations WHERE org_id = :oid");
             $check->execute([':oid' => $orgId]);
             if ($check->fetch()) throw new Exception("Společnost s ID '$orgId' již existuje.");
@@ -62,13 +79,13 @@ try {
                 street, city, zip, 
                 contact_email, contact_phone, 
                 bank_account, bank_code, data_box_id,
-                is_active
+                is_active, is_virtual_group
             ) VALUES (
                 :oid, :tid, :name, :ico, :dic,
                 :street, :city, :zip,
                 :email, :phone,
                 :bank, :bank_code, :dbox,
-                true
+                true, :is_virtual
             )";
 
             $stmt = $pdo->prepare($sql);
@@ -85,7 +102,8 @@ try {
                 ':phone' => $input['contact_phone'] ?? null,
                 ':bank' => $input['bank_account'] ?? null,
                 ':bank_code' => $input['bank_code'] ?? null,
-                ':dbox' => $input['data_box_id'] ?? null
+                ':dbox' => $input['data_box_id'] ?? null,
+                ':is_virtual' => $isVirtual ? 'true' : 'false'
             ]);
 
             // Automatically grant access to the creator
@@ -118,14 +136,15 @@ try {
                 'bank_account' => 'bank_account',
                 'bank_code' => 'bank_code',
                 'data_box_id' => 'data_box_id',
-                'is_active' => 'is_active' // boolean
+                'is_active' => 'is_active',
+                'is_virtual_group' => 'is_virtual_group'
             ];
 
             foreach ($fields as $jsonKey => $dbCol) {
                 if (array_key_exists($jsonKey, $input)) {
                     $sets[] = "$dbCol = :$dbCol";
                     // Special handling for boolean
-                    if ($jsonKey === 'is_active') {
+                    if ($jsonKey === 'is_active' || $jsonKey === 'is_virtual_group') {
                         $params[":$dbCol"] = (bool)$input[$jsonKey] ? 'true' : 'false';
                     } else {
                         $params[":$dbCol"] = $input[$jsonKey];
@@ -154,14 +173,113 @@ try {
             // IMPORTANT: Tenant check in DELETE
             $sql = "DELETE FROM sys_organizations WHERE tenant_id = ? AND org_id IN ($placeholders)";
             
-            // Allow deleting only if not current context? 
-            // Better to prevent self-deletion in frontend, but backend should ideally check relations.
-            
             $params = array_merge([$tenantId], $ids);
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
 
             echo json_encode(['success' => true, 'message' => 'Smazáno.', 'count' => $stmt->rowCount()]);
+            break;
+
+        // --- SHARED COMPANIES LOGIC ---
+
+        case 'get_group_members':
+            $groupId = $_GET['group_id'] ?? '';
+            if (!$groupId) throw new Exception("Group ID required");
+
+            // Get All Active Standard Orgs (Available)
+            $stmtAll = $pdo->prepare("SELECT org_id, display_name FROM sys_organizations WHERE tenant_id = :tid AND (is_virtual_group = false OR is_virtual_group IS NULL) AND is_active = true");
+            $stmtAll->execute([':tid' => $tenantId]);
+            $allOrgs = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
+
+            // Get Assigned Members
+            $stmtAssigned = $pdo->prepare("SELECT member_id FROM sys_org_group_members WHERE group_id = :gid");
+            $stmtAssigned->execute([':gid' => $groupId]);
+            $assignedIds = $stmtAssigned->fetchAll(PDO::FETCH_COLUMN);
+
+            echo json_encode([
+                'success' => true,
+                'available_orgs' => $allOrgs,
+                'assigned_ids' => $assignedIds
+            ]);
+            break;
+
+        case 'save_group_members':
+            $input = json_decode(file_get_contents('php://input'), true);
+            $groupId = $input['group_id'] ?? '';
+            $memberIds = $input['member_ids'] ?? [];
+
+            if (!$groupId) throw new Exception("Group ID required");
+
+            DB::transaction(function($pdo) use ($groupId, $memberIds) {
+                // Delete existing
+                $del = $pdo->prepare("DELETE FROM sys_org_group_members WHERE group_id = ?");
+                $del->execute([$groupId]);
+
+                // Insert new
+                if (!empty($memberIds)) {
+                    $ins = $pdo->prepare("INSERT INTO sys_org_group_members (group_id, member_id) VALUES (?, ?)");
+                    foreach ($memberIds as $mid) {
+                        $ins->execute([$groupId, $mid]);
+                    }
+                }
+            });
+
+            echo json_encode(['success' => true, 'message' => 'Členové skupiny aktualizováni']);
+            break;
+
+        case 'get_shared_tables':
+            $groupId = $_GET['group_id'] ?? '';
+            if (!$groupId) throw new Exception("Group ID required");
+
+            // 1. Get List of All Tables in Schema (simple whitelist or introspection)
+            // Ideally we query information_schema, but limit to 'public' schema and exclude system tables if possible.
+            // For safety, let's filter only known prefixes like 'sys_', 'dms_' or allow all for 'public'.
+            $stmtTables = $pdo->query("
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            ");
+            $allTablesRaw = $stmtTables->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Format for TransferList
+            $allTables = array_map(function($t) { return ['id' => $t, 'display_name' => $t]; }, $allTablesRaw);
+
+            // 2. Get Assigned Tables
+            $stmtAssigned = $pdo->prepare("SELECT table_name FROM sys_org_shared_tables WHERE group_id = :gid");
+            $stmtAssigned->execute([':gid' => $groupId]);
+            $assignedTables = $stmtAssigned->fetchAll(PDO::FETCH_COLUMN);
+
+            echo json_encode([
+                'success' => true,
+                'all_tables' => $allTables,
+                'assigned_tables' => $assignedTables
+            ]);
+            break;
+
+        case 'save_shared_tables':
+            $input = json_decode(file_get_contents('php://input'), true);
+            $groupId = $input['group_id'] ?? '';
+            $tableNames = $input['table_names'] ?? [];
+
+            if (!$groupId) throw new Exception("Group ID required");
+
+            DB::transaction(function($pdo) use ($groupId, $tableNames) {
+                // Delete existing
+                $del = $pdo->prepare("DELETE FROM sys_org_shared_tables WHERE group_id = ?");
+                $del->execute([$groupId]);
+
+                // Insert new
+                if (!empty($tableNames)) {
+                    $ins = $pdo->prepare("INSERT INTO sys_org_shared_tables (group_id, table_name) VALUES (?, ?)");
+                    foreach ($tableNames as $tbl) {
+                        $ins->execute([$groupId, $tbl]);
+                    }
+                }
+            });
+
+            echo json_encode(['success' => true, 'message' => 'Konfigurace tabulek uložena']);
             break;
 
         default:

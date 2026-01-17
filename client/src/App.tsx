@@ -10,6 +10,7 @@ import { DmsImport } from './pages/DmsImport';
 import { DmsReview } from './pages/DmsReview';
 import { DmsSettings } from './pages/DmsSettings';
 import RequestsPage from './pages/RequestsPage';
+import { SharedOrgsPage } from './pages/SharedOrgsPage';
 import { SystemTestingList } from "./pages/SystemTestingList";
 import { SystemTestingDetail } from "./pages/SystemTestingDetail";
 import SecurityRoles from './pages/SecurityRoles';
@@ -138,6 +139,7 @@ const router = createBrowserRouter([
                     { path: "system/security-roles", element: <SecurityRoles /> },
                     { path: "system/users", element: <UsersAdmin /> },
                     { path: "system/organizations", element: <OrganizationsAdmin /> },
+                    { path: "system/shared-orgs", element: <SharedOrgsPage /> },
                     { path: "system/audit", element: <CodeAuditPage /> },
                     { path: "system/translations", element: <SystemTranslations /> },
                     { path: "system/table-browser", element: <TableBrowser /> },

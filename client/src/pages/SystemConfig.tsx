@@ -715,6 +715,7 @@ export const SystemConfig: React.FC = () => {
                         <MenuItem label={t('dms.settings.number_series')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label="Správa uživatelů" onClick={() => navigate(orgPrefix + '/system/users')} path={orgPrefix + '/system/users'} />
                         <MenuItem label="Organizace a Subjekty" onClick={() => navigate(orgPrefix + '/system/organizations')} path={orgPrefix + '/system/organizations'} />
+                        <MenuItem label="Sdílené společnosti" onClick={() => navigate(orgPrefix + '/system/shared-orgs')} path={orgPrefix + '/system/shared-orgs'} />
                     </MenuSection>
 
                     {/* 2. DOCS */}
