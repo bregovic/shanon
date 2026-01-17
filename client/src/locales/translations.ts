@@ -4,6 +4,7 @@ export type Language = 'cs' | 'en';
 export const translations = {
     cs: {
         // Common
+        'common.actions': 'Akce',
         'common.save': 'Uložit',
         'common.cancel': 'Zrušit',
         'common.close': 'Zavřít',

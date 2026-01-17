@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
     Button,
     Breadcrumb,
@@ -8,7 +8,6 @@ import {
     BreadcrumbDivider,
     Spinner,
     Input,
-    Title3,
     Label,
     Dialog,
     DialogSurface,
@@ -16,7 +15,21 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Text
+    Text,
+    Drawer,
+    DrawerHeader,
+    DrawerHeaderTitle,
+    DrawerBody,
+    Divider,
+    MessageBar,
+    MessageBarBody,
+    Menu,
+    MenuTrigger,
+    MenuPopover,
+    MenuList,
+    MenuItem,
+    tokens,
+    Switch
 } from '@fluentui/react-components';
 import type { TableColumnDefinition, SelectionItemId } from '@fluentui/react-components';
 import {
@@ -26,7 +39,10 @@ import {
     Save24Regular,
     PeopleTeam24Regular,
     Database24Regular,
-    ArrowLeft24Regular
+    Dismiss24Regular,
+    ChevronDown24Regular,
+    Edit24Regular,
+    BuildingMultiple24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
@@ -35,6 +51,7 @@ import { useTranslation } from '../context/TranslationContext';
 import { ActionBar } from '../components/ActionBar';
 import { useAuth } from '../context/AuthContext';
 import { TransferList } from '../components/TransferList';
+import { useKeyboardShortcut } from '../context/KeyboardShortcutsContext';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend' : '/api';
 
@@ -45,22 +62,33 @@ interface OrgGroup {
     is_virtual_group: boolean;
 }
 
+const defaultGroup: OrgGroup = {
+    org_id: '',
+    display_name: '',
+    is_active: true,
+    is_virtual_group: true
+};
+
 export const SharedOrgsPage: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const { currentOrgId } = useAuth();
     const orgPrefix = `/${currentOrgId || 'VACKR'}`;
 
-    // State
-    const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
+    // --- State ---
     const [items, setItems] = useState<OrgGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<Set<SelectionItemId>>(new Set());
-    const [currentGroup, setCurrentGroup] = useState<OrgGroup>({ org_id: '', display_name: '', is_active: true, is_virtual_group: true });
-    const [saving, setSaving] = useState(false);
-    const [isCreate, setIsCreate] = useState(false);
 
-    // Dialogs State
+    // Drawer & Form State
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
+    const [formData, setFormData] = useState<OrgGroup>(defaultGroup);
+
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Dialogs State (for Membership & Tables)
     const [membersDialogOpen, setMembersDialogOpen] = useState(false);
     const [tablesDialogOpen, setTablesDialogOpen] = useState(false);
 
@@ -71,8 +99,9 @@ export const SharedOrgsPage: React.FC = () => {
     const [availableTables, setAvailableTables] = useState<any[]>([]); // All Tables
     const [assignedTables, setAssignedTables] = useState<string[]>([]); // Names
 
-    // --- FETCH LIST ---
-    const fetchData = async () => {
+    // --- Actions ---
+
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch(`${API_BASE}/api-orgs.php?action=list&type=virtual`);
@@ -83,50 +112,57 @@ export const SharedOrgsPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    const handleOpenCreate = () => {
+        setFormData({ ...defaultGroup });
+        setDrawerMode('create');
+        setError(null);
+        setIsDrawerOpen(true);
     };
 
-    useEffect(() => { fetchData(); }, []);
-
-    // --- HANDLERS ---
-    const handleCreate = () => {
-        setCurrentGroup({ org_id: '', display_name: '', is_active: true, is_virtual_group: true });
-        setIsCreate(true);
-        setViewMode('detail');
-    };
-
-    const handleEdit = (item: OrgGroup) => {
-        setCurrentGroup({ ...item });
-        setIsCreate(false);
-        setViewMode('detail');
+    const handleOpenEdit = (item: OrgGroup) => {
+        setFormData({ ...item });
+        setDrawerMode('edit');
+        setError(null);
+        setIsDrawerOpen(true);
     };
 
     const handleSave = async () => {
-        if (!currentGroup.org_id || !currentGroup.display_name) return alert("Vyplňte ID a název.");
+        if (!formData.org_id || !formData.display_name) {
+            setError(t('common.required_fields') || 'Vyplňte povinná pole.');
+            return;
+        }
+
         setSaving(true);
+        setError(null);
         try {
-            const action = isCreate ? 'create' : 'update';
+            const action = drawerMode === 'create' ? 'create' : 'update';
             const res = await fetch(`${API_BASE}/api-orgs.php?action=${action}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(currentGroup)
+                body: JSON.stringify(formData)
             });
             const json = await res.json();
 
             if (json.success) {
                 await fetchData();
-                setViewMode('list');
+                setIsDrawerOpen(false);
             } else {
-                alert(json.error || 'Uložení selhalo');
+                setError(json.error || 'Uložení selhalo');
             }
         } catch (e) {
-            alert('Chyba sítě');
+            setError('Chyba sítě');
         } finally {
             setSaving(false);
         }
     };
 
     const handleDelete = async () => {
-        if (!confirm('Opravdu smazat vybrané skupiny?')) return;
+        if (selectedIds.size === 0) return;
+        if (!confirm(t('common.confirm_delete') || 'Opravdu smazat vybrané záznamy?')) return;
         try {
             const res = await fetch(`${API_BASE}/api-orgs.php?action=delete`, {
                 method: 'POST',
@@ -140,16 +176,32 @@ export const SharedOrgsPage: React.FC = () => {
         } catch (e) { console.error(e); }
     };
 
-    // --- MEMBERS HANDLING ---
+    // --- Shortcuts ---
+    useKeyboardShortcut('new', handleOpenCreate, []);
+    useKeyboardShortcut('refresh', fetchData, []);
+    useKeyboardShortcut('save', () => { if (isDrawerOpen) handleSave(); }, [isDrawerOpen, formData]);
+    useKeyboardShortcut('escape', () => {
+        if (isDrawerOpen) setIsDrawerOpen(false);
+        else navigate(`${orgPrefix}/system`);
+    }, [isDrawerOpen, orgPrefix, navigate]);
+
+
+    // --- Members Logic ---
     const openMembersDialog = async () => {
+        if (selectedIds.size !== 1) return;
+        const id = Array.from(selectedIds)[0] as string;
+        const group = items.find(i => i.org_id === id);
+        if (!group) return;
+
+        setFormData(group); // Just for title context
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api-orgs.php?action=get_group_members&group_id=${currentGroup.org_id}`);
+            const res = await fetch(`${API_BASE}/api-orgs.php?action=get_group_members&group_id=${id}`);
             const json = await res.json();
             if (json.success) {
                 const available = json.available_orgs.map((o: any) => ({
-                    key: o.org_id,
-                    text: `${o.display_name} (${o.org_id})`
+                    id: o.org_id,
+                    label: `${o.display_name} (${o.org_id})`
                 }));
                 setAvailableMembers(available);
                 setAssignedMembers(json.assigned_ids);
@@ -161,23 +213,33 @@ export const SharedOrgsPage: React.FC = () => {
     };
 
     const saveMembers = async () => {
+        // We use formData.org_id here because we set it before opening dialog
+        // Or better, track "activeDialogId"
+        const groupId = Array.from(selectedIds)[0];
+
         const res = await fetch(`${API_BASE}/api-orgs.php?action=save_group_members`, {
             method: 'POST',
-            body: JSON.stringify({ group_id: currentGroup.org_id, member_ids: assignedMembers })
+            body: JSON.stringify({ group_id: groupId, member_ids: assignedMembers })
         });
         if ((await res.json()).success) setMembersDialogOpen(false);
     };
 
-    // --- TABLES HANDLING ---
+    // --- Tables Logic ---
     const openTablesDialog = async () => {
+        if (selectedIds.size !== 1) return;
+        const id = Array.from(selectedIds)[0] as string;
+        const group = items.find(i => i.org_id === id);
+        if (!group) return;
+
+        setFormData(group);
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api-orgs.php?action=get_shared_tables&group_id=${currentGroup.org_id}`);
+            const res = await fetch(`${API_BASE}/api-orgs.php?action=get_shared_tables&group_id=${id}`);
             const json = await res.json();
             if (json.success) {
                 const available = json.all_tables.map((t: any) => ({
-                    key: t.id,
-                    text: t.display_name
+                    id: t.id,
+                    label: t.display_name
                 }));
                 setAvailableTables(available);
                 setAssignedTables(json.assigned_tables);
@@ -189,28 +251,41 @@ export const SharedOrgsPage: React.FC = () => {
     };
 
     const saveTables = async () => {
+        const groupId = Array.from(selectedIds)[0];
         const res = await fetch(`${API_BASE}/api-orgs.php?action=save_shared_tables`, {
             method: 'POST',
-            body: JSON.stringify({ group_id: currentGroup.org_id, table_names: assignedTables })
+            body: JSON.stringify({ group_id: groupId, table_names: assignedTables })
         });
         if ((await res.json()).success) setTablesDialogOpen(false);
     };
 
-    // --- COLUMNS ---
+    // --- Columns ---
     const columns: TableColumnDefinition<OrgGroup>[] = useMemo(() => [
         {
             columnId: 'org_id',
             compare: (a, b) => a.org_id.localeCompare(b.org_id),
-            renderHeaderCell: () => 'ID Skupiny',
-            renderCell: (item) => <strong>{item.org_id}</strong>
+            renderHeaderCell: () => t('common.id') || 'ID',
+            renderCell: (item) => <Text font="monospace">{item.org_id}</Text>
         },
         {
             columnId: 'display_name',
             compare: (a, b) => a.display_name.localeCompare(b.display_name),
-            renderHeaderCell: () => 'Název Skupiny',
-            renderCell: (item) => item.display_name
+            renderHeaderCell: () => t('common.name') || 'Název',
+            renderCell: (item) => <strong>{item.display_name}</strong>
+        },
+        {
+            columnId: 'is_active',
+            compare: (a, b) => Number(b.is_active) - Number(a.is_active),
+            renderHeaderCell: () => 'Status',
+            renderCell: (item) => item.is_active ? 'Aktivní' : 'Neaktivní'
         }
-    ], []);
+    ], [t]);
+
+    const getSelectedGroup = () => {
+        if (selectedIds.size !== 1) return null;
+        const id = Array.from(selectedIds)[0];
+        return items.find(i => i.org_id === id);
+    };
 
     return (
         <PageLayout>
@@ -218,131 +293,174 @@ export const SharedOrgsPage: React.FC = () => {
                 <Breadcrumb>
                     <BreadcrumbItem><BreadcrumbButton onClick={() => navigate(`${orgPrefix}/system`)}>Systém</BreadcrumbButton></BreadcrumbItem>
                     <BreadcrumbDivider />
-                    <BreadcrumbItem><BreadcrumbButton onClick={() => setViewMode('list')} current={viewMode === 'list'}>Sdílené společnosti</BreadcrumbButton></BreadcrumbItem>
-                    {viewMode === 'detail' && (
-                        <>
-                            <BreadcrumbDivider />
-                            <BreadcrumbItem><BreadcrumbButton current>{isCreate ? 'Nová skupina' : currentGroup.org_id}</BreadcrumbButton></BreadcrumbItem>
-                        </>
-                    )}
+                    <BreadcrumbItem><BreadcrumbButton current>Sdílené společnosti</BreadcrumbButton></BreadcrumbItem>
                 </Breadcrumb>
             </PageHeader>
 
-            {viewMode === 'list' && (
-                <>
-                    <ActionBar>
-                        <Button appearance="primary" icon={<Add24Regular />} onClick={handleCreate}>Nová skupina</Button>
-                        <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData}>Obnovit</Button>
-                        <Button appearance="subtle" icon={<Delete24Regular />} disabled={selectedIds.size === 0} onClick={handleDelete}>Smazat</Button>
-                    </ActionBar>
-                    <PageContent>
-                        {loading ? <Spinner /> : (
-                            <SmartDataGrid
-                                items={items}
-                                columns={columns}
-                                getRowId={i => i.org_id}
-                                selectionMode="multiselect"
-                                selectedItems={selectedIds}
-                                onSelectionChange={(e, d) => setSelectedIds(d.selectedItems)}
-                                onRowDoubleClick={handleEdit}
+            <ActionBar>
+                {/* Primary Actions Menu */}
+                <Menu>
+                    <MenuTrigger>
+                        <Button appearance="primary" icon={<ChevronDown24Regular />} iconPosition="after">
+                            {t('common.actions') || 'Akce'}
+                        </Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                        <MenuList>
+                            <MenuItem icon={<Add24Regular />} onClick={handleOpenCreate}>{t('common.new') || 'Nová skupina'}</MenuItem>
+                            <MenuItem
+                                icon={<Edit24Regular />}
+                                disabled={selectedIds.size !== 1}
+                                onClick={() => {
+                                    const g = getSelectedGroup();
+                                    if (g) handleOpenEdit(g);
+                                }}
+                            >
+                                {t('common.edit') || 'Upravit'}
+                            </MenuItem>
+                            <MenuItem icon={<Delete24Regular />} disabled={selectedIds.size === 0} onClick={handleDelete}>{t('common.delete') || 'Smazat'}</MenuItem>
+                        </MenuList>
+                    </MenuPopover>
+                </Menu>
+
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+
+                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData} title={t('common.refresh')} />
+
+                <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+
+                {/* Specific Tools */}
+                <Button
+                    appearance="subtle"
+                    icon={<PeopleTeam24Regular />}
+                    disabled={selectedIds.size !== 1}
+                    onClick={openMembersDialog}
+                >
+                    Členové skupiny
+                </Button>
+                <Button
+                    appearance="subtle"
+                    icon={<Database24Regular />}
+                    disabled={selectedIds.size !== 1}
+                    onClick={openTablesDialog}
+                >
+                    Sdílené tabulky
+                </Button>
+            </ActionBar>
+
+            <PageContent>
+                {loading ? <Spinner /> : (
+                    <SmartDataGrid
+                        items={items}
+                        columns={columns}
+                        getRowId={i => i.org_id}
+                        selectionMode="multiselect"
+                        selectedItems={selectedIds}
+                        onSelectionChange={(_, d) => setSelectedIds(d.selectedItems)}
+                        onRowDoubleClick={handleOpenEdit}
+                    />
+                )}
+            </PageContent>
+
+            {/* DRAWER FOR EDIT/CREATE */}
+            <Drawer
+                type="overlay"
+                position="end"
+                open={isDrawerOpen}
+                onOpenChange={(_, d) => setIsDrawerOpen(d.open)}
+                size="medium"
+            >
+                <DrawerHeader>
+                    <DrawerHeaderTitle
+                        action={<Button appearance="subtle" icon={<Dismiss24Regular />} onClick={() => setIsDrawerOpen(false)} />}
+                    >
+                        <BuildingMultiple24Regular style={{ marginRight: 8 }} />
+                        {drawerMode === 'create' ? 'Nová skupina' : 'Upravit skupinu'}
+                    </DrawerHeaderTitle>
+                </DrawerHeader>
+                <DrawerBody>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 0' }}>
+                        {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
+
+                        <div>
+                            <Label required>ID Skupiny (max 5 znaků)</Label>
+                            <Input
+                                value={formData.org_id}
+                                disabled={drawerMode === 'edit'}
+                                onChange={(_, d) => setFormData(p => ({ ...p, org_id: d.value.toUpperCase().substring(0, 5) }))}
+                                placeholder="např. ALL"
+                                style={{ width: '100%' }}
                             />
-                        )}
-                    </PageContent>
-                </>
-            )}
-
-            {viewMode === 'detail' && (
-                <PageContent>
-                    <div style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Button icon={<ArrowLeft24Regular />} onClick={() => setViewMode('list')}>Zpět</Button>
-                            <Button appearance="primary" icon={<Save24Regular />} disabled={saving} onClick={handleSave}>Uložit</Button>
+                        </div>
+                        <div>
+                            <Label required>Název Skupiny</Label>
+                            <Input
+                                value={formData.display_name}
+                                onChange={(_, d) => setFormData(p => ({ ...p, display_name: d.value }))}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div>
+                            <Switch
+                                checked={formData.is_active}
+                                onChange={(_, d) => setFormData(p => ({ ...p, is_active: d.checked }))}
+                                label="Aktivní"
+                            />
                         </div>
 
-                        <div style={{ display: 'grid', gap: 15, padding: 20, background: '#fff', borderRadius: 8, border: '1px solid #eee' }}>
-                            <Title3>Základní údaje</Title3>
-                            <div>
-                                <Label required>ID Skupiny (max 5 znaků)</Label>
-                                <Input
-                                    value={currentGroup.org_id}
-                                    disabled={!isCreate}
-                                    onChange={(e, d) => setCurrentGroup(p => ({ ...p, org_id: d.value.toUpperCase().substring(0, 5) }))}
-                                    placeholder="ALL, GRP1"
-                                />
-                            </div>
-                            <div>
-                                <Label required>Název Skupiny</Label>
-                                <Input
-                                    value={currentGroup.display_name}
-                                    onChange={(e, d) => setCurrentGroup(p => ({ ...p, display_name: d.value }))}
-                                />
-                            </div>
+                        <Divider />
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <Button appearance="primary" icon={<Save24Regular />} onClick={handleSave} disabled={saving}>
+                                {saving ? t('common.saving') : t('common.save')}
+                            </Button>
+                            <Button appearance="secondary" onClick={() => setIsDrawerOpen(false)}>
+                                {t('common.cancel')}
+                            </Button>
                         </div>
-
-                        {!isCreate && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                                <div style={{ padding: 20, background: '#f0f8ff', borderRadius: 8, border: '1px solid #cce0ff' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                        <PeopleTeam24Regular primaryFill="#0066cc" />
-                                        <Title3>Členové skupiny</Title3>
-                                    </div>
-                                    <Text block style={{ marginBottom: 15 }}>Spravujte, které reálné společnosti patří do této skupiny.</Text>
-                                    <Button onClick={openMembersDialog}>Spravovat členy</Button>
-                                </div>
-
-                                <div style={{ padding: 20, background: '#fff0f5', borderRadius: 8, border: '1px solid #ffccdd' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                        <Database24Regular primaryFill="#cc0066" />
-                                        <Title3>Sdílená data</Title3>
-                                    </div>
-                                    <Text block style={{ marginBottom: 15 }}>Vyberte tabulky, jejichž data budou sdílena se členy skupiny.</Text>
-                                    <Button onClick={openTablesDialog}>Konfigurace tabulek</Button>
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </PageContent>
-            )}
+                </DrawerBody>
+            </Drawer>
 
             {/* MEMBERS DIALOG */}
-            <Dialog open={membersDialogOpen} onOpenChange={(e, d) => setMembersDialogOpen(d.open)}>
+            <Dialog open={membersDialogOpen} onOpenChange={(_, d) => setMembersDialogOpen(d.open)}>
                 <DialogSurface>
                     <DialogBody>
-                        <DialogTitle>Členové skupiny {currentGroup.display_name}</DialogTitle>
+                        <DialogTitle>Členové skupiny {formData.display_name}</DialogTitle>
                         <DialogContent style={{ height: 400 }}>
                             <TransferList
-                                leftTitle="Dostupné společnosti"
-                                rightTitle="Přiřazení členové"
-                                leftItems={availableMembers}
-                                rightKeys={assignedMembers}
-                                onChange={setAssignedMembers}
+                                availableTitle="Dostupné společnosti"
+                                selectedTitle="Přiřazení členové"
+                                availableItems={availableMembers}
+                                selectedIds={assignedMembers}
+                                onSelectionChange={(ids) => setAssignedMembers(ids as string[])}
                             />
                         </DialogContent>
                         <DialogActions>
-                            <Button appearance="secondary" onClick={() => setMembersDialogOpen(false)}>Zavřít</Button>
-                            <Button appearance="primary" onClick={saveMembers}>Uložit změny</Button>
+                            <Button appearance="secondary" onClick={() => setMembersDialogOpen(false)}>{t('common.close')}</Button>
+                            <Button appearance="primary" onClick={saveMembers}>{t('common.save')}</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>
             </Dialog>
 
             {/* TABLES DIALOG */}
-            <Dialog open={tablesDialogOpen} onOpenChange={(e, d) => setTablesDialogOpen(d.open)}>
+            <Dialog open={tablesDialogOpen} onOpenChange={(_, d) => setTablesDialogOpen(d.open)}>
                 <DialogSurface>
                     <DialogBody>
-                        <DialogTitle>Sdílené tabulky pro {currentGroup.display_name}</DialogTitle>
+                        <DialogTitle>Sdílené tabulky pro {formData.display_name}</DialogTitle>
                         <DialogContent style={{ height: 400 }}>
                             <TransferList
-                                leftTitle="Dostupné tabulky"
-                                rightTitle="Sdílené tabulky"
-                                leftItems={availableTables}
-                                rightKeys={assignedTables}
-                                onChange={setAssignedTables}
+                                availableTitle="Dostupné tabulky"
+                                selectedTitle="Sdílené tabulky"
+                                availableItems={availableTables}
+                                selectedIds={assignedTables}
+                                onSelectionChange={(ids) => setAssignedTables(ids as string[])}
                             />
                         </DialogContent>
                         <DialogActions>
-                            <Button appearance="secondary" onClick={() => setTablesDialogOpen(false)}>Zavřít</Button>
-                            <Button appearance="primary" onClick={saveTables}>Uložit konfiguraci</Button>
+                            <Button appearance="secondary" onClick={() => setTablesDialogOpen(false)}>{t('common.close')}</Button>
+                            <Button appearance="primary" onClick={saveTables}>{t('common.save')}</Button>
                         </DialogActions>
                     </DialogBody>
                 </DialogSurface>
