@@ -242,6 +242,89 @@ const DocuRefDrawer: React.FC<DrawerProps> = ({ open, onOpenChange, refTable, re
     );
 };
 
+export const DocuRefPanel: React.FC<{ refTable: string; refId: number | null }> = ({ refTable, refId }) => {
+    const styles = useStyles();
+    const { getApiUrl } = useAuth();
+    const [items, setItems] = useState<DocuItem[]>([]);
+    const [isAddOpen, setIsAddOpen] = useState(false);
+
+    const loadItems = async () => {
+        if (!refId) {
+            setItems([]);
+            return;
+        }
+        try {
+            const res = await axios.get(getApiUrl(`api-docuref.php?action=list&ref_table=${refTable}&ref_id=${refId}`));
+            if (res.data.success) {
+                setItems(res.data.data);
+            }
+        } catch (e) {
+            console.error("Failed to load attachments", e);
+        }
+    };
+
+    useEffect(() => {
+        loadItems();
+    }, [refId, refTable]);
+
+    const downloadFile = (id: number) => {
+        const url = getApiUrl(`api-docuref.php?action=download&id=${id}`);
+        window.open(url, '_blank');
+    };
+
+    const deleteItem = async (id: number) => {
+        if (!confirm("Opravdu smazat?")) return;
+        try {
+            const formData = new FormData();
+            formData.append('id', id.toString());
+            await axios.post(getApiUrl('api-docuref.php?action=delete'), formData);
+            loadItems();
+        } catch (e) { alert("Chyba při mazání"); }
+    };
+
+    return (
+        <div className={styles.root}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text weight="semibold">Přílohy ({items.length})</Text>
+                <Button size="small" icon={<Add24Regular />} onClick={() => setIsAddOpen(true)}>Přidat</Button>
+            </div>
+
+            {items.length === 0 && <Text style={{ padding: 20, textAlign: 'center', color: tokens.colorNeutralForeground3 }}>Žádné přílohy</Text>}
+
+            {items.map(item => (
+                <div key={item.id} className={styles.item}>
+                    <div className={styles.itemIcon}>
+                        {item.type === 'Note' ? <Note24Regular /> : <Document24Regular />}
+                    </div>
+                    <div className={styles.itemContent}>
+                        <Text weight="semibold">{item.name}</Text>
+                        {item.type === 'Note' && <Text size={200} style={{ whiteSpace: 'pre-wrap' }}>{item.notes}</Text>}
+                        <span className={styles.meta}>
+                            {new Date(item.created_at).toLocaleString()} • {item.creator_name}
+                            {item.file_size ? ` • ${(item.file_size / 1024).toFixed(1)} KB` : ''}
+                        </span>
+                    </div>
+                    <div className={styles.itemActions}>
+                        {item.type === 'File' && (
+                            <Button icon={<ArrowDownload24Regular />} appearance="subtle" onClick={() => downloadFile(item.id)} />
+                        )}
+                        <Button icon={<Delete24Regular />} appearance="subtle" onClick={() => deleteItem(item.id)} />
+                    </div>
+                </div>
+            ))}
+
+            <AddDocuDialog
+                open={isAddOpen}
+                onClose={() => setIsAddOpen(false)}
+                refTable={refTable}
+                refId={refId}
+                onSuccess={() => { setIsAddOpen(false); loadItems(); }}
+            />
+        </div>
+    );
+};
+
+
 // --- ADD DIALOG ---
 const AddDocuDialog: React.FC<any> = ({ open, onClose, refTable, refId, onSuccess }) => {
     const [type, setType] = useState<'File' | 'Note'>('File');

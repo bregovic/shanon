@@ -37,7 +37,7 @@ import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
 import type { SelectionItemId, OnSelectionChangeData } from '@fluentui/react-components';
 import { PageFilterBar, PageHeader } from "../components/PageLayout";
-import { DocuRefButton } from "../components/DocuRef";
+import { DocuRefButton, DocuRefPanel } from "../components/DocuRef";
 import { VisualEditor } from "../components/VisualEditor";
 import {
     Attach24Regular,
@@ -1032,68 +1032,12 @@ const RequestsPage = () => {
                                 </div>
                             </div>
 
-                            <div className={styles.card}>
-                                <div className={styles.sectionHeader}>
-                                    <Text className={styles.sectionTitle}><Attach24Regular /> Přílohy ({attachments.length})</Text>
-                                </div>
+                            <div className={styles.card} style={{ minHeight: '300px' }}>
+                                <DocuRefPanel refTable="sys_change_requests" refId={viewRequest.id} />
 
-                                <div
-                                    className={`${styles.dropZone} ${isDragging ? styles.dropZoneActive : ''}`}
-                                    onDragOver={handleDragOver}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={handleDrop}
-                                    onClick={() => document.getElementById('req-file-input')?.click()}
-                                    style={{ marginBottom: '12px' }}
-                                >
-                                    <Attach24Regular style={{ color: tokens.colorBrandForeground1 }} />
-                                    <Text size={200} weight="semibold">Přidat přílohy</Text>
-                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>(vložte nebo přetáhněte)</Text>
-                                    <input
-                                        id="req-file-input"
-                                        type="file"
-                                        multiple
-                                        style={{ display: 'none' }}
-                                        onChange={(e) => handleUploadAttachment(e.target.files)}
-                                    />
-                                </div>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {attachments.map(att => (
-                                        <div
-                                            key={att.id}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '10px',
-                                                padding: '8px',
-                                                backgroundColor: tokens.colorNeutralBackground2,
-                                                borderRadius: '4px',
-                                            }}
-                                        >
-                                            <div
-                                                style={{ display: 'flex', flex: 1, alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0 }}
-                                                onClick={() => window.open(getApiUrl(att.file_path), '_blank')}
-                                            >
-                                                <Document24Regular style={{ color: tokens.colorNeutralForeground4 }} />
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <Text block truncate weight="semibold" size={200}>{att.filename}</Text>
-                                                    <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>
-                                                        {Math.round(att.filesize / 1024)} KB • {new Date(att.created_at).toLocaleDateString('cs-CZ')}
-                                                    </Text>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                icon={<Delete20Regular />}
-                                                size="small"
-                                                appearance="subtle"
-                                                onClick={() => handleDeleteAttachment(att.id)}
-                                                style={{ color: tokens.colorPaletteRedForeground1 }}
-                                            />
-                                        </div>
-                                    ))}
-                                    {attachments.length === 0 && <Text style={{ fontStyle: 'italic', fontSize: '12px' }}>Žádné přílohy.</Text>}
-                                    {uploadingAttachment && <Spinner size="tiny" label="Nahrávám..." />}
-                                </div>
+
+
                             </div>
 
                             <div className={styles.card}>
