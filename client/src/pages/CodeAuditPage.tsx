@@ -19,7 +19,8 @@ import {
     DocumentSearch24Regular,
     Copy24Regular,
     ClipboardCode24Regular,
-    ArrowDownload24Regular
+    ArrowDownload24Regular,
+    Ruler24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageContent } from '../components/PageLayout';
@@ -66,6 +67,7 @@ interface AuditData {
     hardcoded_candidates: { file: string; text: string }[];
     duplicate_values: { value: string; keys: string[] }[];
     code_smells: { type: 'console' | 'todo' | 'fixme'; file: string; line: number; content: string }[];
+    uniformity_issues: { type: 'html_tag' | 'style' | 'structure'; file: string; line: number; message: string }[];
 }
 
 export const CodeAuditPage: React.FC = () => {
@@ -82,7 +84,8 @@ export const CodeAuditPage: React.FC = () => {
         unused_translations: [],
         hardcoded_candidates: [],
         duplicate_values: [],
-        code_smells: []
+        code_smells: [],
+        uniformity_issues: []
     });
 
     useEffect(() => {
@@ -97,7 +100,8 @@ export const CodeAuditPage: React.FC = () => {
                         unused_translations: json.unused_translations || [],
                         hardcoded_candidates: json.hardcoded_candidates || [],
                         duplicate_values: [],
-                        code_smells: []
+                        code_smells: [],
+                        uniformity_issues: []
                     });
                 }
             } catch (e) {
@@ -136,9 +140,9 @@ export const CodeAuditPage: React.FC = () => {
         },
         {
             columnId: 'status',
-            compare: (a, b) => 0,
+            compare: () => 0,
             renderHeaderCell: () => 'Status',
-            renderCell: (i) => <Badge appearance="ghost">Nepoužito</Badge>
+            renderCell: () => <Badge appearance="ghost">Nepoužito</Badge>
         },
     ], []);
 
@@ -190,6 +194,30 @@ export const CodeAuditPage: React.FC = () => {
             compare: (a, b) => a.content.localeCompare(b.content),
             renderHeaderCell: () => 'Obsah',
             renderCell: (i) => <code>{i.content}</code>
+        },
+    ], []);
+
+    const uniformityColumns: TableColumnDefinition<AuditData['uniformity_issues'][0]>[] = useMemo(() => [
+        {
+            columnId: 'type',
+            compare: (a, b) => a.type.localeCompare(b.type),
+            renderHeaderCell: () => 'Problém',
+            renderCell: (i) => {
+                const colors: any = { html_tag: 'danger', style: 'warning', structure: 'important' };
+                return <Badge color={colors[i.type] ?? 'neutral'}>{i.type.toUpperCase()}</Badge>;
+            }
+        },
+        {
+            columnId: 'file',
+            compare: (a, b) => a.file.localeCompare(b.file),
+            renderHeaderCell: () => 'Soubor : Řádek',
+            renderCell: (i) => <span>{i.file}:{i.line}</span>
+        },
+        {
+            columnId: 'message',
+            compare: (a, b) => a.message.localeCompare(b.message),
+            renderHeaderCell: () => 'Doporučení',
+            renderCell: (i) => <span style={{ fontWeight: 500 }}>{i.message}</span>
         },
     ], []);
 
@@ -267,6 +295,7 @@ export const CodeAuditPage: React.FC = () => {
                                         const result = await runLocalAudit(dirHandle);
                                         // @ts-ignore
                                         setData(result);
+                                        setSelectedTab('uniformity'); // Switch to new interesting tab
                                     } catch (e: any) {
                                         if (e.name !== 'AbortError') {
                                             alert('Nepodařilo se načíst složku: ' + e.message);
@@ -287,6 +316,7 @@ export const CodeAuditPage: React.FC = () => {
                                     const result = await runLocalAudit(handle);
                                     // @ts-ignore
                                     setData(result);
+                                    setSelectedTab('uniformity');
                                 } finally {
                                     setLoading(false);
                                 }
@@ -304,6 +334,10 @@ export const CodeAuditPage: React.FC = () => {
                 <Tab value="missing" icon={<ErrorCircle24Regular />}>
                     Chybějící překlady
                     <Badge appearance="filled" color="danger" style={{ marginLeft: 5 }}>{data.missing_translations.length}</Badge>
+                </Tab>
+                <Tab value="uniformity" icon={<Ruler24Regular />}>
+                    Jednotnost & UI
+                    <Badge appearance="filled" color="important" style={{ marginLeft: 5 }}>{data.uniformity_issues?.length || 0}</Badge>
                 </Tab>
                 <Tab value="hardcoded" icon={<DocumentSearch24Regular />}>
                     Hardcoded Texty
@@ -335,6 +369,18 @@ export const CodeAuditPage: React.FC = () => {
                                 columns={missingColumns}
                                 getRowId={(i) => i.key}
                             />
+                        )}
+                        {selectedTab === 'uniformity' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div style={{ background: '#fff0f0', padding: 10, borderRadius: 4 }}>
+                                    📐 <strong>Standardy UI:</strong> Kontrola použití Fluent UI komponent namísto HTML tagů, inline stylů a správné struktury stránek.
+                                </div>
+                                <SmartDataGrid
+                                    items={data.uniformity_issues || []}
+                                    columns={uniformityColumns}
+                                    getRowId={(i) => i.file + i.line}
+                                />
+                            </div>
                         )}
                         {selectedTab === 'hardcoded' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

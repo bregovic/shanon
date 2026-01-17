@@ -8,6 +8,7 @@ export interface AuditResult {
     hardcoded_candidates: { file: string; text: string }[];
     duplicate_values: { value: string; keys: string[] }[];
     code_smells: { type: 'console' | 'todo' | 'fixme'; file: string; line: number; content: string }[];
+    uniformity_issues: { type: 'html_tag' | 'style' | 'structure'; file: string; line: number; message: string }[];
 }
 
 export async function runLocalAudit(p0: any): Promise<AuditResult> {
@@ -23,6 +24,7 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
 
     const hardcodedCandidates: { file: string; text: string }[] = [];
     const codeSmells: { type: 'console' | 'todo' | 'fixme'; file: string; line: number; content: string }[] = [];
+    const uniformityIssues: { type: 'html_tag' | 'style' | 'structure'; file: string; line: number; message: string }[] = [];
 
     // Regex patterns
     const tPattern = /[^a-zA-Z]t\(['"]([^'"]+)['"]\)/g;
@@ -31,6 +33,14 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
     // Advanced TS Definition Parser: 'key': 'value' or key: 'val'
     // Group 1: key, Group 2: value
     const keyValPattern = /['"]?([a-zA-Z0-9_.]+)['"]?\s*:\s*['"`]([^'"`]+)['"`]/g;
+
+    // Uniformity Patterns
+    const forbiddenTags = [
+        { tag: '<input', replacement: 'Input' },
+        { tag: '<textarea', replacement: 'Textarea' },
+        { tag: '<select', replacement: 'Dropdown' },
+        { tag: '<button', replacement: 'Button' }
+    ];
 
     async function scanDir(handle: any, path: string) {
         for await (const entry of handle.values()) {
@@ -65,9 +75,12 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
                     const file = await entry.getFile();
                     const text = await file.text();
                     const lines = text.split('\n');
+                    const isPage = relativePath.includes('/pages/');
+
+                    let hasPageLayout = false;
 
                     // Line-based checks
-                    lines.forEach((lineStr, idx) => {
+                    lines.forEach((lineStr: string, idx: number) => {
                         const lineNum = idx + 1;
                         if (lineStr.includes('console.log')) {
                             codeSmells.push({ type: 'console', file: relativePath, line: lineNum, content: lineStr.trim() });
@@ -78,7 +91,50 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
                                 codeSmells.push({ type: match[1].toLowerCase() as any, file: relativePath, line: lineNum, content: lineStr.trim() });
                             }
                         }
+
+                        // Uniformity: Forbidden Tags
+                        forbiddenTags.forEach(f => {
+                            // Check regular tag start or closing tag, simple heuristic
+                            // Avoid matching component like <MyInput> by ensuring space, > or / after tag name
+                            const tagRegex = new RegExp(`${f.tag}(\\s|>)`, 'i');
+                            if (tagRegex.test(lineStr)) {
+                                uniformityIssues.push({
+                                    type: 'html_tag',
+                                    file: relativePath,
+                                    line: lineNum,
+                                    message: `Use Fluent UI <${f.replacement}> instead of HTML ${f.tag}>`
+                                });
+                            }
+                        });
+
+
+                        // Uniformity: Complex Inline Styles (approximate check for many properties)
+                        if (lineStr.includes('style={{')) {
+                            // Count commas inside style block line (simple heuristic for one-liners)
+                            const styleContent = lineStr.match(/style=\{\{(.*?)\}\}/);
+                            if (styleContent && styleContent[1].split(',').length > 3) {
+                                uniformityIssues.push({
+                                    type: 'style',
+                                    file: relativePath,
+                                    line: lineNum,
+                                    message: `Complex inline style detected (>3 props). Use makeStyles instead.`
+                                });
+                            }
+                        }
+
+                        if (lineStr.includes('<PageLayout')) hasPageLayout = true;
                     });
+
+                    // Structural Checks for Pages
+                    if (isPage && !hasPageLayout && !name.includes('login') && !name.includes('register') && !name.includes('dashboard')) {
+                        // Relaxed rule: Only warn if it looks like a main page
+                        uniformityIssues.push({
+                            type: 'structure',
+                            file: relativePath,
+                            line: 1,
+                            message: `Page missing <PageLayout> wrapper.`
+                        });
+                    }
 
                     // Full text checks (Regex)
                     let match;
@@ -135,6 +191,7 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
 
     // Sort
     codeSmells.sort((a, b) => a.file.localeCompare(b.file));
+    uniformityIssues.sort((a, b) => a.file.localeCompare(b.file));
 
     return {
         scanned_count: scannedCount,
@@ -142,6 +199,7 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
         unused_translations: unused,
         hardcoded_candidates: hardcodedCandidates.slice(0, 200),
         duplicate_values: duplicates,
-        code_smells: codeSmells
+        code_smells: codeSmells,
+        uniformity_issues: uniformityIssues
     };
 }
