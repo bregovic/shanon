@@ -30,6 +30,7 @@ import { Filter24Regular, ArrowUp24Regular, ArrowDown24Regular, Subtract24Regula
 import { useAuth } from "../context/AuthContext";
 import { useTranslation } from "../context/TranslationContext";
 import { FeedbackModal } from "../components/FeedbackModal";
+import { useKeyboardShortcut } from "../context/KeyboardShortcutsContext";
 import { useState, useEffect, type SyntheticEvent } from "react";
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -774,6 +775,32 @@ const RequestsPage = () => {
             minWidth: 140
         }
     ];
+
+    // --- Keyboard Shortcuts ---
+    useKeyboardShortcut('new', () => setFeedbackOpen(true), []);
+    useKeyboardShortcut('refresh', () => {
+        if (viewRequest) {
+            loadComments(viewRequest.id);
+            loadAuditLog(viewRequest.id);
+            loadAttachments(viewRequest.id);
+        } else {
+            loadRequests();
+        }
+    }, [viewRequest, showOnlyMine]); // loadRequests depends on showOnlyMine
+    useKeyboardShortcut('delete', () => handleDeleteRequests(), [selectedItems]);
+    useKeyboardShortcut('toggleFilters', () => setIsFilterBarOpen(prev => !prev), []);
+    useKeyboardShortcut('escape', () => {
+        if (viewRequest) setViewRequest(null);
+    }, [viewRequest]);
+    useKeyboardShortcut('enter', () => {
+        if (!viewRequest && selectedRequest) {
+            setViewRequest(selectedRequest);
+        }
+    }, [viewRequest, selectedRequest]);
+    useKeyboardShortcut('save', () => {
+        if (isEditingDescription) handleSaveDescription();
+        if (isEditingSubject) handleSaveSubject();
+    }, [isEditingDescription, isEditingSubject, descriptionEditValue, subjectEditValue]);
 
     if (viewRequest) {
         return (
