@@ -36,7 +36,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
 import type { SelectionItemId, OnSelectionChangeData } from '@fluentui/react-components';
-import { PageFilterBar } from "../components/PageLayout";
+import { PageFilterBar, PageHeader } from "../components/PageLayout";
+import { DocuRefButton } from "../components/DocuRef";
 import { VisualEditor } from "../components/VisualEditor";
 import {
     Attach24Regular,
@@ -1149,7 +1150,11 @@ const RequestsPage = () => {
                 <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
 
                 <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={loadRequests} title="Obnovit" />
-                <Button icon={<Attach24Regular />} appearance="subtle" title="Přílohy" />
+                <DocuRefButton
+                    refTable="sys_change_requests"
+                    refId={selectedRequest?.id || null}
+                    disabled={!selectedRequest}
+                />
                 <Button icon={<Share24Regular />} appearance="subtle" title="Export/Import" />
 
                 <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />

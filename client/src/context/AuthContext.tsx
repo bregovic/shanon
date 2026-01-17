@@ -27,6 +27,7 @@ type AuthContextType = {
     currentOrgId: string | null;
     switchOrg: (orgId: string, preventReload?: boolean) => Promise<boolean>;
     orgPrefix: string;
+    getApiUrl: (endpoint: string) => string;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -39,7 +40,8 @@ const AuthContext = createContext<AuthContextType>({
     organizations: [],
     currentOrgId: null,
     switchOrg: async () => false,
-    orgPrefix: ''
+    orgPrefix: '',
+    getApiUrl: (e) => e
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -59,6 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const API_BASE = import.meta.env.DEV
         ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
         : '/api';
+
+    const getApiUrl = (endpoint: string) => `${API_BASE}/${endpoint}`;
 
     useEffect(() => {
         checkAuth();
@@ -174,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, permissions, isLoading, login, logout, hasPermission, organizations, currentOrgId, switchOrg, orgPrefix }}>
+        <AuthContext.Provider value={{ user, permissions, isLoading, login, logout, hasPermission, organizations, currentOrgId, switchOrg, orgPrefix, getApiUrl }}>
 
             {children}
         </AuthContext.Provider>

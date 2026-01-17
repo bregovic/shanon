@@ -952,7 +952,34 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         '039_dms_attribute_options' => null,
         '040_dms_ocr_data' => null,
         '041_dms_isolation' => null,
-        '050_multi_org_structure' => null
+        '050_multi_org_structure' => null,
+        '060_sys_docuref' => "
+            CREATE TABLE IF NOT EXISTS sys_docuref (
+                rec_id SERIAL PRIMARY KEY,
+                ref_table VARCHAR(64) NOT NULL,
+                ref_id INT NOT NULL,
+                type VARCHAR(20) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                notes TEXT,
+                file_path TEXT,
+                file_mime VARCHAR(100),
+                file_size BIGINT,
+                storage_type VARCHAR(50) DEFAULT 'local',
+                created_by INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_docuref_lookup ON sys_docuref (ref_table, ref_id);
+
+            CREATE TABLE IF NOT EXISTS sys_parameters (
+                param_key VARCHAR(100) PRIMARY KEY,
+                param_value TEXT,
+                description VARCHAR(255)
+            );
+            
+            INSERT INTO sys_parameters (param_key, param_value, description)
+            VALUES ('DOCUREF_STORAGE_PATH', 'uploads/docuref', 'Default storage path for attachments')
+            ON CONFLICT (param_key) DO NOTHING;
+        "
     ];
 
 
