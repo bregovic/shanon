@@ -1246,7 +1246,12 @@ const RequestsPage = () => {
             <div style={{ flex: 1, overflow: 'hidden', padding: '16px' }}>
                 <div style={{ height: '100%', boxShadow: tokens.shadow2, borderRadius: tokens.borderRadiusMedium, overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: tokens.colorNeutralBackground1 }}>
                     <div style={{ minWidth: '1000px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        {loadingRequests ? <Spinner /> : (
+                        <div style={{ position: 'relative', height: '100%' }}>
+                            {loadingRequests && (
+                                <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(255,255,255,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}>
+                                    <Spinner />
+                                </div>
+                            )}
                             <SmartDataGrid
                                 items={filteredRequests}
                                 columns={columns}
@@ -1257,7 +1262,7 @@ const RequestsPage = () => {
                                 onSelectionChange={handleSelectionChange}
                                 selectionMode="multiselect"
                             />
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>
