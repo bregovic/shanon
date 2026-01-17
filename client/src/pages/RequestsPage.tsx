@@ -37,7 +37,7 @@ import axios from "axios";
 import { SmartDataGrid } from "../components/SmartDataGrid";
 import type { SelectionItemId, OnSelectionChangeData } from '@fluentui/react-components';
 import { PageFilterBar, PageHeader } from "../components/PageLayout";
-import { DocuRefButton, DocuRefPanel } from "../components/DocuRef";
+import { DocuRefButton } from "../components/DocuRef";
 import { VisualEditor } from "../components/VisualEditor";
 import {
     Attach24Regular,
@@ -802,10 +802,34 @@ const RequestsPage = () => {
                         </BreadcrumbItem>
                     </Breadcrumb>
                     <div style={{ flex: 1 }} />
+
+                    {/* Action Lookup (Menu) - Standard per Manifest */}
+                    <Menu>
+                        <MenuTrigger disableButtonEnhancement>
+                            <Button appearance="primary" icon={<Edit24Regular />} iconPosition="before">Akce</Button>
+                        </MenuTrigger>
+                        <MenuPopover>
+                            <MenuList>
+                                <MenuItem icon={<Edit24Regular />} onClick={() => {
+                                    setDescriptionEditValue(viewRequest.description);
+                                    setIsEditingDescription(true);
+                                }}>Upravit popis</MenuItem>
+                                <MenuItem icon={<Delete20Regular />} onClick={() => {
+                                    if (confirm('Opravdu smazat tento požadavek?')) {
+                                        handleDeleteRequests();
+                                    }
+                                }}>Smazat</MenuItem>
+                            </MenuList>
+                        </MenuPopover>
+                    </Menu>
+
+                    <div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />
+
+                    <Button icon={<ArrowClockwise24Regular />} appearance="subtle" onClick={() => {
+                        loadComments(viewRequest.id);
+                        loadAuditLog(viewRequest.id);
+                    }} title={t('common.refresh')} />
                     <DocuRefButton refTable="sys_change_requests" refId={viewRequest.id} />
-                    <Tooltip content="Obnovit" relationship="label">
-                        <Button appearance="subtle" icon={<ArrowClockwise24Regular />} aria-label="Obnovit" onClick={() => loadAuditLog(viewRequest.id)} />
-                    </Tooltip>
                 </ActionBar>
 
                 <div style={{ flex: 1, padding: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
