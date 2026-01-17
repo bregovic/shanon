@@ -24,6 +24,18 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
         try {
             $pdo = DB::connect();
             
+            // 0. Fetch user settings from DB (language, theme, etc.)
+            $userSettings = [];
+            try {
+                $settingsStmt = $pdo->prepare("SELECT settings FROM sys_users WHERE rec_id = ?");
+                $settingsStmt->execute([$userId]);
+                $settingsRow = $settingsStmt->fetch(PDO::FETCH_ASSOC);
+                if ($settingsRow && $settingsRow['settings']) {
+                    $userSettings = json_decode($settingsRow['settings'], true) ?: [];
+                }
+            } catch (Exception $e) {
+                // Settings fetch failed, continue with empty settings
+            }
             // 1. Resolve effective Role IDs
             // Combine strict RBAC roles (sys_user_roles) with legacy session roles mapping
             $roleCodes = [];
@@ -160,7 +172,8 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
         'user' => $user,
         'permissions' => $permissions,
         'organizations' => $availableOrgs,
-        'current_org_id' => $currentOrgId
+        'current_org_id' => $currentOrgId,
+        'settings' => $userSettings ?? []
     ]);
 
 } else {

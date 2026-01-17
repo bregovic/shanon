@@ -21,12 +21,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Load settings from server on mount
     useEffect(() => {
         const isDev = import.meta.env.DEV;
-        // FIX: Correct API path
+        // FIX: Use ajax-get-user which returns settings along with user data
         const url = isDev
-            ? '/api/api-settings.php' // Proxy handles it in dev usually
-            : '/api/api-settings.php';
+            ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend/ajax-get-user.php'
+            : '/api/ajax-get-user.php';
 
-        axios.get(url).then(res => {
+        axios.get(url, { withCredentials: true }).then(res => {
             if (res.data && res.data.success && res.data.settings) {
                 if (res.data.settings.language) setLanguageState(res.data.settings.language as Language);
             }
