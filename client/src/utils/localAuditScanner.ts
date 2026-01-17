@@ -45,7 +45,12 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
     async function scanDir(handle: any, path: string) {
         console.log(`Scanning directory: ${path || 'root'} (${handle.name})`);
         try {
+            let itemIndex = 0;
+            // @ts-ignore
             for await (const entry of handle.values()) {
+                itemIndex++;
+                if (itemIndex <= 5) console.log(`[DEBUG] Found item: ${entry.name} (${entry.kind})`);
+
                 const relativePath = path ? `${path}/${entry.name}` : entry.name;
 
                 if (entry.kind === 'file') {
@@ -222,6 +227,8 @@ export async function runLocalAudit(p0: any): Promise<AuditResult> {
                     }
                 }
             }
+            // @ts-ignore
+            console.log(`Finished dir: ${path || 'root'}, found ${itemIndex} items.`);
         } catch (err) {
             console.error(`Error scanning directory ${path}:`, err);
         }
