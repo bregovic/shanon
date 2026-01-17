@@ -802,6 +802,7 @@ const RequestsPage = () => {
                         </BreadcrumbItem>
                     </Breadcrumb>
                     <div style={{ flex: 1 }} />
+                    <DocuRefButton refTable="sys_change_requests" refId={viewRequest.id} />
                     <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={() => loadAuditLog(viewRequest.id)}>Obnovit</Button>
                 </ActionBar>
 
@@ -1032,13 +1033,7 @@ const RequestsPage = () => {
                                 </div>
                             </div>
 
-                            <div className={styles.card} style={{ minHeight: '300px' }}>
-                                <DocuRefPanel refTable="sys_change_requests" refId={viewRequest.id} />
 
-
-
-
-                            </div>
 
                             <div className={styles.card}>
                                 <Text className={styles.sectionTitle} style={{ marginBottom: '8px' }}><History24Regular /> Historie</Text>
