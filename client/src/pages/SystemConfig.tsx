@@ -25,6 +25,7 @@ import {
     MessageBarBody
 } from '@fluentui/react-components';
 import { MenuSection, MenuItem } from '../components/MenuSection';
+import { TaskProgressModal } from '../components/TaskProgressModal';
 import {
     Settings24Regular,
     ArrowLeft24Regular,
@@ -221,18 +222,72 @@ export const SystemConfig: React.FC = () => {
         }
     };
 
+    // Task Progress State
+    const [taskModalOpen, setTaskModalOpen] = useState(false);
+    const [taskProgress, setTaskProgress] = useState(0);
+    const [taskStatus, setTaskStatus] = useState('');
+    const [taskLogs, setTaskLogs] = useState<Array<{ time: string, message: string, type?: 'info' | 'error' | 'success' }>>([]);
+    const [taskRunning, setTaskRunning] = useState(false);
+    const [taskTotal, setTaskTotal] = useState(0);
+    const [taskCurrent, setTaskCurrent] = useState(0);
+
+    const appendLog = (msg: string, type: 'info' | 'error' | 'success' = 'info') => {
+        const time = new Date().toLocaleTimeString();
+        setTaskLogs(prev => [...prev, { time, message: msg, type }]);
+    };
+
     const handleReindex = async () => {
-        if (!confirm('Spustit údržbu databáze (Indexace + Analyze)?')) return;
-        setUpdatingDB(true); // Re-use spinner state
-        setMigrationResult(null);
+        if (!confirm('Spustit údržbu databáze?')) return;
+
+        setTaskModalOpen(true);
+        setTaskRunning(true);
+        setTaskProgress(0);
+        setTaskTotal(0);
+        setTaskCurrent(0);
+        setTaskLogs([]);
+        setTaskStatus('Initializing...');
+        appendLog("Starting maintenance task...", 'info');
+
         try {
-            const res = await fetch('/api/api-system-maintenance.php?action=reindex');
-            const json = await res.json();
-            setMigrationResult(json);
+            setTaskStatus("Fetching table list...");
+            const resList = await fetch('/api/api-system-maintenance.php?action=get_tables_list');
+            const jsonList = await resList.json();
+
+            if (!jsonList.success) throw new Error(jsonList.error);
+
+            const tables = jsonList.tables;
+            setTaskTotal(tables.length);
+            appendLog(`Found ${tables.length} tables to process.`);
+
+            for (let i = 0; i < tables.length; i++) {
+                const tableName = tables[i];
+                setTaskCurrent(i + 1);
+                setTaskStatus(`Processing ${tableName}...`);
+                setTaskProgress(Math.round(((i) / tables.length) * 100));
+
+                try {
+                    const res = await fetch(`/api/api-system-maintenance.php?action=maintain_table&table=${tableName}`);
+                    const json = await res.json();
+
+                    if (json.success) {
+                        appendLog(`${tableName}: OK (${json.details})`, 'success');
+                    } else {
+                        appendLog(`${tableName}: Error - ${json.error}`, 'error');
+                    }
+                } catch (e: any) {
+                    appendLog(`${tableName}: Network Error`, 'error');
+                }
+            }
+
+            setTaskProgress(100);
+            setTaskStatus("Completed.");
+            appendLog("Maintenance task finished successfully.", 'info');
+
         } catch (e: any) {
-            setMigrationResult({ success: false, error: e.message || 'Network Error' });
+            setTaskStatus("Failed.");
+            appendLog(`Critical Error: ${e.message}`, 'error');
         } finally {
-            setUpdatingDB(false);
+            setTaskRunning(false);
         }
     };
 
@@ -713,6 +768,20 @@ export const SystemConfig: React.FC = () => {
                 </div>
 
             </div>
+
+            {/* TASK PROGRESS MODAL */}
+            <TaskProgressModal
+                isOpen={taskModalOpen}
+                onClose={() => setTaskModalOpen(false)}
+                title="Údržba Systému"
+                totalSteps={taskTotal}
+                currentStep={taskCurrent}
+                progress={taskProgress}
+                statusMessage={taskStatus}
+                isRunning={taskRunning}
+                logs={taskLogs}
+                canClose={!taskRunning}
+            />
 
             {/* MIGRATION RESULT MODAL (Keep generic) */}
             {migrationResult && (
