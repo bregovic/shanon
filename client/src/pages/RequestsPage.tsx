@@ -342,8 +342,23 @@ const RequestsPage = () => {
 
     // Selection state for grid
     const [selectedItems, setSelectedItems] = useState<Set<SelectionItemId>>(new Set());
+
+    // Core function to sync selection
     const handleSelectionChange = (_e: SyntheticEvent, data: OnSelectionChangeData) => {
-        setSelectedItems(data.selectedItems);
+        const newSelection = data.selectedItems;
+        setSelectedItems(newSelection);
+
+        // Sync logic: If exactly one item is selected via checkbox, treat it as "Open Detail" equivalent for Toolbar
+        if (newSelection.size === 1) {
+            const id = Array.from(newSelection)[0];
+            const item = requests.find(r => r.id === id);
+            if (item) setSelectedRequest(item);
+        } else {
+            // If 0 or >1 items, we clear the detailed 'focused' request context
+            // UNLESS the user explicitly clicked a row? 
+            // Better to keep it simple: Selection dictates context for Toolbar.
+            setSelectedRequest(null);
+        }
     };
 
     // Lightbox
