@@ -94,9 +94,19 @@ try {
             
             logChange($pdo, $recId, 'status', '', 'New', $userId);
             
-            // 2. Handle Attachments
+            // 2. Handle Attachments - Use standard DocuRef system
             if (isset($_FILES['attachments'])) {
                 $files = $_FILES['attachments'];
+                
+                // Get Storage Path from Params
+                $pathParams = $pdo->prepare("SELECT param_value FROM sys_parameters WHERE param_key = 'DOCUREF_STORAGE_PATH'");
+                $pathParams->execute();
+                $baseDir = $pathParams->fetchColumn() ?: 'uploads/docuref';
+                
+                // Ensure dir exists
+                $targetDir = __DIR__ . '/../' . $baseDir;
+                if (!file_exists($targetDir)) mkdir($targetDir, 0777, true);
+                
                 if (isset($files['name']) && is_array($files['name'])) {
                     for ($i = 0; $i < count($files['name']); $i++) {
                         if ($files['error'][$i] === UPLOAD_ERR_OK) {
@@ -108,10 +118,21 @@ try {
                             // Limit 5MB per file
                             if ($size > 5 * 1024 * 1024) continue;
                             
-                            $content = base64_encode(file_get_contents($tmp));
+                            // Generate unique filename
+                            $ext = pathinfo($name, PATHINFO_EXTENSION);
+                            $storedName = 'sys_change_requests_' . $recId . '_' . uniqid() . '.' . $ext;
+                            $fullPath = $targetDir . '/' . $storedName;
                             
-                            $fStmt = $pdo->prepare("INSERT INTO sys_change_requests_files (cr_id, file_name, file_type, file_size, file_data) VALUES (?, ?, ?, ?, ?)");
-                            $fStmt->execute([$recId, $name, $type, $size, $content]);
+                            if (move_uploaded_file($tmp, $fullPath)) {
+                                $filePath = $baseDir . '/' . $storedName;
+                                
+                                // Insert into standard DocuRef system
+                                $fStmt = $pdo->prepare("
+                                    INSERT INTO sys_docuref (ref_table, ref_id, type, name, file_path, file_mime, file_size, storage_type, created_by)
+                                    VALUES ('sys_change_requests', ?, 'File', ?, ?, ?, ?, 'local', ?)
+                                ");
+                                $fStmt->execute([$recId, $name, $filePath, $type, $size, $userId]);
+                            }
                         }
                     }
                 }
