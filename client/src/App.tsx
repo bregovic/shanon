@@ -18,6 +18,7 @@ import { CodeAuditPage } from './pages/CodeAuditPage';
 import { OrganizationsAdmin } from './pages/OrganizationsAdmin';
 import { SystemConfig } from './pages/SystemConfig';
 import { SystemTranslations } from './pages/SystemTranslations';
+import { TableBrowser } from './pages/TableBrowser';
 import { OcrTemplateDesigner } from './pages/OcrTemplateDesigner';
 import { DmsGoogleSetup } from './pages/DmsGoogleSetup';
 import { LoginPage } from './pages/LoginPage';
@@ -139,6 +140,7 @@ const router = createBrowserRouter([
                     { path: "system/organizations", element: <OrganizationsAdmin /> },
                     { path: "system/audit", element: <CodeAuditPage /> },
                     { path: "system/translations", element: <SystemTranslations /> },
+                    { path: "system/table-browser", element: <TableBrowser /> },
                     { path: "system/testing", element: <SystemTestingList /> },
                     { path: "system/testing/:id", element: <SystemTestingDetail /> },
                     { path: "dms/ocr-designer/:id", element: <OcrTemplateDesigner /> },
