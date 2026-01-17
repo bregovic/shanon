@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS sys_help_pages (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_help_search ON sys_help_pages(title, keywords);
-CREATE INDEX idx_help_module ON sys_help_pages(module);
+CREATE INDEX IF NOT EXISTS idx_help_search ON sys_help_pages(title, keywords);
+CREATE INDEX IF NOT EXISTS idx_help_module ON sys_help_pages(module);

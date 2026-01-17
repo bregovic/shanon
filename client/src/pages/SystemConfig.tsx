@@ -675,7 +675,7 @@ export const SystemConfig: React.FC = () => {
                         <MenuItem label={t('system.item.cron_jobs')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('system.item.run_indexing')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label="Kvalita kódu & Audit" onClick={() => navigate(orgPrefix + '/system/audit')} path={orgPrefix + '/system/audit'} />
-                        <MenuItem label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} />
+                        <MenuItem label={t('system.item.update_db')} onClick={() => handleUpdateDB()} disabled={updatingDB} path={orgPrefix + '/system?view=update_db'} />
                     </MenuSection>
                 </div>
 

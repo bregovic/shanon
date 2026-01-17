@@ -8,4 +8,4 @@ CREATE TABLE IF NOT EXISTS sys_user_favorites (
     CONSTRAINT uk_user_favorite_path UNIQUE (user_id, path)
 );
 
-CREATE INDEX idx_favorites_user ON sys_user_favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON sys_user_favorites(user_id);
