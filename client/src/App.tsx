@@ -25,6 +25,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { SettingsProvider } from './context/SettingsContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TranslationProvider } from './context/TranslationContext';
+import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
 
 const BASE_NAME = import.meta.env.BASE_URL || '/';
 
@@ -170,7 +171,9 @@ function App() {
             <AuthProvider>
                 <SettingsProvider>
                     <TranslationProvider>
-                        <RouterProvider router={router} />
+                        <KeyboardShortcutsProvider>
+                            <RouterProvider router={router} />
+                        </KeyboardShortcutsProvider>
                     </TranslationProvider>
                 </SettingsProvider>
             </AuthProvider>

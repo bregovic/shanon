@@ -105,3 +105,47 @@ We follow the **Microsoft Fluent UI (Investyx/D365)** aesthetic.
 2. **Copy a Template** (don't start from empty file).
 3. **Use <PageLayout>** wrapper.
 4. **Test on Mobile** devtools before committing.
+
+---
+
+## 7. Keyboard Shortcuts Standard (CRITICAL)
+**Every page MUST implement standard keyboard shortcuts for accessibility and power users.**
+
+### Global Shortcuts
+| Shortcut | Action | Notes |
+|----------|--------|-------|
+| `Esc` | Go back / Close modal | Always works, even in inputs |
+| `Shift+R` | Refresh data | Calls current page's refresh function |
+
+### Grid/List View Shortcuts
+| Shortcut | Action | Hook Usage |
+|----------|--------|------------|
+| `Shift+N` | New record | `useKeyboardShortcut('new', () => setAddOpen(true))` |
+| `Shift+D` | Delete selected | `useKeyboardShortcut('delete', handleDelete)` |
+| `Shift+F` | Toggle filters (Funkce) | `useKeyboardShortcut('toggleFilters', () => setFiltersOpen(!open))` |
+
+### Form/Detail View Shortcuts
+| Shortcut | Action | Hook Usage |
+|----------|--------|------------|
+| `Enter` | Confirm / Submit | `useKeyboardShortcut('enter', handleSubmit)` |
+| `Shift+S` | Save | `useKeyboardShortcut('save', handleSave)` |
+| `Esc` | Cancel / Go back | `useKeyboardShortcut('escape', () => navigate(-1))` |
+
+### Implementation Example
+```tsx
+import { useKeyboardShortcut } from '../context/KeyboardShortcutsContext';
+
+const MyGridPage = () => {
+    useKeyboardShortcut('new', () => setIsAddDialogOpen(true));
+    useKeyboardShortcut('refresh', () => loadData());
+    useKeyboardShortcut('delete', () => selectedItem && handleDelete(selectedItem.id));
+    useKeyboardShortcut('escape', () => navigate(-1));
+    // ...
+};
+```
+
+### Key Rules:
+1. **Shortcuts** are blocked when typing in `<input>` or `<textarea>` (except Esc).
+2. **Enter** is blocked in `<textarea>` to allow multiline.
+3. **Unregistration** is automatic via hook cleanup.
+4. **Handlers** MUST be stable (use useCallback or inline with correct deps).
