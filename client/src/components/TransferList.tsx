@@ -11,8 +11,8 @@ import {
 import {
     ChevronRight24Regular,
     ChevronLeft24Regular,
-    ChevronDoubleRight24Regular,
-    ChevronDoubleLeft24Regular,
+    ArrowRight24Regular,
+    ArrowLeft24Regular,
     Search24Regular
 } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
@@ -269,7 +269,7 @@ export const TransferList: React.FC<TransferListProps> = ({
                     title={t('transfer.addSelected') || 'Přidat vybrané'}
                 />
                 <Button
-                    icon={<ChevronDoubleRight24Regular />}
+                    icon={<ArrowRight24Regular />}
                     onClick={moveAllRight}
                     disabled={availableFiltered.length === 0}
                     title={t('transfer.addAll') || 'Přidat vše'}
@@ -281,7 +281,7 @@ export const TransferList: React.FC<TransferListProps> = ({
                     title={t('transfer.removeSelected') || 'Odebrat vybrané'}
                 />
                 <Button
-                    icon={<ChevronDoubleLeft24Regular />}
+                    icon={<ArrowLeft24Regular />}
                     onClick={moveAllLeft}
                     disabled={selectedFiltered.length === 0}
                     title={t('transfer.removeAll') || 'Odebrat vše'}

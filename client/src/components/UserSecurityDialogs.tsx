@@ -11,18 +11,10 @@ import {
     Dropdown,
     Option,
     Spinner,
-    Table,
-    TableHeader,
-    TableRow,
-    TableHeaderCell,
-    TableBody,
-    TableCell,
-    Badge,
-    Drawer,
-    Switch
+    Drawer
 } from '@fluentui/react-components';
-import { Delete24Regular, Add24Regular } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
+import { TransferList, type TransferItem } from './TransferList';
 
 const API_BASE = import.meta.env.DEV
     ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
@@ -139,271 +131,153 @@ export const UserSettingsDialog: React.FC<{
     );
 };
 
-// --- User Access Drawer (Matrix) ---
+// --- User Access Drawer (using TransferList) ---
 
-interface OrgMatrixItem {
+interface OrgData {
     org_id: string;
     display_name: string;
-    roles: string[];
-    is_assigned: boolean;
-    is_active: boolean;
 }
-
-const AVAILABLE_ROLES = [
-    { value: 'ADMIN', label: 'Administrátor' },
-    { value: 'MANAGER', label: 'Manažer' },
-    { value: 'USER', label: 'Uživatel' },
-    { value: 'VIEWER', label: 'Čtenář' },
-    { value: 'GUEST', label: 'Host' },
-];
 
 export const UserAccessDrawer: React.FC<{
     open: boolean;
-    userId: number;
-    userName: string;
+    userIds: number[];  // Support multiple users
+    userNames: string[];
     onClose: () => void;
-}> = ({ open, userId, userName, onClose }) => {
+    onSaved?: () => void;
+}> = ({ open, userIds, userNames, onClose, onSaved }) => {
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
-    const [matrix, setMatrix] = useState<OrgMatrixItem[]>([]);
+    const [saving, setSaving] = useState(false);
 
-    // UI State
-    const [filterAssigned, setFilterAssigned] = useState(false);
-    const [selectedOrgs, setSelectedOrgs] = useState<Set<string>>(new Set());
-
-    // Bulk Role Edit State
-    const [roleDialogOpen, setRoleDialogOpen] = useState(false);
-    const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+    // All available organizations
+    const [allOrgs, setAllOrgs] = useState<OrgData[]>([]);
+    // Currently assigned org IDs (intersection for multiple users)
+    const [assignedOrgIds, setAssignedOrgIds] = useState<string[]>([]);
+    // Initial state for comparison
+    const [initialAssignedIds, setInitialAssignedIds] = useState<string[]>([]);
 
     useEffect(() => {
-        if (open && userId) loadData();
-    }, [open, userId]);
+        if (open && userIds.length > 0) {
+            loadData();
+        }
+    }, [open, userIds]);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api-users.php?action=get_security_details&id=${userId}`, { credentials: 'include' });
+            // For single user, get their assignments
+            // For multiple users, get intersection of assignments
+            const res = await fetch(`${API_BASE}/api-users.php?action=get_org_assignments&ids=${userIds.join(',')}`, {
+                credentials: 'include'
+            });
             const json = await res.json();
             if (json.success) {
-                setMatrix(json.matrix || []);
+                setAllOrgs(json.all_orgs || []);
+                setAssignedOrgIds(json.assigned_org_ids || []);
+                setInitialAssignedIds(json.assigned_org_ids || []);
             }
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSave = async (updatedMatrix: OrgMatrixItem[]) => {
-        setLoading(true);
-        // Transform matrix back to expected save format (only assigned items)
-        const payload = updatedMatrix
-            .filter(item => item.is_assigned)
-            .map(item => ({
-                org_id: item.org_id,
-                roles: item.roles,
-                is_active: true
-            }));
-
+    const handleSave = async () => {
+        setSaving(true);
         try {
-            await fetch(`${API_BASE}/api-users.php?action=save_security_details`, {
+            // Determine what to add and remove
+            const toAdd = assignedOrgIds.filter(id => !initialAssignedIds.includes(id));
+            const toRemove = initialAssignedIds.filter(id => !assignedOrgIds.includes(id));
+
+            await fetch(`${API_BASE}/api-users.php?action=save_org_assignments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    user_id: userId,
-                    org_access: payload
+                    user_ids: userIds,
+                    add_org_ids: toAdd,
+                    remove_org_ids: toRemove
                 }),
                 credentials: 'include'
             });
-            // Reload to confirm state
-            await loadData();
+
+            onSaved?.();
+            onClose();
         } finally {
-            setLoading(false);
+            setSaving(false);
         }
     };
 
-    // --- Bulk Operations ---
+    // Transform orgs to TransferItem format
+    const availableItems: TransferItem[] = allOrgs.map(org => ({
+        id: org.org_id,
+        label: org.display_name,
+        description: org.org_id
+    }));
 
-    const handleBulkAssign = () => {
-        // Open Role Picker
-        setSelectedRoles([]); // Reset or prefill? Reset is safer for bulk.
-        setRoleDialogOpen(true);
-    };
-
-    const applyBulkRoles = () => {
-        const newMatrix = matrix.map(item => {
-            if (selectedOrgs.has(item.org_id)) {
-                return {
-                    ...item,
-                    is_assigned: true, // Auto-assign if we set roles
-                    roles: selectedRoles
-                };
-            }
-            return item;
-        });
-        setMatrix(newMatrix);
-        setRoleDialogOpen(false);
-        handleSave(newMatrix); // Auto-save on apply
-    };
-
-    const handleBulkRemove = () => {
-        if (!confirm(t('security.bulk_remove_confirm'))) return;
-        const newMatrix = matrix.map(item => {
-            if (selectedOrgs.has(item.org_id)) {
-                return { ...item, is_assigned: false, roles: [] };
-            }
-            return item;
-        });
-        setMatrix(newMatrix);
-        handleSave(newMatrix);
-    };
-
-    // --- Columns ---
-    const filteredItems = matrix.filter(item => {
-        if (filterAssigned && !item.is_assigned) return false;
-        return true;
-    });
+    const hasChanges = JSON.stringify(assignedOrgIds.sort()) !== JSON.stringify(initialAssignedIds.sort());
 
     return (
         <Drawer
             type="overlay"
             position="end"
-            size="large" // Wider drawer for matrix
+            size="large"
             open={open}
             onOpenChange={(_, data) => !data.open && onClose()}
         >
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 20 }}>
                 {/* Header */}
                 <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ margin: 0 }}>{t('security.org_access')}</h2>
-                    <div style={{ color: '#666' }}>{t('security.permissions_for')}: <strong>{userName}</strong></div>
-                </div>
-
-                {/* Toolbar */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid #ccc' }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        <Switch
-                            label={filterAssigned ? t('security.org_filter_assigned') : t('security.org_filter_all')}
-                            checked={filterAssigned}
-                            onChange={(_, d) => setFilterAssigned(d.checked)}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                        <Button
-                            icon={<Add24Regular />}
-                            disabled={selectedOrgs.size === 0}
-                            onClick={handleBulkAssign}
-                        >
-                            {t('security.set_roles')}
-                        </Button>
-                        <Button
-                            icon={<Delete24Regular />}
-                            disabled={selectedOrgs.size === 0}
-                            onClick={handleBulkRemove}
-                        >
-                            {t('security.remove')}
-                        </Button>
+                    <h2 style={{ margin: 0 }}>{t('security.org_access') || 'Přiřazení organizací'}</h2>
+                    <div style={{ color: '#666', marginTop: 4 }}>
+                        {userIds.length === 1 ? (
+                            <>{t('security.permissions_for') || 'Pro uživatele'}: <strong>{userNames[0]}</strong></>
+                        ) : (
+                            <>{t('security.permissions_for_multiple') || 'Pro uživatele'}: <strong>{userIds.length} uživatelů</strong> ({userNames.slice(0, 3).join(', ')}{userNames.length > 3 && '...'})</>
+                        )}
                     </div>
                 </div>
 
-                {/* List / Grid */}
-                <div style={{ flexGrow: 1, overflowY: 'auto', marginTop: 10 }}>
-                    {loading && <Spinner />}
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHeaderCell style={{ width: 40 }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedOrgs.size === filteredItems.length && filteredItems.length > 0}
-                                        onChange={(e) => {
-                                            if (e.target.checked) setSelectedOrgs(new Set(filteredItems.map(i => i.org_id)));
-                                            else setSelectedOrgs(new Set());
-                                        }}
-                                    />
-                                </TableHeaderCell>
-                                <TableHeaderCell>{t('security.organizations')}</TableHeaderCell>
-                                <TableHeaderCell>{t('security.status')}</TableHeaderCell>
-                                <TableHeaderCell>{t('security.roles')}</TableHeaderCell>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredItems.map(item => (
-                                <TableRow key={item.org_id} onClick={() => {
-                                    // Toggle selection on row click
-                                    const newSet = new Set(selectedOrgs);
-                                    newSet.has(item.org_id) ? newSet.delete(item.org_id) : newSet.add(item.org_id);
-                                    setSelectedOrgs(newSet);
-                                }} style={{ cursor: 'pointer', background: selectedOrgs.has(item.org_id) ? '#f0f0f0' : 'transparent' }}>
-                                    <TableCell>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedOrgs.has(item.org_id)}
-                                            readOnly
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <strong>{item.display_name}</strong>
-                                        <div style={{ fontSize: '0.8em', color: '#888' }}>{item.org_id}</div>
-                                    </TableCell>
-                                    <TableCell>
-                                        {item.is_assigned
-                                            ? <Badge appearance="filled" color="success">{t('security.assigned')}</Badge>
-                                            : <Badge appearance="ghost">{t('security.unassigned')}</Badge>
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                            {item.roles.map(r => (
-                                                <Badge key={r} appearance="outline">{r}</Badge>
-                                            ))}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {filteredItems.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={4} style={{ textAlign: 'center', padding: 20 }}>{t('security.no_orgs_found')}</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                {/* Transfer List */}
+                <div style={{ flexGrow: 1, overflow: 'hidden' }}>
+                    <TransferList
+                        availableItems={availableItems}
+                        selectedIds={assignedOrgIds}
+                        onSelectionChange={(ids) => setAssignedOrgIds(ids.map(id => String(id)))}
+                        availableTitle={t('security.available_orgs') || 'Dostupné organizace'}
+                        selectedTitle={t('security.assigned_orgs') || 'Přiřazené organizace'}
+                        loading={loading}
+                        height="100%"
+                    />
                 </div>
 
                 {/* Footer */}
-                <div style={{ marginTop: 10, textAlign: 'right' }}>
-                    <Button onClick={onClose}>{t('common.close')}</Button>
+                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <Button appearance="secondary" onClick={onClose}>
+                        {t('common.cancel') || 'Zrušit'}
+                    </Button>
+                    <Button
+                        appearance="primary"
+                        onClick={handleSave}
+                        disabled={!hasChanges || saving}
+                    >
+                        {saving ? (t('common.saving') || 'Ukládám...') : (t('common.save') || 'Uložit')}
+                    </Button>
                 </div>
             </div>
-
-            {/* Role Picker Dialog (Internal) */}
-            <Dialog open={roleDialogOpen} onOpenChange={(_, d) => !d.open && setRoleDialogOpen(false)}>
-                <DialogSurface>
-                    <DialogBody>
-                        <DialogTitle>{t('security.bulk_roles_title')}</DialogTitle>
-                        <DialogContent>
-                            <p>{t('security.select_roles_desc')}</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                {AVAILABLE_ROLES.map(role => (
-                                    <div key={role.value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <Switch
-                                            checked={selectedRoles.includes(role.value)}
-                                            onChange={(_, d) => {
-                                                if (d.checked) setSelectedRoles([...selectedRoles, role.value]);
-                                                else setSelectedRoles(selectedRoles.filter(r => r !== role.value));
-                                            }}
-                                        />
-                                        <span>{role.label}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </DialogContent>
-                        <DialogActions>
-                            <Button appearance="primary" onClick={applyBulkRoles}>{t('security.apply')}</Button>
-                            <Button appearance="secondary" onClick={() => setRoleDialogOpen(false)}>{t('common.cancel')}</Button>
-                        </DialogActions>
-                    </DialogBody>
-                </DialogSurface>
-            </Dialog>
-
         </Drawer>
     );
 };
+
+// Backward compatibility wrapper for single user
+export const UserAccessDrawerSingle: React.FC<{
+    open: boolean;
+    userId: number;
+    userName: string;
+    onClose: () => void;
+}> = ({ userId, userName, ...props }) => (
+    <UserAccessDrawer
+        {...props}
+        userIds={[userId]}
+        userNames={[userName]}
+    />
+);
+

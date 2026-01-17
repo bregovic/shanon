@@ -218,12 +218,16 @@ export const UsersAdmin: React.FC = () => {
         handleOpenEdit(item);
     };
 
-    // --- New Security Handlers ---
+    // --- Security Handlers (support multi-select for Organizations) ---
 
     const getSelectedUser = () => {
         if (selectedIds.size !== 1) return null;
         const id = Array.from(selectedIds)[0];
         return users.find(u => u.rec_id === id) || null;
+    };
+
+    const getSelectedUsers = () => {
+        return users.filter(u => selectedIds.has(u.rec_id));
     };
 
     const handleOpenSettings = () => {
@@ -235,9 +239,9 @@ export const UsersAdmin: React.FC = () => {
     };
 
     const handleOpenSecurity = () => {
-        const u = getSelectedUser();
-        if (u) {
-            setTargetUser(u);
+        // Support multiple users
+        const selectedUsers = getSelectedUsers();
+        if (selectedUsers.length > 0) {
             setSecurityOpen(true);
         }
     };
@@ -400,11 +404,11 @@ export const UsersAdmin: React.FC = () => {
                 <Button
                     appearance="subtle"
                     icon={<BuildingBank24Regular />}
-                    disabled={selectedIds.size !== 1}
+                    disabled={selectedIds.size === 0}
                     onClick={handleOpenSecurity}
                     title={t('users.organizations') || 'Organizace'}
                 >
-                    {t('users.organizations') || 'Organizace'}
+                    {t('users.organizations') || 'Organizace'}{selectedIds.size > 1 && ` (${selectedIds.size})`}
                 </Button>
             </ActionBar>
 
@@ -528,22 +532,23 @@ export const UsersAdmin: React.FC = () => {
                 </DrawerBody>
             </Drawer>
 
-            {/* New Security Dialogs */}
+            {/* Settings Dialog (single user only) */}
             {targetUser && (
-                <>
-                    <UserSettingsDialog
-                        open={settingsOpen}
-                        userId={targetUser.rec_id}
-                        onClose={() => setSettingsOpen(false)}
-                    />
-                    <UserAccessDrawer
-                        open={securityOpen}
-                        userId={targetUser.rec_id}
-                        userName={targetUser.full_name || targetUser.email}
-                        onClose={() => setSecurityOpen(false)}
-                    />
-                </>
+                <UserSettingsDialog
+                    open={settingsOpen}
+                    userId={targetUser.rec_id}
+                    onClose={() => setSettingsOpen(false)}
+                />
             )}
+
+            {/* Organizations Drawer (supports multiple users) */}
+            <UserAccessDrawer
+                open={securityOpen}
+                userIds={getSelectedUsers().map(u => u.rec_id)}
+                userNames={getSelectedUsers().map(u => u.full_name || u.email)}
+                onClose={() => setSecurityOpen(false)}
+                onSaved={fetchData}
+            />
         </PageLayout>
     );
 };

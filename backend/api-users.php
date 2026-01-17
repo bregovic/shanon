@@ -347,6 +347,101 @@ try {
             echo json_encode(['success' => true, 'message' => 'Security details updated']);
             break;
 
+        // --- NEW: TransferList-based Organization Assignment ---
+        case 'get_org_assignments':
+            $userIdsParam = $_GET['ids'] ?? '';
+            $userIds = array_filter(array_map('trim', explode(',', $userIdsParam)));
+            
+            if (empty($userIds)) throw new Exception("User IDs required");
+
+            $tenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+
+            // Get all active organizations
+            $orgStmt = $pdo->prepare("
+                SELECT org_id, display_name 
+                FROM sys_organizations 
+                WHERE tenant_id = :tid AND is_active = true
+                ORDER BY display_name ASC
+            ");
+            $orgStmt->execute([':tid' => $tenantId]);
+            $allOrgs = $orgStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Get assigned org IDs for each user
+            // For single user: return their assignments
+            // For multiple users: return INTERSECTION (orgs assigned to ALL selected users)
+            $assignedOrgIds = [];
+            
+            if (count($userIds) === 1) {
+                // Single user - get their assignments
+                $stmt = $pdo->prepare("SELECT org_id FROM sys_user_org_access WHERE user_id = ?");
+                $stmt->execute([$userIds[0]]);
+                $assignedOrgIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            } else {
+                // Multiple users - get intersection
+                // Start with all orgs, then filter to only those assigned to ALL users
+                $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT org_id, COUNT(DISTINCT user_id) as user_count
+                    FROM sys_user_org_access 
+                    WHERE user_id IN ($placeholders)
+                    GROUP BY org_id
+                    HAVING COUNT(DISTINCT user_id) = ?
+                ");
+                $params = array_merge($userIds, [count($userIds)]);
+                $stmt->execute($params);
+                $assignedOrgIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            }
+
+            echo json_encode([
+                'success' => true,
+                'all_orgs' => $allOrgs,
+                'assigned_org_ids' => $assignedOrgIds
+            ]);
+            break;
+
+        case 'save_org_assignments':
+            $input = json_decode(file_get_contents('php://input'), true);
+            $userIds = $input['user_ids'] ?? [];
+            $addOrgIds = $input['add_org_ids'] ?? [];
+            $removeOrgIds = $input['remove_org_ids'] ?? [];
+
+            if (empty($userIds)) throw new Exception("User IDs required");
+
+            DB::transaction(function($pdo) use ($userIds, $addOrgIds, $removeOrgIds) {
+                // Remove assignments
+                if (!empty($removeOrgIds)) {
+                    $userPlaceholders = implode(',', array_fill(0, count($userIds), '?'));
+                    $orgPlaceholders = implode(',', array_fill(0, count($removeOrgIds), '?'));
+                    $stmt = $pdo->prepare("
+                        DELETE FROM sys_user_org_access 
+                        WHERE user_id IN ($userPlaceholders) AND org_id IN ($orgPlaceholders)
+                    ");
+                    $stmt->execute(array_merge($userIds, $removeOrgIds));
+                }
+
+                // Add assignments (for each user and each org)
+                if (!empty($addOrgIds)) {
+                    $insertStmt = $pdo->prepare("
+                        INSERT INTO sys_user_org_access (user_id, org_id, roles, is_active)
+                        VALUES (?, ?, '[]', true)
+                        ON CONFLICT (user_id, org_id) DO NOTHING
+                    ");
+                    foreach ($userIds as $userId) {
+                        foreach ($addOrgIds as $orgId) {
+                            $insertStmt->execute([$userId, $orgId]);
+                        }
+                    }
+                }
+            });
+
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Organization assignments updated',
+                'added' => count($addOrgIds),
+                'removed' => count($removeOrgIds)
+            ]);
+            break;
+
         default:
             throw new Exception("Unknown action: $action");
     }
