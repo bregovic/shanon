@@ -234,6 +234,7 @@ try {
             // 1. Get List of All Tables in Schema (simple whitelist or introspection)
             // Ideally we query information_schema, but limit to 'public' schema and exclude system tables if possible.
             // For safety, let's filter only known prefixes like 'sys_', 'dms_' or allow all for 'public'.
+            $stmtTables = $pdo->query("
                 SELECT DISTINCT t.table_name 
                 FROM information_schema.tables t
                 JOIN information_schema.columns c ON c.table_name = t.table_name AND c.table_schema = t.table_schema
