@@ -787,18 +787,22 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                 {...getColumnSizingProps(columnId)}
                                 className={styles.headerCell}
                                 style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
-                                draggable
-                                onDragStart={(e: React.DragEvent) => handleHeaderDragStart(e, String(columnId))}
-                                onDragOver={handleHeaderDragOver}
-                                onDrop={(e: React.DragEvent) => handleHeaderDrop(e, String(columnId))}
                             >
-                                <ColumnHeaderMenu
-                                    column={extCol}
-                                    sortState={sortState}
-                                    currentFilter={filters[String(extCol.columnId)] || ''}
-                                    onSort={handleSort}
-                                    onApplyFilter={(val) => handleFilterChange(String(extCol.columnId), val)}
-                                />
+                                <div
+                                    draggable
+                                    onDragStart={(e: React.DragEvent) => handleHeaderDragStart(e, String(columnId))}
+                                    onDragOver={handleHeaderDragOver}
+                                    onDrop={(e: React.DragEvent) => handleHeaderDrop(e, String(columnId))}
+                                    style={{ flex: 1, cursor: 'grab' }}
+                                >
+                                    <ColumnHeaderMenu
+                                        column={extCol}
+                                        sortState={sortState}
+                                        currentFilter={filters[String(extCol.columnId)] || ''}
+                                        onSort={handleSort}
+                                        onApplyFilter={(val) => handleFilterChange(String(extCol.columnId), val)}
+                                    />
+                                </div>
                             </DataGridHeaderCell>
                         );
                     }}
