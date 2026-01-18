@@ -281,9 +281,6 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                             ))}
                                         </TableBody>
                                     </Table>
-                                    <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>
-                                        {t('settings.personalization_hint')}
-                                    </Text>
                                 </div>
                             )}
                         </div>

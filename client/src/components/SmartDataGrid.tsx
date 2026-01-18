@@ -772,6 +772,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             selectionMode={selectionMode === 'none' ? undefined : selectionMode}
             onSelectionChange={onSelectionChange}
             resizableColumns
+            resizableColumnsOptions={{ autoFitColumns: false }}
             {...({ columnSizing_unstable: columnSizing } as any)}
             onColumnResize={onColumnResize}
         >
@@ -816,6 +817,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             selectedItems={selectedItems}
             onSelectionChange={onSelectionChange}
             resizableColumns
+            resizableColumnsOptions={{ autoFitColumns: false }}
             {...({ columnSizing_unstable: columnSizing } as any)}
             onColumnResize={onColumnResize}
         >
