@@ -539,7 +539,16 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key: `grid_${preferenceId}`, value: newConfig, org_specific: false }),
                 credentials: 'include'
-            }).catch(console.error);
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) {
+                        console.error('Grid settings save failed:', data.error);
+                    } else {
+                        console.log('Grid settings saved successfully');
+                    }
+                })
+                .catch(console.error);
             setLocalLastValue(`grid_${preferenceId}`, newConfig).catch(() => { });
         }
     };
