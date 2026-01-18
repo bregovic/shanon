@@ -48,7 +48,8 @@ import {
     Checkbox,
     Label,
     Divider,
-    DialogTrigger
+    DialogTrigger,
+    createTableColumn
 } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
@@ -365,13 +366,16 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
         if (preferenceId) {
             return [...baseCols, {
-                columnId: 'sys_settings',
-                minWidth: 40,
-                renderHeaderCell: () => (
-                    <Button appearance="subtle" icon={<Settings24Regular />} onClick={(e: any) => { e.stopPropagation(); setShowSettings(true); }} title={t('common.settings')} />
-                ),
-                renderCell: () => null
-            } as unknown as ExtendedTableColumnDefinition<T>];
+                ...createTableColumn<T>({
+                    columnId: 'sys_settings',
+                    compare: (a, b) => 0,
+                    renderHeaderCell: () => (
+                        <Button appearance="subtle" icon={<Settings24Regular />} onClick={(e: any) => { e.stopPropagation(); setShowSettings(true); }} title={t('common.settings')} />
+                    ),
+                    renderCell: () => <></>
+                }),
+                minWidth: 40
+            } as ExtendedTableColumnDefinition<T>];
         }
         return baseCols;
     }, [propColumns, columnConfig, preferenceId, t]);
