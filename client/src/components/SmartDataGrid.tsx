@@ -874,10 +874,6 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         getRowId={getRowId}
                         selectedItems={selectedItems}
                         onSelectionChange={onSelectionChange}
-                        resizableColumns
-                        resizableColumnsOptions={{ autoFitColumns: false }}
-                        {...({ columnSizing_unstable: columnSizing } as any)}
-                        onColumnResize={onColumnResize}
                     >
                         <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 2, background: tokens.colorNeutralBackground1 }}>
                             <DataGridRow>
@@ -887,7 +883,6 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     const extCol = col as ExtendedTableColumnDefinition<T>;
                                     return (
                                         <DataGridHeaderCell
-                                            {...getColumnSizingProps(columnId)}
                                             style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                                         >
                                             <ColumnHeaderMenu
@@ -908,11 +903,11 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     key={rowId}
                                     style={{ cursor: undefined }}
                                 >
-                                    {columns.map(col => {
-                                        const extCol = col as ExtendedTableColumnDefinition<T>;
+                                    {({ item: col, columnId, renderCell }: any) => {
+                                        const colDef = col || columns.find(c => c.columnId === columnId);
+                                        const extCol = colDef as ExtendedTableColumnDefinition<T>;
                                         return (
                                             <DataGridCell
-                                                key={col.columnId}
                                                 style={{
                                                     textAlign: extCol?.align || 'left',
                                                     justifyContent: extCol?.align === 'right' ? 'flex-end' : (extCol?.align === 'center' ? 'center' : 'flex-start'),
@@ -923,10 +918,10 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                                 onDoubleClick={() => onRowDoubleClick?.(item)}
                                                 className={styles.cell}
                                             >
-                                                {col.renderCell(item)}
+                                                {renderCell(item)}
                                             </DataGridCell>
                                         );
-                                    })}
+                                    }}
                                 </DataGridRow>
                             )}
                         </DataGridBody>
