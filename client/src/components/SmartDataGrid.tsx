@@ -353,36 +353,52 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
     // -- Resizing --
     const saveTimeout = useRef<any>(null);
+    const widthsRef = useRef<Record<string, number>>({});
+
+    useEffect(() => {
+        if (columnConfig?.widths) {
+            widthsRef.current = { ...columnConfig.widths };
+        }
+    }, [columnConfig]);
+
     const handleColumnResize = React.useCallback((_: any, { columnId, width }: { columnId: TableColumnId, width: number }) => {
-        setColumnConfig((prev: any) => {
-            const next = {
+        widthsRef.current = { ...widthsRef.current, [columnId]: width };
+
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        saveTimeout.current = setTimeout(async () => {
+            const currentWidths = { ...widthsRef.current };
+
+            // Update State
+            setColumnConfig((prev: any) => ({
                 ...(prev || { hiddenIds: [], order: [] }),
-                widths: { ...(prev?.widths || {}), [columnId]: width }
-            };
+                widths: currentWidths
+            }));
 
-            if (saveTimeout.current) clearTimeout(saveTimeout.current);
-            saveTimeout.current = setTimeout(async () => {
-                if (preferenceId) {
-                    try {
-                        const res = await fetch('/api/api-user.php?action=save_param', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ key: `grid_${preferenceId}`, value: next, org_specific: false })
-                        });
-                        if (!res.ok) {
-                            const text = await res.text();
-                            console.error("Save failed (HTTP)", res.status, text);
-                            return;
-                        }
-                    } catch (e) {
-                        console.error("Save failed (Net)", e);
-                    }
+            if (preferenceId) {
+                try {
+                    // Note: We need to pull latest hiddenIds/order from current state if possible, 
+                    // or rely on what's available in closure if dependent on columnConfig.
+                    // Since we added columnConfig to deps, this callback is recreated when config changes.
+                    // But we should use the functional state update logic's result if we could, but here we construct payload.
+                    // Safe enough to use columnConfig from closure as it's in deps.
+                    const nextConfig = {
+                        hiddenIds: columnConfig?.hiddenIds || [],
+                        order: columnConfig?.order || [],
+                        widths: currentWidths
+                    };
+
+                    const res = await fetch('/api/api-user.php?action=save_param', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
+                    });
+                    if (!res.ok) console.error("Save resize error", res.status);
+                } catch (e) {
+                    console.error("Save resize net error", e);
                 }
-            }, 1000);
-
-            return next;
-        });
-    }, [preferenceId]);
+            }
+        }, 1000);
+    }, [preferenceId, columnConfig]);
 
     const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useTableColumnSizing_unstable({
         onColumnResize: handleColumnResize
@@ -430,14 +446,15 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
         setColumnConfig(newConfig);
         setShowSettings(false);
         if (preferenceId) {
-            fetch('/backend/api-user.php?action=save_param', {
+            fetch('/api/api-user.php?action=save_param', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     key: `grid_${preferenceId}`,
                     value: newConfig,
                     org_specific: false
                 })
-            });
+            }).catch(e => console.error("Save settings error", e));
         }
     };
 
