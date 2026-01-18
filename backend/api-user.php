@@ -51,12 +51,11 @@ try {
                  $stmt->execute([':uid'=>$userId, ':key'=>$key, ':oid'=>$storeOrgId]);
             }
 
-            // Insert new
-            $sql = "INSERT INTO sys_user_params (tenant_id, user_id, org_id, param_key, param_value, updated_at) 
-                    VALUES (:tid, :uid, :oid, :key, :val, NOW())";
+            // Insert new (schema: user_id, org_id, param_key, param_value, updated_at)
+            $sql = "INSERT INTO sys_user_params (user_id, org_id, param_key, param_value, updated_at) 
+                    VALUES (:uid, :oid, :key, :val, NOW())";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
-                ':tid' => $tenantId,
                 ':uid' => $userId,
                 ':oid' => $storeOrgId,
                 ':key' => $key,

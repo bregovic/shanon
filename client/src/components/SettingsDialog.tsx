@@ -28,7 +28,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { Input } from '@fluentui/react-components';
-import { getAllLocalKeys, deleteLocalLastValue, clearAllLocalValues } from '../utils/indexedDB';
+import { deleteLocalLastValue, clearAllLocalValues } from '../utils/indexedDB';
 
 const useStyles = makeStyles({
     content: {
@@ -118,31 +118,47 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
         onOpenChange(false);
     };
 
-    // Personalization Logic (IndexedDB)
+    // Personalization Logic (Server + IndexedDB cache)
     const [tab, setTab] = useState<string>('general');
-    const [localKeys, setLocalKeys] = useState<string[]>([]);
+    const [serverParams, setServerParams] = useState<any[]>([]);
 
-    const fetchLocalKeys = async () => {
+    const fetchServerParams = async () => {
         try {
-            const keys = await getAllLocalKeys();
-            setLocalKeys(keys.filter(k => k.startsWith('grid_'))); // Only grid prefs
+            const r = await fetch(`${API_BASE}/api-user.php?action=list_params`);
+            const j = await r.json();
+            if (j.success) setServerParams(j.data || []);
         } catch (e) { console.error(e); }
     };
 
     useEffect(() => {
-        if (tab === 'personalization' && open) fetchLocalKeys();
+        if (tab === 'personalization' && open) fetchServerParams();
     }, [tab, open]);
 
-    const deleteLocalKey = async (key: string) => {
+    const deleteServerParam = async (id: number, key: string) => {
         if (!confirm(t('common.confirm_delete'))) return;
-        await deleteLocalLastValue(key);
-        fetchLocalKeys();
+        await fetch(`${API_BASE}/api-user.php?action=delete_param`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        // Also clear from IndexedDB cache
+        await deleteLocalLastValue(key).catch(() => { });
+        fetchServerParams();
     };
 
     const clearAllPrefs = async () => {
         if (!confirm(t('settings.confirm_clear_all'))) return;
+        // Delete all from server
+        for (const p of serverParams) {
+            await fetch(`${API_BASE}/api-user.php?action=delete_param`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: p.rec_id })
+            });
+        }
+        // Clear IndexedDB cache
         await clearAllLocalValues();
-        fetchLocalKeys();
+        fetchServerParams();
     };
 
 
@@ -240,7 +256,7 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Text weight="semibold">{t('settings.grid_preferences')}</Text>
-                                        <Button appearance="secondary" onClick={clearAllPrefs} disabled={localKeys.length === 0}>
+                                        <Button appearance="secondary" onClick={clearAllPrefs} disabled={serverParams.length === 0}>
                                             {t('settings.clear_all')}
                                         </Button>
                                     </div>
@@ -248,16 +264,18 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHeaderCell>{t('common.name')}</TableHeaderCell>
+                                                <TableHeaderCell>{t('common.updated_at')}</TableHeaderCell>
                                                 <TableHeaderCell />
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {localKeys.length === 0 && <TableRow><TableCell colSpan={2}>{t('common.no_data')}</TableCell></TableRow>}
-                                            {localKeys.map(key => (
-                                                <TableRow key={key}>
-                                                    <TableCell>{key.replace('grid_', (t('common.grid') || 'Grid') + ': ')}</TableCell>
+                                            {serverParams.length === 0 && <TableRow><TableCell colSpan={3}>{t('common.no_data')}</TableCell></TableRow>}
+                                            {serverParams.map((p: any) => (
+                                                <TableRow key={p.rec_id}>
+                                                    <TableCell>{p.param_key.replace('grid_', (t('common.grid') || 'Grid') + ': ')}</TableCell>
+                                                    <TableCell>{p.updated_at ? new Date(p.updated_at).toLocaleString() : '-'}</TableCell>
                                                     <TableCell>
-                                                        <Button icon={<Delete24Regular />} appearance="subtle" onClick={() => deleteLocalKey(key)} title={t('common.delete')} />
+                                                        <Button icon={<Delete24Regular />} appearance="subtle" onClick={() => deleteServerParam(p.rec_id, p.param_key)} title={t('common.delete')} />
                                                     </TableCell>
                                                 </TableRow>
                                             ))}

@@ -346,9 +346,23 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
     useEffect(() => {
         if (!preferenceId) return;
-        getLocalLastValue(`grid_${preferenceId}`).then((data) => {
-            if (data) setColumnConfig(data);
-        }).catch(e => console.error("Grid load failed", e));
+        // Try server first, then fallback to IndexedDB cache
+        fetch(`/api/api-user.php?action=get_param&key=grid_${preferenceId}`)
+            .then(r => r.json())
+            .then(d => {
+                if (d.success && d.data) {
+                    setColumnConfig(d.data);
+                    // Cache locally for faster next load
+                    setLocalLastValue(`grid_${preferenceId}`, d.data).catch(() => { });
+                }
+            })
+            .catch(e => {
+                console.error("Server load failed, trying IndexedDB", e);
+                // Fallback to IndexedDB
+                getLocalLastValue(`grid_${preferenceId}`).then((data) => {
+                    if (data) setColumnConfig(data);
+                }).catch(() => { });
+            });
     }, [preferenceId]);
 
     // -- Resizing --
@@ -369,31 +383,26 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             const currentWidths = { ...widthsRef.current };
 
             // Update State
-            setColumnConfig((prev: any) => ({
-                ...(prev || { hiddenIds: [], order: [] }),
-                widths: currentWidths
-            }));
+            setColumnConfig((prev: any) => {
+                const nextConfig = {
+                    ...(prev || { hiddenIds: [], order: [] }),
+                    widths: currentWidths
+                };
 
-            if (preferenceId) {
-                try {
-                    // Note: We need to pull latest hiddenIds/order from current state if possible, 
-                    // or rely on what's available in closure if dependent on columnConfig.
-                    // Since we added columnConfig to deps, this callback is recreated when config changes.
-                    // But we should use the functional state update logic's result if we could, but here we construct payload.
-                    // Safe enough to use columnConfig from closure as it's in deps.
-                    const nextConfig = {
-                        hiddenIds: columnConfig?.hiddenIds || [],
-                        order: columnConfig?.order || [],
-                        widths: currentWidths
-                    };
-
-                    await setLocalLastValue(`grid_${preferenceId}`, nextConfig);
-                } catch (e) {
-                    console.error("Save resize net error", e);
+                // Save to server (primary) and IndexedDB (cache)
+                if (preferenceId) {
+                    fetch('/api/api-user.php?action=save_param', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
+                    }).catch(console.error);
+                    setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(() => { });
                 }
-            }
+
+                return nextConfig;
+            });
         }, 1000);
-    }, [preferenceId, columnConfig]);
+    }, [preferenceId]);
 
     const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useTableColumnSizing_unstable({
         onColumnResize: handleColumnResize
@@ -434,9 +443,14 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
                 const nextConfig = { ...(prev || { hiddenIds: [], widths: {} }), order: newOrder };
 
-                // Save immediately to IndexedDB
+                // Save to server (primary) and IndexedDB (cache)
                 if (preferenceId) {
-                    setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(console.error);
+                    fetch('/api/api-user.php?action=save_param', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
+                    }).catch(console.error);
+                    setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(() => { });
                 }
                 return nextConfig;
             });
@@ -486,7 +500,13 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
         setColumnConfig(newConfig);
         setShowSettings(false);
         if (preferenceId) {
-            setLocalLastValue(`grid_${preferenceId}`, newConfig).catch(console.error);
+            // Save to server (primary) and IndexedDB (cache)
+            fetch('/api/api-user.php?action=save_param', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: `grid_${preferenceId}`, value: newConfig, org_specific: false })
+            }).catch(console.error);
+            setLocalLastValue(`grid_${preferenceId}`, newConfig).catch(() => { });
         }
     };
 
