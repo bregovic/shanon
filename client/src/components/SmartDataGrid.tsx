@@ -881,9 +881,11 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     const col = item || columns.find(c => c.columnId === columnId);
                                     if (!col) return null;
                                     const extCol = col as ExtendedTableColumnDefinition<T>;
+                                    const sizingProps = getColumnSizingProps(columnId);
                                     return (
                                         <DataGridHeaderCell
-                                            style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
+                                            {...sizingProps}
+                                            style={{ ...sizingProps.style, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                                         >
                                             <ColumnHeaderMenu
                                                 column={extCol}
@@ -906,12 +908,15 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     {({ item: col, columnId, renderCell }: any) => {
                                         const colDef = col || columns.find(c => c.columnId === columnId);
                                         const extCol = colDef as ExtendedTableColumnDefinition<T>;
+                                        const currentWidth = columnSizing[columnId];
                                         return (
                                             <DataGridCell
                                                 style={{
                                                     textAlign: extCol?.align || 'left',
                                                     justifyContent: extCol?.align === 'right' ? 'flex-end' : (extCol?.align === 'center' ? 'center' : 'flex-start'),
-                                                    minWidth: extCol?.minWidth ? `${extCol.minWidth}px` : undefined,
+                                                    minWidth: currentWidth ? `${currentWidth}px` : (extCol?.minWidth ? `${extCol.minWidth}px` : undefined),
+                                                    width: currentWidth ? `${currentWidth}px` : undefined,
+                                                    maxWidth: currentWidth ? `${currentWidth}px` : undefined,
                                                     cursor: onRowClick ? 'pointer' : undefined
                                                 }}
                                                 onClick={() => onRowClick?.(item)}
