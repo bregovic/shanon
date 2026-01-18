@@ -23,7 +23,6 @@ import {
     MenuItem,
     MenuPopover
 } from '@fluentui/react-components';
-import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
     Add24Regular,
     ArrowClockwise24Regular,
@@ -35,7 +34,7 @@ import {
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
-import { SmartDataGrid } from '../components/SmartDataGrid';
+import { SmartDataGrid, type ExtendedTableColumnDefinition } from '../components/SmartDataGrid';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/TranslationContext';
 
@@ -49,6 +48,9 @@ interface DmsDocument {
     status: string;
     created_at: string;
     metadata?: string; // JSON string from DB
+    original_filename?: string;
+    mime_type?: string;
+    updated_at?: string;
 }
 
 export const DmsList: React.FC = () => {
@@ -191,7 +193,7 @@ export const DmsList: React.FC = () => {
     };
 
     // Column definitions
-    const columns: TableColumnDefinition<DmsDocument>[] = [
+    const columns: ExtendedTableColumnDefinition<DmsDocument>[] = [
         createTableColumn<DmsDocument>({
             columnId: 'rec_id',
             compare: (a, b) => a.rec_id - b.rec_id,
@@ -264,6 +266,30 @@ export const DmsList: React.FC = () => {
             compare: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
             renderHeaderCell: () => t('common.created_at'),
             renderCell: (item) => <Text>{new Date(item.created_at).toLocaleString('cs-CZ')}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'updated_at',
+            compare: (a, b) => new Date(a.updated_at || 0).getTime() - new Date(b.updated_at || 0).getTime(),
+            renderHeaderCell: () => t('common.updated_at'),
+            renderCell: (item) => <Text>{item.updated_at ? new Date(item.updated_at).toLocaleString('cs-CZ') : '-'}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'original_filename',
+            compare: (a, b) => (a.original_filename || '').localeCompare(b.original_filename || ''),
+            renderHeaderCell: () => t('dms.original_filename') || 'Orig. Soubor',
+            renderCell: (item) => <Text>{item.original_filename}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'mime_type',
+            compare: (a, b) => (a.mime_type || '').localeCompare(b.mime_type || ''),
+            renderHeaderCell: () => 'Typ souboru',
+            renderCell: (item) => <Text>{item.mime_type}</Text>
+        }),
+        createTableColumn<DmsDocument>({
+            columnId: 'ocr_status',
+            compare: (a, b) => (a.ocr_status || '').localeCompare(b.ocr_status || ''),
+            renderHeaderCell: () => 'OCR Stav',
+            renderCell: (item) => <Text>{item.ocr_status}</Text>
         })
     ];
 
@@ -390,6 +416,7 @@ export const DmsList: React.FC = () => {
                             setIsDrawerOpen(true);
                         }}
                         preferenceId="dms_list"
+                        defaultHiddenColumnIds={['original_filename', 'mime_type', 'ocr_status', 'updated_at']}
                     />
                 </div>
             </PageContent>

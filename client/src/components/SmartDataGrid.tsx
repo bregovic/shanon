@@ -126,6 +126,7 @@ interface SmartDataGridProps<T> {
     selectedItems?: Set<SelectionItemId>;
     onSelectionChange?: (e: SyntheticEvent, data: OnSelectionChangeData) => void;
     preferenceId?: string;
+    defaultHiddenColumnIds?: string[];
 }
 // Helper to safely get Array
 const safeArray = <T,>(arr: T[] | undefined | null): T[] => Array.isArray(arr) ? arr : [];
@@ -374,7 +375,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
     const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useTableColumnSizing_unstable({
         onColumnResize: handleColumnResize
-    });
+    }) as any;
 
     useEffect(() => {
         if (columnConfig?.widths) {
