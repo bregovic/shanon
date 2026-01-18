@@ -3,108 +3,61 @@
 
 ---
 
-## 🔧 SYSTÉMOVÉ POŽADAVKY (Musí být splněny)
+## 🔧 SYSTÉMOVÉ POŽADAVKY (Checklist)
 
-### Layout & Komponenty
-- [ ] `PageLayout`, `PageHeader`, `PageContent` wrapper
-- [ ] `Breadcrumb` navigace (Systém → Modul → Aktuální stránka)
-- [ ] `ActionBar` s tlačítky dle standardu:
-  - **Grid:** `Akce ▼` → Divider → `↻` (icon-only) → `📎 DocuRef` → Divider → `Funkce`
-  - **Detail:** `Akce ▼` → Divider → `↻` → `📎`
-- [ ] `SmartDataGrid` pro tabulky (NE raw DataGrid)
-- [ ] `Drawer` pro editační panely, `Dialog` pouze pro potvrzení
+### 1. Layout & UX (Desktop + Mobile)
+- [ ] **Mobile First:** Formulář se musí vejít na šířku mobilu (žádný horiz. scrollbar). Grid sloupce se musí skrývat nebo zalamovat.
+- [ ] **Struktura:** `PageLayout`, `PageHeader` (s Title/Breadcrumbs), `PageFilterBar` (skrývatelný), `PageContent`.
+- [ ] **Navigace (Breadcrumbs):**
+  - Klik na sekci "Modul" (např. DMS) → Jde na root modulu (reset filtrů).
+  - Klik na Logo → Jde na Dashboard nebo root aktuálního modulu.
+- [ ] **Nápověda:** Stránka musí mít odkaz na nápovědu (ikona `?` nebo klávesa `F1` bindovaná na kontext).
 
-### Labely & Překlady
-- [ ] **Žádné hardcoded texty** - vždy `t('key')`
-- [ ] Používej `common.*` klíče (`common.save`, `common.cancel`, `common.new`)
-- [ ] Netvořit duplicitní překlady (`users.save` ❌ → `common.save` ✅)
+### 2. Data Grid (SmartDataGrid)
+- [ ] **Personalizace:** `preferenceId="[UNIQUE_ID]"` (umožní ukládání sloupců).
+- [ ] **Interakce:**
+  - **Single Click:** Označí řádek (změna selection).
+  - **Double Click:** Otevře detail/editaci záznamu.
+- [ ] **Funkce:** Multiselect, Řazení, Filtrování (inline v hlavičce).
 
-### Keyboard Shortcuts
-```tsx
-useKeyboardShortcut('new', () => setAddOpen(true));
-useKeyboardShortcut('refresh', handleRefresh);
-useKeyboardShortcut('escape', () => navigate(-1));
-useKeyboardShortcut('save', handleSave);
-```
-- `Alt+N` = Nový, `Alt+R` = Refresh, `Alt+D` = Smazat, `Alt+F` = Funkce
-- `Ctrl+S` = Uložit, `Esc` = Zpět/Zavřít
+### 3. Action Bar & Funkce
+- [ ] **ActionBar Standard:** `[Breadcrumbs] ... [Akce ▼] | [Divider] | [↻] [📎] [↗] | [Divider] | [Funkce]`
+- [ ] **Standardní tlačítka:**
+  - `↻` (Refresh): Icon-only, `title="Obnovit"`.
+  - `📎` (DocuRef): Přílohy (pokud relevantní).
+  - `↗` (Export): Export do Excelu/CSV.
+- [ ] **Funkce Bar:** Tlačítko "Funkce" (Toogle) zobrazuje/skrývá `PageFilterBar` s pokročilými filtry.
 
-### Security (RBAC)
-- [ ] Backend: Kontrola role (`admin`, `superadmin`, `sysadmin`)
-- [ ] Backend: Filtrování `WHERE tenant_id = ? AND org_id = ?`
-- [ ] Frontend: `hasPermission()` pro skrytí/disable tlačítek
-- [ ] Nepoužívat `alert()` - jen `Toast` nebo `MessageBar`
+### 4. Security & Data Integrity
+- [ ] **Oprávnění (RBAC):** Tlačítka šedivá/skrytá přes `hasPermission('action')`.
+- [ ] **Multi-Tenant:** Backend query VŽDY obsahuje `WHERE tenant_id = ?`.
+- [ ] **RLS (Record Level Security):** Uživatel vidí jen svá data (pokud není admin/manager).
+- [ ] **Virtuální Společnosti (Virtual Groups):**
+  - **Čtení:** Query musí zohlednit `OR org_id IN (moje_skupiny)`.
+  - **Zápis:** Použít `DB::resolveWriteOrgId` pro správné přiřazení sdílené skupině.
 
-### Data Grid Features
-- [ ] Multiselect: `selectionMode="multiselect"`
-- [ ] `getRowId={(item) => item.rec_id}`
-- [ ] `onSelectionChange` pro hromadné akce
-- [ ] Filtrování automaticky přes SmartDataGrid
-- [ ] **Personalization:** `preferenceId="unique_grid_name"` pro ukládání nastavení sloupců
-- [ ] **Click Behavior (POVINNÉ)**:
-  - **Single click** = Označení řádku (selection)
-  - **Double click** = Otevření detailu/editace
-  - Používej `onRowDoubleClick` (NE `onRowClick`) pro otevření editace!
-
-### Forms
-- [ ] Validace onBlur (ne jen onSubmit)
-- [ ] Required pole označena `*`
-- [ ] Unikátní `id` atributy pro testování
-- [ ] Save/Cancel tlačítka dole vpravo
-
-### API Pattern
-```tsx
-const API_BASE = import.meta.env.DEV
-    ? 'http://localhost/Webhry/hollyhop/broker/shanon/backend'
-    : '/api';
-
-// nebo použij:
-const { getApiUrl } = useAuth();
-fetch(getApiUrl('api-endpoint.php?action=list'))
-```
-
-### Session & Context
-```tsx
-const { currentOrgId } = useAuth();
-const orgPrefix = `/${currentOrgId || 'VACKR'}`;
-```
+### 5. Klávesové Zkratky (Standard)
+- [ ] **Esc:** Zavřít dialog / Zrušit výběr / Zpět.
+- [ ] **Tab:** Nativní navigace po polích (nesmí být blokována).
+- [ ] **Alt+N:** Nový záznam.
+- [ ] **Alt+R:** Refresh.
+- [ ] **Ctrl+S:** Uložit formulář.
 
 ---
 
-## 📋 CHECKLIST PRO NOVÝ FORMULÁŘ
+## 📝 VZOROVÝ PROMPT (Copy & Paste)
 
-1. **Vytvořit stránku** v `client/src/pages/[NazevPage].tsx`
-2. **Registrovat routu** v `App.tsx`
-3. **Vytvořit API** v `backend/api-[nazev].php`
-4. **Přidat překlady** do `locales/cs.json` (preferuj `common.*`)
-5. **Přidat do menu** v příslušném `ModuleDashboard.tsx`
-6. **Přidat migraci** pokud nová tabulka (s `COMMENT ON TABLE`)
+```text
+Potřebuji vytvořit nový formulář "[NÁZEV]".
 
----
+Funkční požadavky:
+- Grid: Multiselect, PreferenceId="[ID]", Double-click editace.
+- Pole: [SEZNAM POLÍ].
+- Akce: Nový, Smazat, [DALŠÍ].
+- Security: Support pro sdílené organizace (Virtual Groups).
 
-## 📝 VZOROVÝ PROMPT
-
+Technické požadavky:
+- Dodržuj .agent/NEW_FORM_PROMPT.md a FORM_STANDARD.md.
+- Optimalizace pro mobil (skrývání sloupců).
+- Klávesové zkratky dle standardu.
 ```
-Potřebuji vytvořit nový formulář pro [NÁZEV ENTITY].
-
-Požadavky:
-- Grid s multiselect, filtrování, řazení
-- Drawer pro vytvoření/editaci záznamu
-- Pole: [seznam polí]
-- Akce: Nový, Upravit, Smazat, Export
-
-Dodržuj standardy z .agent/FORM_STANDARD.md a .agent/CONTEXT_PROMPT.md.
-```
-
----
-
-## 🚀 QUICK REFERENCE
-
-| Co | Jak |
-|----|-----|
-| Refresh tlačítko | `<Button icon={<ArrowClockwise24Regular />} appearance="subtle" title={t('common.refresh')} />` |
-| Divider v ActionBar | `<div style={{ width: 1, height: 24, backgroundColor: tokens.colorNeutralStroke2, margin: '0 8px' }} />` |
-| Funkce toggle | `<Button appearance={showFilters ? 'primary' : 'subtle'} icon={<Filter24Regular />}>Funkce</Button>` |
-| Loading state | `<Spinner label="Načítání..." />` |
-| Error feedback | `<MessageBar intent="error">{error}</MessageBar>` |
-| Success toast | `dispatchToast(<Toast>Uloženo</Toast>, { intent: 'success' })` |
