@@ -466,6 +466,24 @@ export const translations = {
         'system.db_schema': 'Dokumentace DB schématu',
         'common.yes': 'Ano',
         'common.no': 'Ne',
+
+        // Settings Dialog
+        'settings.title': 'Nastavení',
+        'settings.tab_general': 'Obecné',
+        'settings.tab_security': 'Zabezpečení',
+        'settings.tab_personalization': 'Personalizace',
+        'settings.language_label': 'Jazyk',
+        'settings.language_cs': 'Čeština',
+        'settings.language_en': 'English',
+        'settings.default_org_label': 'Výchozí organizace',
+        'settings.defaultOrgHint': 'Tato organizace bude automaticky vybrána při přihlášení.',
+        'settings.password_change': 'Změna hesla',
+        'settings.new_password': 'Nové heslo',
+        'settings.confirm_password': 'Potvrdit heslo',
+        'settings.grid_preferences': 'Nastavení tabulek',
+        'settings.clear_all': 'Smazat vše',
+        'settings.confirm_clear_all': 'Opravdu smazat všechna lokální nastavení? Tabulky se vrátí do výchozího stavu.',
+        'settings.personalization_hint': 'Tato nastavení jsou uložena lokálně v prohlížeči a ovlivňují pouze vzhled tabulek (šířky, pořadí sloupců).',
     },
 
     en: {
@@ -1024,5 +1042,23 @@ export const translations = {
         'system.db_schema': 'DB Schema Documentation',
         'common.yes': 'Yes',
         'common.no': 'No',
+
+        // Settings Dialog
+        'settings.title': 'Settings',
+        'settings.tab_general': 'General',
+        'settings.tab_security': 'Security',
+        'settings.tab_personalization': 'Personalization',
+        'settings.language_label': 'Language',
+        'settings.language_cs': 'Čeština',
+        'settings.language_en': 'English',
+        'settings.default_org_label': 'Default Organization',
+        'settings.defaultOrgHint': 'This organization will be selected automatically on login.',
+        'settings.password_change': 'Change Password',
+        'settings.new_password': 'New Password',
+        'settings.confirm_password': 'Confirm Password',
+        'settings.grid_preferences': 'Grid Preferences',
+        'settings.clear_all': 'Clear All',
+        'settings.confirm_clear_all': 'Really clear all local settings? Grids will return to default state.',
+        'settings.personalization_hint': 'These settings are stored locally in your browser and only affect grid appearance (column widths, order).',
     }
 };

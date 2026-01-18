@@ -15,14 +15,12 @@ import {
     tokens,
     TabList,
     Tab,
-    SelectTabData,
     Table,
     TableHeader,
     TableRow,
     TableHeaderCell,
     TableBody,
-    TableCell,
-    Card
+    TableCell
 } from '@fluentui/react-components';
 import { Delete24Regular } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
@@ -30,6 +28,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { Input } from '@fluentui/react-components';
+import { getAllLocalKeys, deleteLocalLastValue, clearAllLocalValues } from '../utils/indexedDB';
 
 const useStyles = makeStyles({
     content: {
@@ -119,26 +118,31 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
         onOpenChange(false);
     };
 
-    // Personalization Logic
+    // Personalization Logic (IndexedDB)
     const [tab, setTab] = useState<string>('general');
-    const [params, setParams] = useState<any[]>([]);
+    const [localKeys, setLocalKeys] = useState<string[]>([]);
 
-    const fetchParams = async () => {
+    const fetchLocalKeys = async () => {
         try {
-            const r = await fetch(`${API_BASE}/api-user.php?action=list_params`);
-            const j = await r.json();
-            if (j.success) setParams(j.data);
+            const keys = await getAllLocalKeys();
+            setLocalKeys(keys.filter(k => k.startsWith('grid_'))); // Only grid prefs
         } catch (e) { console.error(e); }
     };
 
     useEffect(() => {
-        if (tab === 'personalization' && open) fetchParams();
+        if (tab === 'personalization' && open) fetchLocalKeys();
     }, [tab, open]);
 
-    const deleteParam = async (id: number) => {
+    const deleteLocalKey = async (key: string) => {
         if (!confirm(t('common.confirm_delete'))) return;
-        await fetch(`${API_BASE}/api-user.php?action=delete_param`, { method: 'POST', body: JSON.stringify({ id }) });
-        fetchParams();
+        await deleteLocalLastValue(key);
+        fetchLocalKeys();
+    };
+
+    const clearAllPrefs = async () => {
+        if (!confirm(t('settings.confirm_clear_all'))) return;
+        await clearAllLocalValues();
+        fetchLocalKeys();
     };
 
 
@@ -233,27 +237,36 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
 
                             {/* PERSONALIZATION TAB */}
                             {tab === 'personalization' && (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHeaderCell>{t('common.name')}</TableHeaderCell>
-                                            <TableHeaderCell>{t('common.updated_at')}</TableHeaderCell>
-                                            <TableHeaderCell />
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {params.length === 0 && <TableRow><TableCell colSpan={3}>{t('common.no_data')}</TableCell></TableRow>}
-                                        {params.map(p => (
-                                            <TableRow key={p.rec_id}>
-                                                <TableCell>{p.param_key.replace('grid_', (t('common.grid') || 'Grid') + ': ')}</TableCell>
-                                                <TableCell>{new Date(p.updated_at).toLocaleString()}</TableCell>
-                                                <TableCell>
-                                                    <Button icon={<Delete24Regular />} appearance="subtle" onClick={() => deleteParam(p.rec_id)} title={t('common.delete')} />
-                                                </TableCell>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text weight="semibold">{t('settings.grid_preferences')}</Text>
+                                        <Button appearance="secondary" onClick={clearAllPrefs} disabled={localKeys.length === 0}>
+                                            {t('settings.clear_all')}
+                                        </Button>
+                                    </div>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHeaderCell>{t('common.name')}</TableHeaderCell>
+                                                <TableHeaderCell />
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {localKeys.length === 0 && <TableRow><TableCell colSpan={2}>{t('common.no_data')}</TableCell></TableRow>}
+                                            {localKeys.map(key => (
+                                                <TableRow key={key}>
+                                                    <TableCell>{key.replace('grid_', (t('common.grid') || 'Grid') + ': ')}</TableCell>
+                                                    <TableCell>
+                                                        <Button icon={<Delete24Regular />} appearance="subtle" onClick={() => deleteLocalKey(key)} title={t('common.delete')} />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                    <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>
+                                        {t('settings.personalization_hint')}
+                                    </Text>
+                                </div>
                             )}
                         </div>
                     </DialogContent>

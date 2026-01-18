@@ -45,6 +45,39 @@ export const setLocalLastValue = async (key: string, value: any): Promise<void> 
     });
 };
 
+export const deleteLocalLastValue = async (key: string): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getAllLocalKeys = async (): Promise<string[]> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAllKeys();
+        req.onsuccess = () => resolve(req.result as string[]);
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const clearAllLocalValues = async (): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.clear();
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
 /**
  * Hook to manage persistent state (Local IndexedDB for complex objects like FileHandles, 
  * Server for simple prefs - though server sync is implemented in separate context).
