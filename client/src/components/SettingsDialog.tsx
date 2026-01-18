@@ -12,8 +12,19 @@ import {
     Label,
     makeStyles,
     Text,
-    tokens
+    tokens,
+    TabList,
+    Tab,
+    SelectTabData,
+    Table,
+    TableHeader,
+    TableRow,
+    TableHeaderCell,
+    TableBody,
+    TableCell,
+    Card
 } from '@fluentui/react-components';
+import { Delete24Regular } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +37,8 @@ const useStyles = makeStyles({
         flexDirection: 'column',
         gap: '16px',
         paddingTop: '10px',
-        minHeight: '150px'
+        minHeight: '400px',
+        minWidth: '550px'
     }
 });
 
@@ -107,6 +119,28 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
         onOpenChange(false);
     };
 
+    // Personalization Logic
+    const [tab, setTab] = useState<string>('general');
+    const [params, setParams] = useState<any[]>([]);
+
+    const fetchParams = async () => {
+        try {
+            const r = await fetch(`${API_BASE}/api-user.php?action=list_params`);
+            const j = await r.json();
+            if (j.success) setParams(j.data);
+        } catch (e) { console.error(e); }
+    };
+
+    useEffect(() => {
+        if (tab === 'personalization' && open) fetchParams();
+    }, [tab, open]);
+
+    const deleteParam = async (id: number) => {
+        if (!confirm(t('common.confirm_delete'))) return;
+        await fetch(`${API_BASE}/api-user.php?action=delete_param`, { method: 'POST', body: JSON.stringify({ id }) });
+        fetchParams();
+    };
+
 
     // ...
     return (
@@ -115,75 +149,112 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                 <DialogBody>
                     <DialogTitle>{t('settings.title')}</DialogTitle>
                     <DialogContent className={styles.content}>
-                        <div style={{ marginBottom: '16px', padding: '8px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '4px' }}>
-                            <Text size={200} block style={{ color: tokens.colorNeutralForeground4 }}>
-                                Version: <span style={{ fontFamily: 'monospace' }}>{__APP_VERSION__}</span>
-                            </Text>
-                            <Text size={200} block style={{ color: tokens.colorNeutralForeground4 }}>
-                                Built: {__APP_BUILD_DATE__}
-                            </Text>
-                        </div>
+                        <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as string)}>
+                            <Tab value="general">{t('settings.tab_general')}</Tab>
+                            <Tab value="security">{t('settings.tab_security')}</Tab>
+                            <Tab value="personalization">{t('settings.tab_personalization')}</Tab>
+                        </TabList>
 
-                        {/* Language Setting */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                            <Label>{t('settings.language_label')}</Label>
-                            <Dropdown
-                                value={language === 'cs' ? t('settings.language_cs') : t('settings.language_en')}
-                                onOptionSelect={(_, data) => setLanguage(data.optionValue as any)}
-                            >
-                                <Option value="cs" text={t('settings.language_cs')}>{t('settings.language_cs')}</Option>
-                                <Option value="en" text={t('settings.language_en')}>{t('settings.language_en')}</Option>
-                            </Dropdown>
-                        </div>
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
+                            {/* GENERAL TAB */}
+                            {tab === 'general' && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-                        {/* Default Organization Setting */}
-                        {organizations.length > 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                <Label>{t('settings.default_org_label')}</Label>
-                                <Dropdown
-                                    value={organizations.find(o => o.org_id === effectiveDefault)?.display_name || effectiveDefault}
-                                    onOptionSelect={(_, data) => setSelectedDefaultOrg(data.optionValue as string)}
-                                >
-                                    {organizations.map(org => (
-                                        <Option key={org.org_id} value={org.org_id} text={`${org.display_name} (${org.org_id})`}>
-                                            {org.display_name} ({org.org_id})
-                                        </Option>
-                                    ))}
-                                </Dropdown>
-                                <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
-                                    {t('settings.defaultOrgHint')}
-                                </Text>
-                            </div>
-                        )}
+                                    <div style={{ padding: '8px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '4px' }}>
+                                        <Text size={200} block style={{ color: tokens.colorNeutralForeground4 }}>
+                                            Version: <span style={{ fontFamily: 'monospace' }}>{__APP_VERSION__}</span>
+                                        </Text>
+                                        <Text size={200} block style={{ color: tokens.colorNeutralForeground4 }}>
+                                            Built: {__APP_BUILD_DATE__}
+                                        </Text>
+                                    </div>
 
-                        {/* Password Change */}
-                        <div style={{ marginTop: '16px', borderTop: `1px solid ${tokens.colorNeutralStroke2}`, paddingTop: '16px' }}>
-                            <Text weight="semibold" style={{ marginBottom: '8px', display: 'block' }}>{t('settings.password_change')}</Text>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div>
-                                    <Label>{t('settings.new_password')}</Label>
-                                    <Input
-                                        type="password"
-                                        value={newPassword}
-                                        onChange={(_, d) => setNewPassword(d.value)}
-                                        style={{ width: '100%' }}
-                                    />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                        <Label>{t('settings.language_label')}</Label>
+                                        <Dropdown
+                                            value={language === 'cs' ? t('settings.language_cs') : t('settings.language_en')}
+                                            onOptionSelect={(_, data) => setLanguage(data.optionValue as any)}
+                                        >
+                                            <Option value="cs" text={t('settings.language_cs')}>{t('settings.language_cs')}</Option>
+                                            <Option value="en" text={t('settings.language_en')}>{t('settings.language_en')}</Option>
+                                        </Dropdown>
+                                    </div>
+
+                                    {organizations.length > 0 && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                            <Label>{t('settings.default_org_label')}</Label>
+                                            <Dropdown
+                                                value={organizations.find(o => o.org_id === effectiveDefault)?.display_name || effectiveDefault}
+                                                onOptionSelect={(_, data) => setSelectedDefaultOrg(data.optionValue as string)}
+                                            >
+                                                {organizations.map(org => (
+                                                    <Option key={org.org_id} value={org.org_id} text={`${org.display_name} (${org.org_id})`}>
+                                                        {org.display_name} ({org.org_id})
+                                                    </Option>
+                                                ))}
+                                            </Dropdown>
+                                            <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
+                                                {t('settings.defaultOrgHint')}
+                                            </Text>
+                                        </div>
+                                    )}
                                 </div>
-                                <div>
-                                    <Label>{t('settings.confirm_password')}</Label>
-                                    <Input
-                                        type="password"
-                                        value={confirmPassword}
-                                        onChange={(_, d) => setConfirmPassword(d.value)}
-                                        style={{ width: '100%' }}
-                                    />
+                            )}
+
+                            {/* SECURITY TAB */}
+                            {tab === 'security' && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <Text weight="semibold" style={{ marginBottom: '8px', display: 'block' }}>{t('settings.password_change')}</Text>
+                                    <div>
+                                        <Label>{t('settings.new_password')}</Label>
+                                        <Input
+                                            type="password"
+                                            value={newPassword}
+                                            onChange={(_, d) => setNewPassword(d.value)}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>{t('settings.confirm_password')}</Label>
+                                        <Input
+                                            type="password"
+                                            value={confirmPassword}
+                                            onChange={(_, d) => setConfirmPassword(d.value)}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                    {passwordError && (
+                                        <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
+                                            {t(passwordError) || passwordError}
+                                        </Text>
+                                    )}
                                 </div>
-                                {passwordError && (
-                                    <Text style={{ color: tokens.colorPaletteRedForeground1 }}>
-                                        {t(passwordError) || passwordError}
-                                    </Text>
-                                )}
-                            </div>
+                            )}
+
+                            {/* PERSONALIZATION TAB */}
+                            {tab === 'personalization' && (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHeaderCell>{t('common.name')}</TableHeaderCell>
+                                            <TableHeaderCell>{t('common.updated_at')}</TableHeaderCell>
+                                            <TableHeaderCell />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {params.length === 0 && <TableRow><TableCell colSpan={3}>{t('common.no_data')}</TableCell></TableRow>}
+                                        {params.map(p => (
+                                            <TableRow key={p.rec_id}>
+                                                <TableCell>{p.param_key.replace('grid_', (t('common.grid') || 'Grid') + ': ')}</TableCell>
+                                                <TableCell>{new Date(p.updated_at).toLocaleString()}</TableCell>
+                                                <TableCell>
+                                                    <Button icon={<Delete24Regular />} appearance="subtle" onClick={() => deleteParam(p.rec_id)} title={t('common.delete')} />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
                         </div>
                     </DialogContent>
                     <DialogActions>
