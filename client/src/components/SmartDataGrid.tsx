@@ -363,7 +363,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     useEffect(() => {
         if (!preferenceId) return;
         // Try server first, then fallback to IndexedDB cache
-        fetch(`/api/api-user.php?action=get_param&key=grid_${preferenceId}`)
+        fetch(`/api/api-user.php?action=get_param&key=grid_${preferenceId}`, { credentials: 'include' })
             .then(r => r.json())
             .then(d => {
                 if (d.success && d.data) {
@@ -410,7 +410,8 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                     fetch('/api/api-user.php?action=save_param', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
+                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false }),
+                        credentials: 'include'
                     }).catch(console.error);
                     setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(() => { });
                 }
@@ -479,7 +480,8 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                     fetch('/api/api-user.php?action=save_param', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
+                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false }),
+                        credentials: 'include'
                     }).catch(console.error);
                     setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(() => { });
                 }
@@ -535,7 +537,8 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             fetch('/api/api-user.php?action=save_param', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: `grid_${preferenceId}`, value: newConfig, org_specific: false })
+                body: JSON.stringify({ key: `grid_${preferenceId}`, value: newConfig, org_specific: false }),
+                credentials: 'include'
             }).catch(console.error);
             setLocalLastValue(`grid_${preferenceId}`, newConfig).catch(() => { });
         }
