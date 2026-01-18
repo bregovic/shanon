@@ -792,9 +792,11 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         const col = item || columns.find(c => c.columnId === columnId);
                         if (!col) return null;
                         const extCol = col as ExtendedTableColumnDefinition<T>;
+                        const sizingProps = getColumnSizingProps(columnId);
+
                         return (
                             <DataGridHeaderCell
-                                {...getColumnSizingProps(columnId)}
+                                {...sizingProps}
                                 className={styles.headerCell}
                                 style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                             >
@@ -806,7 +808,8 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     }}
                                     onDragOver={handleHeaderDragOver}
                                     onDrop={(e: React.DragEvent) => handleHeaderDrop(e, String(columnId))}
-                                    style={{ flex: 1, cursor: 'grab' }}
+                                    // Add margin right to prevent covering the resize handle
+                                    style={{ flex: 1, cursor: 'grab', marginRight: '12px', display: 'flex', alignItems: 'center' }}
                                 >
                                     <ColumnHeaderMenu
                                         column={extCol}
