@@ -15,8 +15,8 @@ if (!isset($_SESSION['loggedin'])) {
     exit;
 }
 
-// Read session data first
-$userId = $_SESSION['user']['rec_id'] ?? null;
+// Read session data first (note: 'id' not 'rec_id' - see ajax-login.php)
+$userId = $_SESSION['user']['id'] ?? null;
 $tenantId = $_SESSION['user']['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
 $currentOrgId = $_SESSION['current_org_id'] ?? null;
 
