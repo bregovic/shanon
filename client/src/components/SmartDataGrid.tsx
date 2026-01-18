@@ -420,7 +420,22 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
         }, 1000);
     }, [preferenceId]);
 
+    // Build columnSizingOptions from columns (required for resize to work)
+    const columnSizingOptions = useMemo(() => {
+        const options: Record<string, { minWidth?: number; defaultWidth?: number; idealWidth?: number }> = {};
+        propColumns.forEach(col => {
+            const extCol = col as ExtendedTableColumnDefinition<T>;
+            options[String(col.columnId)] = {
+                minWidth: extCol.minWidth || 50,
+                defaultWidth: columnConfig?.widths?.[String(col.columnId)] || extCol.minWidth || 100,
+                idealWidth: columnConfig?.widths?.[String(col.columnId)] || 150
+            };
+        });
+        return options;
+    }, [propColumns, columnConfig?.widths]);
+
     const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useTableColumnSizing_unstable({
+        columnSizingOptions,
         onColumnResize: handleColumnResize
     }) as any;
 

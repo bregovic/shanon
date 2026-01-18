@@ -32,12 +32,17 @@ try {
     // ACTION: SAVE PARAM (Grid Prefs, etc.)
     // -------------------------------------------------------------------------
     if ($action === 'save_param') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+        
+        // Debug logging
+        @file_put_contents('debug.txt', date('Y-m-d H:i:s') . " save_param raw: " . substr($rawInput, 0, 200) . "\n", FILE_APPEND);
+        
         $key = $input['key'] ?? null;
         $value = $input['value'] ?? null;
         $isOrgSpecific = $input['org_specific'] ?? false;
 
-        if (!$key) throw new Exception("Key required");
+        if (!$key) throw new Exception("Key required. Raw input: " . substr($rawInput, 0, 100));
         if (!$userId) throw new Exception("User ID not found in session");
 
         $storeOrgId = $isOrgSpecific ? $currentOrgId : null;
