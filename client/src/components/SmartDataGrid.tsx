@@ -800,25 +800,13 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                 className={styles.headerCell}
                                 style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                             >
-                                <div
-                                    draggable
-                                    onDragStart={(e: React.DragEvent) => {
-                                        console.log('Drag started', columnId);
-                                        handleHeaderDragStart(e, String(columnId));
-                                    }}
-                                    onDragOver={handleHeaderDragOver}
-                                    onDrop={(e: React.DragEvent) => handleHeaderDrop(e, String(columnId))}
-                                    // Add margin right to prevent covering the resize handle
-                                    style={{ flex: 1, cursor: 'grab', marginRight: '12px', display: 'flex', alignItems: 'center' }}
-                                >
-                                    <ColumnHeaderMenu
-                                        column={extCol}
-                                        sortState={sortState}
-                                        currentFilter={filters[String(extCol.columnId)] || ''}
-                                        onSort={handleSort}
-                                        onApplyFilter={(val) => handleFilterChange(String(extCol.columnId), val)}
-                                    />
-                                </div>
+                                <ColumnHeaderMenu
+                                    column={extCol}
+                                    sortState={sortState}
+                                    currentFilter={filters[String(extCol.columnId)] || ''}
+                                    onSort={handleSort}
+                                    onApplyFilter={(val) => handleFilterChange(String(extCol.columnId), val)}
+                                />
                             </DataGridHeaderCell>
                         );
                     }}
