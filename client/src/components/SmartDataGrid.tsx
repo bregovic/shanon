@@ -869,11 +869,15 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                     <DataGrid
                         items={processedItems}
                         columns={columns}
-                        sortable={false}
+                        sortable
                         selectionMode={selectionMode === 'none' ? undefined : selectionMode}
                         getRowId={getRowId}
                         selectedItems={selectedItems}
                         onSelectionChange={onSelectionChange}
+                        resizableColumns
+                        resizableColumnsOptions={{ autoFitColumns: false }}
+                        {...({ columnSizing_unstable: columnSizing } as any)}
+                        onColumnResize={onColumnResize}
                     >
                         <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 2, background: tokens.colorNeutralBackground1 }}>
                             <DataGridRow>
@@ -882,7 +886,10 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     if (!col) return null;
                                     const extCol = col as ExtendedTableColumnDefinition<T>;
                                     return (
-                                        <DataGridHeaderCell style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}>
+                                        <DataGridHeaderCell
+                                            {...getColumnSizingProps(columnId)}
+                                            style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
+                                        >
                                             <ColumnHeaderMenu
                                                 column={extCol}
                                                 sortState={sortState}
