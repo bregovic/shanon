@@ -13,19 +13,46 @@ header("Content-Type: application/json");
 if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
     require_once 'db.php';
     
-    $user = $_SESSION['user'] ?? null;
+    // Get user ID from session (minimal session data needed)
+    $sessionUser = $_SESSION['user'] ?? null;
+    $userId = $sessionUser['rec_id'] ?? $sessionUser['id'] ?? null;
+    
+    $user = null;
     $permissions = [];
     $rolesList = [];
-    
-    // Get user ID - support both 'id' and 'rec_id' field names
-    $userId = $user['rec_id'] ?? $user['id'] ?? null;
+    $userSettings = [];
 
-    if ($user && $userId) {
+    if ($userId) {
         try {
             $pdo = DB::connect();
             
-            // 0. Fetch user settings from DB (language, theme, etc.)
-            $userSettings = [];
+            // CRITICAL: Fetch FRESH user data from DB (not stale session)
+            // This ensures role/permission changes are reflected immediately
+            $userStmt = $pdo->prepare("SELECT rec_id, email, full_name, role, tenant_id, initials FROM sys_users WHERE rec_id = ? AND is_active = true");
+            $userStmt->execute([$userId]);
+            $dbUser = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($dbUser) {
+                $user = [
+                    'id' => $dbUser['rec_id'],
+                    'rec_id' => $dbUser['rec_id'],
+                    'email' => $dbUser['email'],
+                    'name' => $dbUser['full_name'],
+                    'role' => $dbUser['role'],
+                    'tenant_id' => $dbUser['tenant_id'],
+                    'initials' => $dbUser['initials'] ?? strtoupper(substr($dbUser['full_name'] ?? 'U', 0, 2))
+                ];
+                
+                // Also update session with fresh data for other endpoints
+                $_SESSION['user'] = $user;
+            } else {
+                // User was deleted or deactivated - force logout
+                session_destroy();
+                echo json_encode(['success' => false, 'is_logged_in' => false, 'error' => 'User not found']);
+                exit;
+            }
+            
+            // Fetch user settings
             try {
                 $settingsStmt = $pdo->prepare("SELECT settings FROM sys_users WHERE rec_id = ?");
                 $settingsStmt->execute([$userId]);

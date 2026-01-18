@@ -94,15 +94,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             const data = await res.json();
             if (data.success && data.user) {
-                // Only update if changed to prevent loops
-                setUser(prev => (prev?.id === data.user.id ? prev : {
+                // Update user data (check all fields that might change, not just ID)
+                const newUser = {
                     id: data.user.id,
                     username: data.user.name,
                     role: data.user.role || 'user',
                     name: data.user.name || '',
                     initials: data.user.initials || '?',
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
-                }));
+                };
+                setUser(prev => {
+                    if (!prev) return newUser;
+                    // Compare all relevant fields
+                    if (prev.id !== newUser.id ||
+                        prev.role !== newUser.role ||
+                        prev.name !== newUser.name) {
+                        return newUser;
+                    }
+                    return prev;
+                });
                 setPermissions(prev => (JSON.stringify(prev) === JSON.stringify(data.permissions) ? prev : data.permissions || {}));
                 setOrganizations(prev => (JSON.stringify(prev) === JSON.stringify(data.organizations) ? prev : data.organizations || []));
                 setCurrentOrgId(prev => (prev === data.current_org_id ? prev : data.current_org_id || null));
