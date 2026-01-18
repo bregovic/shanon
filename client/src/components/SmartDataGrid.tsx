@@ -345,14 +345,15 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
     useEffect(() => {
         if (!preferenceId) return;
-        fetch(`/backend/api-user.php?action=get_param&key=grid_${preferenceId}`)
+        fetch(`/api/api-user.php?action=get_param&key=grid_${preferenceId}`)
             .then(r => r.json())
-            .then(d => { if (d.success && d.data) setColumnConfig(d.data); });
+            .then(d => { if (d.success && d.data) setColumnConfig(d.data); })
+            .catch(e => console.error("Grid load failed", e));
     }, [preferenceId]);
 
     // -- Resizing --
     const saveTimeout = useRef<any>(null);
-    const handleColumnResize = React.useCallback((_: any, { columnId, width }: { columnId: string, width: number }) => {
+    const handleColumnResize = React.useCallback((_: any, { columnId, width }: { columnId: TableColumnId, width: number }) => {
         setColumnConfig((prev: any) => {
             const next = {
                 ...(prev || { hiddenIds: [], order: [] }),
@@ -360,12 +361,22 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             };
 
             if (saveTimeout.current) clearTimeout(saveTimeout.current);
-            saveTimeout.current = setTimeout(() => {
+            saveTimeout.current = setTimeout(async () => {
                 if (preferenceId) {
-                    fetch('/backend/api-user.php?action=save_param', {
-                        method: 'POST',
-                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: next, org_specific: false })
-                    });
+                    try {
+                        const res = await fetch('/api/api-user.php?action=save_param', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: `grid_${preferenceId}`, value: next, org_specific: false })
+                        });
+                        if (!res.ok) {
+                            const text = await res.text();
+                            console.error("Save failed (HTTP)", res.status, text);
+                            return;
+                        }
+                    } catch (e) {
+                        console.error("Save failed (Net)", e);
+                    }
                 }
             }, 1000);
 
@@ -659,6 +670,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             onSelectionChange={onSelectionChange}
             resizableColumns
             {...({ columnSizing_unstable: columnSizing } as any)}
+            onColumnResize={onColumnResize}
         >
             <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 2, background: tokens.colorNeutralBackground1 }}>
                 <DataGridRow>
