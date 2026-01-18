@@ -404,6 +404,55 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
         onColumnResize: handleColumnResize
     }) as any;
 
+    // -- Reordering --
+    const [draggedColId, setDraggedColId] = useState<string | null>(null);
+
+    const handleHeaderDragStart = (e: React.DragEvent, colId: string) => {
+        setDraggedColId(colId);
+        e.dataTransfer.effectAllowed = 'move';
+        // Required for Firefox
+        e.dataTransfer.setData('text/plain', colId);
+    };
+
+    const handleHeaderDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleHeaderDrop = (e: React.DragEvent, targetId: string) => {
+        e.preventDefault();
+        if (draggedColId && draggedColId !== targetId) {
+            setColumnConfig((prev: any) => {
+                const oldOrder = prev?.order || propColumns.map(c => String(c.columnId));
+                const newOrder = [...oldOrder];
+
+                const fromIdx = newOrder.indexOf(draggedColId);
+                const toIdx = newOrder.indexOf(targetId);
+
+                if (fromIdx !== -1 && toIdx !== -1) {
+                    newOrder.splice(fromIdx, 1);
+                    newOrder.splice(toIdx, 0, draggedColId);
+                } else {
+                    // Fallback if not in order array (new columns)
+                    // Not trivial, but unlikely if logic is consistent
+                }
+
+                const nextConfig = { ...(prev || { hiddenIds: [], widths: {} }), order: newOrder };
+
+                // Save immediately
+                if (preferenceId) {
+                    fetch('/api/api-user.php?action=save_param', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
+                    }).catch(err => console.error("Save reorder error", err));
+                }
+                return nextConfig;
+            });
+        }
+        setDraggedColId(null);
+    };
+
     useEffect(() => {
         if (columnConfig?.widths) {
             setColumnSizing(columnConfig.widths);
@@ -696,7 +745,14 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         if (!col) return null;
                         const extCol = col as ExtendedTableColumnDefinition<T>;
                         return (
-                            <DataGridHeaderCell {...getColumnSizingProps(columnId)} style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}>
+                            <DataGridHeaderCell
+                                {...getColumnSizingProps(columnId)}
+                                style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
+                                draggable
+                                onDragStart={(e) => handleHeaderDragStart(e, String(columnId))}
+                                onDragOver={handleHeaderDragOver}
+                                onDrop={(e) => handleHeaderDrop(e, String(columnId))}
+                            >
                                 <ColumnHeaderMenu
                                     column={extCol}
                                     sortState={sortState}

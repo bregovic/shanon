@@ -123,5 +123,7 @@ try {
 
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['success'=>false, 'error'=>$e->getMessage()]);
+    $msg = $e->getMessage();
+    file_put_contents('debug.txt', date('Y-m-d H:i:s') . " Error: $msg\n", FILE_APPEND);
+    echo json_encode(['success'=>false, 'error'=>$msg]);
 }
