@@ -328,10 +328,10 @@ try {
                     }
 
                     // Upsert incoming
-                    $upsertSql = "INSERT INTO sys_user_org_access (user_id, org_id, roles, is_active) 
-                                  VALUES (:uid, :oid, :roles, true)
+                    $upsertSql = "INSERT INTO sys_user_org_access (user_id, org_id, roles) 
+                                  VALUES (:uid, :oid, :roles)
                                   ON CONFLICT (user_id, org_id) 
-                                  DO UPDATE SET roles = EXCLUDED.roles, updated_at = NOW()";
+                                  DO UPDATE SET roles = EXCLUDED.roles";
                     $upsertStmt = $pdo->prepare($upsertSql);
 
                     foreach ($input['org_access'] as $item) {
@@ -422,8 +422,8 @@ try {
                 // Add assignments (for each user and each org)
                 if (!empty($addOrgIds)) {
                     $insertStmt = $pdo->prepare("
-                        INSERT INTO sys_user_org_access (user_id, org_id, roles, is_active)
-                        VALUES (?, ?, '[]', true)
+                        INSERT INTO sys_user_org_access (user_id, org_id, roles)
+                        VALUES (?, ?, '[]')
                         ON CONFLICT (user_id, org_id) DO NOTHING
                     ");
                     foreach ($userIds as $userId) {
