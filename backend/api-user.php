@@ -60,7 +60,7 @@ try {
                 ':uid' => $userId,
                 ':oid' => $storeOrgId,
                 ':key' => $key,
-                ':val' => json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE)
+                ':val' => json_encode($value)
             ]);
         });
 
