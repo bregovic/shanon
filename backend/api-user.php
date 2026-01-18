@@ -6,21 +6,22 @@ require_once 'cors.php';
 require_once 'session_init.php';
 require_once 'db.php';
 
-// Unlock session for perf
-session_write_close(); 
-
 header("Content-Type: application/json");
 
-// Auth Check
+// Auth Check - must read session BEFORE closing it!
 if (!isset($_SESSION['loggedin'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
 }
 
+// Read session data first
 $userId = $_SESSION['user']['rec_id'] ?? null;
 $tenantId = $_SESSION['user']['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
 $currentOrgId = $_SESSION['current_org_id'] ?? null;
+
+// NOW unlock session for performance (after reading all needed data)
+session_write_close();
 
 $action = $_GET['action'] ?? 'list';
 
@@ -37,6 +38,7 @@ try {
         $isOrgSpecific = $input['org_specific'] ?? false;
 
         if (!$key) throw new Exception("Key required");
+        if (!$userId) throw new Exception("User ID not found in session");
 
         $storeOrgId = $isOrgSpecific ? $currentOrgId : null;
         

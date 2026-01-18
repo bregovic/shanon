@@ -107,6 +107,22 @@ const useStyles = makeStyles({
     helpPopover: {
         padding: '12px',
         maxWidth: '300px'
+    },
+    // Resize handle styles for column resizing
+    headerCell: {
+        position: 'relative' as const,
+        '& .fui-DataGridHeaderCell__resizeHandle': {
+            width: '8px',
+            height: '100%',
+            position: 'absolute' as const,
+            right: 0,
+            top: 0,
+            cursor: 'col-resize',
+            zIndex: 1,
+            '&:hover': {
+                backgroundColor: tokens.colorBrandBackground,
+            }
+        }
     }
 });
 
@@ -750,11 +766,12 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         return (
                             <DataGridHeaderCell
                                 {...getColumnSizingProps(columnId)}
+                                className={styles.headerCell}
                                 style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                                 draggable
-                                onDragStart={(e) => handleHeaderDragStart(e, String(columnId))}
+                                onDragStart={(e: React.DragEvent) => handleHeaderDragStart(e, String(columnId))}
                                 onDragOver={handleHeaderDragOver}
-                                onDrop={(e) => handleHeaderDrop(e, String(columnId))}
+                                onDrop={(e: React.DragEvent) => handleHeaderDrop(e, String(columnId))}
                             >
                                 <ColumnHeaderMenu
                                     column={extCol}
