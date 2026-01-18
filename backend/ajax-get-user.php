@@ -116,6 +116,7 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
                         FROM sys_organizations o
                         LEFT JOIN sys_user_org_access a ON o.org_id = a.org_id AND a.user_id = :uid
                         WHERE o.is_active = true
+                          AND (o.is_virtual_group = false OR o.is_virtual_group IS NULL)
                         ORDER BY o.display_name
                      ";
                  } else {
@@ -124,6 +125,7 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
                         FROM sys_user_org_access a
                         JOIN sys_organizations o ON a.org_id = o.org_id
                         WHERE a.user_id = :uid AND o.is_active = true
+                          AND (o.is_virtual_group = false OR o.is_virtual_group IS NULL)
                         ORDER BY o.display_name
                      ";
                  }
