@@ -123,7 +123,7 @@ try {
             SELECT * FROM dms_doc_types 
             WHERE is_active = true 
               AND tenant_id = :tid 
-              AND (org_id = :oid OR org_id IS NULL)
+              AND (org_id = :oid OR org_id IS NULL OR org_id IN (SELECT group_id FROM sys_org_group_members WHERE member_id = :oid))
             ORDER BY name
         ");
         $stmt->execute([':tid' => $tenantId, ':oid' => $currentOrgId]);
@@ -149,12 +149,13 @@ try {
              // Check existence? Code should be unique per tenant/org
              // Use ON CONFLICT DO NOTHING or Check first. 
              // Simple insert for now.
+             $targetOrgId = DB::resolveWriteOrgId($pdo, $currentOrgId, 'dms_doc_types');
              $sql = "INSERT INTO dms_doc_types (tenant_id, org_id, code, name, description, icon, is_active) 
                      VALUES (:tid, :oid, :code, :name, :desc, :icon, true)";
              $stmt = $pdo->prepare($sql);
              $stmt->execute([
                  ':tid' => $tenantId,
-                 ':oid' => $currentOrgId,
+                 ':oid' => $targetOrgId,
                  ':code' => $code,
                  ':name' => $name,
                  ':desc' => $description,
@@ -201,7 +202,7 @@ try {
         $stmt = $pdo->prepare("
             SELECT * FROM dms_storage_profiles 
             WHERE tenant_id = :tid 
-              AND (org_id = :oid OR org_id IS NULL)
+              AND (org_id = :oid OR org_id IS NULL OR org_id IN (SELECT group_id FROM sys_org_group_members WHERE member_id = :oid))
             ORDER BY rec_id
         ");
         $stmt->execute([':tid' => $tenantId, ':oid' => $currentOrgId]);
@@ -248,12 +249,13 @@ try {
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':name'=>$name, ':type'=>$type, ':config'=>$config, ':active'=>$isActive? 'true':'false', ':def'=>$isDefault?'true':'false', ':id'=>$id]);
         } else {
+            $targetOrgId = DB::resolveWriteOrgId($pdo, $currentOrgId, 'dms_storage_profiles');
             $sql = "INSERT INTO dms_storage_profiles (tenant_id, org_id, name, type, configuration, is_active, is_default) 
                     VALUES (:tid, :oid, :name, :type, :config, :active, :def)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':tid' => $tenantId,
-                ':oid' => $currentOrgId, // Profiles created via specific org context belong to that org? Usually yes.
+                ':oid' => $targetOrgId, // Profiles created via specific org context belong to that org? Usually yes.
                 ':name'=>$name, 
                 ':type'=>$type, 
                 ':config'=>$config, 

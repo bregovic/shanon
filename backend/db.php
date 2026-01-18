@@ -63,4 +63,30 @@ class DB {
             throw $e;
         }
     }
+
+    /**
+     * Zjistí, zda se má pro zápis do tabulky použít ID skupiny místo ID aktuální organizace.
+     * Pokud je tabulka definována v sys_org_shared_tables pro skupinu, do které organizace patří,
+     * vrátí ID této skupiny. Jinak vrátí původní ID.
+     */
+    public static function resolveWriteOrgId($pdo, $currentOrgId, $tableName) {
+        if (!$currentOrgId) return null;
+
+        // Check if currentOrgId belongs to a group that shares this table
+        $sql = "
+            SELECT m.group_id 
+            FROM sys_org_group_members m
+            JOIN sys_org_shared_tables st ON m.group_id = st.group_id
+            WHERE m.member_id = :oid 
+              AND st.table_name = :tbl 
+              AND st.is_active = true
+            LIMIT 1
+        ";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':oid' => $currentOrgId, ':tbl' => $tableName]);
+        $groupId = $stmt->fetchColumn();
+        
+        return $groupId ? $groupId : $currentOrgId;
+    }
 }
