@@ -36,6 +36,7 @@ import {
     Settings24Regular
 } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
+import { getLocalLastValue, setLocalLastValue } from '../utils/indexedDB';
 
 // Imports for Settings Dialog
 import {
@@ -345,10 +346,9 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
     useEffect(() => {
         if (!preferenceId) return;
-        fetch(`/api/api-user.php?action=get_param&key=grid_${preferenceId}`)
-            .then(r => r.json())
-            .then(d => { if (d.success && d.data) setColumnConfig(d.data); })
-            .catch(e => console.error("Grid load failed", e));
+        getLocalLastValue(`grid_${preferenceId}`).then((data) => {
+            if (data) setColumnConfig(data);
+        }).catch(e => console.error("Grid load failed", e));
     }, [preferenceId]);
 
     // -- Resizing --
@@ -387,12 +387,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         widths: currentWidths
                     };
 
-                    const res = await fetch('/api/api-user.php?action=save_param', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
-                    });
-                    if (!res.ok) console.error("Save resize error", res.status);
+                    await setLocalLastValue(`grid_${preferenceId}`, nextConfig);
                 } catch (e) {
                     console.error("Save resize net error", e);
                 }
@@ -439,13 +434,9 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 
                 const nextConfig = { ...(prev || { hiddenIds: [], widths: {} }), order: newOrder };
 
-                // Save immediately
+                // Save immediately to IndexedDB
                 if (preferenceId) {
-                    fetch('/api/api-user.php?action=save_param', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false })
-                    }).catch(err => console.error("Save reorder error", err));
+                    setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(console.error);
                 }
                 return nextConfig;
             });
@@ -495,15 +486,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
         setColumnConfig(newConfig);
         setShowSettings(false);
         if (preferenceId) {
-            fetch('/api/api-user.php?action=save_param', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    key: `grid_${preferenceId}`,
-                    value: newConfig,
-                    org_specific: false
-                })
-            }).catch(e => console.error("Save settings error", e));
+            setLocalLastValue(`grid_${preferenceId}`, newConfig).catch(console.error);
         }
     };
 
