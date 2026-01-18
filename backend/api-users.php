@@ -356,11 +356,13 @@ try {
 
             $tenantId = $_SESSION['user']['tenant_id'] ?? $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
 
-            // Get all active organizations
+            // Get all active organizations (excluding virtual groups)
             $orgStmt = $pdo->prepare("
                 SELECT org_id, display_name 
                 FROM sys_organizations 
-                WHERE tenant_id = :tid AND is_active = true
+                WHERE tenant_id = :tid 
+                  AND is_active = true
+                  AND (is_virtual_group = false OR is_virtual_group IS NULL)
                 ORDER BY display_name ASC
             ");
             $orgStmt->execute([':tid' => $tenantId]);
