@@ -985,7 +985,8 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         '072_seed_help' => null,
         '073_sys_help_map' => null,
         '074_update_help_shortcuts' => null,
-        '080_shared_companies' => null
+        '080_shared_companies' => null,
+        '081_sys_user_params' => null
     ];
 
 

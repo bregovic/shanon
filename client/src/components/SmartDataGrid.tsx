@@ -32,9 +32,24 @@ import {
     ArrowSortDown24Regular,
     Filter24Regular,
     QuestionCircle24Regular,
-    ChevronDown24Regular
+    ChevronDown24Regular,
+    Settings24Regular
 } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
+
+// Imports for Settings Dialog
+import {
+    Dialog,
+    DialogSurface,
+    DialogTitle,
+    DialogBody,
+    DialogActions,
+    DialogContent,
+    Checkbox,
+    Label,
+    Divider,
+    DialogTrigger
+} from '@fluentui/react-components';
 
 const useStyles = makeStyles({
     headerCellContent: {
@@ -108,6 +123,7 @@ interface SmartDataGridProps<T> {
     selectionMode?: 'single' | 'multiselect' | 'none';
     selectedItems?: Set<SelectionItemId>;
     onSelectionChange?: (e: SyntheticEvent, data: OnSelectionChangeData) => void;
+    preferenceId?: string;
 }
 // Helper to safely get Array
 const safeArray = <T,>(arr: T[] | undefined | null): T[] => Array.isArray(arr) ? arr : [];
@@ -303,16 +319,77 @@ const ColumnHeaderMenu = <T,>({
     );
 };
 
-export const SmartDataGrid = <T,>({ items, columns, getRowId,
+export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     onFilteredDataChange,
     onRowClick,
     onRowDoubleClick,
     selectionMode,
     selectedItems,
-    onSelectionChange
+    onSelectionChange,
+    preferenceId
 }: SmartDataGridProps<T>) => {
     const styles = useStyles();
+    const { t } = useTranslation();
     const [filters, setFilters] = useState<Record<string, string>>({});
+
+    // -- Preferences --
+    const [columnConfig, setColumnConfig] = useState<{
+        hiddenIds: string[];
+        widths: Record<string, number>;
+        order: string[];
+    } | null>(null);
+    const [showSettings, setShowSettings] = useState(false);
+
+    useEffect(() => {
+        if (!preferenceId) return;
+        fetch(`/backend/api-user.php?action=get_param&key=grid_${preferenceId}`)
+            .then(r => r.json())
+            .then(d => { if (d.success && d.data) setColumnConfig(d.data); });
+    }, [preferenceId]);
+
+    const columns = useMemo(() => {
+        let baseCols = propColumns;
+        if (columnConfig) {
+            const colMap = new Map(propColumns.map(c => [String(c.columnId), c]));
+            const orderedIds = columnConfig.order || [];
+            propColumns.forEach(c => { if (!orderedIds.includes(String(c.columnId))) orderedIds.push(String(c.columnId)); });
+
+            baseCols = [];
+            const hidden = new Set(columnConfig.hiddenIds || []);
+            orderedIds.forEach(id => {
+                if (hidden.has(id)) return;
+                const col = colMap.get(id);
+                if (col) baseCols.push(columnConfig.widths?.[id] ? { ...col, minWidth: columnConfig.widths[id] } : col);
+            });
+        }
+
+        if (preferenceId) {
+            return [...baseCols, {
+                columnId: 'sys_settings',
+                minWidth: 40,
+                renderHeaderCell: () => (
+                    <Button appearance="subtle" icon={<Settings24Regular />} onClick={(e: any) => { e.stopPropagation(); setShowSettings(true); }} title={t('common.settings')} />
+                ),
+                renderCell: () => null
+            } as unknown as ExtendedTableColumnDefinition<T>];
+        }
+        return baseCols;
+    }, [propColumns, columnConfig, preferenceId, t]);
+
+    const handleSaveSettings = (newConfig: any) => {
+        setColumnConfig(newConfig);
+        setShowSettings(false);
+        if (preferenceId) {
+            fetch('/backend/api-user.php?action=save_param', {
+                method: 'POST',
+                body: JSON.stringify({
+                    key: `grid_${preferenceId}`,
+                    value: newConfig,
+                    org_specific: false
+                })
+            });
+        }
+    };
 
     const handleFilterChange = (colId: string, val: string) => {
         setFilters(prev => {
@@ -671,6 +748,15 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                         </DataGridBody>
                     </DataGrid>
                 </div>
+                {showSettings && (
+                    <GridSettingsDialog
+                        open={showSettings}
+                        allColumns={propColumns}
+                        config={columnConfig}
+                        onSave={handleSaveSettings}
+                        onCancel={() => setShowSettings(false)}
+                    />
+                )}
             </div>
         );
     }
@@ -696,6 +782,68 @@ export const SmartDataGrid = <T,>({ items, columns, getRowId,
                     </div>
                 </div>
             </div>
+            {showSettings && (
+                <GridSettingsDialog
+                    open={showSettings}
+                    allColumns={propColumns}
+                    config={columnConfig}
+                    onSave={handleSaveSettings}
+                    onCancel={() => setShowSettings(false)}
+                />
+            )}
         </div>
     );
 };
+
+
+const GridSettingsDialog = ({ open, allColumns, config, onSave, onCancel }: any) => {
+    const { t } = useTranslation();
+    const [hidden, setHidden] = React.useState<Set<string>>(new Set(config?.hiddenIds || []));
+
+    // Widths? Standard for now.
+
+    const toggle = (id: string) => {
+        const next = new Set(hidden);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setHidden(next);
+    };
+
+    const handleSave = () => {
+        onSave({ ...config, hiddenIds: Array.from(hidden) });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(_, data) => !data.open && onCancel()}>
+            <DialogSurface>
+                <DialogBody>
+                    <DialogTitle>{t('grid.settings')}</DialogTitle>
+                    <DialogContent>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <Label weight='semibold'>{t('grid.visible_columns')}</Label>
+                            <Divider />
+                            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                {allColumns.map((col: any) => (
+                                    <Checkbox
+                                        key={col.columnId}
+                                        checked={!hidden.has(String(col.columnId))}
+                                        onChange={() => toggle(String(col.columnId))}
+                                        label={col.renderHeaderCell ? 'Column' : (col.title || col.columnId)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button appearance="subtle" onClick={() => onSave(null)}>{t('common.default')}</Button>
+                        <DialogTrigger disableButtonEnhancement>
+                            <Button appearance='secondary' onClick={onCancel}>{t('common.cancel')}</Button>
+                        </DialogTrigger>
+                        <Button appearance='primary' onClick={handleSave}>{t('common.save')}</Button>
+                    </DialogActions>
+                </DialogBody>
+            </DialogSurface>
+        </Dialog>
+    );
+};
+

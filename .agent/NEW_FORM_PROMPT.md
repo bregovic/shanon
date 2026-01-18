@@ -40,6 +40,7 @@ useKeyboardShortcut('save', handleSave);
 - [ ] `getRowId={(item) => item.rec_id}`
 - [ ] `onSelectionChange` pro hromadné akce
 - [ ] Filtrování automaticky přes SmartDataGrid
+- [ ] **Personalization:** `preferenceId="unique_grid_name"` pro ukládání nastavení sloupců
 - [ ] **Click Behavior (POVINNÉ)**:
   - **Single click** = Označení řádku (selection)
   - **Double click** = Otevření detailu/editace

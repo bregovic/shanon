@@ -56,6 +56,7 @@ We follow the **Microsoft Fluent UI (Investyx/D365)** aesthetic.
     - Numbers: Right
     - Dates/Bool: Center
 - **Filters:** Enabled by default.
+- **Personalization:** Always provide a unique `preferenceId` prop (e.g., `preferenceId="users_list"`) to enable persistent column settings.
 
 ### Action Bar Standard (CRITICAL)
 **Every page MUST have an ActionBar.** The components differ based on view type:

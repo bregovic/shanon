@@ -389,6 +389,7 @@ export const DmsList: React.FC = () => {
                             setDrawerDoc(doc);
                             setIsDrawerOpen(true);
                         }}
+                        preferenceId="dms_list"
                     />
                 </div>
             </PageContent>
