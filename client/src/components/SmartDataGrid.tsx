@@ -49,16 +49,9 @@ import {
     Label,
     Divider,
     DialogTrigger,
-    createTableColumn
+    createTableColumn,
+    useTableColumnSizing_unstable
 } from '@fluentui/react-components';
-
-// TEMPORARY: Mock hook to fix build (export missing in current pkg version)
-const useDataGridColumnSizing_unstable = (_: any) => ({
-    getColumnSizingProps: (_id: string) => ({}),
-    onColumnResize: (_e: any, _d: any) => { },
-    columnSizing: {},
-    setColumnSizing: (_s: any) => { }
-});
 
 const useStyles = makeStyles({
     headerCellContent: {
@@ -379,7 +372,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
         });
     }, [preferenceId]);
 
-    const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useDataGridColumnSizing_unstable({
+    const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useTableColumnSizing_unstable({
         onColumnResize: handleColumnResize
     });
 
@@ -663,8 +656,8 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             sortable
             selectionMode={selectionMode === 'none' ? undefined : selectionMode}
             onSelectionChange={onSelectionChange}
-        // resizableColumns
-        // {...({ columnSizing_unstable: columnSizing } as any)}
+            resizableColumns
+            {...({ columnSizing_unstable: columnSizing } as any)}
         >
             <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 2, background: tokens.colorNeutralBackground1 }}>
                 <DataGridRow>
@@ -698,9 +691,9 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             getRowId={getRowId}
             selectedItems={selectedItems}
             onSelectionChange={onSelectionChange}
-        // resizableColumns
-        // {...({ columnSizing_unstable: columnSizing } as any)}
-        // onColumnResize={onColumnResize}
+            resizableColumns
+            {...({ columnSizing_unstable: columnSizing } as any)}
+            onColumnResize={onColumnResize}
         >
             <DataGridBody<T>>
                 {({ item, rowId }) => (
