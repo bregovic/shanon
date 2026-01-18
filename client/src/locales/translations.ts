@@ -484,6 +484,21 @@ export const translations = {
         'settings.clear_all': 'Smazat vše',
         'settings.confirm_clear_all': 'Opravdu smazat všechna lokální nastavení? Tabulky se vrátí do výchozího stavu.',
         'settings.personalization_hint': 'Tato nastavení jsou uložena lokálně v prohlížeči a ovlivňují pouze vzhled tabulek (šířky, pořadí sloupců).',
+
+        // Transfer List
+        'transfer.available': 'Dostupné',
+        'transfer.selected': 'Vybrané',
+        'transfer.selectAll': 'Vybrat vše',
+        'transfer.noAvailable': 'Žádné dostupné položky',
+        'transfer.noSelected': 'Žádné vybrané položky',
+        'transfer.items': 'položek',
+
+        // Security - Organization Access
+        'security.org_access': 'Oprávnění v organizacích',
+        'security.permissions_for': 'Oprávnění uživatele',
+        'security.permissions_for_multiple': 'Pro více uživatelů',
+        'security.available_orgs': 'Dostupné organizace',
+        'security.assigned_orgs': 'Přiřazené organizace',
     },
 
     en: {
@@ -1060,5 +1075,20 @@ export const translations = {
         'settings.clear_all': 'Clear All',
         'settings.confirm_clear_all': 'Really clear all local settings? Grids will return to default state.',
         'settings.personalization_hint': 'These settings are stored locally in your browser and only affect grid appearance (column widths, order).',
+
+        // Transfer List
+        'transfer.available': 'Available',
+        'transfer.selected': 'Selected',
+        'transfer.selectAll': 'Select All',
+        'transfer.noAvailable': 'No available items',
+        'transfer.noSelected': 'No selected items',
+        'transfer.items': 'items',
+
+        // Security - Organization Access
+        'security.org_access': 'Organization Access',
+        'security.permissions_for': 'Permissions for',
+        'security.permissions_for_multiple': 'For multiple users',
+        'security.available_orgs': 'Available Organizations',
+        'security.assigned_orgs': 'Assigned Organizations',
     }
 };
