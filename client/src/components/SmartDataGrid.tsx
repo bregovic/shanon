@@ -874,10 +874,6 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         getRowId={getRowId}
                         selectedItems={selectedItems}
                         onSelectionChange={onSelectionChange}
-                        resizableColumns
-                        resizableColumnsOptions={{ autoFitColumns: false }}
-                        {...({ columnSizing_unstable: columnSizing } as any)}
-                        onColumnResize={onColumnResize}
                     >
                         <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 2, background: tokens.colorNeutralBackground1 }}>
                             <DataGridRow>
