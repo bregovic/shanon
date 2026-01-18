@@ -28,7 +28,7 @@ import { Delete24Regular } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
