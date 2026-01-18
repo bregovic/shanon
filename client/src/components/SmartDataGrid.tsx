@@ -49,7 +49,8 @@ import {
     Label,
     Divider,
     DialogTrigger,
-    createTableColumn
+    createTableColumn,
+    useDataGridColumnSizing_unstable
 } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
@@ -348,6 +349,39 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             .then(d => { if (d.success && d.data) setColumnConfig(d.data); });
     }, [preferenceId]);
 
+    // -- Resizing --
+    const saveTimeout = useRef<any>(null);
+    const handleColumnResize = React.useCallback((_: any, { columnId, width }: { columnId: string, width: number }) => {
+        setColumnConfig((prev: any) => {
+            const next = {
+                ...(prev || { hiddenIds: [], order: [] }),
+                widths: { ...(prev?.widths || {}), [columnId]: width }
+            };
+
+            if (saveTimeout.current) clearTimeout(saveTimeout.current);
+            saveTimeout.current = setTimeout(() => {
+                if (preferenceId) {
+                    fetch('/backend/api-user.php?action=save_param', {
+                        method: 'POST',
+                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: next, org_specific: false })
+                    });
+                }
+            }, 1000);
+
+            return next;
+        });
+    }, [preferenceId]);
+
+    const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useDataGridColumnSizing_unstable({
+        onColumnResize: handleColumnResize
+    });
+
+    useEffect(() => {
+        if (columnConfig?.widths) {
+            setColumnSizing(columnConfig.widths);
+        }
+    }, [columnConfig?.widths, setColumnSizing]);
+
     const columns = useMemo(() => {
         let baseCols = propColumns;
         if (columnConfig) {
@@ -612,16 +646,18 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     const visibleItems = isVirtualized ? processedItems.slice(startIndex, endIndex) : processedItems;
     const offsetY = startIndex * ROW_HEIGHT;
 
+    const validColumns = useMemo(() => columns.filter(c => c.columnId !== 'sys_settings'), [columns]);
+
     // Sticky Header Rendering Helper
     const renderHeader = () => (
         <DataGrid
-            items={processedItems}
-            columns={columns}
-            sortable={false}
+            items={items}
+            columns={validColumns}
+            sortable
             selectionMode={selectionMode === 'none' ? undefined : selectionMode}
-            getRowId={getRowId}
-            selectedItems={selectedItems}
             onSelectionChange={onSelectionChange}
+            resizableColumns
+            {...({ columnSizing_unstable: columnSizing } as any)}
         >
             <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 2, background: tokens.colorNeutralBackground1 }}>
                 <DataGridRow>
@@ -630,7 +666,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         if (!col) return null;
                         const extCol = col as ExtendedTableColumnDefinition<T>;
                         return (
-                            <DataGridHeaderCell style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}>
+                            <DataGridHeaderCell {...getColumnSizingProps(columnId)} style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}>
                                 <ColumnHeaderMenu
                                     column={extCol}
                                     sortState={sortState}
@@ -649,12 +685,15 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     const renderBody = (itemsToRender: T[]) => (
         <DataGrid
             items={itemsToRender}
-            columns={columns}
-            sortable={false}
+            columns={validColumns}
+            sortable
             selectionMode={selectionMode === 'none' ? undefined : selectionMode}
             getRowId={getRowId}
             selectedItems={selectedItems}
             onSelectionChange={onSelectionChange}
+            resizableColumns
+            {...({ columnSizing_unstable: columnSizing } as any)}
+            onColumnResize={onColumnResize}
         >
             <DataGridBody<T>>
                 {({ item, rowId }) => (
@@ -800,6 +839,22 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
 };
 
 
+const resolveColumnLabel = (col: any): string => {
+    if (col.title) return col.title;
+    try {
+        if (col.renderHeaderCell) {
+            const val = col.renderHeaderCell();
+            if (typeof val === 'string') return val;
+            if (typeof val === 'number') return String(val);
+            if (val && typeof val === 'object' && 'props' in val) {
+                const children = (val as any).props.children;
+                if (typeof children === 'string') return children;
+            }
+        }
+    } catch (e) { }
+    return col.columnId;
+};
+
 const GridSettingsDialog = ({ open, allColumns, config, onSave, onCancel }: any) => {
     const { t } = useTranslation();
     const [hidden, setHidden] = React.useState<Set<string>>(new Set(config?.hiddenIds || []));
@@ -832,7 +887,7 @@ const GridSettingsDialog = ({ open, allColumns, config, onSave, onCancel }: any)
                                         key={col.columnId}
                                         checked={!hidden.has(String(col.columnId))}
                                         onChange={() => toggle(String(col.columnId))}
-                                        label={col.renderHeaderCell ? 'Column' : (col.title || col.columnId)}
+                                        label={resolveColumnLabel(col)}
                                     />
                                 ))}
                             </div>
