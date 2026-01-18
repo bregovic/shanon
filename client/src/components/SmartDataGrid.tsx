@@ -392,6 +392,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     }, [columnConfig]);
 
     const handleColumnResize = React.useCallback((_: any, { columnId, width }: { columnId: TableColumnId, width: number }) => {
+        console.log('Column resizing:', columnId, width);
         widthsRef.current = { ...widthsRef.current, [columnId]: width };
 
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -795,11 +796,14 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                             <DataGridHeaderCell
                                 {...getColumnSizingProps(columnId)}
                                 className={styles.headerCell}
-                                style={{ padding: 0, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
+                                style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                             >
                                 <div
                                     draggable
-                                    onDragStart={(e: React.DragEvent) => handleHeaderDragStart(e, String(columnId))}
+                                    onDragStart={(e: React.DragEvent) => {
+                                        console.log('Drag started', columnId);
+                                        handleHeaderDragStart(e, String(columnId));
+                                    }}
                                     onDragOver={handleHeaderDragOver}
                                     onDrop={(e: React.DragEvent) => handleHeaderDrop(e, String(columnId))}
                                     style={{ flex: 1, cursor: 'grab' }}
