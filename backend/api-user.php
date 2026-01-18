@@ -121,9 +121,9 @@ try {
          exit;
     }
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     $msg = $e->getMessage();
-    file_put_contents('debug.txt', date('Y-m-d H:i:s') . " Error: $msg\n", FILE_APPEND);
+    @file_put_contents('debug.txt', date('Y-m-d H:i:s') . " Error: $msg\n", FILE_APPEND);
     echo json_encode(['success'=>false, 'error'=>$msg]);
 }
