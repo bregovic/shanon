@@ -852,7 +852,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     onDoubleClick={() => onRowDoubleClick?.(item)}
                                     className={styles.cell}
                                 >
-                                    {renderCell(item)}
+                                    {extCol?.renderCell ? extCol.renderCell(item) : (renderCell && typeof renderCell === 'function' ? renderCell(item) : null)}
                                 </DataGridCell>
                             );
                         }}
@@ -923,7 +923,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                                 onDoubleClick={() => onRowDoubleClick?.(item)}
                                                 className={styles.cell}
                                             >
-                                                {renderCell(item)}
+                                                {extCol?.renderCell ? extCol.renderCell(item) : (renderCell && typeof renderCell === 'function' ? renderCell(item) : null)}
                                             </DataGridCell>
                                         );
                                     }}
