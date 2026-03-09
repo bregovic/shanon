@@ -7,6 +7,7 @@ type User = {
     role: 'admin' | 'user' | 'superadmin' | 'developer';
     name: string;
     initials: string;
+    email?: string;
     assigned_tasks_count?: number;
 };
 
@@ -100,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     username: data.user.name,
                     role: data.user.role || 'user',
                     name: data.user.name || '',
+                    email: data.user.email || '',
                     initials: data.user.initials || '?',
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
                 };
@@ -108,7 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     // Compare all relevant fields
                     if (prev.id !== newUser.id ||
                         prev.role !== newUser.role ||
-                        prev.name !== newUser.name) {
+                        prev.name !== newUser.name ||
+                        prev.email !== newUser.email) {
                         return newUser;
                     }
                     return prev;
@@ -148,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     username: data.user.name, // Use 'name' from response
                     role: data.user.role,
                     name: data.user.name,
+                    email: data.user.email,
                     initials: data.user.initials,
                     assigned_tasks_count: data.user.assigned_tasks_count || 0
                 });

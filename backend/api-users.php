@@ -193,16 +193,44 @@ try {
             
             if (!$userId) throw new Exception("User ID missing in session");
 
-            $newPassword = $input['password'] ?? '';
+            $sets = [];
+            $params = [':id' => $userId];
+
+            if (!empty($input['password'])) {
+                $passwordHash = password_hash($input['password'], PASSWORD_DEFAULT);
+                $sets[] = "password_hash = :pwd";
+                $params[':pwd'] = $passwordHash;
+            }
+            if (isset($input['email'])) {
+                $sets[] = "email = :email";
+                $params[':email'] = trim($input['email']);
+            }
+            if (isset($input['first_name']) || isset($input['last_name'])) {
+                $fullName = trim(($input['first_name'] ?? '') . ' ' . ($input['last_name'] ?? ''));
+                if (!empty($fullName)) {
+                    $sets[] = "full_name = :full_name";
+                    $params[':full_name'] = $fullName;
+
+                    // Update initials
+                    $nameParts = explode(' ', $fullName);
+                    $initials = '';
+                    foreach ($nameParts as $part) {
+                        if (!empty($part)) $initials .= mb_strtoupper(mb_substr($part, 0, 1, 'UTF-8'), 'UTF-8');
+                    }
+                    $sets[] = "initials = :initials";
+                    $params[':initials'] = mb_substr($initials, 0, 2, 'UTF-8');
+                }
+            }
+
+            if (empty($sets)) throw new Exception("Žádná data k aktualizaci");
+
+            $sets[] = "updated_at = NOW()";
             
-            if (empty($newPassword)) throw new Exception("Heslo je povinné");
+            $sql = "UPDATE sys_users SET " . implode(', ', $sets) . " WHERE rec_id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
             
-            $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
-            
-            $stmt = $pdo->prepare("UPDATE sys_users SET password_hash = :pwd, updated_at = NOW() WHERE rec_id = :id");
-            $stmt->execute([':pwd' => $passwordHash, ':id' => $userId]);
-            
-            echo json_encode(['success' => true, 'message' => 'Heslo změněno']);
+            echo json_encode(['success' => true, 'message' => 'Profil aktualizován']);
             break;
 
         case 'get_security_details':

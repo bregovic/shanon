@@ -58,6 +58,26 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
 
+    const { user } = useAuth();
+
+    // Profile State
+    const nameParts = user?.name ? user.name.split(' ') : [];
+    const initialFirstName = nameParts[0] || '';
+    const initialLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    
+    const [firstName, setFirstName] = useState(initialFirstName);
+    const [lastName, setLastName] = useState(initialLastName);
+    const [email, setEmail] = useState(user?.email || '');
+
+    useEffect(() => {
+        if (user) {
+            const parts = (user.name || '').split(' ');
+            setFirstName(parts[0] || '');
+            setLastName(parts.length > 1 ? parts.slice(1).join(' ') : '');
+            setEmail(user.email || '');
+        }
+    }, [user]);
+
     // Find initial default
     const initialDefault = organizations.find(o => o.is_default)?.org_id || organizations[0]?.org_id || '';
     const effectiveDefault = selectedDefaultOrg ?? initialDefault;
@@ -65,6 +85,16 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
     const handleSave = async () => {
         setSaving(true);
         setPasswordError('');
+
+        const updatePayload: any = {};
+        let needsUpdate = false;
+
+        if (firstName !== initialFirstName || lastName !== initialLastName || email !== user?.email) {
+            updatePayload.first_name = firstName;
+            updatePayload.last_name = lastName;
+            updatePayload.email = email;
+            needsUpdate = true;
+        }
 
         // Password Change Logic
         if (newPassword || confirmPassword) {
@@ -78,23 +108,27 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                 setSaving(false);
                 return;
             }
+            updatePayload.password = newPassword;
+            needsUpdate = true;
+        }
 
+        if (needsUpdate) {
             try {
                 const res = await fetch(`${API_BASE}/api-users.php?action=update_profile`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: newPassword }),
+                    body: JSON.stringify(updatePayload),
                     credentials: 'include'
                 });
                 const json = await res.json();
                 if (!json.success) {
-                    setPasswordError(json.error || 'Failed to change password');
+                    setPasswordError(json.error || json.message || 'Failed to update profile');
                     setSaving(false);
                     return;
                 }
             } catch (e) {
                 console.error(e);
-                setPasswordError('Network error during password change');
+                setPasswordError('Network error during profile update');
                 setSaving(false);
                 return;
             }
@@ -187,6 +221,33 @@ export const SettingsDialog = ({ open, onOpenChange }: { open: boolean, onOpenCh
                                         <Text size={200} block style={{ color: tokens.colorNeutralForeground4 }}>
                                             Built: {__APP_BUILD_DATE__}
                                         </Text>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                <Label>{t('settings.first_name')}</Label>
+                                                <Input 
+                                                    value={firstName} 
+                                                    onChange={(_, d) => setFirstName(d.value)} 
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                <Label>{t('settings.last_name')}</Label>
+                                                <Input 
+                                                    value={lastName} 
+                                                    onChange={(_, d) => setLastName(d.value)} 
+                                                />
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                            <Label>{t('settings.email')}</Label>
+                                            <Input 
+                                                type="email"
+                                                value={email} 
+                                                onChange={(_, d) => setEmail(d.value)} 
+                                            />
+                                        </div>
                                     </div>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>

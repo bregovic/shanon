@@ -484,6 +484,9 @@ export const translations = {
         'settings.clear_all': 'Smazat vše',
         'settings.confirm_clear_all': 'Opravdu smazat všechna lokální nastavení? Tabulky se vrátí do výchozího stavu.',
         'settings.personalization_hint': 'Tato nastavení jsou uložena lokálně v prohlížeči a ovlivňují pouze vzhled tabulek (šířky, pořadí sloupců).',
+        'settings.first_name': 'Jméno',
+        'settings.last_name': 'Příjmení',
+        'settings.email': 'Email',
 
         // Transfer List
         'transfer.available': 'Dostupné',
@@ -786,6 +789,9 @@ export const translations = {
         'settings.password_change': 'Change Password',
         'settings.new_password': 'New Password',
         'settings.confirm_password': 'Confirm Password',
+        'settings.first_name': 'First Name',
+        'settings.last_name': 'Last Name',
+        'settings.email': 'Email',
 
         'import.unsupported.title': 'Unsupported Format',
         'import.unsupported.desc': 'This file could not be recognized. Please check the format or contact support.',
