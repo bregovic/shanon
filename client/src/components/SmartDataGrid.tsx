@@ -510,22 +510,21 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             orderedIds.forEach(id => {
                 if (hidden.has(id)) return;
                 const col = colMap.get(id);
-                if (col) baseCols.push(columnConfig.widths?.[id] ? { ...col, minWidth: columnConfig.widths[id] } : col);
+                if (col) baseCols.push(col);
             });
         }
 
         if (preferenceId) {
-            return [...baseCols, {
-                ...createTableColumn<T>({
-                    columnId: 'sys_settings',
-                    compare: (a, b) => 0,
-                    renderHeaderCell: () => (
-                        <Button appearance="subtle" icon={<Settings24Regular />} onClick={(e: any) => { e.stopPropagation(); setShowSettings(true); }} title={t('common.settings')} />
-                    ),
-                    renderCell: () => <></>
-                }),
-                minWidth: 40
-            } as ExtendedTableColumnDefinition<T>];
+            const sysCol = createTableColumn<T>({
+                columnId: 'sys_settings',
+                compare: (a, b) => 0,
+                renderHeaderCell: () => (
+                    <Button appearance="subtle" icon={<Settings24Regular />} onClick={(e: any) => { e.stopPropagation(); setShowSettings(true); }} title={t('common.settings')} />
+                ),
+                renderCell: () => <></>
+            });
+            Object.assign(sysCol, { minWidth: 40 });
+            return [...baseCols, sysCol as ExtendedTableColumnDefinition<T>];
         }
         return baseCols;
     }, [propColumns, columnConfig, preferenceId, t]);

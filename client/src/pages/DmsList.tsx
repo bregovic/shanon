@@ -200,8 +200,8 @@ export const DmsList: React.FC = () => {
             renderHeaderCell: () => t('common.id'),
             renderCell: (item) => <Text>{item.rec_id}</Text>
         }),
-        {
-            ...createTableColumn<DmsDocument>({
+        Object.assign(
+            createTableColumn<DmsDocument>({
                 columnId: 'display_name',
                 compare: (a, b) => a.display_name.localeCompare(b.display_name),
                 renderHeaderCell: () => t('common.name'),
@@ -212,8 +212,8 @@ export const DmsList: React.FC = () => {
                     </div>
                 )
             }),
-            minWidth: 400
-        },
+            { minWidth: 400 }
+        ),
         createTableColumn<DmsDocument>({
             columnId: 'doc_type_name',
             compare: (a, b) => (a.doc_type_name || '').localeCompare(b.doc_type_name || ''),
