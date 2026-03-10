@@ -337,106 +337,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     const { t } = useTranslation();
     const [filters, setFilters] = useState<Record<string, string>>({});
 
-    // -- Preferences & Reordering Stripped --
-    const [draggedColId, setDraggedColId] = useState<string | null>(null);
-
-    const handleHeaderDragStart = (e: React.DragEvent, colId: string) => {
-        setDraggedColId(colId);
-        e.dataTransfer.effectAllowed = 'move';
-        // Required for Firefox
-        e.dataTransfer.setData('text/plain', colId);
-    };
-
-    const handleHeaderDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    };
-
-    const handleHeaderDrop = (e: React.DragEvent, targetId: string) => {
-        e.preventDefault();
-        if (draggedColId && draggedColId !== targetId) {
-            setColumnConfig((prev: any) => {
-                const oldOrder = prev?.order || propColumns.map(c => String(c.columnId));
-                const newOrder = [...oldOrder];
-
-                const fromIdx = newOrder.indexOf(draggedColId);
-                const toIdx = newOrder.indexOf(targetId);
-
-                if (fromIdx !== -1 && toIdx !== -1) {
-                    newOrder.splice(fromIdx, 1);
-                    newOrder.splice(toIdx, 0, draggedColId);
-                } else {
-                    // Fallback if not in order array (new columns)
-                    // Not trivial, but unlikely if logic is consistent
-                }
-
-                const nextConfig = { ...(prev || { hiddenIds: [], widths: {} }), order: newOrder };
-
-                // Save to server (primary) and IndexedDB (cache)
-                if (preferenceId) {
-                    fetch('/api/api-user.php?action=save_param', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false }),
-                        credentials: 'include'
-                    }).catch(console.error);
-                    setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(() => { });
-                }
-                return nextConfig;
-            });
-        }
-        setDraggedColId(null);
-    };
-
-    useEffect(() => {
-        if (columnConfig?.widths) {
-            setColumnSizing(columnConfig.widths);
-        }
-    }, [columnConfig?.widths, setColumnSizing]);
-
-    const columns = useMemo(() => {
-        let baseCols = propColumns;
-        if (columnConfig) {
-            const colMap = new Map(propColumns.map(c => [String(c.columnId), c]));
-            const orderedIds = columnConfig.order || [];
-            propColumns.forEach(c => { if (!orderedIds.includes(String(c.columnId))) orderedIds.push(String(c.columnId)); });
-
-            baseCols = [];
-            const hidden = new Set(columnConfig.hiddenIds || []);
-            orderedIds.forEach(id => {
-                if (hidden.has(id)) return;
-                const col = colMap.get(id);
-                if (col) baseCols.push(col);
-            });
-        }
-
-        // sys_settings column removed as requested
-        return baseCols;
-    }, [propColumns, columnConfig, preferenceId, t]);
-
-    const handleSaveSettings = (newConfig: any) => {
-        setColumnConfig(newConfig);
-        setShowSettings(false);
-        if (preferenceId) {
-            // Save to server (primary) and IndexedDB (cache)
-            fetch('/api/api-user.php?action=save_param', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: `grid_${preferenceId}`, value: newConfig, org_specific: false }),
-                credentials: 'include'
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.success) {
-                        console.error('Grid settings save failed:', data.error);
-                    } else {
-                        console.log('Grid settings saved successfully');
-                    }
-                })
-                .catch(console.error);
-            setLocalLastValue(`grid_${preferenceId}`, newConfig).catch(() => { });
-        }
-    };
+    const columns = propColumns;
 
     const handleFilterChange = (colId: string, val: string) => {
         setFilters(prev => {
@@ -655,20 +556,14 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     const visibleItems = isVirtualized ? processedItems.slice(startIndex, endIndex) : processedItems;
     const offsetY = startIndex * ROW_HEIGHT;
 
-    const validColumns = useMemo(() => columns.filter(c => c.columnId !== 'sys_settings'), [columns]);
-
     // Sticky Header Rendering Helper
     const renderHeader = () => (
         <DataGrid
             items={items}
-            columns={validColumns}
+            columns={columns}
             sortable
             selectionMode={selectionMode === 'none' ? undefined : selectionMode}
             onSelectionChange={onSelectionChange}
-            resizableColumns
-            resizableColumnsOptions={{ autoFitColumns: false }}
-            {...({ columnSizing_unstable: columnSizing } as any)}
-            onColumnResize={onColumnResize}
         >
             <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 2, background: tokens.colorNeutralBackground1 }}>
                 <DataGridRow>
@@ -699,27 +594,23 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     const renderBody = (itemsToRender: T[]) => (
         <DataGrid
             items={itemsToRender}
-            columns={validColumns}
+            columns={columns}
             sortable
             selectionMode={selectionMode === 'none' ? undefined : selectionMode}
             getRowId={getRowId}
             selectedItems={selectedItems}
             onSelectionChange={onSelectionChange}
-            resizableColumns
-            resizableColumnsOptions={{ autoFitColumns: false }}
-            {...({ columnSizing_unstable: columnSizing } as any)}
-            onColumnResize={onColumnResize}
         >
             <DataGridBody<T>>
-                {({ item, rowId }) => (
+                {({ item: rowItem, rowId }) => (
                     <DataGridRow<T>
                         key={rowId}
                         style={{
                             ...(isVirtualized ? { height: `${ROW_HEIGHT}px` } : {}),
                         }}
                     >
-                        {({ item: col, columnId, renderCell }: any) => {
-                            const colDef = col || columns.find(c => c.columnId === columnId);
+                        {({ item: colItem, columnId, renderCell }: any) => {
+                            const colDef = colItem || columns.find(c => c.columnId === columnId);
                             const extCol = colDef as ExtendedTableColumnDefinition<T>;
                             return (
                                 <DataGridCell
@@ -779,23 +670,20 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                             </DataGridRow>
                         </DataGridHeader>
                         <DataGridBody<T>>
-                            {({ item, rowId }) => (
+                            {({ item: rowItem, rowId }) => (
                                 <DataGridRow<T>
                                     key={rowId}
                                     style={{ cursor: undefined }}
                                 >
-                                    {({ item: col, columnId, renderCell }: any) => {
-                                        const colDef = col || columns.find(c => c.columnId === columnId);
+                                    {({ item: colItem, columnId, renderCell }: any) => {
+                                        const colDef = colItem || columns.find(c => c.columnId === columnId);
                                         const extCol = colDef as ExtendedTableColumnDefinition<T>;
-                                        const currentWidth = columnSizing[columnId];
                                         return (
                                             <DataGridCell
                                                 style={{
                                                     textAlign: extCol?.align || 'left',
                                                     justifyContent: extCol?.align === 'right' ? 'flex-end' : (extCol?.align === 'center' ? 'center' : 'flex-start'),
-                                                    minWidth: currentWidth ? `${currentWidth}px` : (extCol?.minWidth ? `${extCol.minWidth}px` : undefined),
-                                                    width: currentWidth ? `${currentWidth}px` : undefined,
-                                                    maxWidth: currentWidth ? `${currentWidth}px` : undefined,
+                                                    minWidth: extCol?.minWidth ? `${extCol.minWidth}px` : undefined,
                                                     cursor: onRowClick ? 'pointer' : undefined
                                                 }}
                                                 onClick={() => onRowClick?.(rowItem)}
@@ -837,15 +725,6 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                     </div>
                 </div>
             </div>
-            {showSettings && (
-                <GridSettingsDialog
-                    open={showSettings}
-                    allColumns={propColumns}
-                    config={columnConfig}
-                    onSave={handleSaveSettings}
-                    onCancel={() => setShowSettings(false)}
-                />
-            )}
         </div>
     );
 };
