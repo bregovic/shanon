@@ -15,7 +15,6 @@ import {
     Card,
     CardHeader,
     Divider,
-    TableCellLayout,
     createTableColumn,
     Menu,
     MenuTrigger,
@@ -30,7 +29,8 @@ import {
     ScanText24Regular,
     Dismiss24Regular,
     Delete24Regular,
-    Edit24Regular
+    Edit24Regular,
+    Settings24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout, PageHeader, PageFilterBar, PageContent } from '../components/PageLayout';
@@ -321,10 +321,58 @@ export const DmsList: React.FC = () => {
                     </BreadcrumbItem>
                 </Breadcrumb>
                 <div style={{ flex: 1 }} />
-                <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData} aria-label={t('common.refresh')} />
-                <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate(`/${currentOrgId}/dms/import`)}>
-                    {t('dms.import_documents')}
-                </Button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button appearance="subtle" icon={<ArrowClockwise24Regular />} onClick={fetchData} aria-label={t('common.refresh')} />
+                    <Button appearance="primary" icon={<Add24Regular />} onClick={() => navigate(`/${currentOrgId}/dms/import`)}>
+                        {t('dms.import_documents')}
+                    </Button>
+                    
+                    <Menu>
+                        <MenuTrigger disableButtonEnhancement>
+                            <Button icon={<Settings24Regular />} disabled={selectedIds.size === 0}>
+                                {t('common.functions', 'Funkce')}
+                            </Button>
+                        </MenuTrigger>
+                        <MenuPopover>
+                            <MenuList>
+                                <MenuItem 
+                                    icon={<ScanText24Regular />} 
+                                    disabled={selectedIds.size === 0}
+                                    onClick={handleBatchAnalyze}
+                                >
+                                    {t('dms.review.ocr_extract')} {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+                                </MenuItem>
+                                
+                                <MenuItem 
+                                    icon={<Edit24Regular />}
+                                    disabled={selectedIds.size === 0}
+                                >
+                                    {t('dms.list.btn_change_status')}
+                                    <MenuPopover>
+                                        <MenuList>
+                                            <MenuItem onClick={() => handleBatchStatusChange('review', 'mapping')}>{t('dms.status.set_mapping')}</MenuItem>
+                                            <MenuItem onClick={() => handleBatchStatusChange('verified')}>{t('dms.status.set_verified')}</MenuItem>
+                                            <MenuItem onClick={() => handleBatchStatusChange('rejected')}>{t('common.status.rejected')}</MenuItem>
+                                            <Divider />
+                                            <MenuItem onClick={() => handleBatchStatusChange('new', 'pending')}>{t('dms.status.set_new')}</MenuItem>
+                                        </MenuList>
+                                    </MenuPopover>
+                                </MenuItem>
+                                
+                                <Divider />
+                                
+                                <MenuItem 
+                                    icon={<Delete24Regular />}
+                                    style={{ color: '#d13438' }}
+                                    disabled={selectedIds.size === 0}
+                                    onClick={handleBatchDelete}
+                                >
+                                    {t('common.delete')} {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+                                </MenuItem>
+                            </MenuList>
+                        </MenuPopover>
+                    </Menu>
+                </div>
             </PageHeader>
 
             {/* Function Toolbar (replaces search) */}
@@ -396,6 +444,22 @@ export const DmsList: React.FC = () => {
                     </Button>
                 </div>
             </PageFilterBar>
+
+            {/* Simplified Filter Bar if needed, currently empty to match clean header look */}
+            {selectedIds.size > 0 && (
+                <PageFilterBar>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <Text size={200} weight="semibold">{selectedIds.size} {t('common.selected', 'vybráno')}</Text>
+                        <Button
+                            size="small"
+                            appearance="subtle"
+                            onClick={() => setSelectedIds(new Set())}
+                        >
+                            {t('common.clear_selection', 'Zrušit výběr')}
+                        </Button>
+                    </div>
+                </PageFilterBar>
+            )}
 
             <PageContent>
                 <div style={{ height: 'calc(100vh - 180px)', width: '100%', overflow: 'hidden' }}>

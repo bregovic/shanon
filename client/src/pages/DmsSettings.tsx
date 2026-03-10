@@ -1,10 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../context/TranslationContext';
 import { PageLayout, PageContent, PageHeader } from '../components/PageLayout';
 import {
     Button,
-    Title3,
     Text,
     Card,
     TabList,
@@ -24,11 +22,14 @@ import {
     Option,
     createTableColumn,
     tokens,
-    Divider
+    Divider,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbButton,
+    BreadcrumbDivider
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
 import {
-    ArrowLeft24Regular,
     Add24Regular,
     Edit24Regular,
     Translate24Regular,
@@ -41,6 +42,7 @@ import { TranslationDialog } from '../components/TranslationDialog';
 import { useNavigate } from 'react-router-dom';
 import { SmartDataGrid } from '../components/SmartDataGrid';
 import { AttributeSelectorDialog } from '../components/AttributeSelectorDialog';
+import { useAuth } from '../context/AuthContext';
 
 type TabValue = 'doc_types' | 'attributes' | 'storage' | 'ocr_templates';
 
@@ -52,10 +54,9 @@ interface DocType {
     number_series_id?: number;
     number_series_name?: string;
     is_active: boolean;
-    attr_count?: number; // Added from API
+    attr_count?: number;
+    org_id?: string | null;
 }
-
-
 
 interface StorageProfile {
     rec_id: number;
@@ -65,6 +66,7 @@ interface StorageProfile {
     base_path?: string;
     is_default: boolean;
     is_active: boolean;
+    org_id?: string | null;
 }
 
 interface Attribute {
@@ -93,12 +95,12 @@ const STORAGE_TYPES = [
 export const DmsSettings: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { currentOrgId } = useAuth();
     const [activeTab, setActiveTab] = useState<TabValue>('doc_types');
     const [loading, setLoading] = useState(false);
 
     // Data
     const [docTypes, setDocTypes] = useState<DocType[]>([]);
-
     const [storageProfiles, setStorageProfiles] = useState<StorageProfile[]>([]);
     const [attributes, setAttributes] = useState<Attribute[]>([]);
 
@@ -112,8 +114,7 @@ export const DmsSettings: React.FC = () => {
     const [docTypeForm, setDocTypeForm] = useState({
         code: '',
         name: '',
-        description: '',
-
+        description: ''
     });
 
     // Attribute Selector Dialog State
@@ -139,6 +140,7 @@ export const DmsSettings: React.FC = () => {
         setTransTarget({ id: attr.rec_id, name: attr.name });
         setTransOpen(true);
     };
+
     const [attrForm, setAttrForm] = useState({
         name: '',
         code: '',
@@ -293,6 +295,29 @@ export const DmsSettings: React.FC = () => {
         }
     };
 
+    const handleDeleteDocType = async (dt: DocType) => {
+        if (!confirm(t('common.delete') + ' ' + dt.name + '?')) return;
+        try {
+            const res = await fetch('/api/api-dms.php?action=doc_type_delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: dt.rec_id })
+            });
+            const json = await res.json();
+            if (json.success) {
+                // Reload data
+                const resList = await fetch('/api/api-dms.php?action=doc_types');
+                const jsonList = await resList.json();
+                if (jsonList.success) setDocTypes(jsonList.data);
+            } else {
+                alert('Chyba: ' + (json.error || 'Neznámá chyba'));
+            }
+        } catch (e) {
+            console.error(e);
+            alert(t('error.delete'));
+        }
+    };
+
     const openStorageDialog = (sp?: StorageProfile) => {
         if (sp) {
             setEditingStorageProfile(sp);
@@ -408,15 +433,16 @@ export const DmsSettings: React.FC = () => {
                     case 'attributes': endpoint = 'attributes'; break;
                 }
 
-                const res = await fetch(`/api/api-dms.php?action=${endpoint}`);
-                const json = await res.json();
+                if (endpoint) {
+                    const res = await fetch(`/api/api-dms.php?action=${endpoint}`);
+                    const json = await res.json();
 
-                if (json.success) {
-                    switch (activeTab) {
-                        case 'doc_types': setDocTypes(json.data || []); break;
-
-                        case 'storage': setStorageProfiles(json.data || []); break;
-                        case 'attributes': setAttributes(json.data || []); break;
+                    if (json.success) {
+                        switch (activeTab) {
+                            case 'doc_types': setDocTypes(json.data || []); break;
+                            case 'storage': setStorageProfiles(json.data || []); break;
+                            case 'attributes': setAttributes(json.data || []); break;
+                        }
                     }
                 }
             } catch (e) {
@@ -428,7 +454,7 @@ export const DmsSettings: React.FC = () => {
         fetchData();
     }, [activeTab]);
 
-    // Column Definitions using Fluent UI createTableColumn
+    // Column Definitions
     const docTypeColumns: TableColumnDefinition<DocType>[] = [
         createTableColumn<DocType>({
             columnId: 'code',
@@ -453,10 +479,33 @@ export const DmsSettings: React.FC = () => {
             )
         }),
         createTableColumn<DocType>({
+            columnId: 'org_id',
+            compare: (a, b) => (a.org_id || '').localeCompare(b.org_id || ''),
+            renderHeaderCell: () => t('common.organization', 'Organizace'),
+            renderCell: (item) => (
+                <Text 
+                    size={200} 
+                    weight={item.org_id === currentOrgId ? 'semibold' : 'regular'}
+                    style={{ color: !item.org_id ? tokens.colorNeutralForeground4 : 'inherit' }}
+                >
+                    {item.org_id || t('common.global', 'Globální')}
+                </Text>
+            )
+        }),
+        createTableColumn<DocType>({
             columnId: 'actions',
             renderHeaderCell: () => t('common.actions'),
             renderCell: (item) => (
-                <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openDocTypeDialog(item)} />
+                <div style={{ display: 'flex', gap: '4px' }}>
+                    <Button icon={<Edit24Regular />} appearance="subtle" size="small" onClick={() => openDocTypeDialog(item)} />
+                    <Button
+                        icon={<Delete24Regular />}
+                        appearance="subtle"
+                        size="small"
+                        style={{ color: '#d13438' }}
+                        onClick={() => handleDeleteDocType(item)}
+                    />
+                </div>
             )
         })
     ];
@@ -498,6 +547,20 @@ export const DmsSettings: React.FC = () => {
                 <Badge appearance="tint" color={item.is_active ? 'success' : 'danger'}>
                     {item.is_active ? t('common.active') : t('common.inactive')}
                 </Badge>
+            )
+        }),
+        createTableColumn<StorageProfile>({
+            columnId: 'org_id',
+            compare: (a, b) => (a.org_id || '').localeCompare(b.org_id || ''),
+            renderHeaderCell: () => t('common.organization', 'Organizace'),
+            renderCell: (item) => (
+                <Text 
+                    size={200} 
+                    weight={item.org_id === currentOrgId ? 'semibold' : 'regular'}
+                    style={{ color: !item.org_id ? tokens.colorNeutralForeground4 : 'inherit' }}
+                >
+                    {item.org_id || t('common.global', 'Globální')}
+                </Text>
             )
         }),
         createTableColumn<StorageProfile>({
@@ -584,13 +647,19 @@ export const DmsSettings: React.FC = () => {
     return (
         <PageLayout>
             <PageHeader>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Button appearance="subtle" icon={<ArrowLeft24Regular />} onClick={() => navigate('/dms')}>
-                        {t('common.back', 'Zpět')}
-                    </Button>
-                    <Settings24Regular />
-                    <Title3>{t('dms.settings.title', 'Nastavení DMS')}</Title3>
-                </div>
+                <Breadcrumb>
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => navigate(`/${currentOrgId}/dashboard`)}>{t('common.modules')}</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    <BreadcrumbDivider />
+                    <BreadcrumbItem>
+                        <BreadcrumbButton onClick={() => navigate(`/${currentOrgId}/dms`)}>{t('modules.dms')}</BreadcrumbButton>
+                    </BreadcrumbItem>
+                    <BreadcrumbDivider />
+                    <BreadcrumbItem>
+                        <BreadcrumbButton current>{t('dms.settings.title', 'Nastavení')}</BreadcrumbButton>
+                    </BreadcrumbItem>
+                </Breadcrumb>
             </PageHeader>
 
             <PageContent>
@@ -609,7 +678,6 @@ export const DmsSettings: React.FC = () => {
                     <Spinner label={t('common.loading')} />
                 ) : (
                     <>
-                        {/* DOC TYPES TAB */}
                         {activeTab === 'doc_types' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -623,12 +691,12 @@ export const DmsSettings: React.FC = () => {
                                         items={docTypes}
                                         columns={docTypeColumns}
                                         getRowId={(item) => item.rec_id}
+                                        withFilterRow={true}
                                     />
                                 </div>
                             </Card>
                         )}
 
-                        {/* STORAGE PROFILES TAB */}
                         {activeTab === 'storage' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -642,12 +710,12 @@ export const DmsSettings: React.FC = () => {
                                         items={storageProfiles}
                                         columns={storageColumns}
                                         getRowId={(item) => item.rec_id}
+                                        withFilterRow={true}
                                     />
                                 </div>
                             </Card>
                         )}
 
-                        {/* ATTRIBUTES TAB */}
                         {activeTab === 'attributes' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -661,12 +729,12 @@ export const DmsSettings: React.FC = () => {
                                         items={attributes}
                                         columns={attributeColumns}
                                         getRowId={(item) => item.rec_id}
+                                        withFilterRow={true}
                                     />
                                 </div>
                             </Card>
                         )}
 
-                        {/* OCR TEMPLATES TAB */}
                         {activeTab === 'ocr_templates' && (
                             <Card style={{ padding: '16px', height: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -676,11 +744,7 @@ export const DmsSettings: React.FC = () => {
                                     </Button>
                                 </div>
                                 <div style={{ padding: '32px', textAlign: 'center', color: tokens.colorNeutralForeground3 }}>
-                                    <div style={{ padding: '32px', textAlign: 'center', color: tokens.colorNeutralForeground3 }}>
-                                        <Text>{t('dms.settings.no_templates')}</Text>
-                                        {/* TODO: List existing templates via SmartDataGrid once API action=list_templates is verified */}
-                                    </div>
-                                    {/* TODO: List existing templates via SmartDataGrid once API action=list_templates is verified */}
+                                    <Text>{t('dms.settings.no_templates')}</Text>
                                 </div>
                             </Card>
                         )}
@@ -688,7 +752,6 @@ export const DmsSettings: React.FC = () => {
                 )}
             </PageContent>
 
-            {/* ATTRIBUTE DIALOG */}
             <Dialog open={isAttrDialogOpen} onOpenChange={(_, data) => setIsAttrDialogOpen(data.open)}>
                 <DialogSurface>
                     <DialogBody>
@@ -702,7 +765,6 @@ export const DmsSettings: React.FC = () => {
                                     style={{ width: '100%' }}
                                 />
                             </div>
-
                             <div>
                                 <Label>Typ dat</Label>
                                 <Dropdown
@@ -736,8 +798,6 @@ export const DmsSettings: React.FC = () => {
                                     style={{ width: '100%' }}
                                 />
                             </div>
-
-                            {/* Options Manager */}
                             <div style={{ marginTop: '8px' }}>
                                 <Label>Možnosti (Alternativy hodnot)</Label>
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', marginTop: '4px' }}>
@@ -776,7 +836,6 @@ export const DmsSettings: React.FC = () => {
                 </DialogSurface>
             </Dialog>
 
-            {/* DOC TYPE DIALOG */}
             <Dialog open={isDocTypeDialogOpen} onOpenChange={(_, data) => setIsDocTypeDialogOpen(data.open)}>
                 <DialogSurface style={{ minWidth: '600px', minHeight: '600px' }}>
                     <DialogBody>
@@ -809,16 +868,12 @@ export const DmsSettings: React.FC = () => {
                                     style={{ width: '100%' }}
                                 />
                             </div>
-
                             <Divider />
-
-                            {/* Attribute Linking Section (Improved) */}
                             {editingDocType && editingDocType.rec_id > 0 ? (
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                         <Text weight="semibold">Přiřazené atributy</Text>
                                     </div>
-
                                     <div style={{ padding: '16px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '4px', border: `1px solid ${tokens.colorNeutralStroke2}` }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
@@ -844,7 +899,6 @@ export const DmsSettings: React.FC = () => {
                                     Přiřazování atributů bude dostupné po uložení základních údajů.
                                 </Text>
                             )}
-
                         </DialogContent>
                         <DialogActions>
                             <Button appearance="primary" onClick={handleSaveDocType} disabled={!docTypeForm.code || !docTypeForm.name}>{t('common.save', 'Uložit')}</Button>
@@ -853,6 +907,7 @@ export const DmsSettings: React.FC = () => {
                     </DialogBody>
                 </DialogSurface>
             </Dialog>
+
             <TranslationDialog
                 open={transOpen}
                 onOpenChange={setTransOpen}
@@ -861,7 +916,6 @@ export const DmsSettings: React.FC = () => {
                 title={transTarget?.name || ''}
             />
 
-            {/* ATTRIBUTE SELECTOR DIALOG */}
             <AttributeSelectorDialog
                 open={isAttrSelectorOpen}
                 onOpenChange={setIsAttrSelectorOpen}
@@ -871,8 +925,6 @@ export const DmsSettings: React.FC = () => {
                         if (j.success) {
                             const newTypes = j.data;
                             setDocTypes(newTypes);
-
-                            // Update the editing dialog state if open
                             if (editingDocType) {
                                 const updated = newTypes.find((d: DocType) => d.rec_id === editingDocType.rec_id);
                                 if (updated) setEditingDocType(updated);
@@ -882,7 +934,6 @@ export const DmsSettings: React.FC = () => {
                 }}
             />
 
-            {/* STORAGE PROFILE DIALOG */}
             <Dialog open={isStorageDialogOpen} onOpenChange={(_, data) => setIsStorageDialogOpen(data.open)}>
                 <DialogSurface style={{ minWidth: '500px' }}>
                     <DialogBody>
@@ -911,7 +962,6 @@ export const DmsSettings: React.FC = () => {
                                     ))}
                                 </Dropdown>
                             </div>
-
                             {storageForm.storage_type === 'local' && (
                                 <div>
                                     <Label>Cesta k adresáři (na serveru)</Label>
@@ -923,7 +973,6 @@ export const DmsSettings: React.FC = () => {
                                     />
                                 </div>
                             )}
-
                             {storageForm.storage_type === 'google_drive' && (
                                 <>
                                     <div style={{ padding: '8px', background: '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
@@ -950,7 +999,6 @@ export const DmsSettings: React.FC = () => {
                                     </div>
                                 </>
                             )}
-
                             <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
                                 <Checkbox
                                     label="Aktivní"
@@ -963,7 +1011,6 @@ export const DmsSettings: React.FC = () => {
                                     onChange={(_, data) => setStorageForm({ ...storageForm, is_default: data.checked === true })}
                                 />
                             </div>
-
                         </DialogContent>
                         <DialogActions>
                             <Button
