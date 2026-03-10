@@ -11,8 +11,6 @@ import {
     Label,
     TabList,
     Tab,
-    SelectTabEvent,
-    SelectTabData,
     Switch,
     Title3
 } from '@fluentui/react-components';
@@ -304,7 +302,7 @@ export const OrganizationsAdmin: React.FC = () => {
     );
 
     // Security Check (Moved to render to avoid hook violation)
-    if (!hasPermission('mod_orgs', 'view') && !hasPermission('mod_system', 'view')) {
+    if (!hasPermission('mod_orgs', 1) && !hasPermission('mod_system', 1)) {
         return <div style={{ padding: 24 }}>Access Denied (mod_orgs)</div>;
     }
 

@@ -273,6 +273,12 @@ export const translations = {
         'modules.dms': 'DMS',
         'modules.requests': 'Požadavky',
         'modules.system': 'Systém',
+        
+        // Dashboard
+        'dashboard.title': 'Přehled',
+        'dashboard.requests.title': 'Požadavky na změnu',
+        'dashboard.requests.desc': 'Správa systémových požadavků, chyb a nových funkcí.',
+        'dashboard.requests.new': 'Nový požadavek',
 
         // Settings
         'settings.title': 'Nastavení uživatele',
@@ -468,18 +474,10 @@ export const translations = {
         'common.no': 'Ne',
 
         // Settings Dialog
-        'settings.title': 'Nastavení',
         'settings.tab_general': 'Obecné',
         'settings.tab_security': 'Zabezpečení',
         'settings.tab_personalization': 'Personalizace',
-        'settings.language_label': 'Jazyk',
-        'settings.language_cs': 'Čeština',
-        'settings.language_en': 'English',
-        'settings.default_org_label': 'Výchozí organizace',
         'settings.defaultOrgHint': 'Tato organizace bude automaticky vybrána při přihlášení.',
-        'settings.password_change': 'Změna hesla',
-        'settings.new_password': 'Nové heslo',
-        'settings.confirm_password': 'Potvrdit heslo',
         'settings.grid_preferences': 'Nastavení tabulek',
         'settings.clear_all': 'Smazat vše',
         'settings.confirm_clear_all': 'Opravdu smazat všechna lokální nastavení? Tabulky se vrátí do výchozího stavu.',
@@ -497,11 +495,12 @@ export const translations = {
         'transfer.items': 'položek',
 
         // Security - Organization Access
-        'security.org_access': 'Oprávnění v organizacích',
-        'security.permissions_for': 'Oprávnění uživatele',
         'security.permissions_for_multiple': 'Pro více uživatelů',
         'security.available_orgs': 'Dostupné organizace',
         'security.assigned_orgs': 'Přiřazené organizace',
+        'system.tables_browser': 'Prohlížeč tabulek',
+        'users.manage': 'Správa uživatelů',
+        'system.update_result': 'Výsledek aktualizace',
     },
 
     en: {
@@ -1065,18 +1064,10 @@ export const translations = {
         'common.no': 'No',
 
         // Settings Dialog
-        'settings.title': 'Settings',
         'settings.tab_general': 'General',
         'settings.tab_security': 'Security',
         'settings.tab_personalization': 'Personalization',
-        'settings.language_label': 'Language',
-        'settings.language_cs': 'Čeština',
-        'settings.language_en': 'English',
-        'settings.default_org_label': 'Default Organization',
         'settings.defaultOrgHint': 'This organization will be selected automatically on login.',
-        'settings.password_change': 'Change Password',
-        'settings.new_password': 'New Password',
-        'settings.confirm_password': 'Confirm Password',
         'settings.grid_preferences': 'Grid Preferences',
         'settings.clear_all': 'Clear All',
         'settings.confirm_clear_all': 'Really clear all local settings? Grids will return to default state.',
@@ -1089,12 +1080,19 @@ export const translations = {
         'transfer.noAvailable': 'No available items',
         'transfer.noSelected': 'No selected items',
         'transfer.items': 'items',
+        
+        // Dashboard
+        'dashboard.title': 'Dashboard',
+        'dashboard.requests.title': 'Change Requests',
+        'dashboard.requests.desc': 'Manage system requirements, bugs, and feature requests.',
+        'dashboard.requests.new': 'New Request',
 
         // Security - Organization Access
-        'security.org_access': 'Organization Access',
-        'security.permissions_for': 'Permissions for',
         'security.permissions_for_multiple': 'For multiple users',
         'security.available_orgs': 'Available Organizations',
         'security.assigned_orgs': 'Assigned Organizations',
+        'system.tables_browser': 'Table Browser',
+        'users.manage': 'Manage Users',
+        'system.update_result': 'Update Result',
     }
 };

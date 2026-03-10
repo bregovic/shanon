@@ -13,6 +13,7 @@ import {
     Add24Regular
 } from '@fluentui/react-icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../context/TranslationContext';
 
 
 const useStyles = makeStyles({
@@ -56,10 +57,12 @@ export const DashboardPage: React.FC = () => {
     const navigate = useNavigate();
 
 
+    const { t } = useTranslation();
+
     return (
         <div className={styles.root}>
             <div className={styles.header}>
-                <Title3>Dashboard</Title3>
+                <Title3>{t('dashboard.title')}</Title3>
 
             </div>
 
@@ -75,14 +78,14 @@ export const DashboardPage: React.FC = () => {
                         }}>
                             <ClipboardTextEdit24Regular />
                         </div>
-                        <Text weight="semibold" size={400}>Change Requests</Text>
+                        <Text weight="semibold" size={400}>{t('dashboard.requests.title')}</Text>
                     </div>
                     <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
-                        Manage system requirements, bugs, and feature requests.
+                        {t('dashboard.requests.desc')}
                     </Text>
                     <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end' }}>
                         <Button icon={<Add24Regular />} appearance="subtle" onClick={(e) => { e.stopPropagation(); navigate('/requests?new=1'); }}>
-                            New Request
+                            {t('dashboard.requests.new')}
                         </Button>
                     </div>
                 </Card>
