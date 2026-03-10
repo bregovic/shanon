@@ -436,10 +436,8 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
         return options;
     }, [propColumns, columnConfig?.widths]);
 
-    const { getColumnSizingProps, onColumnResize, columnSizing, setColumnSizing } = useTableColumnSizing_unstable({
-        columnSizingOptions,
-        onColumnResize: handleColumnResize
-    }) as any;
+    const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
+    const onColumnResize = handleColumnResize;
 
     // -- Reordering --
     const [draggedColId, setDraggedColId] = useState<string | null>(null);
@@ -791,11 +789,8 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         const col = item || columns.find(c => c.columnId === columnId);
                         if (!col) return null;
                         const extCol = col as ExtendedTableColumnDefinition<T>;
-                        const sizingProps = getColumnSizingProps(columnId);
-
                         return (
                             <DataGridHeaderCell
-                                {...sizingProps}
                                 className={styles.headerCell}
                                 style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                             >
@@ -880,11 +875,9 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     const col = item || columns.find(c => c.columnId === columnId);
                                     if (!col) return null;
                                     const extCol = col as ExtendedTableColumnDefinition<T>;
-                                    const sizingProps = getColumnSizingProps(columnId);
                                     return (
                                         <DataGridHeaderCell
-                                            {...sizingProps}
-                                            style={{ ...sizingProps.style, minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
+                                            style={{ minWidth: extCol.minWidth ? `${extCol.minWidth}px` : undefined }}
                                         >
                                             <ColumnHeaderMenu
                                                 column={extCol}
