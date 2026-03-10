@@ -33,26 +33,11 @@ import {
     Filter24Regular,
     QuestionCircle24Regular,
     ChevronDown24Regular,
-    Settings24Regular
-} from '@fluentui/react-icons';
+    } from '@fluentui/react-icons';
 import { useTranslation } from '../context/TranslationContext';
 import { getLocalLastValue, setLocalLastValue } from '../utils/indexedDB';
 
-// Imports for Settings Dialog
-import {
-    Dialog,
-    DialogSurface,
-    DialogTitle,
-    DialogBody,
-    DialogActions,
-    DialogContent,
-    Checkbox,
-    Label,
-    Divider,
-    DialogTrigger,
-    createTableColumn,
-    useTableColumnSizing_unstable
-} from '@fluentui/react-components';
+import { createTableColumn } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
     headerCellContent: {
@@ -352,94 +337,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     const { t } = useTranslation();
     const [filters, setFilters] = useState<Record<string, string>>({});
 
-    // -- Preferences --
-    const [columnConfig, setColumnConfig] = useState<{
-        hiddenIds: string[];
-        widths: Record<string, number>;
-        order: string[];
-    } | null>(null);
-    const [showSettings, setShowSettings] = useState(false);
-
-    useEffect(() => {
-        if (!preferenceId) return;
-        // Try server first, then fallback to IndexedDB cache
-        fetch(`/api/api-user.php?action=get_param&key=grid_${preferenceId}`, { credentials: 'include' })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success && d.data) {
-                    setColumnConfig(d.data);
-                    // Cache locally for faster next load
-                    setLocalLastValue(`grid_${preferenceId}`, d.data).catch(() => { });
-                }
-            })
-            .catch(e => {
-                console.error("Server load failed, trying IndexedDB", e);
-                // Fallback to IndexedDB
-                getLocalLastValue(`grid_${preferenceId}`).then((data) => {
-                    if (data) setColumnConfig(data);
-                }).catch(() => { });
-            });
-    }, [preferenceId]);
-
-    // -- Resizing --
-    const saveTimeout = useRef<any>(null);
-    const widthsRef = useRef<Record<string, number>>({});
-
-    useEffect(() => {
-        if (columnConfig?.widths) {
-            widthsRef.current = { ...columnConfig.widths };
-        }
-    }, [columnConfig]);
-
-    const handleColumnResize = React.useCallback((_: any, { columnId, width }: { columnId: TableColumnId, width: number }) => {
-        console.log('Column resizing:', columnId, width);
-        widthsRef.current = { ...widthsRef.current, [columnId]: width };
-
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-        saveTimeout.current = setTimeout(async () => {
-            const currentWidths = { ...widthsRef.current };
-
-            // Update State
-            setColumnConfig((prev: any) => {
-                const nextConfig = {
-                    ...(prev || { hiddenIds: [], order: [] }),
-                    widths: currentWidths
-                };
-
-                // Save to server (primary) and IndexedDB (cache)
-                if (preferenceId) {
-                    fetch('/api/api-user.php?action=save_param', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: `grid_${preferenceId}`, value: nextConfig, org_specific: false }),
-                        credentials: 'include'
-                    }).catch(console.error);
-                    setLocalLastValue(`grid_${preferenceId}`, nextConfig).catch(() => { });
-                }
-
-                return nextConfig;
-            });
-        }, 1000);
-    }, [preferenceId]);
-
-    // Build columnSizingOptions from columns (required for resize to work)
-    const columnSizingOptions = useMemo(() => {
-        const options: Record<string, { minWidth?: number; defaultWidth?: number; idealWidth?: number }> = {};
-        propColumns.forEach(col => {
-            const extCol = col as ExtendedTableColumnDefinition<T>;
-            options[String(col.columnId)] = {
-                minWidth: extCol.minWidth || 50,
-                defaultWidth: columnConfig?.widths?.[String(col.columnId)] || extCol.minWidth || 100,
-                idealWidth: columnConfig?.widths?.[String(col.columnId)] || 150
-            };
-        });
-        return options;
-    }, [propColumns, columnConfig?.widths]);
-
-    const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
-    const onColumnResize = handleColumnResize;
-
-    // -- Reordering --
+    // -- Preferences & Reordering Stripped --
     const [draggedColId, setDraggedColId] = useState<string | null>(null);
 
     const handleHeaderDragStart = (e: React.DragEvent, colId: string) => {
@@ -512,18 +410,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
             });
         }
 
-        if (preferenceId) {
-            const sysCol = createTableColumn<T>({
-                columnId: 'sys_settings',
-                compare: (a, b) => 0,
-                renderHeaderCell: () => (
-                    <Button appearance="subtle" icon={<Settings24Regular />} onClick={(e: any) => { e.stopPropagation(); setShowSettings(true); }} title={t('common.settings')} />
-                ),
-                renderCell: () => <></>
-            });
-            Object.assign(sysCol, { minWidth: 40 });
-            return [...baseCols, sysCol as ExtendedTableColumnDefinition<T>];
-        }
+        // sys_settings column removed as requested
         return baseCols;
     }, [propColumns, columnConfig, preferenceId, t]);
 
@@ -842,11 +729,11 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                         minWidth: extCol?.minWidth ? `${extCol.minWidth}px` : undefined,
                                         cursor: onRowClick ? 'pointer' : undefined
                                     }}
-                                    onClick={() => onRowClick?.(item)}
-                                    onDoubleClick={() => onRowDoubleClick?.(item)}
+                                    onClick={() => onRowClick?.(rowItem)}
+                                    onDoubleClick={() => onRowDoubleClick?.(rowItem)}
                                     className={styles.cell}
                                 >
-                                    {typeof renderCell === 'function' ? renderCell() : (extCol?.renderCell && typeof extCol.renderCell === 'function' ? extCol.renderCell(item) : String(renderCell) + ' IS NOT A FUNC')}
+                                    {renderCell()}
                                 </DataGridCell>
                             );
                         }}
@@ -911,11 +798,11 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                                     maxWidth: currentWidth ? `${currentWidth}px` : undefined,
                                                     cursor: onRowClick ? 'pointer' : undefined
                                                 }}
-                                                onClick={() => onRowClick?.(item)}
-                                                onDoubleClick={() => onRowDoubleClick?.(item)}
+                                                onClick={() => onRowClick?.(rowItem)}
+                                                onDoubleClick={() => onRowDoubleClick?.(rowItem)}
                                                 className={styles.cell}
                                             >
-                                                {typeof renderCell === 'function' ? renderCell() : (extCol?.renderCell && typeof extCol.renderCell === 'function' ? extCol.renderCell(item) : String(renderCell) + ' IS NOT A FUNC')}
+                                                {renderCell()}
                                             </DataGridCell>
                                         );
                                     }}
@@ -924,15 +811,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                         </DataGridBody>
                     </DataGrid>
                 </div>
-                {showSettings && (
-                    <GridSettingsDialog
-                        open={showSettings}
-                        allColumns={propColumns}
-                        config={columnConfig}
-                        onSave={handleSaveSettings}
-                        onCancel={() => setShowSettings(false)}
-                    />
-                )}
+                
             </div>
         );
     }
@@ -971,71 +850,4 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
     );
 };
 
-
-const resolveColumnLabel = (col: any): string => {
-    if (col.title) return col.title;
-    try {
-        if (col.renderHeaderCell) {
-            const val = col.renderHeaderCell();
-            if (typeof val === 'string') return val;
-            if (typeof val === 'number') return String(val);
-            if (val && typeof val === 'object' && 'props' in val) {
-                const children = (val as any).props.children;
-                if (typeof children === 'string') return children;
-            }
-        }
-    } catch (e) { }
-    return col.columnId;
-};
-
-const GridSettingsDialog = ({ open, allColumns, config, onSave, onCancel }: any) => {
-    const { t } = useTranslation();
-    const [hidden, setHidden] = React.useState<Set<string>>(new Set(config?.hiddenIds || []));
-
-    // Widths? Standard for now.
-
-    const toggle = (id: string) => {
-        const next = new Set(hidden);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        setHidden(next);
-    };
-
-    const handleSave = () => {
-        onSave({ ...config, hiddenIds: Array.from(hidden) });
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={(_, data) => !data.open && onCancel()}>
-            <DialogSurface>
-                <DialogBody>
-                    <DialogTitle>{t('grid.settings')}</DialogTitle>
-                    <DialogContent>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <Label weight='semibold'>{t('grid.visible_columns')}</Label>
-                            <Divider />
-                            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                {allColumns.map((col: any) => (
-                                    <Checkbox
-                                        key={col.columnId}
-                                        checked={!hidden.has(String(col.columnId))}
-                                        onChange={() => toggle(String(col.columnId))}
-                                        label={resolveColumnLabel(col)}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button appearance="subtle" onClick={() => onSave(null)}>{t('common.default')}</Button>
-                        <DialogTrigger disableButtonEnhancement>
-                            <Button appearance='secondary' onClick={onCancel}>{t('common.cancel')}</Button>
-                        </DialogTrigger>
-                        <Button appearance='primary' onClick={handleSave}>{t('common.save')}</Button>
-                    </DialogActions>
-                </DialogBody>
-            </DialogSurface>
-        </Dialog>
-    );
-};
 
