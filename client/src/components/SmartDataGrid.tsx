@@ -609,8 +609,9 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                             ...(isVirtualized ? { height: `${ROW_HEIGHT}px` } : {}),
                         }}
                     >
-                        {({ item: colItem, columnId, renderCell }: any) => {
+                        {({ item: colItem, columnId }: any) => {
                             const colDef = colItem || columns.find(c => c.columnId === columnId);
+                            if (!colDef) return null;
                             const extCol = colDef as ExtendedTableColumnDefinition<T>;
                             return (
                                 <DataGridCell
@@ -624,7 +625,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     onDoubleClick={() => onRowDoubleClick?.(rowItem)}
                                     className={styles.cell}
                                 >
-                                    {renderCell()}
+                                    {extCol?.renderCell ? extCol.renderCell(rowItem) : null}
                                 </DataGridCell>
                             );
                         }}
@@ -675,8 +676,9 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                     key={rowId}
                                     style={{ cursor: undefined }}
                                 >
-                                    {({ item: colItem, columnId, renderCell }: any) => {
+                                    {({ item: colItem, columnId }: any) => {
                                         const colDef = colItem || columns.find(c => c.columnId === columnId);
+                                        if (!colDef) return null;
                                         const extCol = colDef as ExtendedTableColumnDefinition<T>;
                                         return (
                                             <DataGridCell
@@ -690,7 +692,7 @@ export const SmartDataGrid = <T,>({ items, columns: propColumns, getRowId,
                                                 onDoubleClick={() => onRowDoubleClick?.(rowItem)}
                                                 className={styles.cell}
                                             >
-                                                {renderCell()}
+                                                {extCol?.renderCell ? extCol.renderCell(rowItem) : null}
                                             </DataGridCell>
                                         );
                                     }}
