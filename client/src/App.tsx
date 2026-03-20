@@ -18,6 +18,7 @@ import { UsersAdmin } from './pages/UsersAdmin';
 import { CodeAuditPage } from './pages/CodeAuditPage';
 import { OrganizationsAdmin } from './pages/OrganizationsAdmin';
 import { SystemConfig } from './pages/SystemConfig';
+import { GabIndex } from './pages/GabIndex';
 import { SystemTranslations } from './pages/SystemTranslations';
 import { TableBrowser } from './pages/TableBrowser';
 import { OcrTemplateDesigner } from './pages/OcrTemplateDesigner';
@@ -54,13 +55,10 @@ const OrgGuard = () => {
 
     useEffect(() => {
         if (!isLoading && orgId && orgId !== currentOrgId) {
-            // Validate if user has access to this org
-            // Case-insensitive check for URL friendliness
             const isValid = organizations.some(o => o.org_id.toUpperCase() === orgId.toUpperCase());
             if (isValid) {
-                switchOrg(orgId, true); // true = prevent reload
+                switchOrg(orgId, true);
             } else if (organizations.length > 0) {
-                // Invalid org, redirect to first valid
                 navigate(`/${organizations[0].org_id}/dashboard`);
             }
         }
@@ -68,7 +66,6 @@ const OrgGuard = () => {
 
     if (isLoading) return null;
 
-    // No organizations available (DB migration not run or user has no access)
     if (organizations.length === 0) {
         return (
             <div style={{ padding: 40, textAlign: 'center' }}>
@@ -81,7 +78,6 @@ const OrgGuard = () => {
         );
     }
 
-    // Waiting for context switch
     if (orgId && orgId !== currentOrgId) {
         return <div style={{ padding: 20 }}>Načítání společnosti...</div>;
     }
@@ -89,7 +85,6 @@ const OrgGuard = () => {
     return <Layout />;
 };
 
-// Redirect Helper for non-prefixed routes
 const ContextRedirect = ({ prefix }: { prefix?: string }) => {
     const { currentOrgId, isLoading } = useAuth();
     const navigate = useNavigate();
@@ -137,6 +132,7 @@ const router = createBrowserRouter([
                     { path: "requests", element: <RequestsPage /> },
                     { path: "system", element: <SystemConfig /> },
                     { path: "system/security-roles", element: <SecurityRoles /> },
+                    { path: "system/gab", element: <GabIndex /> },
                     { path: "system/users", element: <UsersAdmin /> },
                     { path: "system/organizations", element: <OrganizationsAdmin /> },
                     { path: "system/shared-orgs", element: <SharedOrgsPage /> },

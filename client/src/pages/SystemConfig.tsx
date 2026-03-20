@@ -710,6 +710,7 @@ export const SystemConfig: React.FC = () => {
                     {/* 1. ADMIN TOOLS */}
                     <MenuSection id="admin" title={t('system.group.admin')} icon={<Desktop24Regular />} isOpen={expandedSections.has('admin')} onToggle={toggleSection}>
                         <MenuItem label={t('system.item.diagnostics')} onClick={() => navigateToView('diagnostics', 'system.item.diagnostics')} path={orgPrefix + '/system?view=diagnostics'} />
+                        <MenuItem label="Správa organizace (GAB)" onClick={() => navigate(orgPrefix + '/system/gab')} path={orgPrefix + '/system/gab'} />
                         <MenuItem label={t('system.tables_browser') || 'Prohlížeč tabulek'} onClick={() => navigate(orgPrefix + '/system/table-browser')} path={orgPrefix + '/system/table-browser'} />
                         <MenuItem label={t('system.item.sessions')} onClick={() => alert(t('common.working'))} />
                         <MenuItem label={t('dms.settings.number_series')} onClick={() => alert(t('common.working'))} />
