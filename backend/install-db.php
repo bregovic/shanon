@@ -1027,6 +1027,10 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
                     VALUES (v_tenant, 'CHATGPT_SYSTEM_PROMPT', 'Jste ERP asistent Shanon. Vaším cílem je pomoci s analýzou dokumentů.', 'Výchozí systémový prompt pro AI');
                 END IF;
             END $$;
+
+            INSERT INTO development_history (date, title, description, category, created_at)
+            SELECT CURRENT_DATE, 'System Parameters Multi-Tenancy', 'Přidána podpora pro tenant_id a org_id do sys_parameters. Nasazeny základní klíče pro ChatGPT.', 'Feature', NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'System Parameters Multi-Tenancy' AND date = CURRENT_DATE);
         "
     ];
 

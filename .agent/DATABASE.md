@@ -34,6 +34,17 @@ Persistent PHP sessions storage (via `DbSessionHandler`).
 | `data` | TEXT | Serialized PHP session payload |
 | `access` | INT | Timestamp of last activity |
 
+### `sys_parameters`
+Central parameter and configuration storage with multi-tenant context.
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `rec_id` | SERIAL (PK) | No | Record ID |
+| `tenant_id` | UUID | No | Tenant isolation key |
+| `org_id` | CHAR(5) | Yes | Org ID for private overrides. If NULL, shared across tenant. |
+| `param_key` | VARCHAR(100) | No | Unique parameter key |
+| `param_value`| TEXT | Yes | Configured value |
+| `description`| VARCHAR(255) | Yes | Human readable helper text |
+
 ### `sys_number_series` (Global)
 Centralized ID generation service.
 | Column | Type | Description |
