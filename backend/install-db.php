@@ -987,7 +987,47 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
         '074_update_help_shortcuts' => null,
         '080_shared_companies' => null,
         '081_sys_user_params' => null,
-        '090_add_ui_standard_test' => null
+        '090_add_ui_standard_test' => null,
+        '091_sys_parameters_tenant' => "
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_parameters' AND column_name='tenant_id') THEN
+                    ALTER TABLE sys_parameters ADD COLUMN tenant_id UUID DEFAULT '00000000-0000-0000-0000-000000000001';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_parameters' AND column_name='org_id') THEN
+                    ALTER TABLE sys_parameters ADD COLUMN org_id CHAR(5);
+                END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_parameters' AND column_name='rec_id') THEN
+                    BEGIN
+                        ALTER TABLE sys_parameters DROP CONSTRAINT IF EXISTS sys_parameters_pkey CASCADE;
+                    EXCEPTION WHEN OTHERS THEN NULL; END;
+                    ALTER TABLE sys_parameters ADD COLUMN rec_id SERIAL PRIMARY KEY;
+                END IF;
+            END $$;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_params_global_v2 
+                ON sys_parameters (tenant_id, param_key) 
+                WHERE org_id IS NULL;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_params_org_v2 
+                ON sys_parameters (tenant_id, org_id, param_key) 
+                WHERE org_id IS NOT NULL;
+                
+            DO $$
+            DECLARE 
+               v_tenant UUID := '00000000-0000-0000-0000-000000000001';
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM sys_parameters WHERE param_key = 'CHATGPT_API_KEY' AND tenant_id = v_tenant AND org_id IS NULL) THEN
+                    INSERT INTO sys_parameters (tenant_id, param_key, param_value, description)
+                    VALUES (v_tenant, 'CHATGPT_API_KEY', '', 'API klíč pro OpenAI ChatGPT');
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM sys_parameters WHERE param_key = 'CHATGPT_SYSTEM_PROMPT' AND tenant_id = v_tenant AND org_id IS NULL) THEN
+                    INSERT INTO sys_parameters (tenant_id, param_key, param_value, description)
+                    VALUES (v_tenant, 'CHATGPT_SYSTEM_PROMPT', 'Jste ERP asistent Shanon. Vaším cílem je pomoci s analýzou dokumentů.', 'Výchozí systémový prompt pro AI');
+                END IF;
+            END $$;
+        "
     ];
 
 

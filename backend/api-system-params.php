@@ -13,15 +13,31 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
+$tenantId = $_SESSION['tenant_id'] ?? '00000000-0000-0000-0000-000000000001';
+$orgId = $_SESSION['current_org_id'] ?? null;
 $action = $_GET['action'] ?? 'list';
 
 try {
     $db = DB::connect();
 
     if ($action === 'list') {
-        $stmt = $db->query("SELECT param_key, param_value, description FROM sys_parameters ORDER BY param_key");
-        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'data' => $data]);
+        $sql = "SELECT rec_id, param_key, param_value, description, org_id 
+                FROM sys_parameters 
+                WHERE tenant_id = :tid 
+                  AND (org_id IS NULL OR org_id = :oid)
+                ORDER BY param_key, org_id NULLS FIRST";
+                
+        $stmt = $db->prepare($sql);
+        $stmt->execute(['tid' => $tenantId, 'oid' => $orgId]);
+        $raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Merge so specific overrides shared
+        $merged = [];
+        foreach ($raw as $row) {
+            $merged[$row['param_key']] = $row; 
+        }
+        
+        echo json_encode(['success' => true, 'data' => array_values($merged)]);
     } 
     elseif ($action === 'update') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -29,17 +45,29 @@ try {
         
         $key = $input['key'] ?? '';
         $value = $input['value'] ?? '';
+        $scope = $input['scope'] ?? 'local'; // 'global' for shared across tenant, 'local' for private to org
         
         if (empty($key)) throw new Exception("Missing key");
-
-        // Simple upsert
-        $stmt = $db->prepare("
-            INSERT INTO sys_parameters (param_key, param_value) 
-            VALUES (?, ?)
-            ON CONFLICT (param_key) 
-            DO UPDATE SET param_value = EXCLUDED.param_value
-        ");
-        $stmt->execute([$key, $value]);
+        
+        $targetOrgId = ($scope === 'global') ? null : $orgId;
+        
+        if ($targetOrgId === null) {
+            $stmt = $db->prepare("
+                INSERT INTO sys_parameters (tenant_id, org_id, param_key, param_value) 
+                VALUES (?, NULL, ?, ?)
+                ON CONFLICT (tenant_id, param_key) WHERE org_id IS NULL 
+                DO UPDATE SET param_value = EXCLUDED.param_value
+            ");
+            $stmt->execute([$tenantId, $key, $value]);
+        } else {
+            $stmt = $db->prepare("
+                INSERT INTO sys_parameters (tenant_id, org_id, param_key, param_value) 
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (tenant_id, org_id, param_key) WHERE org_id IS NOT NULL 
+                DO UPDATE SET param_value = EXCLUDED.param_value
+            ");
+            $stmt->execute([$tenantId, $targetOrgId, $key, $value]);
+        }
         
         echo json_encode(['success' => true]);
     }
