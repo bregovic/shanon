@@ -1031,7 +1031,9 @@ Administrator must configure Shared Drive or Enable Domain-Wide Delegation for t
             INSERT INTO development_history (date, title, description, category, created_at)
             SELECT CURRENT_DATE, 'System Parameters Multi-Tenancy', 'Přidána podpora pro tenant_id a org_id do sys_parameters. Nasazeny základní klíče pro ChatGPT.', 'Feature', NOW()
             WHERE NOT EXISTS (SELECT 1 FROM development_history WHERE title = 'System Parameters Multi-Tenancy' AND date = CURRENT_DATE);
-        "
+        ",
+        '092_setup_gab_module' => null,
+        '093_gab_seed_data' => null
     ];
 
 

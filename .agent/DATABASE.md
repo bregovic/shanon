@@ -45,6 +45,56 @@ Central parameter and configuration storage with multi-tenant context.
 | `param_value`| TEXT | Yes | Configured value |
 | `description`| VARCHAR(255) | Yes | Human readable helper text |
 
+---
+
+## Modul: Správa Organizace (GAB)
+
+### `gab_subjects`
+Hlavní globální registr unikátních entit (Master-Data). Zabraňuje duplicitám účtovaných společností, zaměstnanců, dodavatelů a odběratelů. Záznam sdružuje identifikátory, na které se odkazují další moduly (přes `gab_subject_id`).
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `rec_id` | SERIAL (PK) | No | Unique Subject ID |
+| `tenant_id` | UUID | No | Tenant isolation key |
+| `name` | VARCHAR(255) | No | Název společnosti / Jméno a příjmení |
+| `reg_no` | VARCHAR(50) | Yes | IČO (Unikátní constraint `idx_gab_subj_reg_no`) |
+| `tax_no` | VARCHAR(50) | Yes | DIČ |
+| `country_iso` | CHAR(2) | No | Default: 'CZ' |
+| `language` | CHAR(2) | No | Default: 'cs' |
+| `is_active` | BOOLEAN | No | Soft-delete status |
+| Audit Cols | TIMESTAMP, VARCHAR | No | `created_at`, `created_by`, `updated_at`, `updated_by` |
+
+### `gab_subject_roles`
+Vazební (Pivot) tabulka definující formální funkce subjektu v systému. Subjekt může být evidován jako `CUSTOMER`, a zároveň jako `VENDOR` i `EMPLOYEE`.
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `rec_id` | SERIAL (PK) | No | ID |
+| `tenant_id` | UUID | No | Tenant isolation key |
+| `subject_id` | INT (FK) | No | FK to `gab_subjects` |
+| `role_code` | VARCHAR(50) | No | Role (např. 'INTERNAL_ORG', 'EMPLOYEE', 'CUSTOMER', 'VENDOR') |
+
+### `gab_addresses`
+Evidence adres subjektu s rozlišením typu (fakturační, korespondenční) a primárního stavu.
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `subject_id` | INT (FK) | No | FK to `gab_subjects` |
+| `address_type` | VARCHAR(50) | No | 'BILLING', 'SHIPPING', 'HQ', 'OTHER' |
+| `street` | VARCHAR(255) | No | Ulice včetně čísla |
+| `city` | VARCHAR(100) | No | Město / Obec |
+| `zip_code` | VARCHAR(20) | Yes | PSČ |
+| `country_iso` | CHAR(2) | No | ISO |
+| `is_primary` | BOOLEAN | No | Určuje primární adresu v rámci jednoho `address_type` |
+
+### `gab_contacts`
+Kontaktní údaje na subjekt (telefon, e-mail, weby, sociální sítě).
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `subject_id` | INT (FK) | No | FK to `gab_subjects` |
+| `contact_type` | VARCHAR(50) | No | 'EMAIL', 'PHONE', 'WEB', 'OTHER' |
+| `contact_value` | VARCHAR(255) | No | Hodnota (např. 'test@example.com') |
+| `is_primary` | BOOLEAN | No | Určuje preferovaný způsob komunikace |
+
+---
+
 ### `sys_number_series` (Global)
 Centralized ID generation service.
 | Column | Type | Description |
