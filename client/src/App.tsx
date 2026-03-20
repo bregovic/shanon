@@ -19,6 +19,7 @@ import { CodeAuditPage } from './pages/CodeAuditPage';
 import { OrganizationsAdmin } from './pages/OrganizationsAdmin';
 import { SystemConfig } from './pages/SystemConfig';
 import { GabIndex } from './pages/GabIndex';
+import { GabDashboard } from './pages/GabDashboard';
 import { SystemTranslations } from './pages/SystemTranslations';
 import { TableBrowser } from './pages/TableBrowser';
 import { OcrTemplateDesigner } from './pages/OcrTemplateDesigner';
@@ -130,6 +131,8 @@ const router = createBrowserRouter([
                     { path: "dms/review", element: <DmsReview /> },
                     { path: "dms/settings", element: <DmsSettings /> },
                     { path: "requests", element: <RequestsPage /> },
+                    { path: "gab", element: <GabDashboard /> },
+                    { path: "gab/list", element: <GabIndex /> },
                     { path: "system", element: <SystemConfig /> },
                     { path: "system/security-roles", element: <SecurityRoles /> },
                     { path: "system/gab", element: <GabIndex /> },
@@ -165,6 +168,11 @@ const router = createBrowserRouter([
         path: "/requests/*",
         element: <RequireAuth />,
         children: [{ path: "*", element: <ContextRedirect prefix="requests" /> }]
+    },
+    {
+        path: "/gab/*",
+        element: <RequireAuth />,
+        children: [{ path: "*", element: <ContextRedirect prefix="gab" /> }]
     }
 ], { basename: BASE_NAME });
 

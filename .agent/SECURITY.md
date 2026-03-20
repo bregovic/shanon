@@ -23,6 +23,7 @@ Každý UI prvek nebo logická sekce musí mít přidělený unikátní **Securi
 | 1 | `mod_dashboard` | Dashboard | Přístup na hlavní přehled. |
 | 2 | `mod_crm` | CRM | Modul pro správu klientů. |
 | 3 | `mod_dms` | DMS | Document Management System. |
+| 7 | `mod_gab` | GAB | Oprávnění pro vstup do Globálního adresáře (Správa organizace). |
 | 4 | `mod_requests` | Požadavky | Change Request Management. |
 | 5 | `mod_projects` | Projekty | Řízení projektů. |
 | 6 | `mod_system` | Systém | Konfigurace a administrace. |
