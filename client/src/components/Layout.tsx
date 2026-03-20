@@ -115,7 +115,7 @@ const Layout: React.FC = () => {
 
     const modules = [
         { label: t('modules.dashboard'), path: `${orgPrefix}/dashboard`, icon: <Home24Regular />, securityId: 'mod_dashboard' },
-        { label: "GAB (Adresář)", path: `${orgPrefix}/gab`, icon: <BuildingBank24Regular />, securityId: 'mod_gab' },
+        { label: "Organizace", path: `${orgPrefix}/gab`, icon: <BuildingBank24Regular />, securityId: 'mod_gab' },
         { label: t('modules.dms'), path: `${orgPrefix}/dms`, icon: <DocumentData24Regular />, securityId: 'mod_dms' },
         { label: t('modules.requests'), path: `${orgPrefix}/requests`, icon: <ClipboardTextEdit24Regular />, securityId: 'mod_requests', resetEvent: 'reset-requests-page' },
         { label: t('modules.system'), path: `${orgPrefix}/system`, icon: <Settings24Regular />, securityId: 'mod_system' },

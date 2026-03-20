@@ -97,7 +97,7 @@ export const GabIndex = () => {
 
     return (
         <PageContent>
-            <Title1 style={{ padding: '24px 24px 0 24px' }}>Globální adresář (GAB)</Title1>
+            <Title1 style={{ padding: '24px 24px 0 24px' }}>Hlavní adresář</Title1>
             
             {error && (
                 <MessageBar intent="error" style={{ margin: '0 24px' }}>

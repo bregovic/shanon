@@ -67,8 +67,7 @@ export const GabDashboard: React.FC = () => {
     const { currentOrgId } = useAuth();
     const orgPrefix = `/${currentOrgId || 'VACKR'}`;
 
-    // Sections for GAB
-    const SECTION_IDS = ['subjects', 'org_mgmt', 'settings'];
+    const SECTION_IDS = ['subjects', 'settings'];
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(SECTION_IDS));
 
     const toggleSection = (id: string) => {
@@ -90,7 +89,7 @@ export const GabDashboard: React.FC = () => {
                     </BreadcrumbItem>
                     <BreadcrumbDivider />
                     <BreadcrumbItem>
-                        <BreadcrumbButton current>Správa organizace (GAB)</BreadcrumbButton>
+                        <BreadcrumbButton current>Organizace</BreadcrumbButton>
                     </BreadcrumbItem>
                 </Breadcrumb>
 
@@ -121,32 +120,7 @@ export const GabDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="subjects" title="Adresář" icon={<BuildingBank24Regular />} isOpen={expandedSections.has('subjects')} onToggle={toggleSection}>
-                        <MenuItem label="Všechny subjekty" onClick={() => navigate(orgPrefix + '/gab/list')} path={orgPrefix + '/gab/list'} />
-                        <MenuItem label="Moji dodavatelé" onClick={() => {}} />
-                        <MenuItem label="Moji zákazníci" onClick={() => {}} />
-                    </MenuSection>
-
-                    <MenuSection id="org_mgmt" title="Vazby a Týmy" icon={<TaskListSquareLtr24Regular />} isOpen={expandedSections.has('org_mgmt')} onToggle={toggleSection}>
-                        <MenuItem label="Zaměstnanci" onClick={() => {}} />
-                        <MenuItem label="Organizační struktura" onClick={() => {}} />
-                    </MenuSection>
-                </div>
-
-                {/* Group: SYSTÉMOVÉ ORG */}
-                <div className={styles.scrollColumn} style={{ breakInside: 'avoid', marginBottom: '32px' }}>
-                    <Text weight="bold" style={{
-                        color: tokens.colorNeutralForeground2,
-                        textTransform: 'uppercase',
-                        fontSize: '13px',
-                        letterSpacing: '0.5px',
-                        display: 'block',
-                        marginBottom: '16px'
-                    }}>
-                        Interní Organizace
-                    </Text>
-                    <MenuSection id="internals" title="Účtované Společnosti" icon={<BuildingBank24Regular />} isOpen={expandedSections.has('internals')} onToggle={toggleSection}>
-                        <MenuItem label={t('users.organizations') || 'Společnosti'} onClick={() => navigate(orgPrefix + '/system/organizations')} path={orgPrefix + '/system/organizations'} />
-                        <MenuItem label={t('shared_orgs.title')} onClick={() => navigate(orgPrefix + '/system/shared-orgs')} path={orgPrefix + '/system/shared-orgs'} />
+                        <MenuItem label="Hlavní adresář - formulář" onClick={() => navigate(orgPrefix + '/gab/list')} path={orgPrefix + '/gab/list'} />
                     </MenuSection>
                 </div>
 
@@ -164,7 +138,7 @@ export const GabDashboard: React.FC = () => {
                     </Text>
 
                     <MenuSection id="settings" title={t('common.settings')} icon={<Settings24Regular />} isOpen={expandedSections.has('settings')} onToggle={toggleSection}>
-                        <MenuItem label="Parametry GAB" onClick={() => {}} />
+                        <MenuItem label="Parametry Organizací" onClick={() => {}} />
                         <MenuItem label="Duplikační pravidla" onClick={() => {}} />
                     </MenuSection>
                 </div>
