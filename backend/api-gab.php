@@ -27,10 +27,10 @@ try {
     if ($action === 'list') {
         $stmt = $db->prepare("
             SELECT s.rec_id, s.name, s.reg_no, s.tax_no, s.country_iso, s.is_active,
-                   (SELECT string_agg(role_code, ',') FROM gab_subject_roles r WHERE r.subject_id = s.rec_id AND r.tenant_id = ?) as roles,
-                   (SELECT contact_value FROM gab_contacts c WHERE c.subject_id = s.rec_id AND c.tenant_id = ? AND is_primary = true LIMIT 1) as primary_contact
+                   (SELECT string_agg(role_code::text, ',') FROM gab_subject_roles r WHERE r.subject_id = s.rec_id AND r.tenant_id = ?::uuid) as roles,
+                   (SELECT contact_value FROM gab_contacts c WHERE c.subject_id = s.rec_id AND c.tenant_id = ?::uuid AND is_primary = true LIMIT 1) as primary_contact
             FROM gab_subjects s
-            WHERE s.tenant_id = ?
+            WHERE s.tenant_id = ?::uuid
             ORDER BY s.name ASC
         ");
         $stmt->execute([$tenantId, $tenantId, $tenantId]);
