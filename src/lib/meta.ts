@@ -16,6 +16,8 @@ export interface FieldMeta {
   options?: { value: string; label: string }[];
   refObject?: string;
   refHref?: string;
+  /** číslo se nesčítá v řádku Celkem */
+  noTotal?: boolean;
   /** pole rozšíření (hodnota v record.ext) */
   ext?: boolean;
 }

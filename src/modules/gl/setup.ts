@@ -3,6 +3,7 @@
  * Zakládá jen to, co chybí — účtový rozvrh, jen když je úplně prázdný.
  */
 import type { DataApi } from "@/core/module";
+import { createPeriods } from "./posting";
 
 /** Výřez směrné účtové osnovy pro start (firma si ho doplní). */
 export const DEFAULT_ACCOUNTS: [string, string, string][] = [
@@ -22,6 +23,12 @@ export const DEFAULT_ACCOUNTS: [string, string, string][] = [
 export async function glSetup(data: DataApi): Promise<void> {
   if (!(await data.find("gl.account", {}, { take: 1 })).length) {
     for (const [accountNum, name, type] of DEFAULT_ACCOUNTS) await data.create("gl.account", { accountNum, name, type });
+  }
+  // fiskální rok = aktuální kalendářní rok s měsíčními obdobími
+  if (!(await data.find("gl.fiscalYear", {}, { take: 1 })).length) {
+    const y = new Date().getUTCFullYear();
+    const fy = await data.create("gl.fiscalYear", { code: String(y), startDate: `${y}-01-01`, endDate: `${y}-12-31` });
+    await createPeriods(data, fy);
   }
   if (!(await data.find("gl.journalName", { code: "GEN" }, { take: 1 })).length) {
     await data.create("gl.journalName", { code: "GEN", name: "Obecný deník" });

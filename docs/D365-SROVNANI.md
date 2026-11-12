@@ -18,7 +18,12 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 | Izolace tenantů v DB (RLS) | — (D365 je single-tenant) |
 | Číselné řady s Použitím, výchozí nastavení | Number sequences, references, wizard |
 | Hlavní kniha: účty, střediska, názvy deníků, deník → doklad → zápisy | Main accounts, financial dimensions, journal names, GJ → voucher → GeneralJournalAccountEntry |
-| Daňové kódy | Sales tax codes |
+| Daňové kódy, daňové transakce | Sales tax codes, TaxTrans |
+| Fiskální roky a období (otevřené / pozastavené / uzavřené) | Fiscal calendars, ledger periods |
+| Měny a kurzy, načítání kurzů ČNB, deník a faktury v cizí měně | Currencies, exchange rates, rate providers |
+| Skupiny odběratelů/dodavatelů jako účtovací profil | Customer/vendor groups, posting profiles |
+| Odběratelé, vydané faktury, saldo | Customers, free text invoices, customer transactions |
+| Dodavatelé, přijaté faktury, saldo | Vendors, vendor invoices, vendor transactions |
 | Přílohy | Document management (DocuRef) |
 | Historie změn | Database log |
 | Oblíbené, plochy modulů | Favorites, workspaces / area pages |
@@ -28,9 +33,9 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 
 | # | Funkce v AX/D365 | Proč je užitečná | Priorita |
 |---|---|---|---|
-| 1 | **Fiskální kalendář a účetní období** (otevřené / zastavené / uzavřené) | Zamykání období, podklad pro výkazy a uzávěrky | P1 |
-| 2 | **Měny a kurzy** (účetní a vykazovací měna, denní kurzy ČNB) | Faktury v EUR, přecenění | P1 |
-| 3 | **Účtovací profily** (posting profiles, posting setup) | Pomocné knihy bez účtů natvrdo | P1 |
+| 1 | ~~Fiskální kalendář a účetní období~~ — hotovo 13. 11. 2026 | | ✓ |
+| 2 | ~~Měny a kurzy ČNB~~ — hotovo; zbývá vykazovací měna a přecenění | Přecenění otevřených položek | P2 |
+| 3 | ~~Účtovací profily~~ — hotovo přes skupiny partnerů; zbývá profil per partner / položka | | P3 |
 | 4 | **Workflow / schvalování** (deník, faktura, objednávka; delegace, eskalace) | Malé firmy chtějí aspoň „schválí jednatel“; navazuje na Schvaleem | P1 |
 | 5 | **Šablony záznamů** (record templates — výchozí hodnoty při založení per firma/uživatel) | Rychlé zakládání podobných záznamů; doplní „výchozí hodnoty kdekoli“ | P2 |
 | 6 | **Uložená zobrazení** (saved views: sloupce, filtry, řazení, sdílení s rolí) | Personalizace gridů bez programování | P2 |
@@ -56,10 +61,10 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 
 | # | Funkce | Priorita |
 |---|---|---|
-| 24 | Odběratelé (AR): odběratelé, skupiny, vydané faktury, saldo, platby, upomínky, úroky z prodlení | P1 |
-| 25 | Dodavatelé (AP): dodavatelé, přijaté faktury, schválení, platby, příkazy k úhradě | P1 |
+| 24 | Odběratelé (AR): ~~odběratelé, skupiny, vydané faktury, saldo~~ hotovo; zbývá **úhrady a párování**, dobropisy, upomínky, úroky z prodlení | P1 |
+| 25 | Dodavatelé (AP): ~~dodavatelé, přijaté faktury, saldo~~ hotovo; zbývá **úhrady, příkazy k úhradě**, schválení faktur | P1 |
 | 26 | Banka a pokladna: bankovní účty, import výpisů (GPC/ABO/camt), párování, pokladní doklady | P1 |
-| 27 | Výpočet DPH na řádcích dokladů, daňové transakce, přiznání, KH, SH (XML EPO) | P1 |
+| 27 | ~~Výpočet DPH na řádcích, daňové transakce~~ hotovo; zbývá **přiznání, KH, SH (XML EPO)**, přenesená daňová povinnost | P1 |
 | 28 | Uzávěrka: přecenění měn, zavření období, převod výsledku | P2 |
 | 29 | Výkazy: obratová předvaha, rozvaha, výsledovka, hlavní kniha, saldokonto (Financial reporting) | P1 |
 | 30 | Dlouhodobý majetek: karty, odpisové plány (účetní/daňové), vyřazení | P2 |
@@ -69,8 +74,9 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 
 ## Doporučené pořadí
 
-1. **Období + měny + účtovací profily** (#1, #2, #3) — bez nich nejdou pomocné knihy postavit správně.
-2. **AR + AP + banka + DPH** (#24–27) se **tiskem faktur** (#10) a **výkazy** (#29) → první ostré nasazení.
+1. ~~Období + měny + účtovací profily~~, ~~faktury AR/AP se saldem a DPH~~ (hotovo).
+2. **Banka a úhrady** (#26, párování s otevřenými položkami), **přiznání a KH** (#27),
+   **tisk faktur** (#10) a **výkazy** (#29) → první ostré nasazení.
 3. **Šablony záznamů a uložená zobrazení** (#5, #6) — „výchozí hodnoty kdekoli“ a personalizace.
 4. **Workflow schvalování** (#4) — propojit se Schvaleem.
 5. **Import dat, dávky, upozornění** (#7–9).

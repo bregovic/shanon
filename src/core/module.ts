@@ -69,7 +69,8 @@ export type RecordData = Record<string, unknown>;
  */
 export interface DataApi {
   get(objectId: string, id: string): Promise<RecordData | null>;
-  find(objectId: string, where: RecordData, opts?: { take?: number }): Promise<RecordData[]>;
+  /** přesná shoda, nebo rozsah { gte, lte, gt, lt } (data, čísla) */
+  find(objectId: string, where: RecordData, opts?: { take?: number; orderBy?: Record<string, "asc" | "desc"> }): Promise<RecordData[]>;
   create(objectId: string, data: RecordData): Promise<RecordData>;
   update(objectId: string, id: string, data: RecordData): Promise<RecordData>;
   /**
@@ -106,6 +107,8 @@ export interface ObjectHandlers {
   afterSave?: (ctx: EventContext, data: RecordData, isNew: boolean) => void | Promise<void>;
   /** vrátí label chyby, pokud mazání nelze povolit */
   beforeDelete?: (ctx: EventContext, data: RecordData) => void | LabelRef | Promise<void | LabelRef>;
+  /** po smazání (např. přepočet součtů hlavičky dokladu) */
+  afterDelete?: (ctx: EventContext, data: RecordData) => void | Promise<void>;
   /** akce nad záznamem (tlačítka ve formuláři), klíč = id akce z ObjectDef.actions */
   actions?: Record<string, (ctx: EventContext, record: RecordData) => Promise<void>>;
 }

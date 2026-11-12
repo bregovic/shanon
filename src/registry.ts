@@ -7,11 +7,14 @@ import { ADMIN_ONLY } from "@/core/security";
 import gab from "@/modules/gab";
 import gl from "@/modules/gl";
 import { glHandlers } from "@/modules/gl/posting";
+import { sysHandlers } from "@/modules/sys/currency";
 import sys, { NumberedObject, SecurityTarget } from "@/modules/sys";
 import tax from "@/modules/tax";
+import ar, { ar as arLedger } from "@/modules/ar";
+import ap, { ap as apLedger } from "@/modules/ap";
 import subjectRating from "@/extensions/subject-rating";
 
-export const modules = [sys, gab, gl, tax];
+export const modules = [sys, gab, gl, tax, ar, ap];
 export const extensions = [subjectRating];
 
 // cíle oprávnění = všechny moduly a jejich objekty (modul, pak jeho objekty)
@@ -25,7 +28,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [glHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

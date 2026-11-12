@@ -23,7 +23,7 @@ async function main() {
     name: "Demo s.r.o.",
     adminEmail: email,
     adminPassword: password,
-    modules: ["gab", "gl", "tax"],
+    modules: ["gab", "gl", "tax", "ar", "ap"],
     company: { code: "DEMO", name: "Demo s.r.o.", regNo: "12345678", vatId: "CZ12345678" },
   });
   console.log(`Tenant ${code}: ${email} / ${process.env.SEED_PASSWORD ? "(SEED_PASSWORD)" : password}`);

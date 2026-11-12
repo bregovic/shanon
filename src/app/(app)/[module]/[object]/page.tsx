@@ -34,7 +34,7 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
 
   const defaults: Record<string, unknown> = {};
   for (const [n, f] of Object.entries(def.fields)) {
-    if (f.default !== undefined) defaults[n] = coerce(f.edt, f.default, registry)[0];
+    if (f.default !== undefined) defaults[n] = coerce(f.edt, f.default === "$today" ? new Date().toISOString().slice(0, 10) : f.default, registry)[0];
   }
   const openInPage = !!def.lines?.length || !!def.actions?.length;
 

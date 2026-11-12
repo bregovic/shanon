@@ -58,7 +58,8 @@ function scalar(name: string, f: FieldDef): string {
   const isBool = e.kind === "bool";
   const def = f.default ?? (isBool ? false : undefined);
   if (def !== undefined) {
-    if (typeof def === "string" && e.kind !== "decimal") attrs.unshift(`@default("${def}")`);
+    if (def === "$today") attrs.unshift("@default(now())");
+    else if (typeof def === "string" && e.kind !== "decimal") attrs.unshift(`@default("${def}")`);
     else attrs.unshift(`@default(${def})`);
   }
   const col = columnName(name);

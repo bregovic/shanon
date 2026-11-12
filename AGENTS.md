@@ -19,7 +19,17 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   délky a validace přímo u pole.
 - Žádný vlastní CRUD v modulech. Čtení/zápis jen přes `src/server/data.ts`;
   byznys logika přes události (`ObjectHandlers`) a `DataApi`.
-- Do hlavní knihy jen přes `postVoucher()` (`src/modules/gl/posting.ts`).
+- Do hlavní knihy jen přes `postVoucher()` (`src/modules/gl/posting.ts`) — hlídá
+  vyrovnanost a otevřené účetní období. Cizí měna: `convertLines` / `rateFor`
+  (kurz ČNB, nejvýš 7 dní starý, chybějící se načte samo).
+- Doklady s řádky a DPH (faktury) nepsat znovu: `src/modules/tax/document.ts`
+  (výpočet, součty, zaúčtování, saldo, daňové transakce). Pomocná kniha partnerů
+  (AR, AP) vzniká továrnou `partner-ledger.ts` — nový podobný modul = parametry
+  + labely, ne nový kód.
+- Typy polí: `Edts.Amount` se sčítá v řádku Celkem, `Edts.Price`, `Edts.Qty`,
+  `Edts.AmountCur` ne (`noTotal`). Výchozí datum „dnes“ = `default: "$today"`.
+- Řádky, které záznamu nepatří (faktury odběratele), mají v `lines` `owned: false`
+  — se záznamem se nemažou.
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.
 
 ## Obecné metody — žádný kód pro běžné operace

@@ -29,6 +29,16 @@ export const JournalStatus = defineEnum({
   ],
 });
 
+export const PeriodStatus = defineEnum({
+  id: "PeriodStatus",
+  label: "@GL:PeriodStatus",
+  values: [
+    { value: "open", label: "@GL:Open" },
+    { value: "onHold", label: "@GL:OnHold" },
+    { value: "closed", label: "@GL:Closed" },
+  ],
+});
+
 export const AccountNum = defineEdt({
   id: "AccountNum",
   kind: "string",
@@ -44,6 +54,50 @@ const VoucherRef = refEdt("gl.voucher", "@GL:Voucher");
 const JournalRef = refEdt("gl.journal", "@GL:Journal");
 const JournalNameRef = refEdt("gl.journalName", "@GL:JournalName");
 const NumberSeqRef = refEdt("sys.numberSeq", "@SYS:NumberSeq");
+const CurrencyRef = refEdt("sys.currency", "@SYS:Currency");
+const FiscalYearRef = refEdt("gl.fiscalYear", "@GL:FiscalYear");
+
+/** Fiskální rok (obdoba Fiscal calendar v D365) — období jsou jeho řádky. */
+export const fiscalYear = defineObject({
+  id: "gl.fiscalYear",
+  table: "gl_fiscal_year",
+  label: "@GL:FiscalYear",
+  labelPlural: "@GL:FiscalYears",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    startDate: { edt: Edts.TransDate, label: "@GL:StartDate", mandatory: true },
+    endDate: { edt: Edts.TransDate, label: "@GL:EndDate", mandatory: true },
+  },
+  titleField: "code",
+  list: ["code", "startDate", "endDate"],
+  form: [{ label: "@SYS:General", fields: ["code", "startDate", "endDate"] }],
+  unique: [["code"]],
+  defaultSort: { field: "startDate", dir: "desc" },
+  lines: [{ object: "gl.period", field: "fiscalYearId", label: "@GL:Periods" }],
+  actions: [{ id: "periods", label: "@GL:CreatePeriods" }],
+});
+
+/** Účetní období: do uzavřeného ani pozastaveného se neúčtuje. */
+export const period = defineObject({
+  id: "gl.period",
+  table: "gl_period",
+  label: "@GL:Period",
+  labelPlural: "@GL:Periods",
+  scope: "company",
+  fields: {
+    fiscalYearId: { edt: FiscalYearRef, mandatory: true },
+    code: { edt: Edts.Code, mandatory: true },
+    startDate: { edt: Edts.TransDate, label: "@GL:StartDate", mandatory: true },
+    endDate: { edt: Edts.TransDate, label: "@GL:EndDate", mandatory: true },
+    status: { edt: enumEdt(PeriodStatus), mandatory: true, default: "open" },
+  },
+  titleField: "code",
+  list: ["fiscalYearId", "code", "startDate", "endDate", "status"],
+  form: [{ label: "@SYS:General", fields: ["fiscalYearId", "code", "startDate", "endDate", "status"] }],
+  unique: [["code"]],
+  defaultSort: { field: "startDate", dir: "asc" },
+});
 
 export const account = defineObject({
   id: "gl.account",
@@ -142,11 +196,16 @@ export const trans = defineObject({
     costCenterId: { edt: CostCenterRef },
     /** kladná = MD (debet), záporná = D (kredit) */
     amount: { edt: Edts.Amount, mandatory: true, label: "@GL:AmountSigned" },
+    currencyId: { edt: CurrencyRef },
+    amountCur: { edt: Edts.AmountCur, label: "@GL:AmountCur" },
     text: { edt: Edts.Description, label: "@GL:Text" },
   },
   titleField: "text",
-  list: ["date", "voucherId", "accountId", "costCenterId", "amount", "text"],
-  form: [{ label: "@SYS:General", fields: ["voucherId", "date", "accountId", "costCenterId", "amount", "text"] }],
+  list: ["date", "voucherId", "accountId", "costCenterId", "amount", "currencyId", "amountCur", "text"],
+  form: [
+    { label: "@SYS:General", fields: ["voucherId", "date", "accountId", "costCenterId", "amount", "text"] },
+    { label: "@SYS:Currency", fields: ["currencyId", "amountCur"] },
+  ],
   defaultSort: { field: "date", dir: "desc" },
 });
 
@@ -188,13 +247,15 @@ export const journalLine = defineObject({
     journalId: { edt: JournalRef, mandatory: true },
     accountId: { edt: AccountRef, mandatory: true },
     costCenterId: { edt: CostCenterRef },
+    /** prázdné = účetní měna firmy */
+    currencyId: { edt: CurrencyRef },
     debit: { edt: Edts.Amount, label: "@GL:Debit" },
     credit: { edt: Edts.Amount, label: "@GL:Credit" },
     text: { edt: Edts.Description, label: "@GL:Text" },
   },
   titleField: "text",
-  list: ["accountId", "costCenterId", "debit", "credit", "text"],
-  form: [{ label: "@SYS:General", fields: ["journalId", "accountId", "costCenterId", "debit", "credit", "text"] }],
+  list: ["accountId", "costCenterId", "currencyId", "debit", "credit", "text"],
+  form: [{ label: "@SYS:General", fields: ["journalId", "accountId", "costCenterId", "currencyId", "debit", "credit", "text"] }],
 });
 
 export default defineModule({
@@ -203,14 +264,17 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [AccountType, JournalStatus],
-  objects: [account, costCenter, voucher, trans, journalName, journal, journalLine],
+  enums: [AccountType, JournalStatus, PeriodStatus],
+  objects: [account, costCenter, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
   menu: [
     {
       label: "@GL:Module",
       items: [{ object: "gl.journal" }, { object: "gl.voucher" }, { object: "gl.trans" }],
     },
-    { label: "@SYS:Setup", items: [{ object: "gl.account" }, { object: "gl.costCenter" }, { object: "gl.journalName" }] },
+    {
+      label: "@SYS:Setup",
+      items: [{ object: "gl.account" }, { object: "gl.costCenter" }, { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
+    },
   ],
   numberSeqs: [
     { code: "GLJOURNAL", name: "@GL:Journals", format: "DEN{YY}-{#####}", usedFor: "gl.journal" },
@@ -265,6 +329,21 @@ export default defineModule({
       JournalNameBlocked: "Název deníku {name} je blokovaný.",
       MissingJournalName: "Chybí název deníku. Založte ho v Nastavení → Názvy deníků.",
       GeneralJournal: "Obecný deník",
+      FiscalYear: "Fiskální rok",
+      FiscalYears: "Fiskální roky",
+      Period: "Účetní období",
+      Periods: "Účetní období",
+      PeriodStatus: "Stav období",
+      Open: "Otevřené",
+      OnHold: "Pozastavené",
+      Closed: "Uzavřené",
+      StartDate: "Od",
+      EndDate: "Do",
+      CreatePeriods: "Vytvořit měsíční období",
+      NoPeriod: "Pro datum {date} neexistuje účetní období. Založte fiskální rok v Nastavení → Fiskální roky.",
+      PeriodClosed: "Období {period} není otevřené, do něj nelze účtovat.",
+      PeriodsExist: "Fiskální rok už období má.",
+      AmountCur: "Částka v měně",
     },
     en: {
       Module: "General ledger",
@@ -313,6 +392,21 @@ export default defineModule({
       JournalNameBlocked: "Journal name {name} is blocked.",
       MissingJournalName: "Journal name is missing. Create it in Setup → Journal names.",
       GeneralJournal: "General journal",
+      FiscalYear: "Fiscal year",
+      FiscalYears: "Fiscal years",
+      Period: "Ledger period",
+      Periods: "Ledger periods",
+      PeriodStatus: "Period status",
+      Open: "Open",
+      OnHold: "On hold",
+      Closed: "Closed",
+      StartDate: "From",
+      EndDate: "To",
+      CreatePeriods: "Create monthly periods",
+      NoPeriod: "No ledger period exists for {date}. Create a fiscal year in Setup → Fiscal years.",
+      PeriodClosed: "Period {period} is not open; posting is not allowed.",
+      PeriodsExist: "The fiscal year already has periods.",
+      AmountCur: "Amount in currency",
     },
   },
 });

@@ -1,5 +1,5 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt, type EnumDef } from "@/core/edt";
-import { defineModule } from "@/core/module";
+import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 
 export const SeqFormat = defineEdt({
@@ -80,6 +80,48 @@ export const PermLevel = defineEnum({
  */
 export const SecurityTarget: EnumDef = { id: "SecurityTarget", label: "@SYS:SecurityTarget", values: [] };
 
+/** Kurz: kolik Kč stojí `amount` jednotek měny (jako kurzovní lístek ČNB). */
+const Rate = defineEdt({ id: "ExchRate", kind: "decimal", label: "@SYS:Rate", precision: 18, scale: 6, align: "right" });
+
+export const currency = defineObject({
+  id: "sys.currency",
+  table: "sys_currency",
+  label: "@SYS:CurrencyObj",
+  labelPlural: "@SYS:Currencies",
+  scope: "tenant",
+  fields: {
+    code: { edt: Edts.CurrencyCode, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    symbol: { edt: { id: "CurrencySymbol", kind: "string", label: "@SYS:Symbol", maxLength: 5 } },
+  },
+  titleField: "code",
+  list: ["code", "name", "symbol"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "symbol"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+  lines: [{ object: "sys.exchangeRate", field: "currencyId", label: "@SYS:ExchangeRates" }],
+  actions: [{ id: "cnb", label: "@SYS:LoadCnb" }],
+});
+
+export const exchangeRate = defineObject({
+  id: "sys.exchangeRate",
+  table: "sys_exchange_rate",
+  label: "@SYS:ExchangeRate",
+  labelPlural: "@SYS:ExchangeRates",
+  scope: "tenant",
+  fields: {
+    currencyId: { edt: refEdt("sys.currency", "@SYS:Currency"), mandatory: true },
+    date: { edt: Edts.TransDate, mandatory: true },
+    amount: { edt: Edts.Int, label: "@SYS:RateAmount", mandatory: true, default: 1 },
+    rate: { edt: Rate, mandatory: true },
+  },
+  titleField: "date",
+  list: ["currencyId", "date", "amount", "rate"],
+  form: [{ label: "@SYS:General", fields: ["currencyId", "date", "amount", "rate"] }],
+  unique: [["currencyId", "date"]],
+  defaultSort: { field: "date", dir: "desc" },
+});
+
 export const role = defineObject({
   id: "sys.role",
   table: "sys_role",
@@ -118,6 +160,18 @@ export const rolePermission = defineObject({
   defaultSort: { field: "target", dir: "asc" },
 });
 
+/** Výchozí měny tenanta (jen pokud žádné nejsou). */
+async function sysSetup(data: DataApi) {
+  if ((await data.find("sys.currency", {}, { take: 1 })).length) return;
+  for (const [code, name, symbol] of [
+    ["CZK", "Česká koruna", "Kč"],
+    ["EUR", "Euro", "€"],
+    ["USD", "Americký dolar", "$"],
+  ]) {
+    await data.create("sys.currency", { code, name, symbol });
+  }
+}
+
 export default defineModule({
   id: "sys",
   label: "@SYS:Module",
@@ -126,13 +180,16 @@ export default defineModule({
   core: true,
   dependsOn: [],
   enums: [PermLevel, SecurityTarget, NumberedObject],
-  objects: [company, numberSeq, role, rolePermission],
+  setup: sysSetup,
+  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission],
   menu: [
     {
       label: "@SYS:Setup",
       items: [
         { object: "sys.company" },
         { object: "sys.numberSeq" },
+        { object: "sys.currency" },
+        { object: "sys.exchangeRate" },
         { href: "/system/modules", label: "@SYS:Modules" },
         { href: "/system/setup", label: "@SYS:DefaultSetup" },
       ],
@@ -221,6 +278,19 @@ export default defineModule({
       Changes: "Změny",
       Security: "Zabezpečení",
       Usage: "Použití",
+      CurrencyObj: "Měna",
+      Price: "Cena",
+      AmountCur: "Částka v měně",
+      PartnerBlocked: "Partner je blokovaný.",
+      Currencies: "Měny",
+      Symbol: "Symbol",
+      ExchangeRate: "Kurz",
+      ExchangeRates: "Kurzy měn",
+      Rate: "Kurz",
+      RateAmount: "Množství",
+      LoadCnb: "Načíst kurzy ČNB",
+      MissingRate: "Chybí kurz {cur} k {date}. Načtěte kurzy ČNB nebo kurz zadejte v Nastavení → Kurzy měn.",
+      CnbFailed: "Kurzy ČNB se nepodařilo načíst. Zkuste to později nebo kurz zadejte ručně.",
       SuperUser: "Superuživatel (všechny firmy)",
       CompanyAccess: "Přístup do firmy",
       CompanyAdmin: "Správce firmy",
@@ -381,6 +451,19 @@ export default defineModule({
       Changes: "Changes",
       Security: "Security",
       Usage: "Usage",
+      CurrencyObj: "Currency",
+      Price: "Price",
+      AmountCur: "Amount in currency",
+      PartnerBlocked: "The partner is blocked.",
+      Currencies: "Currencies",
+      Symbol: "Symbol",
+      ExchangeRate: "Exchange rate",
+      ExchangeRates: "Exchange rates",
+      Rate: "Rate",
+      RateAmount: "Amount",
+      LoadCnb: "Load CNB rates",
+      MissingRate: "Exchange rate {cur} for {date} is missing. Load CNB rates or enter the rate in Setup → Exchange rates.",
+      CnbFailed: "CNB rates could not be loaded. Try later or enter the rate manually.",
       SuperUser: "Superuser (all companies)",
       CompanyAccess: "Access to company",
       CompanyAdmin: "Company administrator",

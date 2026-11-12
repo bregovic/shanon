@@ -26,7 +26,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
 
   const defaults = (d: typeof def) => {
     const out: RecordData = {};
-    for (const [n, f] of Object.entries(d.fields)) if (f.default !== undefined) out[n] = coerce(f.edt, f.default, registry)[0];
+    for (const [n, f] of Object.entries(d.fields)) if (f.default !== undefined) out[n] = coerce(f.edt, f.default === "$today" ? new Date().toISOString().slice(0, 10) : f.default, registry)[0];
     return out;
   };
 

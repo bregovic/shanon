@@ -147,12 +147,20 @@ function serialize(def: ObjectDef, row: RecordData): RecordData {
 }
 
 /** prosté hodnoty → Prisma */
+const RANGE_OPS = ["gt", "gte", "lt", "lte"] as const;
+
 function toDb(def: ObjectDef, data: RecordData): RecordData {
   const out: RecordData = {};
   for (const [name, f] of Object.entries(def.fields)) {
     if (!(name in data)) continue;
     const v = data[name];
-    out[name] = v !== null && f.edt.kind === "date" ? new Date(`${v}T00:00:00Z`) : v;
+    const conv = (x: unknown) => (x !== null && f.edt.kind === "date" ? new Date(`${x}T00:00:00Z`) : x);
+    if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+      // rozsah pro DataApi.find: { gte: "2026-01-01", lte: "2026-12-31" }
+      const r: RecordData = {};
+      for (const op of RANGE_OPS) if (op in (v as RecordData)) r[op] = conv((v as RecordData)[op]);
+      out[name] = r;
+    } else out[name] = conv(v);
   }
   return out;
 }
@@ -203,7 +211,7 @@ class Session {
     const s = this.sys();
     return {
       get: (o, id) => s.get(o, id),
-      find: (o, where, opts) => s.find(o, where, opts?.take),
+      find: (o, where, opts) => s.find(o, where, opts?.take, opts?.orderBy),
       create: (o, data) => s.save(o, null, data, { system: true }),
       update: (o, id, data) => s.save(o, id, data, { system: true }),
       nextNumber: (seq, date) => s.nextNumber(seq, date),
@@ -218,12 +226,12 @@ class Session {
     return row ? serialize(def, row) : null;
   }
 
-  async find(objectId: string, where: RecordData, take = 1000): Promise<RecordData[]> {
+  async find(objectId: string, where: RecordData, take = 1000, orderBy?: Record<string, "asc" | "desc">): Promise<RecordData[]> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "read", this.system);
     const rows = await delegate(this.tx, def).findMany({
       where: { ...toDb(def, where), ...scopeWhere(this.ctx, def) },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      orderBy: [...Object.entries(orderBy ?? {}).filter(([f]) => f in def.fields).map(([f, d]) => ({ [f]: d })), { createdAt: "asc" }, { id: "asc" }],
       take,
     });
     return rows.map((r) => serialize(def, r));
@@ -263,7 +271,7 @@ class Session {
     const out = rows.map((r) => serialize(def, r));
     await this.attachRefTitles(def, out);
     let totals: Record<string, string> | undefined;
-    const sumFields = def.list.filter((f) => def.fields[f]?.edt.kind === "decimal");
+    const sumFields = def.list.filter((f) => def.fields[f]?.edt.kind === "decimal" && !def.fields[f].edt.noTotal);
     if (p.totals && sumFields.length) {
       const agg = await d.aggregate({ where, _sum: Object.fromEntries(sumFields.map((f) => [f, true])) });
       totals = Object.fromEntries(sumFields.map((f) => [f, (agg._sum?.[f] ?? new Prisma.Decimal(0)).toFixed(def.fields[f].edt.scale ?? 2)]));
@@ -340,7 +348,8 @@ class Session {
     if (isNew) {
       for (const [name, f] of Object.entries(def.fields)) {
         if (merged[name] === undefined && f.default !== undefined) {
-          const [v] = coerce(f.edt, f.default, registry);
+          const def0 = f.default === "$today" ? new Date().toISOString().slice(0, 10) : f.default;
+          const [v] = coerce(f.edt, def0, registry);
           merged[name] = v;
         }
       }
@@ -421,7 +430,7 @@ class Session {
     // řádky dokladu se mažou s ním
     for (const l of def.lines ?? []) {
       const lineDef = getObject(l.object);
-      if (lineDef.systemOnly) continue;
+      if (lineDef.systemOnly || l.owned === false) continue;
       // řádky patří dokladu — stačí právo smazat doklad
       const sys = this.sys();
       for (const line of await sys.find(l.object, { [l.field]: id })) await sys.remove(l.object, String(line.id));
@@ -436,6 +445,7 @@ class Session {
     for (const r of refs) if (r.storageKey) await storageFor(r.storage).remove(this.tx, this.ctx.tenantId, r.storageKey);
     if (refs.length) await this.tx.sysDocuRef.deleteMany({ where: { id: { in: refs.map((r) => r.id) } } });
     await this.audit(objectId, id, "delete", existing, null);
+    for (const h of handlersFor(this.ctx, objectId)) await h.afterDelete?.(ectx, existing);
   }
 
   async action(objectId: string, id: string, actionId: string): Promise<void> {

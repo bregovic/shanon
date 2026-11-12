@@ -22,7 +22,7 @@ import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { Open24Regular } from "@fluentui/react-icons";
 import { searchRefs } from "@/app/actions";
-import type { FieldMeta } from "@/lib/meta";
+import { displayValue, type FieldMeta } from "@/lib/meta";
 
 export type Values = Record<string, unknown>;
 
@@ -167,7 +167,8 @@ function FieldInput({
     default:
       control = (
         <Input
-          value={v}
+          // zamčené číslo zobrazit česky (12 450,00), editované nechat surové
+          value={disabled && v && (f.kind === "decimal" || f.kind === "int") ? displayValue(f, { [f.name]: v }, "cs") : v}
           disabled={disabled}
           maxLength={f.maxLength}
           inputMode={f.kind === "decimal" || f.kind === "int" ? "decimal" : undefined}

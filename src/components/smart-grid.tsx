@@ -308,7 +308,7 @@ export function SmartGrid({
   const [rows, setRows] = useState<Row[]>(initial?.rows ?? []);
   const [total, setTotal] = useState(initial?.total ?? 0);
   const [sums, setSums] = useState<Record<string, string> | undefined>(initial?.totals);
-  const wantTotals = columns.some((c) => c.kind === "decimal" && !c.ext);
+  const wantTotals = columns.some((c) => c.kind === "decimal" && !c.ext && !c.noTotal);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());

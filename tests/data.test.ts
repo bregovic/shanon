@@ -18,6 +18,8 @@ import { withTenant } from "@/server/db";
 import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
 import { recordHistory } from "@/server/history";
 import { setupCompany } from "@/server/setup";
+import { convertCents, parseCnb } from "@/modules/sys/currency";
+import { fromCents } from "@/core/money";
 import { inTenant } from "@/server/data";
 import { resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
@@ -47,7 +49,7 @@ beforeAll(async () => {
       name: `Tenant ${x}`,
       adminEmail: `admin-${x}-${run}@test.local`,
       adminPassword: "heslo-12345",
-      modules: ["gab", "tax"],
+      modules: ["gab", "tax", "ar", "ap"],
       company: { code: x.toUpperCase(), name: `Firma ${x}` },
     });
   A = (await mk("a")).ctx;
@@ -186,7 +188,16 @@ describe("přílohy (DocuRef)", () => {
 describe("číselné řady a výchozí nastavení", () => {
   it("nová firma dostane řady s Použitím, účty, deník GEN a DPH; opakované spuštění nic nepřidá", async () => {
     const seqs = (await listRecords(A, "sys.numberSeq", {}, client)).rows;
-    expect(seqs.map((x) => `${x.code}:${x.usedFor}`).sort()).toEqual(["GLJOURNAL:gl.journal", "GLVOUCHER:gl.voucher"]);
+    expect(seqs.map((x) => `${x.code}:${x.usedFor}`).sort()).toEqual([
+      "APINV:ap.invoice",
+      "APVEND:ap.vendor",
+      "ARCUST:ar.customer",
+      "ARINV:ar.invoice",
+      "GLJOURNAL:gl.journal",
+      "GLVOUCHER:gl.voucher",
+    ]);
+    expect((await listRecords(A, "ar.group", {}, client)).rows.map((g) => g.code)).toEqual(["TUZ"]);
+    expect((await listRecords(A, "gl.period", {}, client)).total).toBe(12);
     expect((await listRecords(A, "gl.journalName", { filters: { code: "GEN" } }, client)).total).toBe(1);
     expect((await listRecords(A, "tax.taxCode", {}, client)).total).toBeGreaterThanOrEqual(4);
     const again = await inTenant(A, (sess) => setupCompany(sess.sys().api(), A.modules), client);
@@ -219,6 +230,115 @@ describe("číselné řady a výchozí nastavení", () => {
     const [moje] = (await listRecords(A, "sys.numberSeq", { filters: { code: "MOJE" } }, client)).rows;
     await saveRecord(A, "sys.numberSeq", String(moje.id), { usedFor: null }, undefined, client);
     await saveRecord(A, "sys.numberSeq", String(old.id), { usedFor: "gl.journal" }, undefined, client);
+  });
+});
+
+describe("účetní období a měny", () => {
+  async function journalWith(ctx: Ctx, date: string, lines: { acc: string; debit?: string; credit?: string; currencyId?: unknown }[]) {
+    const j = await saveRecord(ctx, "gl.journal", null, { date, description: "Test " + date }, undefined, client);
+    for (const l of lines) {
+      const [a] = (await listRecords(ctx, "gl.account", { filters: { accountNum: l.acc } }, client)).rows;
+      await saveRecord(ctx, "gl.journalLine", null, { journalId: j.id, accountId: a.id, debit: l.debit, credit: l.credit, currencyId: l.currencyId ?? null }, undefined, client);
+    }
+    return j;
+  }
+
+  it("do uzavřeného období ani mimo fiskální rok nejde účtovat", async () => {
+    const [nov] = (await listRecords(A, "gl.period", { filters: { code: "2026-11" } }, client)).rows;
+    expect(nov).toBeTruthy();
+    await saveRecord(A, "gl.period", String(nov.id), { status: "closed" }, undefined, client);
+    const j = await journalWith(A, "2026-11-12", [{ acc: "211", debit: "1" }, { acc: "411", credit: "1" }]);
+    await expectUserError(runAction(A, "gl.journal", String(j.id), "post", client), "@GL:PeriodClosed");
+    await saveRecord(A, "gl.period", String(nov.id), { status: "open" }, undefined, client);
+    const j2 = await journalWith(A, "2031-01-05", [{ acc: "211", debit: "1" }, { acc: "411", credit: "1" }]);
+    await expectUserError(runAction(A, "gl.journal", String(j2.id), "post", client), "@GL:NoPeriod");
+  });
+
+  it("řádek v EUR se zaúčtuje v CZK kurzem k datu, v zápisu zůstane částka v EUR", async () => {
+    const [eur] = (await listRecords(A, "sys.currency", { filters: { code: "EUR" } }, client)).rows;
+    await saveRecord(A, "sys.exchangeRate", null, { currencyId: eur.id, date: "2026-11-10", amount: 1, rate: "24.335" }, undefined, client);
+    const j = await journalWith(A, "2026-11-12", [
+      { acc: "221", debit: "100", currencyId: eur.id },
+      { acc: "411", credit: "2433.50" },
+    ]);
+    await runAction(A, "gl.journal", String(j.id), "post", client);
+    const posted = await getRecord(A, "gl.journal", String(j.id), client);
+    const tr = (await listRecords(A, "gl.trans", { filter: { voucherId: posted!.voucherId } }, client)).rows;
+    const bank = tr.find((t) => (t._titles as Record<string, string>).accountId === "221")!;
+    expect(bank.amount).toBe("2433.50");
+    expect(bank.amountCur).toBe("100.00");
+    expect((bank._titles as Record<string, string>).currencyId).toBe("EUR");
+  });
+
+  it("kurzovní lístek ČNB", () => {
+    const sheet = parseCnb("12.11.2026 #219\nzemě|měna|množství|kód|kurz\nEMU|euro|1|EUR|24,335\nJaponsko|jen|100|JPY|15,402\n");
+    expect(sheet.date).toBe("2026-11-12");
+    expect(sheet.rates).toContainEqual({ code: "JPY", amount: 100, rate: "15.402" });
+    expect(fromCents(convertCents("1000", "15.402", 100))).toBe("154.02");
+    expect(fromCents(convertCents("19.99", "24.335", 1))).toBe("486.46");
+  });
+});
+
+describe("odběratelé a dodavatelé", () => {
+  const titles = (r: Record<string, unknown>) => (r._titles as Record<string, string>) ?? {};
+
+  async function partner(ctx: Ctx, obj: "ar.customer" | "ap.vendor", name: string, vatId?: string) {
+    const subj = await saveRecord(ctx, "gab.subject", null, { name, vatId }, undefined, client);
+    const [grp] = (await listRecords(ctx, obj.replace(/\.\w+$/, ".group"), { filters: { code: "TUZ" } }, client)).rows;
+    return saveRecord(ctx, obj, null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+  }
+
+  it("vydaná faktura: DPH na řádcích, součty, zaúčtování, saldo, daňové transakce, zámek", async () => {
+    const cust = await partner(A, "ar.customer", "Odběratel s.r.o.", "CZ11122233");
+    expect(cust.accountNum).toMatch(/^ODB\d{5}$/);
+    const inv = await saveRecord(A, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-12", description: "Služby" }, undefined, client);
+    expect(inv.invoiceNum).toMatch(/^FV26\d{5}$/);
+    expect(inv.dueDate).toBe("2026-11-26"); // 14 dní ze skupiny
+    expect(inv.taxDate).toBe("2026-11-12");
+    await saveRecord(A, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Konzultace", qty: "2.5", unitPrice: "1000" }, undefined, client);
+    const l2 = await saveRecord(A, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Doprava", qty: "1", unitPrice: "99.99" }, undefined, client);
+    expect(l2.taxAmount).toBe("21.00"); // 99,99 × 21 % = 20,9979
+    let h = (await getRecord(A, "ar.invoice", String(inv.id), client))!;
+    expect([h.amountNet, h.taxAmount, h.amountGross]).toEqual(["2599.99", "546.00", "3145.99"]);
+    await deleteRecord(A, "ar.invoiceLine", String(l2.id), client);
+    h = (await getRecord(A, "ar.invoice", String(inv.id), client))!;
+    expect([h.amountNet, h.taxAmount, h.amountGross]).toEqual(["2500.00", "525.00", "3025.00"]);
+
+    await runAction(A, "ar.invoice", String(inv.id), "post", client);
+    h = (await getRecord(A, "ar.invoice", String(inv.id), client))!;
+    expect(h.status).toBe("posted");
+    const tr = (await listRecords(A, "gl.trans", { filter: { voucherId: h.voucherId } }, client)).rows;
+    expect(tr.map((t) => `${titles(t).accountId}:${t.amount}`).sort()).toEqual(["311:3025.00", "343:-525.00", "604:-2500.00"]);
+    const open = (await listRecords(A, "ar.trans", { filter: { customerId: cust.id }, totals: true }, client));
+    expect(open.totals!.amount).toBe("3025.00");
+    const tx = (await listRecords(A, "tax.trans", { filter: { sourceId: String(inv.id) } }, client)).rows;
+    expect(tx.map((t) => [titles(t).taxCodeId, t.base, t.tax, t.vatId, t.direction])).toEqual([["V21", "2500.00", "525.00", "CZ11122233", "output"]]);
+    // zaúčtovaná faktura ani její řádky nejdou měnit
+    await expectUserError(saveRecord(A, "ar.invoice", String(inv.id), { description: "x" }, undefined, client), "@SYS:Locked");
+    const [line] = (await listRecords(A, "ar.invoiceLine", { filter: { invoiceId: inv.id } }, client)).rows;
+    await expectUserError(saveRecord(A, "ar.invoiceLine", String(line.id), { qty: "3" }, undefined, client), "@GL:Locked");
+    // odběratele s fakturami nejde smazat (faktury se s ním nemažou)
+    await expectUserError(deleteRecord(A, "ar.customer", String(cust.id), client), "@SYS:InUse");
+  });
+
+  it("přijatá faktura v EUR: náklady a DPH na vstupu v CZK, závazek, číslo dokladu dodavatele", async () => {
+    const vend = await partner(A, "ap.vendor", "Dodavatel GmbH", "DE123456789");
+    const [eur] = (await listRecords(A, "sys.currency", { filters: { code: "EUR" } }, client)).rows;
+    await saveRecord(A, "sys.exchangeRate", null, { currencyId: eur.id, date: "2026-11-11", amount: 1, rate: "25" }, undefined, client).catch(() => null);
+    const inv = await saveRecord(A, "ap.invoice", null, { vendorId: vend.id, externalNum: "INV-2026-77", invoiceDate: "2026-11-12", currencyId: eur.id }, undefined, client);
+    await saveRecord(A, "ap.invoiceLine", null, { invoiceId: inv.id, description: "Licence", qty: "1", unitPrice: "100" }, undefined, client);
+    await runAction(A, "ap.invoice", String(inv.id), "post", client);
+    const h = (await getRecord(A, "ap.invoice", String(inv.id), client))!;
+    const tr = (await listRecords(A, "gl.trans", { filter: { voucherId: h.voucherId } }, client)).rows;
+    // kurz: nejnovější nejvýš 7 dní starý k datu faktury
+    const rate = (await listRecords(A, "sys.exchangeRate", { filter: { currencyId: eur.id }, sort: "date", dir: "desc" }, client)).rows.find((r) => String(r.date) <= "2026-11-12")!;
+    const czk = (eurAmount: number) => (Math.round(eurAmount * Number(rate.rate) * 100) / 100).toFixed(2);
+    expect(tr.map((t) => `${titles(t).accountId}:${t.amount}:${t.amountCur}`).sort()).toEqual(
+      [`321:-${czk(121)}:-121.00`, `343:${czk(21)}:21.00`, `518:${czk(100)}:100.00`].sort(),
+    );
+    const tx = (await listRecords(A, "tax.trans", { filter: { sourceId: String(inv.id) } }, client)).rows;
+    expect(tx[0].documentNum).toBe("INV-2026-77");
+    expect(tx[0].direction).toBe("input");
   });
 });
 

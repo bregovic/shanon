@@ -207,12 +207,25 @@ model SysCompany {
   sysNumberSeq_company  SysNumberSeq[]  @relation("SysNumberSeq_company")
   glAccount_company     GlAccount[]     @relation("GlAccount_company")
   glCostCenter_company  GlCostCenter[]  @relation("GlCostCenter_company")
+  glFiscalYear_company  GlFiscalYear[]  @relation("GlFiscalYear_company")
+  glPeriod_company      GlPeriod[]      @relation("GlPeriod_company")
   glVoucher_company     GlVoucher[]     @relation("GlVoucher_company")
   glTrans_company       GlTrans[]       @relation("GlTrans_company")
   glJournalName_company GlJournalName[] @relation("GlJournalName_company")
   glJournal_company     GlJournal[]     @relation("GlJournal_company")
   glJournalLine_company GlJournalLine[] @relation("GlJournalLine_company")
   taxCode_company       TaxCode[]       @relation("TaxCode_company")
+  taxTrans_company      TaxTrans[]      @relation("TaxTrans_company")
+  arGroup_company       ArGroup[]       @relation("ArGroup_company")
+  arCustomer_company    ArCustomer[]    @relation("ArCustomer_company")
+  arInvoice_company     ArInvoice[]     @relation("ArInvoice_company")
+  arInvoiceLine_company ArInvoiceLine[] @relation("ArInvoiceLine_company")
+  arTrans_company       ArTrans[]       @relation("ArTrans_company")
+  apGroup_company       ApGroup[]       @relation("ApGroup_company")
+  apVendor_company      ApVendor[]      @relation("ApVendor_company")
+  apInvoice_company     ApInvoice[]     @relation("ApInvoice_company")
+  apInvoiceLine_company ApInvoiceLine[] @relation("ApInvoiceLine_company")
+  apTrans_company       ApTrans[]       @relation("ApTrans_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -243,6 +256,59 @@ model SysNumberSeq {
   @@unique([tenantId, companyId, usedFor])
   @@index([tenantId, companyId])
   @@map("sys_number_seq")
+}
+
+/// sys.currency — generováno z definice objektu
+model SysCurrency {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String   @db.VarChar(3)
+  name      String   @db.VarChar(120)
+  symbol    String?  @db.VarChar(5)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  sysExchangeRate_currency SysExchangeRate[] @relation("SysExchangeRate_currency")
+  glTrans_currency         GlTrans[]         @relation("GlTrans_currency")
+  glJournalLine_currency   GlJournalLine[]   @relation("GlJournalLine_currency")
+  taxTrans_currency        TaxTrans[]        @relation("TaxTrans_currency")
+  arCustomer_currency      ArCustomer[]      @relation("ArCustomer_currency")
+  arInvoice_currency       ArInvoice[]       @relation("ArInvoice_currency")
+  arTrans_currency         ArTrans[]         @relation("ArTrans_currency")
+  apVendor_currency        ApVendor[]        @relation("ApVendor_currency")
+  apInvoice_currency       ApInvoice[]       @relation("ApInvoice_currency")
+  apTrans_currency         ApTrans[]         @relation("ApTrans_currency")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("sys_currency")
+}
+
+/// sys.exchangeRate — generováno z definice objektu
+model SysExchangeRate {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  currencyId String   @map("currency_id") @db.Uuid
+  date       DateTime @db.Date
+  amount     Int      @default(1)
+  rate       Decimal  @db.Decimal(18, 6)
+  ext        Json     @default("{}")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String?  @map("created_by") @db.Uuid
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.Uuid
+
+  currency SysCurrency @relation("SysExchangeRate_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, currencyId, date])
+  @@index([tenantId])
+  @@index([currencyId])
+  @@map("sys_exchange_rate")
 }
 
 /// sys.role — generováno z definice objektu
@@ -308,6 +374,9 @@ model GabSubject {
 
   gabAddress_subject GabAddress[] @relation("GabAddress_subject")
   gabContact_subject GabContact[] @relation("GabContact_subject")
+  taxTrans_subject   TaxTrans[]   @relation("TaxTrans_subject")
+  arCustomer_subject ArCustomer[] @relation("ArCustomer_subject")
+  apVendor_subject   ApVendor[]   @relation("ApVendor_subject")
 
   @@index([tenantId])
   @@map("gab_subject")
@@ -375,11 +444,17 @@ model GlAccount {
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy  String?  @map("updated_by") @db.Uuid
 
-  company                     SysCompany      @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
-  glTrans_account             GlTrans[]       @relation("GlTrans_account")
-  glJournalName_offsetAccount GlJournalName[] @relation("GlJournalName_offsetAccount")
-  glJournalLine_account       GlJournalLine[] @relation("GlJournalLine_account")
-  taxCode_account             TaxCode[]       @relation("TaxCode_account")
+  company                      SysCompany      @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glTrans_account              GlTrans[]       @relation("GlTrans_account")
+  glJournalName_offsetAccount  GlJournalName[] @relation("GlJournalName_offsetAccount")
+  glJournalLine_account        GlJournalLine[] @relation("GlJournalLine_account")
+  taxCode_account              TaxCode[]       @relation("TaxCode_account")
+  arGroup_receivableAccount    ArGroup[]       @relation("ArGroup_receivableAccount")
+  arGroup_revenueAccount       ArGroup[]       @relation("ArGroup_revenueAccount")
+  arInvoiceLine_revenueAccount ArInvoiceLine[] @relation("ArInvoiceLine_revenueAccount")
+  apGroup_payableAccount       ApGroup[]       @relation("ApGroup_payableAccount")
+  apGroup_expenseAccount       ApGroup[]       @relation("ApGroup_expenseAccount")
+  apInvoiceLine_expenseAccount ApInvoiceLine[] @relation("ApInvoiceLine_expenseAccount")
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
@@ -403,10 +478,61 @@ model GlCostCenter {
   company                  SysCompany      @relation("GlCostCenter_company", fields: [companyId], references: [id], onDelete: Restrict)
   glTrans_costCenter       GlTrans[]       @relation("GlTrans_costCenter")
   glJournalLine_costCenter GlJournalLine[] @relation("GlJournalLine_costCenter")
+  arInvoiceLine_costCenter ArInvoiceLine[] @relation("ArInvoiceLine_costCenter")
+  apInvoiceLine_costCenter ApInvoiceLine[] @relation("ApInvoiceLine_costCenter")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
   @@map("gl_cost_center")
+}
+
+/// gl.fiscalYear — generováno z definice objektu
+model GlFiscalYear {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company             SysCompany @relation("GlFiscalYear_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glPeriod_fiscalYear GlPeriod[] @relation("GlPeriod_fiscalYear")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("gl_fiscal_year")
+}
+
+/// gl.period — generováno z definice objektu
+model GlPeriod {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  fiscalYearId String   @map("fiscal_year_id") @db.Uuid
+  code         String   @db.VarChar(20)
+  startDate    DateTime @map("start_date") @db.Date
+  endDate      DateTime @map("end_date") @db.Date
+  status       String   @default("open") @db.VarChar(40)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company    SysCompany   @relation("GlPeriod_company", fields: [companyId], references: [id], onDelete: Restrict)
+  fiscalYear GlFiscalYear @relation("GlPeriod_fiscalYear", fields: [fiscalYearId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([fiscalYearId])
+  @@map("gl_period")
 }
 
 /// gl.voucher — generováno z definice objektu
@@ -429,6 +555,11 @@ model GlVoucher {
   company           SysCompany  @relation("GlVoucher_company", fields: [companyId], references: [id], onDelete: Restrict)
   glTrans_voucher   GlTrans[]   @relation("GlTrans_voucher")
   glJournal_voucher GlJournal[] @relation("GlJournal_voucher")
+  taxTrans_voucher  TaxTrans[]  @relation("TaxTrans_voucher")
+  arInvoice_voucher ArInvoice[] @relation("ArInvoice_voucher")
+  arTrans_voucher   ArTrans[]   @relation("ArTrans_voucher")
+  apInvoice_voucher ApInvoice[] @relation("ApInvoice_voucher")
+  apTrans_voucher   ApTrans[]   @relation("ApTrans_voucher")
 
   @@unique([tenantId, companyId, voucherNum])
   @@index([tenantId, companyId])
@@ -445,6 +576,8 @@ model GlTrans {
   accountId    String   @map("account_id") @db.Uuid
   costCenterId String?  @map("cost_center_id") @db.Uuid
   amount       Decimal  @db.Decimal(18, 2)
+  currencyId   String?  @map("currency_id") @db.Uuid
+  amountCur    Decimal? @map("amount_cur") @db.Decimal(18, 2)
   text         String?  @db.VarChar(255)
   ext          Json     @default("{}")
   version      Int      @default(1)
@@ -457,11 +590,13 @@ model GlTrans {
   voucher    GlVoucher     @relation("GlTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   account    GlAccount     @relation("GlTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
   costCenter GlCostCenter? @relation("GlTrans_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
+  currency   SysCurrency?  @relation("GlTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([voucherId])
   @@index([accountId])
   @@index([costCenterId])
+  @@index([currencyId])
   @@map("gl_trans")
 }
 
@@ -531,6 +666,7 @@ model GlJournalLine {
   journalId    String   @map("journal_id") @db.Uuid
   accountId    String   @map("account_id") @db.Uuid
   costCenterId String?  @map("cost_center_id") @db.Uuid
+  currencyId   String?  @map("currency_id") @db.Uuid
   debit        Decimal? @db.Decimal(18, 2)
   credit       Decimal? @db.Decimal(18, 2)
   text         String?  @db.VarChar(255)
@@ -545,11 +681,13 @@ model GlJournalLine {
   journal    GlJournal     @relation("GlJournalLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
   account    GlAccount     @relation("GlJournalLine_account", fields: [accountId], references: [id], onDelete: Restrict)
   costCenter GlCostCenter? @relation("GlJournalLine_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
+  currency   SysCurrency?  @relation("GlJournalLine_currency", fields: [currencyId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([journalId])
   @@index([accountId])
   @@index([costCenterId])
+  @@index([currencyId])
   @@map("gl_journal_line")
 }
 
@@ -573,11 +711,405 @@ model TaxCode {
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy     String?  @map("updated_by") @db.Uuid
 
-  company SysCompany @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
-  account GlAccount  @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
+  company               SysCompany      @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
+  account               GlAccount       @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
+  taxTrans_taxCode      TaxTrans[]      @relation("TaxTrans_taxCode")
+  arGroup_taxCode       ArGroup[]       @relation("ArGroup_taxCode")
+  arInvoiceLine_taxCode ArInvoiceLine[] @relation("ArInvoiceLine_taxCode")
+  apGroup_taxCode       ApGroup[]       @relation("ApGroup_taxCode")
+  apInvoiceLine_taxCode ApInvoiceLine[] @relation("ApInvoiceLine_taxCode")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
   @@index([accountId])
   @@map("tax_code")
+}
+
+/// tax.trans — generováno z definice objektu
+model TaxTrans {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  taxDate      DateTime @map("tax_date") @db.Date
+  taxCodeId    String   @map("tax_code_id") @db.Uuid
+  direction    String   @db.VarChar(40)
+  base         Decimal  @db.Decimal(18, 2)
+  tax          Decimal  @db.Decimal(18, 2)
+  currencyId   String?  @map("currency_id") @db.Uuid
+  baseCur      Decimal? @map("base_cur") @db.Decimal(18, 2)
+  taxCur       Decimal? @map("tax_cur") @db.Decimal(18, 2)
+  subjectId    String?  @map("subject_id") @db.Uuid
+  vatId        String?  @map("vat_id") @db.VarChar(16)
+  documentNum  String?  @map("document_num") @db.VarChar(255)
+  voucherId    String?  @map("voucher_id") @db.Uuid
+  sourceObject String?  @map("source_object") @db.VarChar(255)
+  sourceId     String?  @map("source_id") @db.VarChar(255)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company  SysCompany   @relation("TaxTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
+  taxCode  TaxCode      @relation("TaxTrans_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  currency SysCurrency? @relation("TaxTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  subject  GabSubject?  @relation("TaxTrans_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+  voucher  GlVoucher?   @relation("TaxTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([taxCodeId])
+  @@index([currencyId])
+  @@index([subjectId])
+  @@index([voucherId])
+  @@map("tax_trans")
+}
+
+/// ar.group — generováno z definice objektu
+model ArGroup {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  companyId           String   @map("company_id") @db.Uuid
+  code                String   @db.VarChar(20)
+  name                String   @db.VarChar(120)
+  receivableAccountId String   @map("receivable_account_id") @db.Uuid
+  revenueAccountId    String?  @map("revenue_account_id") @db.Uuid
+  taxCodeId           String?  @map("tax_code_id") @db.Uuid
+  paymentDays         Int?     @default(14) @map("payment_days")
+  ext                 Json     @default("{}")
+  version             Int      @default(1)
+  createdAt           DateTime @default(now()) @map("created_at")
+  createdBy           String?  @map("created_by") @db.Uuid
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy           String?  @map("updated_by") @db.Uuid
+
+  company           SysCompany   @relation("ArGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  receivableAccount GlAccount    @relation("ArGroup_receivableAccount", fields: [receivableAccountId], references: [id], onDelete: Restrict)
+  revenueAccount    GlAccount?   @relation("ArGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxCode           TaxCode?     @relation("ArGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  arCustomer_group  ArCustomer[] @relation("ArCustomer_group")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([receivableAccountId])
+  @@index([revenueAccountId])
+  @@index([taxCodeId])
+  @@map("ar_group")
+}
+
+/// ar.customer — generováno z definice objektu
+model ArCustomer {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  accountNum  String   @map("account_num") @db.VarChar(20)
+  subjectId   String   @map("subject_id") @db.Uuid
+  groupId     String   @map("group_id") @db.Uuid
+  currencyId  String?  @map("currency_id") @db.Uuid
+  paymentDays Int?     @map("payment_days")
+  blocked     Boolean  @default(false)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company            SysCompany   @relation("ArCustomer_company", fields: [companyId], references: [id], onDelete: Restrict)
+  subject            GabSubject   @relation("ArCustomer_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+  group              ArGroup      @relation("ArCustomer_group", fields: [groupId], references: [id], onDelete: Restrict)
+  currency           SysCurrency? @relation("ArCustomer_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  arInvoice_customer ArInvoice[]  @relation("ArInvoice_customer")
+  arTrans_customer   ArTrans[]    @relation("ArTrans_customer")
+
+  @@unique([tenantId, companyId, accountNum])
+  @@unique([tenantId, companyId, subjectId])
+  @@index([tenantId, companyId])
+  @@index([subjectId])
+  @@index([groupId])
+  @@index([currencyId])
+  @@map("ar_customer")
+}
+
+/// ar.invoice — generováno z definice objektu
+model ArInvoice {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  invoiceNum  String    @map("invoice_num") @db.VarChar(20)
+  customerId  String    @map("customer_id") @db.Uuid
+  invoiceDate DateTime  @default(now()) @map("invoice_date") @db.Date
+  taxDate     DateTime? @map("tax_date") @db.Date
+  dueDate     DateTime? @map("due_date") @db.Date
+  currencyId  String?   @map("currency_id") @db.Uuid
+  description String?   @db.VarChar(255)
+  amountNet   Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount   Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  amountGross Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  status      String    @default("draft") @db.VarChar(40)
+  voucherId   String?   @map("voucher_id") @db.Uuid
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company               SysCompany      @relation("ArInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
+  customer              ArCustomer      @relation("ArInvoice_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  currency              SysCurrency?    @relation("ArInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  voucher               GlVoucher?      @relation("ArInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  arInvoiceLine_invoice ArInvoiceLine[] @relation("ArInvoiceLine_invoice")
+  arTrans_invoice       ArTrans[]       @relation("ArTrans_invoice")
+
+  @@index([tenantId, companyId])
+  @@index([customerId])
+  @@index([currencyId])
+  @@index([voucherId])
+  @@map("ar_invoice")
+}
+
+/// ar.invoiceLine — generováno z definice objektu
+model ArInvoiceLine {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  invoiceId        String   @map("invoice_id") @db.Uuid
+  description      String   @db.VarChar(255)
+  qty              Decimal  @default(1) @db.Decimal(18, 4)
+  unitPrice        Decimal  @map("unit_price") @db.Decimal(18, 2)
+  revenueAccountId String?  @map("revenue_account_id") @db.Uuid
+  taxCodeId        String?  @map("tax_code_id") @db.Uuid
+  costCenterId     String?  @map("cost_center_id") @db.Uuid
+  amountNet        Decimal? @map("amount_net") @db.Decimal(18, 2)
+  taxAmount        Decimal? @map("tax_amount") @db.Decimal(18, 2)
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  company        SysCompany    @relation("ArInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  invoice        ArInvoice     @relation("ArInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  revenueAccount GlAccount?    @relation("ArInvoiceLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?      @relation("ArInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  costCenter     GlCostCenter? @relation("ArInvoiceLine_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([invoiceId])
+  @@index([revenueAccountId])
+  @@index([taxCodeId])
+  @@index([costCenterId])
+  @@map("ar_invoice_line")
+}
+
+/// ar.trans — generováno z definice objektu
+model ArTrans {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  customerId  String    @map("customer_id") @db.Uuid
+  invoiceId   String?   @map("invoice_id") @db.Uuid
+  voucherId   String?   @map("voucher_id") @db.Uuid
+  documentNum String?   @map("document_num") @db.VarChar(255)
+  date        DateTime  @db.Date
+  dueDate     DateTime? @map("due_date") @db.Date
+  currencyId  String?   @map("currency_id") @db.Uuid
+  amount      Decimal   @db.Decimal(18, 2)
+  amountCur   Decimal?  @map("amount_cur") @db.Decimal(18, 2)
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company  SysCompany   @relation("ArTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
+  customer ArCustomer   @relation("ArTrans_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  invoice  ArInvoice?   @relation("ArTrans_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  voucher  GlVoucher?   @relation("ArTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  currency SysCurrency? @relation("ArTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([voucherId])
+  @@index([currencyId])
+  @@map("ar_trans")
+}
+
+/// ap.group — generováno z definice objektu
+model ApGroup {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  code             String   @db.VarChar(20)
+  name             String   @db.VarChar(120)
+  payableAccountId String   @map("payable_account_id") @db.Uuid
+  expenseAccountId String?  @map("expense_account_id") @db.Uuid
+  taxCodeId        String?  @map("tax_code_id") @db.Uuid
+  paymentDays      Int?     @default(14) @map("payment_days")
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  company        SysCompany @relation("ApGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  payableAccount GlAccount  @relation("ApGroup_payableAccount", fields: [payableAccountId], references: [id], onDelete: Restrict)
+  expenseAccount GlAccount? @relation("ApGroup_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?   @relation("ApGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  apVendor_group ApVendor[] @relation("ApVendor_group")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([payableAccountId])
+  @@index([expenseAccountId])
+  @@index([taxCodeId])
+  @@map("ap_group")
+}
+
+/// ap.vendor — generováno z definice objektu
+model ApVendor {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  accountNum  String   @map("account_num") @db.VarChar(20)
+  subjectId   String   @map("subject_id") @db.Uuid
+  groupId     String   @map("group_id") @db.Uuid
+  currencyId  String?  @map("currency_id") @db.Uuid
+  paymentDays Int?     @map("payment_days")
+  blocked     Boolean  @default(false)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company          SysCompany   @relation("ApVendor_company", fields: [companyId], references: [id], onDelete: Restrict)
+  subject          GabSubject   @relation("ApVendor_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+  group            ApGroup      @relation("ApVendor_group", fields: [groupId], references: [id], onDelete: Restrict)
+  currency         SysCurrency? @relation("ApVendor_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  apInvoice_vendor ApInvoice[]  @relation("ApInvoice_vendor")
+  apTrans_vendor   ApTrans[]    @relation("ApTrans_vendor")
+
+  @@unique([tenantId, companyId, accountNum])
+  @@unique([tenantId, companyId, subjectId])
+  @@index([tenantId, companyId])
+  @@index([subjectId])
+  @@index([groupId])
+  @@index([currencyId])
+  @@map("ap_vendor")
+}
+
+/// ap.invoice — generováno z definice objektu
+model ApInvoice {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  invoiceNum  String    @map("invoice_num") @db.VarChar(20)
+  externalNum String    @map("external_num") @db.VarChar(20)
+  vendorId    String    @map("vendor_id") @db.Uuid
+  invoiceDate DateTime  @default(now()) @map("invoice_date") @db.Date
+  taxDate     DateTime? @map("tax_date") @db.Date
+  dueDate     DateTime? @map("due_date") @db.Date
+  currencyId  String?   @map("currency_id") @db.Uuid
+  description String?   @db.VarChar(255)
+  amountNet   Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount   Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  amountGross Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  status      String    @default("draft") @db.VarChar(40)
+  voucherId   String?   @map("voucher_id") @db.Uuid
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company               SysCompany      @relation("ApInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
+  vendor                ApVendor        @relation("ApInvoice_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  currency              SysCurrency?    @relation("ApInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  voucher               GlVoucher?      @relation("ApInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  apInvoiceLine_invoice ApInvoiceLine[] @relation("ApInvoiceLine_invoice")
+  apTrans_invoice       ApTrans[]       @relation("ApTrans_invoice")
+
+  @@index([tenantId, companyId])
+  @@index([vendorId])
+  @@index([currencyId])
+  @@index([voucherId])
+  @@map("ap_invoice")
+}
+
+/// ap.invoiceLine — generováno z definice objektu
+model ApInvoiceLine {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  invoiceId        String   @map("invoice_id") @db.Uuid
+  description      String   @db.VarChar(255)
+  qty              Decimal  @default(1) @db.Decimal(18, 4)
+  unitPrice        Decimal  @map("unit_price") @db.Decimal(18, 2)
+  expenseAccountId String?  @map("expense_account_id") @db.Uuid
+  taxCodeId        String?  @map("tax_code_id") @db.Uuid
+  costCenterId     String?  @map("cost_center_id") @db.Uuid
+  amountNet        Decimal? @map("amount_net") @db.Decimal(18, 2)
+  taxAmount        Decimal? @map("tax_amount") @db.Decimal(18, 2)
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  company        SysCompany    @relation("ApInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  invoice        ApInvoice     @relation("ApInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  expenseAccount GlAccount?    @relation("ApInvoiceLine_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?      @relation("ApInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  costCenter     GlCostCenter? @relation("ApInvoiceLine_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([invoiceId])
+  @@index([expenseAccountId])
+  @@index([taxCodeId])
+  @@index([costCenterId])
+  @@map("ap_invoice_line")
+}
+
+/// ap.trans — generováno z definice objektu
+model ApTrans {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  vendorId    String    @map("vendor_id") @db.Uuid
+  invoiceId   String?   @map("invoice_id") @db.Uuid
+  voucherId   String?   @map("voucher_id") @db.Uuid
+  documentNum String?   @map("document_num") @db.VarChar(255)
+  date        DateTime  @db.Date
+  dueDate     DateTime? @map("due_date") @db.Date
+  currencyId  String?   @map("currency_id") @db.Uuid
+  amount      Decimal   @db.Decimal(18, 2)
+  amountCur   Decimal?  @map("amount_cur") @db.Decimal(18, 2)
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company  SysCompany   @relation("ApTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
+  vendor   ApVendor     @relation("ApTrans_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  invoice  ApInvoice?   @relation("ApTrans_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  voucher  GlVoucher?   @relation("ApTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  currency SysCurrency? @relation("ApTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([vendorId])
+  @@index([invoiceId])
+  @@index([voucherId])
+  @@index([currencyId])
+  @@map("ap_trans")
 }

@@ -27,6 +27,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
       ? registry.enums.get(e.enumId)!.values.map((v) => ({ value: v.value, label: t(v.label) }))
       : undefined,
     refObject: e.refObject,
+    noTotal: e.noTotal,
     refHref: e.refObject ? objectHref(e.refObject) : undefined,
     ext,
   };

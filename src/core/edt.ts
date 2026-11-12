@@ -36,6 +36,8 @@ export interface Edt {
   refObject?: string;
   /** zobrazení v gridu */
   align?: "left" | "right" | "center";
+  /** decimal: nesčítat v řádku Celkem (ceny, množství, částky v různých měnách) */
+  noTotal?: boolean;
   /** převod vstupu (např. velká písmena u kódů) */
   transform?: "upper" | "trim";
 }
@@ -80,7 +82,11 @@ export const Edts = {
   NoYes: defineEdt({ id: "NoYes", kind: "bool", label: "@SYS:Active" }),
   TransDate: defineEdt({ id: "TransDate", kind: "date", label: "@SYS:Date" }),
   Amount: defineEdt({ id: "Amount", kind: "decimal", label: "@SYS:Amount", precision: 18, scale: 2, align: "right" }),
-  Qty: defineEdt({ id: "Qty", kind: "decimal", label: "@SYS:Qty", precision: 18, scale: 4, align: "right" }),
+  Qty: defineEdt({ id: "Qty", kind: "decimal", label: "@SYS:Qty", precision: 18, scale: 4, align: "right", noTotal: true }),
+  /** cena za jednotku — nesčítá se */
+  Price: defineEdt({ id: "Price", kind: "decimal", label: "@SYS:Price", precision: 18, scale: 2, align: "right", noTotal: true }),
+  /** částka v měně dokladu — v seznamu může být víc měn, nesčítá se */
+  AmountCur: defineEdt({ id: "AmountCur", kind: "decimal", label: "@SYS:AmountCur", precision: 18, scale: 2, align: "right", noTotal: true }),
   Percent: defineEdt({ id: "Percent", kind: "decimal", label: "@SYS:Percent", precision: 7, scale: 4, align: "right" }),
   Int: defineEdt({ id: "Int", kind: "int", label: "@SYS:Number", align: "right" }),
   Email: defineEdt({

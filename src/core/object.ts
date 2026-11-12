@@ -25,6 +25,7 @@ export interface FieldDef {
   /** přepíše label typu */
   label?: LabelRef;
   mandatory?: boolean;
+  /** výchozí hodnota; u data "$today" = dnešní datum */
   default?: string | number | boolean;
   /** jen pro čtení ve formuláři (vyplňuje systém) */
   readOnly?: boolean;
@@ -60,7 +61,11 @@ export interface ObjectDef {
   /** záznamy vytváří jen systém (např. účetní zápisy), v UI jen čtení */
   systemOnly?: boolean;
   /** podřízené řádky zobrazené ve formuláři (např. řádky dokladu) */
-  lines?: { object: string; field: string; label: LabelRef }[];
+  /**
+   * podřízené záznamy zobrazené ve formuláři. `owned: false` = jen přehled
+   * (faktury odběratele) — se záznamem se nemažou, smazání pak zastaví vazba.
+   */
+  lines?: { object: string; field: string; label: LabelRef; owned?: boolean }[];
   /** tlačítka ve formuláři; logika v ObjectHandlers.actions */
   actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown } }[];
   /** záznam (i jeho řádky) nelze měnit ani mazat, když pole má danou hodnotu */
