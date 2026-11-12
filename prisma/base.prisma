@@ -35,17 +35,16 @@ model SysUser {
   email        String   @unique @db.VarChar(254)
   name         String   @db.VarChar(120)
   passwordHash String   @map("password_hash")
-  /// admin = správa modulů a nastavení tenanta
+  /// admin = superuživatel tenanta (všechny firmy, moduly, role); user = podle přiřazení k firmám
   role         String   @default("user") @db.VarChar(20)
   lang         String   @default("cs") @db.VarChar(5)
   active       Boolean  @default(true)
-  /// role (sys_role.id), oprávnění = sjednocení oprávnění rolí; správce má vše
-  roleIds      String[] @default([]) @map("role_ids") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
 
   tenant    SysTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions  SysSession[]
   favorites SysFavorite[]
+  companies SysUserCompany[]
 
   @@index([tenantId])
   @@map("sys_user")
@@ -160,4 +159,23 @@ model SysFavorite {
 
   @@id([userId, href])
   @@map("sys_favorite")
+}
+
+/// Přiřazení uživatele k firmě (účetní jednotce) — obdoba přiřazení rolí
+/// k organizacím v D365. Bez přiřazení firmu nevidí (kromě superuživatele).
+model SysUserCompany {
+  userId    String   @map("user_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  /// správce firmy: v této firmě smí vše, spravuje její uživatele
+  admin     Boolean  @default(false)
+  /// role (sys_role.id) platné v této firmě
+  roleIds   String[] @default([]) @map("role_ids") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, companyId])
+  @@index([tenantId, companyId])
+  @@map("sys_user_company")
 }

@@ -6,6 +6,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { glSetup } from "./setup";
 
 export const AccountType = defineEnum({
   id: "AccountType",
@@ -41,6 +42,8 @@ const AccountRef = refEdt("gl.account", "@GL:Account");
 const CostCenterRef = refEdt("gl.costCenter", "@GL:CostCenter");
 const VoucherRef = refEdt("gl.voucher", "@GL:Voucher");
 const JournalRef = refEdt("gl.journal", "@GL:Journal");
+const JournalNameRef = refEdt("gl.journalName", "@GL:JournalName");
+const NumberSeqRef = refEdt("sys.numberSeq", "@SYS:NumberSeq");
 
 export const account = defineObject({
   id: "gl.account",
@@ -96,8 +99,33 @@ export const voucher = defineObject({
   list: ["voucherNum", "date", "description", "sourceObject"],
   form: [{ label: "@SYS:General", fields: ["voucherNum", "date", "description", "sourceObject"] }],
   unique: [["voucherNum"]],
+  numberSeq: { field: "voucherNum", seq: "GLVOUCHER" },
   defaultSort: { field: "date", dir: "desc" },
   lines: [{ object: "gl.trans", field: "voucherId", label: "@GL:Transactions" }],
+});
+
+/** Nastavení deníku (obdoba Journal names v AX): řada dokladů, protiúčet. */
+export const journalName = defineObject({
+  id: "gl.journalName",
+  table: "gl_journal_name",
+  label: "@GL:JournalName",
+  labelPlural: "@GL:JournalNames",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    voucherSeqId: { edt: NumberSeqRef, label: "@GL:VoucherSeq" },
+    offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount" },
+    blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+  },
+  titleField: "code",
+  list: ["code", "name", "voucherSeqId", "offsetAccountId", "blocked"],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "blocked"] },
+    { label: "@GL:Posting", fields: ["voucherSeqId", "offsetAccountId"] },
+  ],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
 });
 
 export const trans = defineObject({
@@ -130,14 +158,19 @@ export const journal = defineObject({
   scope: "company",
   fields: {
     journalNum: { edt: VoucherNum, label: "@GL:JournalNum", mandatory: true, readOnly: true },
+    /** prázdné = výchozí název deníku (GEN, jinak první) — doplní se při uložení */
+    journalNameId: { edt: JournalNameRef },
     date: { edt: Edts.TransDate, mandatory: true },
     description: { edt: Edts.Description, mandatory: true },
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
     voucherId: { edt: VoucherRef, readOnly: true },
   },
   titleField: "journalNum",
-  list: ["journalNum", "date", "description", "status", "voucherId"],
-  form: [{ label: "@SYS:General", fields: ["journalNum", "date", "description", "status", "voucherId"] }],
+  list: ["journalNum", "journalNameId", "date", "description", "status", "voucherId"],
+  form: [
+    { label: "@SYS:General", fields: ["journalNum", "journalNameId", "date", "description"] },
+    { label: "@GL:Status", fields: ["status", "voucherId"] },
+  ],
   numberSeq: { field: "journalNum", seq: "GLJOURNAL" },
   defaultSort: { field: "date", dir: "desc" },
   lines: [{ object: "gl.journalLine", field: "journalId", label: "@SYS:Lines" }],
@@ -171,14 +204,19 @@ export default defineModule({
   icon: "BookNumber",
   dependsOn: ["sys"],
   enums: [AccountType, JournalStatus],
-  objects: [account, costCenter, voucher, trans, journal, journalLine],
+  objects: [account, costCenter, voucher, trans, journalName, journal, journalLine],
   menu: [
     {
       label: "@GL:Module",
       items: [{ object: "gl.journal" }, { object: "gl.voucher" }, { object: "gl.trans" }],
     },
-    { label: "@SYS:Setup", items: [{ object: "gl.account" }, { object: "gl.costCenter" }] },
+    { label: "@SYS:Setup", items: [{ object: "gl.account" }, { object: "gl.costCenter" }, { object: "gl.journalName" }] },
   ],
+  numberSeqs: [
+    { code: "GLJOURNAL", name: "@GL:Journals", format: "DEN{YY}-{#####}", usedFor: "gl.journal" },
+    { code: "GLVOUCHER", name: "@GL:Vouchers", format: "UD{YY}-{######}", usedFor: "gl.voucher" },
+  ],
+  setup: glSetup,
   labels: {
     cs: {
       Module: "Hlavní kniha",
@@ -219,6 +257,14 @@ export default defineModule({
       LineBothSides: "Řádek {line}: vyplňte jen MD, nebo jen D.",
       AccountBlocked: "Účet {account} je blokovaný.",
       Locked: "Zaúčtovaný doklad nelze měnit.",
+      JournalName: "Název deníku",
+      JournalNames: "Názvy deníků",
+      VoucherSeq: "Řada účetních dokladů",
+      OffsetAccount: "Protiúčet",
+      Posting: "Účtování",
+      JournalNameBlocked: "Název deníku {name} je blokovaný.",
+      MissingJournalName: "Chybí název deníku. Založte ho v Nastavení → Názvy deníků.",
+      GeneralJournal: "Obecný deník",
     },
     en: {
       Module: "General ledger",
@@ -259,6 +305,14 @@ export default defineModule({
       LineBothSides: "Line {line}: fill in either debit or credit.",
       AccountBlocked: "Account {account} is blocked.",
       Locked: "A posted journal cannot be changed.",
+      JournalName: "Journal name",
+      JournalNames: "Journal names",
+      VoucherSeq: "Voucher number sequence",
+      OffsetAccount: "Offset account",
+      Posting: "Posting",
+      JournalNameBlocked: "Journal name {name} is blocked.",
+      MissingJournalName: "Journal name is missing. Create it in Setup → Journal names.",
+      GeneralJournal: "General journal",
     },
   },
 });

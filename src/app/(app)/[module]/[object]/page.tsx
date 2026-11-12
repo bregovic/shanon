@@ -30,7 +30,7 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
   }
   const meta = fieldsMeta(s.ctx, def, t);
   const mod = registry.modules.get(module)!;
-  const initial = await listRecords(s.ctx, def.id, { lang: s.lang });
+  const initial = await listRecords(s.ctx, def.id, { lang: s.lang, totals: true });
 
   const defaults: Record<string, unknown> = {};
   for (const [n, f] of Object.entries(def.fields)) {
@@ -51,7 +51,7 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
       canWrite={can(s.ctx.perms, def.id, "write")}
       canDelete={!def.systemOnly && can(s.ctx.perms, def.id, "delete")}
       openInPage={openInPage || !!def.systemOnly}
-      initial={{ rows: initial.rows, total: initial.total }}
+      initial={{ rows: initial.rows, total: initial.total, totals: initial.totals }}
       lang={s.lang}
       labels={uiLabels(t)}
     />

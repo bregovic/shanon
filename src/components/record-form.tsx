@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import {
+  Button,
   Checkbox,
   Combobox,
   Dropdown,
@@ -15,8 +16,11 @@ import {
   Option,
   Textarea,
   tokens,
+  Tooltip,
 } from "@fluentui/react-components";
 import NextLink from "next/link";
+import { useRouter } from "next/navigation";
+import { Open24Regular } from "@fluentui/react-icons";
 import { searchRefs } from "@/app/actions";
 import type { FieldMeta } from "@/lib/meta";
 
@@ -51,6 +55,7 @@ export function RecordForm({
   readOnly,
   onChange,
   columns = 2,
+  openLabel,
 }: {
   groups: FormGroup[];
   values: Values;
@@ -60,6 +65,8 @@ export function RecordForm({
   onChange: (name: string, value: unknown, title?: string) => void;
   /** 1 = šuplík (jeden sloupec), 2 = celá stránka */
   columns?: 1 | 2;
+  /** popisek tlačítka pro proskok na odkazovaný záznam */
+  openLabel: string;
 }) {
   const s = useStyles();
   return (
@@ -77,6 +84,7 @@ export function RecordForm({
                   error={errors[f.name]}
                   disabled={readOnly || f.readOnly}
                   onChange={onChange}
+                  openLabel={openLabel}
                 />
               </div>
             ))}
@@ -94,6 +102,7 @@ function FieldInput({
   error,
   disabled,
   onChange,
+  openLabel,
 }: {
   f: FieldMeta;
   value: unknown;
@@ -101,6 +110,7 @@ function FieldInput({
   error?: string;
   disabled: boolean;
   onChange: (name: string, value: unknown, title?: string) => void;
+  openLabel: string;
 }) {
   const v = value === null || value === undefined ? "" : String(value);
   let control: React.ReactElement;
@@ -152,7 +162,7 @@ function FieldInput({
         );
         break;
       }
-      control = <RefCombobox f={f} value={v} title={title ?? ""} disabled={disabled} onChange={onChange} />;
+      control = <RefCombobox f={f} value={v} title={title ?? ""} disabled={disabled} onChange={onChange} openLabel={openLabel} />;
       break;
     default:
       control = (
@@ -173,6 +183,15 @@ function FieldInput({
   );
 }
 
+function OpenRef({ href, label }: { href: string; label: string }) {
+  const router = useRouter();
+  return (
+    <Tooltip content={label} relationship="label">
+      <Button appearance="subtle" icon={<Open24Regular />} onClick={() => router.push(href)} />
+    </Tooltip>
+  );
+}
+
 /** Výběr odkazovaného záznamu s hledáním na serveru. */
 function RefCombobox({
   f,
@@ -180,12 +199,14 @@ function RefCombobox({
   title,
   disabled,
   onChange,
+  openLabel,
 }: {
   f: FieldMeta;
   value: string;
   title: string;
   disabled: boolean;
   onChange: (name: string, value: unknown, title?: string) => void;
+  openLabel: string;
 }) {
   const [query, setQuery] = useState(title);
   const [open, setOpen] = useState(false);
@@ -209,34 +230,40 @@ function RefCombobox({
   }, [query, open, f.refObject, title]);
 
   return (
-    <Combobox
-      value={query}
-      selectedOptions={value ? [value] : []}
-      disabled={disabled}
-      freeform
-      open={open}
-      onOpenChange={(_, d) => {
-        setOpen(d.open);
-        if (!d.open) setQuery(title);
-      }}
-      onChange={(e) => {
-        setQuery(e.target.value);
-        setOpen(true);
-        if (!e.target.value) onChange(f.name, null, "");
-      }}
-      onOptionSelect={(_, d) => {
-        if (!d.optionValue) return;
-        const o = options.find((x) => x.id === d.optionValue);
-        onChange(f.name, d.optionValue, o?.title ?? "");
-        setQuery(o?.title ?? "");
-      }}
-    >
-      {options.map((o) => (
-        <Option key={o.id} value={o.id} text={o.title}>
-          <span style={{ fontWeight: 600 }}>{o.title}</span>
-          {o.subtitle && <span style={{ marginLeft: 8, color: tokens.colorNeutralForeground3 }}>{o.subtitle}</span>}
-        </Option>
-      ))}
-    </Combobox>
+    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      <Combobox
+        // obal se má zúžit (primární slot Comboboxu je input, proto root)
+        root={{ style: { flex: 1, minWidth: 0 } }}
+        value={query}
+        selectedOptions={value ? [value] : []}
+        disabled={disabled}
+        freeform
+        open={open}
+        onOpenChange={(_, d) => {
+          setOpen(d.open);
+          if (!d.open) setQuery(title);
+        }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          if (!e.target.value) onChange(f.name, null, "");
+        }}
+        onOptionSelect={(_, d) => {
+          if (!d.optionValue) return;
+          const o = options.find((x) => x.id === d.optionValue);
+          onChange(f.name, d.optionValue, o?.title ?? "");
+          setQuery(o?.title ?? "");
+        }}
+      >
+        {options.map((o) => (
+          <Option key={o.id} value={o.id} text={o.title}>
+            <span style={{ fontWeight: 600 }}>{o.title}</span>
+            {o.subtitle && <span style={{ marginLeft: 8, color: tokens.colorNeutralForeground3 }}>{o.subtitle}</span>}
+          </Option>
+        ))}
+      </Combobox>
+      {/* proskok na odkazovaný záznam (číselník, nastavení, subjekt…) */}
+      {value && <OpenRef href={`${f.refHref}/${value}`} label={openLabel} />}
+    </div>
   );
 }

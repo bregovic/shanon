@@ -19,10 +19,10 @@ export interface PostingRequest {
   description?: string | null;
   sourceObject?: string;
   sourceId?: string;
+  /** konkrétní řada dokladů (z názvu deníku); jinak řada s Použitím „Účetní doklady“ */
+  voucherSeqId?: string | null;
   lines: PostingLine[];
 }
-
-export const VOUCHER_SEQ = "GLVOUCHER";
 
 /** Kontrola bez přístupu k datům — vyrovnanost a neprázdnost. */
 export function checkBalanced(lines: PostingLine[]): void {
@@ -56,7 +56,8 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
     if (acc.blocked) throw new UserError("@GL:AccountBlocked", { account: String(acc.accountNum) });
   }
   const voucher = await data.create("gl.voucher", {
-    voucherNum: await data.nextNumber(VOUCHER_SEQ, new Date(req.date)),
+    // bez řady z deníku doplní číslo datová služba podle Použití (gl.voucher)
+    voucherNum: req.voucherSeqId ? await data.nextNumber({ id: req.voucherSeqId }, new Date(req.date)) : null,
     date: req.date,
     description: req.description ?? null,
     sourceObject: req.sourceObject ?? null,
@@ -76,6 +77,18 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
   return voucher;
 }
 
+/** Název deníku: zadaný, jinak GEN, jinak první nezablokovaný. */
+async function resolveJournalName(data: DataApi, id: unknown): Promise<RecordData> {
+  if (id) {
+    const jn = await data.get("gl.journalName", String(id));
+    if (jn) return jn;
+  }
+  const [gen] = await data.find("gl.journalName", { code: "GEN", blocked: false }, { take: 1 });
+  const [first] = gen ? [gen] : await data.find("gl.journalName", { blocked: false }, { take: 1 });
+  if (!first) throw new UserError("@GL:MissingJournalName");
+  return first;
+}
+
 async function assertJournalOpen(data: DataApi, journalId: unknown) {
   const j = journalId ? await data.get("gl.journal", String(journalId)) : null;
   if (j?.status === "posted") throw new UserError("@GL:Locked");
@@ -83,16 +96,29 @@ async function assertJournalOpen(data: DataApi, journalId: unknown) {
 
 export const glHandlers: Record<string, ObjectHandlers> = {
   "gl.journal": {
+    async beforeSave(ctx, data) {
+      const jn = await resolveJournalName(ctx.data, data.journalNameId);
+      if (jn.blocked) return { journalNameId: "@GL:JournalNameBlocked" };
+      data.journalNameId = jn.id;
+    },
     actions: {
       async post(ctx, journal) {
         if (journal.status !== "draft") throw new UserError("@GL:Locked");
-        const lines = await ctx.data.find("gl.journalLine", { journalId: journal.id });
+        const jn = await resolveJournalName(ctx.data, journal.journalNameId);
+        if (jn.blocked) throw new UserError("@GL:JournalNameBlocked", { name: String(jn.code) });
+        const lines = journalLinesToPosting(await ctx.data.find("gl.journalLine", { journalId: journal.id }));
+        // protiúčet z nastavení deníku vyrovná rozdíl MD a D
+        const diff = sumCents(lines.map((l) => toCents(l.amount)));
+        if (diff !== BigInt(0) && jn.offsetAccountId) {
+          lines.push({ accountId: String(jn.offsetAccountId), amount: fromCents(-diff), text: (journal.description as string) ?? null });
+        }
         const voucher = await postVoucher(ctx.data, {
           date: String(journal.date),
           description: (journal.description as string) ?? null,
           sourceObject: "gl.journal",
           sourceId: String(journal.id),
-          lines: journalLinesToPosting(lines),
+          voucherSeqId: (jn.voucherSeqId as string) ?? null,
+          lines,
         });
         await ctx.data.update("gl.journal", String(journal.id), { status: "posted", voucherId: voucher.id });
       },

@@ -37,6 +37,16 @@ export interface ModuleDef {
   enums?: EnumDef[];
   objects: ObjectDef[];
   menu: MenuGroup[];
+  /**
+   * Výchozí číselné řady modulu. „Výchozí nastavení“ je založí ve firmě,
+   * pokud řada s tímto kódem chybí; tenant si je pak upraví.
+   */
+  numberSeqs?: { code: string; name: LabelRef; format: string; usedFor?: string }[];
+  /**
+   * Další výchozí nastavení firmy (účtový rozvrh, názvy deníků…). Musí být
+   * idempotentní — zakládá jen to, co chybí, nic nepřepisuje.
+   */
+  setup?: (data: DataApi) => Promise<void>;
 }
 
 export function defineModule(def: ModuleDef): ModuleDef {
@@ -62,8 +72,11 @@ export interface DataApi {
   find(objectId: string, where: RecordData, opts?: { take?: number }): Promise<RecordData[]>;
   create(objectId: string, data: RecordData): Promise<RecordData>;
   update(objectId: string, id: string, data: RecordData): Promise<RecordData>;
-  /** další číslo z číselné řady firmy */
-  nextNumber(seqCode: string, date?: Date): Promise<string>;
+  /**
+   * Další číslo z číselné řady firmy: podle kódu řady, id řady, nebo podle
+   * objektu, pro který je řada určená (pole Použití).
+   */
+  nextNumber(seq: string | { id?: string; usedFor?: string; code?: string }, date?: Date): Promise<string>;
 }
 
 export interface EventContext {

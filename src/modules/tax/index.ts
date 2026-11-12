@@ -5,7 +5,7 @@
  * odběratelů a dodavatelů (viz docs/ARCHITEKTURA.md).
  */
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
-import { defineModule } from "@/core/module";
+import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 
 export const TaxDirection = defineEnum({
@@ -46,6 +46,22 @@ export const taxCode = defineObject({
   defaultSort: { field: "code", dir: "asc" },
 });
 
+/** Výchozí daňové kódy (jen pokud firma žádné nemá). */
+async function taxSetup(data: DataApi) {
+  if ((await data.find("tax.taxCode", {}, { take: 1 })).length) return;
+  const [vat] = await data.find("gl.account", { accountNum: "343" }, { take: 1 });
+  if (!vat) return;
+  const codes: [string, string, string, string, string, string][] = [
+    ["V21", "DPH na výstupu 21 %", "21", "output", "1", "A4"],
+    ["V12", "DPH na výstupu 12 %", "12", "output", "2", "A4"],
+    ["P21", "DPH na vstupu 21 %", "21", "input", "40", "B2"],
+    ["P12", "DPH na vstupu 12 %", "12", "input", "41", "B2"],
+  ];
+  for (const [code, name, rate, direction, reportLine, khSection] of codes) {
+    await data.create("tax.taxCode", { code, name, rate, direction, accountId: vat.id, reportLine, khSection });
+  }
+}
+
 export default defineModule({
   id: "tax",
   label: "@TAX:Module",
@@ -55,6 +71,7 @@ export default defineModule({
   enums: [TaxDirection],
   objects: [taxCode],
   menu: [{ label: "@TAX:Module", items: [{ object: "tax.taxCode" }] }],
+  setup: taxSetup,
   labels: {
     cs: {
       Module: "DPH",

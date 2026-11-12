@@ -173,6 +173,11 @@ oprávnění na objekt má přednost před modulem. Správce tenanta má vše.
 Kontroluje se v datové službě; systémové kroky (zaúčtování dokladu) se
 kontrolují na úrovni akce, která je spustila.
 
+**Firmy (účetní jednotky):** uživatel vidí jen firmy, ke kterým je přiřazen
+(`sys_user_company`); v každé má vlastní role, případně je správcem firmy.
+Superuživatel tenanta vidí všechny firmy a jako jediný zakládá firmy,
+definuje role a zapíná moduly. Srovnání s D365/AX: `docs/D365-SROVNANI.md`.
+
 ## 10. Bezpečnost
 
 - RLS na všech tabulkách objektů; role `shanon_app` není vlastník ani superuser.

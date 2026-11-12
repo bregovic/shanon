@@ -37,6 +37,7 @@ import {
   FilterDismiss24Regular,
   QuestionCircle24Regular,
 } from "@fluentui/react-icons";
+import NextLink from "next/link";
 import { listAction } from "@/app/actions";
 import { displayValue, type FieldMeta } from "@/lib/meta";
 
@@ -54,6 +55,7 @@ export interface GridLabels {
   empty: string;
   records: string;
   selected: string;
+  total: string;
   help: [string, string][];
 }
 
@@ -62,7 +64,7 @@ interface Props {
   columns: FieldMeta[];
   lang: string;
   labels: GridLabels;
-  initial?: { rows: Row[]; total: number };
+  initial?: { rows: Row[]; total: number; totals?: Record<string, string> };
   /** pevný filtr (řádky dokladu: { journalId }) */
   fixed?: Record<string, string>;
   pageSize?: number;
@@ -129,6 +131,18 @@ const useStyles = makeStyles({
   row: { cursor: "default", userSelect: "none" },
   cell: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   neg: { color: tokens.colorPaletteRedForeground1 },
+  link: {
+    color: tokens.colorBrandForegroundLink,
+    textDecorationLine: "none",
+    ":hover": { textDecorationLine: "underline" },
+  },
+  totals: {
+    position: "sticky",
+    bottom: 0,
+    fontWeight: tokens.fontWeightSemibold,
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderTop: `2px solid ${tokens.colorNeutralStroke1}`,
+  },
   foot: {
     display: "flex",
     alignItems: "center",
@@ -293,6 +307,8 @@ export function SmartGrid({
   const [view, setView] = useState<View>({ filters: {}, dir: "asc" });
   const [rows, setRows] = useState<Row[]>(initial?.rows ?? []);
   const [total, setTotal] = useState(initial?.total ?? 0);
+  const [sums, setSums] = useState<Record<string, string> | undefined>(initial?.totals);
+  const wantTotals = columns.some((c) => c.kind === "decimal" && !c.ext);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -311,15 +327,17 @@ export function SmartGrid({
         page: p,
         pageSize,
         filter: JSON.parse(fixedKey),
+        totals: wantTotals && p === 1,
       });
       if (my !== reqId.current) return; // mezitím přišel novější požadavek
       setLoading(false);
       if (!res.ok) return;
       setRows((prev) => (append ? [...prev, ...res.data.rows] : res.data.rows));
       setTotal(res.data.total);
+      if (p === 1) setSums(res.data.totals);
       setPage(p);
     },
-    [objectId, view, pageSize, fixedKey],
+    [objectId, view, pageSize, fixedKey, wantTotals],
   );
 
   useEffect(() => {
@@ -430,7 +448,19 @@ export function SmartGrid({
                     const neg = c.kind === "decimal" && String(r[c.name] ?? "").startsWith("-");
                     return (
                       <TableCell key={c.name} className={`${s.cell} ${neg ? s.neg : ""}`} style={{ textAlign: c.align }}>
-                        {text}
+                        {c.kind === "ref" && r[c.name] && text ? (
+                          // proskok na odkazovaný záznam; klik neoznačí řádek
+                          <NextLink
+                            href={`${c.refHref}/${r[c.name]}`}
+                            className={s.link}
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                          >
+                            {text}
+                          </NextLink>
+                        ) : (
+                          text
+                        )}
                       </TableCell>
                     );
                   })}
@@ -438,6 +468,22 @@ export function SmartGrid({
               );
             })}
           </TableBody>
+          {sums && rows.length > 0 && (
+            <tfoot>
+              <TableRow className={s.totals}>
+                {selectable && <TableCell />}
+                {columns.map((c, i) => (
+                  <TableCell key={c.name} className={s.cell} style={{ textAlign: c.align }}>
+                    {sums[c.name] !== undefined
+                      ? displayValue(c, { [c.name]: sums[c.name] }, lang)
+                      : i === 0
+                        ? labels.total
+                        : ""}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </tfoot>
+          )}
         </Table>
         {!loading && rows.length === 0 && <div className={s.empty}>{labels.empty}</div>}
       </div>

@@ -13,10 +13,11 @@
     "schema:gen": "tsx scripts/gen-schema.ts",
     "schema:check": "tsx scripts/gen-schema.ts --check",
     "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy && tsx scripts/rls.ts && tsx scripts/seed.ts",
+    "db:deploy": "prisma migrate deploy && tsx scripts/rls.ts && tsx scripts/setup-all.ts && tsx scripts/seed.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:local": "tsx scripts/dev-db.ts",
-    "db:new-migration": "tsx scripts/new-migration.ts"
+    "db:new-migration": "tsx scripts/new-migration.ts",
+    "db:setup": "tsx scripts/setup-all.ts"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.75.2",

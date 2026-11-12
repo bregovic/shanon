@@ -11,7 +11,8 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 ## Objekty a moduly
 
 - Nová tabulka = nový objekt v `src/modules/<modul>/index.ts` (`defineObject`),
-  ne ručně psaný model. Pak `npm run schema:gen` a `npm run db:new-migration -- <popis>`.
+  ne ručně psaný model. Pak `npm run schema:gen` a `npm run db:new-migration -- <popis>`
+  (porovná se snímkem `prisma/migrations/schema.snapshot.prisma`; snímek commitovat s migrací).
 - `prisma/schema.prisma` se **nikdy neupravuje ručně** (generuje se). Systémové
   tabulky jsou v `prisma/base.prisma`.
 - Pole používá existující typ z `Edts` nebo vlastní `defineEdt` — ne vlastní
@@ -38,7 +39,11 @@ všechny objekty**. Nový objekt nepotřebuje žádnou novou stránku ani endpoi
 
 | Funkce | Kde | Poznámka |
 |---|---|---|
-| Oprávnění | `src/core/security.ts`, kontrola v `data.ts` | role → modul/objekt → Číst / Upravovat / Mazat; správce vše; `adminOnly` objekty jen správce |
+| Oprávnění | `src/core/security.ts`, kontrola v `data.ts` | uživatel → firmy (`sys_user_company`) → role v dané firmě → modul/objekt → Číst / Upravovat / Mazat; superuživatel vše; správce firmy vše ve svých firmách kromě `adminOnly` (firmy, role) |
+| Číselné řady | `ObjectDef.numberSeq`, `ModuleDef.numberSeqs` | řada podle Použití (objekt), jinak podle kódu; tenant mění formát, další číslo i přiřazení |
+| Výchozí nastavení | `ModuleDef.setup`, `src/server/setup.ts` | zakládá jen chybějící (řady, účty, deník GEN, DPH); samo při založení firmy, zapnutí modulu a nasazení |
+| Součty | `ListParams.totals` | řádek Celkem pod gridem — součty číselných sloupců za celý výběr |
+| Proklik | odkazy ve formuláři (tlačítko Otevřít) i v gridu | na číselníky, nastavení, subjekty… |
 | Přílohy (DocuRef) | `src/server/docuref.ts`, tlačítko Přílohy | poznámky a soubory do 10 MB, právo = právo na záznam, mažou se se záznamem |
 | Historie změn | `sys_audit`, `src/server/history.ts`, ikona historie | kdo, kdy, co (popisky polí, titulky odkazů) |
 | Oblíbené | `sys_favorite`, hvězdička v liště a na ploše modulu | menu oblíbených v hlavičce |
@@ -89,7 +94,10 @@ ta používá stejné komponenty a akce.
   nečte/nezapisuje data objektů mimo `data.ts` (obešel by oprávnění i RLS).
 - Byznys logika modulu (`ObjectHandlers`, `DataApi`) běží jako systémová
   operace — oprávnění se kontroluje u akce uživatele, která ji spustila.
-- Objekty, které rozdávají práva (role), mají `adminOnly: true`.
+- Objekty, které rozdávají práva nebo zakládají firmy, mají `adminOnly: true`
+  (jen superuživatel). Správce firmy spravuje uživatele jen ve svých firmách.
+- Nové výchozí nastavení modulu patří do `ModuleDef.setup` / `numberSeqs`,
+  nikdy do seedu — musí fungovat pro každou novou firmu i existující tenanty.
 - Soubory se stahují jen přes `/api/files/<id>` (kontrola práva na záznam,
   `nosniff`, nebezpečné typy jen ke stažení).
 - Žádné debug/setup/fix skripty dostupné z webu. Údržba = `scripts/` (CLI).

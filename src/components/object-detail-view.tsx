@@ -43,7 +43,7 @@ export interface LineSpec {
   groups: FormGroup[];
   defaults: Values;
   editable: boolean;
-  initial: { rows: Row[]; total: number };
+  initial: { rows: Row[]; total: number; totals?: Record<string, string> };
 }
 
 export interface ObjectDetailProps {
@@ -258,6 +258,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             titles={titles}
             errors={errors}
             readOnly={p.readOnly}
+            openLabel={p.labels.drawer.open}
             onChange={(name, value, t) => {
               setValues((v) => ({ ...v, [name]: value }));
               if (t !== undefined) setTitles((x) => ({ ...x, [name]: t }));

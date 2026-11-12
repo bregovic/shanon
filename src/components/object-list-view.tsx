@@ -45,7 +45,7 @@ export interface ObjectListProps {
   canWrite: boolean;
   canDelete: boolean;
   openInPage: boolean;
-  initial: { rows: Row[]; total: number };
+  initial: { rows: Row[]; total: number; totals?: Record<string, string> };
   lang: string;
   labels: UiLabels;
 }

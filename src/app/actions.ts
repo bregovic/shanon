@@ -5,11 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
-import { login, logout, requireSession, setCompany } from "@/server/auth";
+import { isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
 import { deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
+import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
 
@@ -118,9 +119,10 @@ export async function searchRefs(objectId: string, q: string) {
 // Moduly a rozšíření (jen správce tenanta)
 // ---------------------------------------------------------------------------
 
+/** superuživatel tenanta (moduly, rozšíření, nastavení všech firem) */
 async function requireAdmin() {
   const s = await requireSession();
-  if (s.user.role !== "admin") throw new Error("Forbidden");
+  if (!s.superUser) throw new Error("Forbidden");
   return s;
 }
 
@@ -133,6 +135,13 @@ export async function toggleModuleAction(form: FormData) {
   if (form.get("enable") === "1") {
     const all = [...dependencyClosure(registry, [id])].filter((m) => !s.ctx.modules.has(m));
     await prisma.sysTenantModule.createMany({ data: all.map((moduleId) => ({ tenantId, moduleId })), skipDuplicates: true });
+    // výchozí nastavení nově zapnutých modulů ve všech firmách
+    const enabled = new Set([...s.ctx.modules, ...all]);
+    for (const c of s.companies) {
+      await inTenant({ ...s.ctx, companyId: c.id, modules: enabled }, (sess) =>
+        setupCompany(sess.sys().api(), new Set(all), s.lang),
+      );
+    }
   } else {
     // vypnout jen pokud na něm nezávisí jiný zapnutý modul (data zůstávají)
     if (dependents(registry, id).some((d) => s.ctx.modules.has(d))) return;
@@ -171,8 +180,16 @@ async function fail(e: unknown, lang: Parameters<typeof getT>[0], tenantId: stri
 
 export async function listAction(
   objectId: string,
-  params: { filters?: Record<string, string>; sort?: string; dir?: "asc" | "desc"; page?: number; pageSize?: number; filter?: Record<string, string> },
-): Promise<ActionResult<{ rows: RecordData[]; total: number }>> {
+  params: {
+    filters?: Record<string, string>;
+    sort?: string;
+    dir?: "asc" | "desc";
+    page?: number;
+    pageSize?: number;
+    filter?: Record<string, string>;
+    totals?: boolean;
+  },
+): Promise<ActionResult<{ rows: RecordData[]; total: number; totals?: Record<string, string> }>> {
   const s = await requireSession();
   try {
     // jen povolené parametry z prohlížeče (žádné interní volby datové služby)
@@ -183,9 +200,10 @@ export async function listAction(
       page: params.page,
       pageSize: params.pageSize,
       filter: params.filter,
+      totals: !!params.totals,
       lang: s.lang,
     });
-    return { ok: true, data: { rows: r.rows, total: r.total } };
+    return { ok: true, data: { rows: r.rows, total: r.total, totals: r.totals } };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
@@ -242,23 +260,32 @@ export async function runRecordAction(objectId: string, id: string, actionId: st
 }
 
 // ---------------------------------------------------------------------------
-// Uživatelé (jen správce tenanta)
+// Uživatelé (superuživatel všechny, správce firmy jen ve svých firmách)
 // ---------------------------------------------------------------------------
+
+export interface UserCompanyInput {
+  companyId: string;
+  admin: boolean;
+  roleIds: string[];
+}
 
 export interface UserInput {
   id: string | null;
   name: string;
   email: string;
-  admin: boolean;
+  superUser: boolean;
   active: boolean;
   lang: string;
-  roleIds: string[];
   password?: string;
+  /** přiřazení k firmám, ve kterých smí editor spravovat uživatele */
+  companies: UserCompanyInput[];
 }
 
 export async function saveUserAction(input: UserInput): Promise<ActionResult> {
-  const s = await requireAdmin();
+  const s = await requireSession();
+  if (!isAnyAdmin(s)) throw new Error("Forbidden");
   const t = await getT(s.lang, s.ctx.tenantId);
+  const scope = new Set(s.adminCompanyIds);
   const errors: Record<string, string> = {};
   const email = input.email.trim().toLowerCase();
   if (!input.name.trim()) errors.name = t("@SYS:Required");
@@ -268,35 +295,52 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
   if (other && other.id !== input.id) errors.email = t("@SYS:EmailTaken");
   if (Object.keys(errors).length) return { ok: false, message: t("@SYS:FixErrors"), errors };
 
-  // role jen z tohoto tenanta
-  const roles = input.roleIds.length
-    ? await inTenant(s.ctx, (sess) => sess.find("sys.role", {}, 500))
-    : [];
-  const roleIds = input.roleIds.filter((id) => roles.some((r) => r.id === id));
+  const existing = input.id
+    ? await prisma.sysUser.findFirst({ where: { id: input.id, tenantId: s.ctx.tenantId }, include: { companies: true } })
+    : null;
+  if (input.id && !existing) return { ok: false, message: t("@SYS:NotFound") };
+
+  // správce firmy nesmí dělat superuživatele ani sahat na superuživatele
+  if (!s.superUser && (input.superUser || existing?.role === "admin")) return { ok: false, message: t("@SYS:NoAccess") };
+  const outside = (existing?.companies ?? []).filter((a) => !scope.has(a.companyId));
+  const basicChanged =
+    !!existing &&
+    (existing.name !== input.name.trim() || existing.email !== email || existing.active !== input.active || existing.lang !== input.lang || !!input.password);
+  if (!s.superUser && outside.length && basicChanged) return { ok: false, message: t("@SYS:OtherCompanies") };
+
+  // přiřazení jen do firem v rozsahu editora a jen existující role tenanta
+  const roles = new Set((await inTenant(s.ctx, (sess) => sess.sys().find("sys.role", {}, 1000))).map((r) => String(r.id)));
+  const assignments = input.companies
+    .filter((a) => scope.has(a.companyId))
+    .map((a) => ({ companyId: a.companyId, admin: !!a.admin, roleIds: a.roleIds.filter((r) => roles.has(r)) }));
+  if (!s.superUser && !input.superUser && assignments.length + outside.length === 0) return { ok: false, message: t("@SYS:NeedCompany") };
+
+  // nesmí zmizet poslední aktivní superuživatel
+  if (existing?.role === "admin" && (!input.superUser || !input.active)) {
+    const supers = await prisma.sysUser.count({ where: { tenantId: s.ctx.tenantId, role: "admin", active: true } });
+    if (supers <= 1) return { ok: false, message: t("@SYS:LastSuper") };
+  }
 
   const data = {
     name: input.name.trim(),
     email,
-    role: input.admin ? "admin" : "user",
+    role: input.superUser ? "admin" : "user",
     active: input.active,
     lang: input.lang === "en" ? "en" : "cs",
-    roleIds,
     ...(input.password ? { passwordHash: await bcrypt.hash(input.password, 12) } : {}),
   };
-  if (input.id) {
-    const existing = await prisma.sysUser.findFirst({ where: { id: input.id, tenantId: s.ctx.tenantId } });
-    if (!existing) return { ok: false, message: t("@SYS:NotFound") };
-    // nesmí zmizet poslední aktivní správce
-    if (existing.role === "admin" && (!input.admin || !input.active)) {
-      const admins = await prisma.sysUser.count({ where: { tenantId: s.ctx.tenantId, role: "admin", active: true } });
-      if (admins <= 1) return { ok: false, message: t("@SYS:LastAdmin") };
+  await prisma.$transaction(async (tx) => {
+    const user = existing
+      ? await tx.sysUser.update({ where: { id: existing.id }, data })
+      : await tx.sysUser.create({ data: { ...data, tenantId: s.ctx.tenantId, passwordHash: data.passwordHash! } });
+    // přiřazení ve firmách editora nahradit, ostatní firmy nechat beze změny
+    await tx.sysUserCompany.deleteMany({ where: { userId: user.id, companyId: { in: [...scope] } } });
+    if (assignments.length) {
+      await tx.sysUserCompany.createMany({ data: assignments.map((a) => ({ ...a, userId: user.id, tenantId: s.ctx.tenantId })) });
     }
-    await prisma.sysUser.update({ where: { id: input.id }, data });
     // změna hesla nebo deaktivace odhlásí ostatní relace uživatele
-    if (input.password || !input.active) await prisma.sysSession.deleteMany({ where: { userId: input.id } });
-  } else {
-    await prisma.sysUser.create({ data: { ...data, tenantId: s.ctx.tenantId, passwordHash: data.passwordHash! } });
-  }
+    if (existing && (input.password || !input.active)) await tx.sysSession.deleteMany({ where: { userId: existing.id } });
+  });
   revalidatePath("/system/users");
   return { ok: true, data: undefined };
 }
@@ -363,4 +407,27 @@ export async function toggleFavoriteAction(href: string, label: string): Promise
   else await prisma.sysFavorite.create({ data: { userId: s.user.id, href: href.slice(0, 255), label: label.slice(0, 120) } });
   revalidatePath("/", "layout");
   return !exists;
+}
+
+// ---------------------------------------------------------------------------
+// Výchozí nastavení (číselné řady a další výchozí data modulů)
+// ---------------------------------------------------------------------------
+
+/** Doplní chybějící výchozí nastavení ve firmě (nebo ve všech firmách tenanta). */
+export async function runSetupAction(allCompanies: boolean): Promise<ActionResult<string>> {
+  const s = await requireSession();
+  const t = await getT(s.lang, s.ctx.tenantId);
+  // superuživatel všechny firmy, správce firmy jen ty své
+  const ids = (allCompanies ? s.companies.map((c) => c.id) : s.ctx.companyId ? [s.ctx.companyId] : []).filter((id) =>
+    s.adminCompanyIds.includes(id),
+  );
+  if (!ids.length) return { ok: false, message: t("@SYS:NoAccess") };
+  const total: Record<string, number> = {};
+  for (const companyId of ids) {
+    const created = await inTenant({ ...s.ctx, companyId }, (sess) => setupCompany(sess.sys().api(), s.ctx.modules, s.lang));
+    for (const [k, n] of Object.entries(created)) total[k] = (total[k] ?? 0) + n;
+  }
+  revalidatePath("/", "layout");
+  const list = Object.entries(total).map(([o, n]) => `${t(registry.objects.get(o)?.labelPlural)} ${n}`);
+  return { ok: true, data: list.length ? t("@SYS:SetupDone", { list: list.join(", ") }) : t("@SYS:SetupNothing") };
 }

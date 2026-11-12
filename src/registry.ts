@@ -7,7 +7,7 @@ import { ADMIN_ONLY } from "@/core/security";
 import gab from "@/modules/gab";
 import gl from "@/modules/gl";
 import { glHandlers } from "@/modules/gl/posting";
-import sys, { SecurityTarget } from "@/modules/sys";
+import sys, { NumberedObject, SecurityTarget } from "@/modules/sys";
 import tax from "@/modules/tax";
 import subjectRating from "@/extensions/subject-rating";
 
@@ -19,6 +19,11 @@ SecurityTarget.values = modules.flatMap((m) => [
   { value: m.id, label: m.label },
   ...m.objects.filter((o) => !o.adminOnly).map((o) => ({ value: o.id, label: o.labelPlural })),
 ]);
+
+// objekty s automatickým číslováním (pro pole Použití u číselné řady)
+NumberedObject.values = modules.flatMap((m) =>
+  m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
+);
 
 export const registry = buildRegistry(modules, extensions, [glHandlers]);
 

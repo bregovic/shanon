@@ -1,6 +1,9 @@
 "use client";
 
-/** Správa uživatelů tenanta: seznam + šuplík (stejný vzor jako u objektů). */
+/**
+ * Správa uživatelů: superuživatel všechny, správce firmy jen uživatele
+ * svých firem. U každé firmy: přístup, správce firmy, role.
+ */
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -26,10 +29,11 @@ import {
   TableHeader,
   TableHeaderCell,
   TableRow,
+  Text,
   tokens,
 } from "@fluentui/react-components";
 import { Add24Regular, Dismiss24Regular } from "@fluentui/react-icons";
-import { saveUserAction, type UserInput } from "@/app/actions";
+import { saveUserAction, type UserCompanyInput, type UserInput } from "@/app/actions";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { useShortcuts } from "./shortcuts";
 
@@ -37,14 +41,32 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  superUser: boolean;
   active: boolean;
   lang: string;
-  roleIds: string[];
+  companies: UserCompanyInput[];
+  companyCodes: string;
 }
 
 type Labels = Record<
-  "new" | "edit" | "save" | "cancel" | "close" | "name" | "email" | "admin" | "administrator" | "active" | "lang" | "roles" | "password" | "passwordHelp" | "user",
+  | "new"
+  | "save"
+  | "cancel"
+  | "close"
+  | "name"
+  | "email"
+  | "superUser"
+  | "active"
+  | "lang"
+  | "roles"
+  | "companies"
+  | "userCompanies"
+  | "access"
+  | "companyAdmin"
+  | "password"
+  | "passwordHelp"
+  | "user"
+  | "general",
   string
 >;
 
@@ -57,18 +79,37 @@ const useStyles = makeStyles({
   },
   row: { cursor: "pointer" },
   form: { display: "flex", flexDirection: "column", gap: "12px" },
+  section: {
+    fontWeight: tokens.fontWeightSemibold,
+    paddingBottom: "6px",
+    marginTop: "8px",
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  company: {
+    padding: "8px 12px",
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  roles: { display: "flex", flexDirection: "column", paddingLeft: "28px" },
 });
-
-const empty: UserInput = { id: null, name: "", email: "", admin: false, active: true, lang: "cs", roleIds: [], password: "" };
 
 export function UsersView({
   crumbs,
+  canSuper,
   users,
+  companies,
   roles,
   labels,
 }: {
   crumbs: { label: string; href?: string }[];
+  /** editor je superuživatel (smí dělat superuživatele) */
+  canSuper: boolean;
   users: User[];
+  /** firmy, ve kterých editor smí přiřazovat */
+  companies: { id: string; label: string }[];
   roles: { id: string; label: string }[];
   labels: Labels;
 }) {
@@ -78,17 +119,24 @@ export function UsersView({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string>();
   const [busy, start] = useTransition();
-  const roleName = (id: string) => roles.find((r) => r.id === id)?.label ?? "";
 
   const open = (u: User | null) => {
     setErrors({});
     setMessage(undefined);
     setEdit(
       u
-        ? { id: u.id, name: u.name, email: u.email, admin: u.role === "admin", active: u.active, lang: u.lang, roleIds: u.roleIds, password: "" }
-        : { ...empty },
+        ? { id: u.id, name: u.name, email: u.email, superUser: u.superUser, active: u.active, lang: u.lang, companies: u.companies, password: "" }
+        : { id: null, name: "", email: "", superUser: false, active: true, lang: "cs", password: "", companies: [] },
     );
   };
+  const assignment = (companyId: string) => edit?.companies.find((a) => a.companyId === companyId);
+  const setAssignment = (companyId: string, a: UserCompanyInput | null) =>
+    edit &&
+    setEdit({
+      ...edit,
+      companies: [...edit.companies.filter((x) => x.companyId !== companyId), ...(a ? [a] : [])],
+    });
+
   const save = () =>
     start(async () => {
       if (!edit) return;
@@ -120,7 +168,7 @@ export function UsersView({
               <TableRow>
                 <TableHeaderCell>{labels.name}</TableHeaderCell>
                 <TableHeaderCell>{labels.email}</TableHeaderCell>
-                <TableHeaderCell>{labels.roles}</TableHeaderCell>
+                <TableHeaderCell>{labels.companies}</TableHeaderCell>
                 <TableHeaderCell style={{ textAlign: "center" }}>{labels.active}</TableHeaderCell>
               </TableRow>
             </TableHeader>
@@ -132,12 +180,12 @@ export function UsersView({
                   </TableCell>
                   <TableCell>{u.email}</TableCell>
                   <TableCell>
-                    {u.role === "admin" ? (
+                    {u.superUser ? (
                       <Badge appearance="tint" color="brand">
-                        {labels.administrator}
+                        {labels.superUser}
                       </Badge>
                     ) : (
-                      u.roleIds.map(roleName).join(", ")
+                      u.companyCodes
                     )}
                   </TableCell>
                   <TableCell style={{ textAlign: "center" }}>{u.active ? "✓" : ""}</TableCell>
@@ -163,6 +211,7 @@ export function UsersView({
                     <MessageBarBody>{message}</MessageBarBody>
                   </MessageBar>
                 )}
+                <div className={s.section}>{labels.general}</div>
                 <Field label={labels.name} required validationMessage={errors.name}>
                   <Input value={edit.name} onChange={(_, d) => setEdit({ ...edit, name: d.value })} />
                 </Field>
@@ -180,24 +229,50 @@ export function UsersView({
                   </Dropdown>
                 </Field>
                 <Switch label={labels.active} checked={edit.active} onChange={(_, d) => setEdit({ ...edit, active: d.checked })} />
-                <Switch label={labels.admin} checked={edit.admin} onChange={(_, d) => setEdit({ ...edit, admin: d.checked })} />
-                {!edit.admin && (
-                  <Field label={labels.roles}>
-                    {roles.map((r) => (
-                      <Checkbox
-                        key={r.id}
-                        label={r.label}
-                        checked={edit.roleIds.includes(r.id)}
-                        onChange={(_, d) =>
-                          setEdit({ ...edit, roleIds: d.checked ? [...edit.roleIds, r.id] : edit.roleIds.filter((x) => x !== r.id) })
-                        }
-                      />
-                    ))}
-                  </Field>
-                )}
                 <Field label={labels.password} required={!edit.id} hint={labels.passwordHelp} validationMessage={errors.password}>
                   <Input type="password" autoComplete="new-password" value={edit.password ?? ""} onChange={(_, d) => setEdit({ ...edit, password: d.value })} />
                 </Field>
+
+                {canSuper && (
+                  <Switch label={labels.superUser} checked={edit.superUser} onChange={(_, d) => setEdit({ ...edit, superUser: d.checked })} />
+                )}
+
+                {!edit.superUser && (
+                  <>
+                    <div className={s.section}>{labels.userCompanies}</div>
+                    {companies.map((c) => {
+                      const a = assignment(c.id);
+                      return (
+                        <div key={c.id} className={s.company}>
+                          <Checkbox
+                            label={<Text weight="semibold">{c.label}</Text>}
+                            checked={!!a}
+                            onChange={(_, d) => setAssignment(c.id, d.checked ? { companyId: c.id, admin: false, roleIds: [] } : null)}
+                          />
+                          {a && (
+                            <div className={s.roles}>
+                              <Switch label={labels.companyAdmin} checked={a.admin} onChange={(_, d) => setAssignment(c.id, { ...a, admin: d.checked })} />
+                              {!a.admin &&
+                                roles.map((r) => (
+                                  <Checkbox
+                                    key={r.id}
+                                    label={r.label}
+                                    checked={a.roleIds.includes(r.id)}
+                                    onChange={(_, d) =>
+                                      setAssignment(c.id, {
+                                        ...a,
+                                        roleIds: d.checked ? [...a.roleIds, r.id] : a.roleIds.filter((x) => x !== r.id),
+                                      })
+                                    }
+                                  />
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             </DrawerBody>
             <DrawerFooter>

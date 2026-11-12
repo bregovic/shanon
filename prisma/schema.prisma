@@ -37,17 +37,16 @@ model SysUser {
   email        String   @unique @db.VarChar(254)
   name         String   @db.VarChar(120)
   passwordHash String   @map("password_hash")
-  /// admin = správa modulů a nastavení tenanta
+  /// admin = superuživatel tenanta (všechny firmy, moduly, role); user = podle přiřazení k firmám
   role         String   @default("user") @db.VarChar(20)
   lang         String   @default("cs") @db.VarChar(5)
   active       Boolean  @default(true)
-  /// role (sys_role.id), oprávnění = sjednocení oprávnění rolí; správce má vše
-  roleIds      String[] @default([]) @map("role_ids") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant    SysTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    SysTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions  SysSession[]
   favorites SysFavorite[]
+  companies SysUserCompany[]
 
   @@index([tenantId])
   @@map("sys_user")
@@ -164,6 +163,25 @@ model SysFavorite {
   @@map("sys_favorite")
 }
 
+/// Přiřazení uživatele k firmě (účetní jednotce) — obdoba přiřazení rolí
+/// k organizacím v D365. Bez přiřazení firmu nevidí (kromě superuživatele).
+model SysUserCompany {
+  userId    String   @map("user_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  /// správce firmy: v této firmě smí vše, spravuje její uživatele
+  admin     Boolean  @default(false)
+  /// role (sys_role.id) platné v této firmě
+  roleIds   String[] @default([]) @map("role_ids") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, companyId])
+  @@index([tenantId, companyId])
+  @@map("sys_user_company")
+}
+
 // ===========================================================================
 // Objekty modulů
 // ===========================================================================
@@ -191,6 +209,7 @@ model SysCompany {
   glCostCenter_company  GlCostCenter[]  @relation("GlCostCenter_company")
   glVoucher_company     GlVoucher[]     @relation("GlVoucher_company")
   glTrans_company       GlTrans[]       @relation("GlTrans_company")
+  glJournalName_company GlJournalName[] @relation("GlJournalName_company")
   glJournal_company     GlJournal[]     @relation("GlJournal_company")
   glJournalLine_company GlJournalLine[] @relation("GlJournalLine_company")
   taxCode_company       TaxCode[]       @relation("TaxCode_company")
@@ -209,6 +228,7 @@ model SysNumberSeq {
   name       String   @db.VarChar(120)
   format     String   @db.VarChar(40)
   nextNumber Int      @default(1) @map("next_number")
+  usedFor    String?  @map("used_for") @db.VarChar(40)
   ext        Json     @default("{}")
   version    Int      @default(1)
   createdAt  DateTime @default(now()) @map("created_at")
@@ -216,9 +236,11 @@ model SysNumberSeq {
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy  String?  @map("updated_by") @db.Uuid
 
-  company SysCompany @relation("SysNumberSeq_company", fields: [companyId], references: [id], onDelete: Restrict)
+  company                  SysCompany      @relation("SysNumberSeq_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glJournalName_voucherSeq GlJournalName[] @relation("GlJournalName_voucherSeq")
 
   @@unique([tenantId, companyId, code])
+  @@unique([tenantId, companyId, usedFor])
   @@index([tenantId, companyId])
   @@map("sys_number_seq")
 }
@@ -353,10 +375,11 @@ model GlAccount {
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy  String?  @map("updated_by") @db.Uuid
 
-  company               SysCompany      @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
-  glTrans_account       GlTrans[]       @relation("GlTrans_account")
-  glJournalLine_account GlJournalLine[] @relation("GlJournalLine_account")
-  taxCode_account       TaxCode[]       @relation("TaxCode_account")
+  company                     SysCompany      @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glTrans_account             GlTrans[]       @relation("GlTrans_account")
+  glJournalName_offsetAccount GlJournalName[] @relation("GlJournalName_offsetAccount")
+  glJournalLine_account       GlJournalLine[] @relation("GlJournalLine_account")
+  taxCode_account             TaxCode[]       @relation("TaxCode_account")
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
@@ -442,28 +465,60 @@ model GlTrans {
   @@map("gl_trans")
 }
 
+/// gl.journalName — generováno z definice objektu
+model GlJournalName {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  code            String   @db.VarChar(20)
+  name            String   @db.VarChar(120)
+  voucherSeqId    String?  @map("voucher_seq_id") @db.Uuid
+  offsetAccountId String?  @map("offset_account_id") @db.Uuid
+  blocked         Boolean  @default(false)
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  company               SysCompany    @relation("GlJournalName_company", fields: [companyId], references: [id], onDelete: Restrict)
+  voucherSeq            SysNumberSeq? @relation("GlJournalName_voucherSeq", fields: [voucherSeqId], references: [id], onDelete: Restrict)
+  offsetAccount         GlAccount?    @relation("GlJournalName_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
+  glJournal_journalName GlJournal[]   @relation("GlJournal_journalName")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([voucherSeqId])
+  @@index([offsetAccountId])
+  @@map("gl_journal_name")
+}
+
 /// gl.journal — generováno z definice objektu
 model GlJournal {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
-  journalNum  String   @map("journal_num") @db.VarChar(30)
-  date        DateTime @db.Date
-  description String   @db.VarChar(255)
-  status      String   @default("draft") @db.VarChar(40)
-  voucherId   String?  @map("voucher_id") @db.Uuid
-  ext         Json     @default("{}")
-  version     Int      @default(1)
-  createdAt   DateTime @default(now()) @map("created_at")
-  createdBy   String?  @map("created_by") @db.Uuid
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?  @map("updated_by") @db.Uuid
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  journalNum    String   @map("journal_num") @db.VarChar(30)
+  journalNameId String?  @map("journal_name_id") @db.Uuid
+  date          DateTime @db.Date
+  description   String   @db.VarChar(255)
+  status        String   @default("draft") @db.VarChar(40)
+  voucherId     String?  @map("voucher_id") @db.Uuid
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
 
   company               SysCompany      @relation("GlJournal_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journalName           GlJournalName?  @relation("GlJournal_journalName", fields: [journalNameId], references: [id], onDelete: Restrict)
   voucher               GlVoucher?      @relation("GlJournal_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   glJournalLine_journal GlJournalLine[] @relation("GlJournalLine_journal")
 
   @@index([tenantId, companyId])
+  @@index([journalNameId])
   @@index([voucherId])
   @@map("gl_journal")
 }

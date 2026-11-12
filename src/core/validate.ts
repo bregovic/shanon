@@ -81,7 +81,8 @@ export function normalizeRecord(
       if (!(name in input)) continue;
       const [v, err] = coerce(f.edt, input[name], reg);
       if (err) errors[name] = err;
-      else if (f.mandatory && (v === null || v === "")) errors[name] = "@SYS:Required";
+      // pole s číselnou řadou doplní číslování, prázdné tedy nevadí
+      else if (f.mandatory && (v === null || v === "") && def.numberSeq?.field !== name) errors[name] = "@SYS:Required";
       target[name] = v;
     }
   };

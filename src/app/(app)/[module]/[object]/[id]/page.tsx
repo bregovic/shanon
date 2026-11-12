@@ -51,7 +51,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
           .map(async (l) => {
             const ld = registry.objects.get(l.object)!;
             const lm = fieldsMeta(s.ctx, ld, t);
-            const initial = await listRecords(s.ctx, ld.id, { filter: { [l.field]: id }, pageSize: 100, lang: s.lang });
+            const initial = await listRecords(s.ctx, ld.id, { filter: { [l.field]: id }, pageSize: 100, lang: s.lang, totals: true });
             return {
               objectId: ld.id,
               field: l.field,
@@ -61,7 +61,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
               groups: formGroups(s.ctx, ld, t, lm, [l.field]),
               defaults: defaults(ld),
               editable: !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
-              initial: { rows: initial.rows, total: initial.total },
+              initial: { rows: initial.rows, total: initial.total, totals: initial.totals },
             };
           }),
       );

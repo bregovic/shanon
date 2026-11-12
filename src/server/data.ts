@@ -28,6 +28,7 @@ import type { Lang } from "@/core/labels";
 import { can, type Level, type Perms } from "@/core/security";
 import { prisma, withTenant, type Tx } from "./db";
 import { fieldWhere, orderByFor } from "./filter-where";
+import { setupCompany } from "./setup";
 import { storageFor } from "./storage";
 
 export interface Ctx {
@@ -54,6 +55,8 @@ export interface ListParams {
   lang?: Lang;
   /** jen pro serverový kód (export) — větší stránky než povolí grid */
   maxPageSize?: number;
+  /** součty číselných sloupců gridu za celý výběr (ne jen stránku) */
+  totals?: boolean;
 }
 
 export interface ListResult {
@@ -61,6 +64,8 @@ export interface ListResult {
   total: number;
   page: number;
   pageSize: number;
+  /** pole → součet (text, 2 desetinná místa), jen když se o něj žádalo */
+  totals?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +79,7 @@ interface Delegate {
   create(args: unknown): Promise<RecordData>;
   updateMany(args: unknown): Promise<{ count: number }>;
   deleteMany(args: unknown): Promise<{ count: number }>;
+  aggregate(args: unknown): Promise<{ _sum?: Record<string, Prisma.Decimal | null> }>;
 }
 
 const delegate = (tx: Tx, def: ObjectDef) => (tx as unknown as Record<string, Delegate>)[delegateName(def.table)];
@@ -256,7 +262,13 @@ class Session {
     ]);
     const out = rows.map((r) => serialize(def, r));
     await this.attachRefTitles(def, out);
-    return { rows: out, total, page, pageSize };
+    let totals: Record<string, string> | undefined;
+    const sumFields = def.list.filter((f) => def.fields[f]?.edt.kind === "decimal");
+    if (p.totals && sumFields.length) {
+      const agg = await d.aggregate({ where, _sum: Object.fromEntries(sumFields.map((f) => [f, true])) });
+      totals = Object.fromEntries(sumFields.map((f) => [f, (agg._sum?.[f] ?? new Prisma.Decimal(0)).toFixed(def.fields[f].edt.scale ?? 2)]));
+    }
+    return { rows: out, total, page, pageSize, totals };
   }
 
   /** k odkazům doplní text cílového záznamu: row._titles[pole] */
@@ -279,14 +291,25 @@ class Session {
     }
   }
 
-  async nextNumber(seqCode: string, date = new Date()): Promise<string> {
+  /**
+   * Další číslo řady. Pořadí hledání: konkrétní řada (id) → řada určená pro
+   * objekt (Použití) → řada podle kódu (výchozí z definice objektu/modulu).
+   */
+  async nextNumber(seq: string | { id?: string; usedFor?: string; code?: string }, date = new Date()): Promise<string> {
     if (!this.ctx.companyId) throw new UserError("@SYS:NoCompany");
-    // atomicky: UPDATE … RETURNING drží zámek řádku do konce transakce
-    const rows = await this.tx.$queryRaw<{ format: string; n: number }[]>`
-      UPDATE sys_number_seq SET next_number = next_number + 1, version = version + 1
-      WHERE tenant_id = ${this.ctx.tenantId}::uuid AND company_id = ${this.ctx.companyId}::uuid AND code = ${seqCode}
-      RETURNING format, next_number - 1 AS n`;
-    if (!rows.length) throw new UserError("@SYS:MissingSeq", { seq: seqCode });
+    const by = typeof seq === "string" ? { code: seq } : seq;
+    const scope = Prisma.sql`tenant_id = ${this.ctx.tenantId}::uuid AND company_id = ${this.ctx.companyId}::uuid`;
+    const take = async (cond: Prisma.Sql) =>
+      // atomicky: UPDATE … RETURNING drží zámek řádku do konce transakce
+      this.tx.$queryRaw<{ format: string; n: number }[]>`
+        UPDATE sys_number_seq SET next_number = next_number + 1, version = version + 1, updated_at = now()
+        WHERE ${scope} AND ${cond}
+        RETURNING format, next_number - 1 AS n`;
+    let rows: { format: string; n: number }[] = [];
+    if (by.id) rows = await take(Prisma.sql`id = ${by.id}::uuid`);
+    if (!rows.length && by.usedFor) rows = await take(Prisma.sql`used_for = ${by.usedFor}`);
+    if (!rows.length && by.code) rows = await take(Prisma.sql`code = ${by.code}`);
+    if (!rows.length) throw new UserError("@SYS:MissingSeq", { seq: by.code ?? by.usedFor ?? "" });
     return formatSeq(rows[0].format, Number(rows[0].n), date);
   }
 
@@ -322,7 +345,7 @@ class Session {
         }
       }
       if (def.numberSeq && !merged[def.numberSeq.field]) {
-        merged[def.numberSeq.field] = await this.nextNumber(def.numberSeq.seq);
+        merged[def.numberSeq.field] = await this.nextNumber({ usedFor: def.id, code: def.numberSeq.seq });
       }
       Object.assign(errors, missingMandatory(def, merged));
     } else {
@@ -376,6 +399,10 @@ class Session {
     const result = serialize(def, saved);
     await this.audit(objectId, String(result.id), isNew ? "create" : "update", existing, result);
     for (const h of handlersFor(this.ctx, objectId)) await h.afterSave?.(ectx, result, isNew);
+    // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
+    if (isNew && def.id === "sys.company") {
+      await setupCompany(new Session(this.tx, { ...this.ctx, companyId: String(result.id) }, true).api(), this.ctx.modules);
+    }
     return result;
   }
 

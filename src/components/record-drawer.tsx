@@ -26,6 +26,7 @@ export interface DrawerLabels {
   cancel: string;
   close: string;
   newTitle: string;
+  open: string;
 }
 
 export interface EditorState {
@@ -138,6 +139,7 @@ function Editor({ objectId, id, title, groups, defaults, defaultTitles, readOnly
             errors={state.errors}
             readOnly={!!readOnly}
             columns={1}
+            openLabel={labels.open}
             onChange={(name, value, t) =>
               setState((s) => ({
                 ...s,

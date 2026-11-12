@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { ModuleWorkspace, type WorkspaceColumn } from "@/components/module-workspace";
 import { registry } from "@/registry";
-import { requireSession } from "@/server/auth";
+import { isAnyAdmin, requireSession } from "@/server/auth";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
 import { can, canSeeModule } from "@/core/security";
@@ -18,7 +18,11 @@ export default async function ModulePage({ params }: { params: Promise<{ module:
     title: t(g.label),
     items: g.items
       // stránky správy jen pro správce, objekty jen s právem číst
-      .filter((it) => (it.href ? !it.href.startsWith("/system/") || s.user.role === "admin" : can(s.ctx.perms, it.object!, "read")))
+      .filter((it) =>
+        it.href
+          ? !it.href.startsWith("/system/") || (it.href === "/system/modules" ? s.superUser : isAnyAdmin(s))
+          : can(s.ctx.perms, it.object!, "read"),
+      )
       .map((it) => {
         const o = it.object ? registry.objects.get(it.object)! : null;
         return { label: t(it.label ?? o!.labelPlural), href: it.href ?? objectHref(o!.id) };

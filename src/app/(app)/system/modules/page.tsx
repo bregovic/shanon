@@ -7,7 +7,7 @@ import { getT } from "@/server/i18n";
 
 export default async function ModulesPage() {
   const s = await requireSession();
-  if (s.user.role !== "admin") notFound();
+  if (!s.superUser) notFound();
   const t = await getT(s.lang, s.ctx.tenantId);
   const name = (id: string) => t(registry.modules.get(id)!.label);
 

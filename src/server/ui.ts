@@ -62,9 +62,10 @@ export function uiLabels(t: T) {
       empty: t("@SYS:Empty"),
       records: t("@SYS:Records"),
       selected: t("@SYS:Selected"),
+      total: t("@SYS:Total"),
       help: FILTER_HELP.map(([code, label]) => [code, t(label)] as [string, string]),
     },
-    drawer: { save: t("@SYS:Save"), cancel: t("@SYS:Cancel"), close: t("@SYS:Close"), newTitle: t("@SYS:New") },
+    drawer: { save: t("@SYS:Save"), cancel: t("@SYS:Cancel"), close: t("@SYS:Close"), newTitle: t("@SYS:New"), open: t("@SYS:Open") },
     history: {
       history: t("@SYS:History"),
       noHistory: t("@SYS:NoHistory"),

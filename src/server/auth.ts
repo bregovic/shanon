@@ -60,7 +60,14 @@ export interface AppSession {
   user: { id: string; name: string; email: string; role: string };
   tenant: { id: string; name: string };
   companies: { id: string; code: string; name: string }[];
+  /** superuživatel tenanta (všechny firmy, moduly, role) */
+  superUser: boolean;
+  /** firmy, ve kterých smí spravovat uživatele a nastavení */
+  adminCompanyIds: string[];
 }
+
+/** Smí spravovat uživatele / nastavení aspoň jedné firmy. */
+export const isAnyAdmin = (s: AppSession) => s.superUser || s.adminCompanyIds.length > 0;
 
 /** Přihlášený uživatel a jeho kontext; jednou za požadavek. */
 export const getSession = cache(async (): Promise<AppSession | null> => {
@@ -68,7 +75,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   if (!token) return null;
   const session = await prisma.sysSession.findUnique({
     where: { id: hash(token) },
-    include: { user: { include: { tenant: { include: { modules: true, extensions: true } } } } },
+    include: { user: { include: { companies: true, tenant: { include: { modules: true, extensions: true } } } } },
   });
   if (!session || session.expiresAt < new Date() || !session.user.active) return null;
   const { user } = session;
@@ -87,16 +94,30 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
       }),
   );
 
-  const [companies, permRows] = await withTenant(tenant.id, (tx) =>
-    Promise.all([
-      tx.sysCompany.findMany({ where: { tenantId: tenant.id }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
-      user.role === "admin" || user.roleIds.length === 0
-        ? Promise.resolve([])
-        : tx.sysRolePermission.findMany({ where: { tenantId: tenant.id, roleId: { in: user.roleIds } }, select: { target: true, level: true } }),
-    ]),
+  // firmy: superuživatel všechny, ostatní jen přiřazené
+  const superUser = user.role === "admin";
+  const assigned = new Map(user.companies.filter((a) => a.tenantId === tenant.id).map((a) => [a.companyId, a]));
+  const allCompanies = await withTenant(tenant.id, (tx) =>
+    tx.sysCompany.findMany({ where: { tenantId: tenant.id }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
   );
-  const perms: Perms = user.role === "admin" ? ADMIN : { admin: false, levels: mergePerms(permRows) };
+  const companies = superUser ? allCompanies : allCompanies.filter((c) => assigned.has(c.id));
   const companyId = companies.find((c) => c.id === session.companyId)?.id ?? companies[0]?.id ?? null;
+
+  // oprávnění platí pro aktuální firmu (role a správce se přiřazují po firmách)
+  const here = companyId ? assigned.get(companyId) : undefined;
+  let perms: Perms;
+  if (superUser) perms = ADMIN;
+  else if (here?.admin) perms = { admin: false, companyAdmin: true, levels: {} };
+  else {
+    const permRows = here?.roleIds.length
+      ? await withTenant(tenant.id, (tx) =>
+          tx.sysRolePermission.findMany({ where: { tenantId: tenant.id, roleId: { in: here.roleIds } }, select: { target: true, level: true } }),
+        )
+      : [];
+    perms = { admin: false, levels: mergePerms(permRows) };
+  }
+  /** firmy, kde smí spravovat uživatele (superuživatel všechny) */
+  const adminCompanyIds = superUser ? allCompanies.map((c) => c.id) : [...assigned.values()].filter((a) => a.admin).map((a) => a.companyId);
 
   return {
     ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions },
@@ -104,6 +125,8 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     tenant: { id: tenant.id, name: tenant.name },
     companies,
+    superUser,
+    adminCompanyIds,
   };
 });
 

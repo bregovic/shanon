@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       modules={modules}
       companies={s.companies}
       companyId={s.ctx.companyId}
-      user={{ name: s.user.name, email: s.user.email, initials, admin: s.user.role === "admin" }}
+      user={{ name: s.user.name, email: s.user.email, initials, admin: s.superUser }}
       labels={{ home: t("@SYS:Home"), settings: t("@SYS:Settings"), signOut: t("@SYS:SignOut") }}
     >
       {children}

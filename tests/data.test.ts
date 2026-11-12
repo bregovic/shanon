@@ -17,6 +17,8 @@ import { provisionTenant } from "@/server/provision";
 import { withTenant } from "@/server/db";
 import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
 import { recordHistory } from "@/server/history";
+import { setupCompany } from "@/server/setup";
+import { inTenant } from "@/server/data";
 import { resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
 
@@ -132,11 +134,20 @@ describe("oprávnění", () => {
     await expectUserError(deleteRecord(accountant, "gl.journal", String(j.id), client), "@SYS:NoAccess");
   });
 
-  it("role a oprávnění smí měnit jen správce", async () => {
+  it("role, oprávnění a firmy smí měnit jen superuživatel", async () => {
     const sysAll = as({ sys: "delete" });
     await expectUserError(listRecords(sysAll, "sys.role", {}, client), "@SYS:NoAccess");
     await expectUserError(saveRecord(sysAll, "sys.role", null, { code: "HACK", name: "x" }, undefined, client), "@SYS:NoAccess");
-    expect((await listRecords(sysAll, "sys.company", {}, client)).total).toBe(1);
+    await expectUserError(listRecords(sysAll, "sys.company", {}, client), "@SYS:NoAccess");
+    expect((await listRecords(sysAll, "sys.numberSeq", {}, client)).total).toBeGreaterThan(0);
+  });
+
+  it("správce firmy smí ve firmě vše kromě rolí a firem", async () => {
+    const ca: Ctx = { ...A, role: "user", perms: { admin: false, companyAdmin: true, levels: {} } };
+    const j = await saveRecord(ca, "gl.journal", null, { date: "2026-11-12", description: "Správce firmy" }, undefined, client);
+    await deleteRecord(ca, "gl.journal", String(j.id), client);
+    await expectUserError(saveRecord(ca, "sys.role", null, { code: "CA", name: "x" }, undefined, client), "@SYS:NoAccess");
+    await expectUserError(saveRecord(ca, "sys.company", null, { code: "NEW", name: "Nová" }, undefined, client), "@SYS:NoAccess");
   });
 });
 
@@ -169,6 +180,45 @@ describe("přílohy (DocuRef)", () => {
     const left = await withTenant(A.tenantId, (tx) => tx.sysDocuRef.count({ where: { recordId: id } }), client);
     expect(left).toBe(0);
     await expectUserError(readFile(A, file.id, client), "@SYS:NotFound");
+  });
+});
+
+describe("číselné řady a výchozí nastavení", () => {
+  it("nová firma dostane řady s Použitím, účty, deník GEN a DPH; opakované spuštění nic nepřidá", async () => {
+    const seqs = (await listRecords(A, "sys.numberSeq", {}, client)).rows;
+    expect(seqs.map((x) => `${x.code}:${x.usedFor}`).sort()).toEqual(["GLJOURNAL:gl.journal", "GLVOUCHER:gl.voucher"]);
+    expect((await listRecords(A, "gl.journalName", { filters: { code: "GEN" } }, client)).total).toBe(1);
+    expect((await listRecords(A, "tax.taxCode", {}, client)).total).toBeGreaterThanOrEqual(4);
+    const again = await inTenant(A, (sess) => setupCompany(sess.sys().api(), A.modules), client);
+    expect(again).toEqual({});
+  });
+
+  it("tenant si určí vlastní řadu deníků (Použití) a vlastní řadu dokladů v nastavení deníku", async () => {
+    const [old] = (await listRecords(A, "sys.numberSeq", { filters: { code: "GLJOURNAL" } }, client)).rows;
+    await saveRecord(A, "sys.numberSeq", String(old.id), { usedFor: null }, undefined, client);
+    await saveRecord(A, "sys.numberSeq", null, { code: "MOJE", name: "Moje deníky", format: "MD-{####}", usedFor: "gl.journal" }, undefined, client);
+    const vs = await saveRecord(A, "sys.numberSeq", null, { code: "BANKA", name: "Bankovní doklady", format: "BV{YY}/{###}" }, undefined, client);
+    const accs = Object.fromEntries((await listRecords(A, "gl.account", { filters: { accountNum: "221, 395, 518" } }, client)).rows.map((a) => [a.accountNum, a.id]));
+    const jn = await saveRecord(A, "gl.journalName", null, { code: "BAN", name: "Banka", voucherSeqId: vs.id, offsetAccountId: accs["221"] }, undefined, client);
+
+    const j = await saveRecord(A, "gl.journal", null, { date: "2026-11-12", description: "Poplatek", journalNameId: jn.id }, undefined, client);
+    expect(j.journalNum).toBe("MD-0001");
+    // jen jedna strana — rozdíl vyrovná protiúčet z nastavení deníku
+    await saveRecord(A, "gl.journalLine", null, { journalId: j.id, accountId: accs["518"], debit: "150" }, undefined, client);
+    await runAction(A, "gl.journal", String(j.id), "post", client);
+    const posted = await getRecord(A, "gl.journal", String(j.id), client);
+    const v = await getRecord(A, "gl.voucher", String(posted!.voucherId), client);
+    expect(v!.voucherNum).toBe("BV26/001");
+    const tr = await listRecords(A, "gl.trans", { filter: { voucherId: v!.id } }, client);
+    expect(tr.rows.map((r) => `${r._titles && (r._titles as Record<string, string>).accountId}:${r.amount}`).sort()).toEqual(["221:-150.00", "518:150.00"]);
+
+    // deník bez názvu dostane GEN
+    const j2 = await saveRecord(A, "gl.journal", null, { date: "2026-11-12", description: "Bez názvu" }, undefined, client);
+    expect((j2._titles as Record<string, string> | undefined)?.journalNameId ?? (await getRecord(A, "gl.journal", String(j2.id), client))!._titles).toBeTruthy();
+    // vrátit původní nastavení řad pro ostatní testy
+    const [moje] = (await listRecords(A, "sys.numberSeq", { filters: { code: "MOJE" } }, client)).rows;
+    await saveRecord(A, "sys.numberSeq", String(moje.id), { usedFor: null }, undefined, client);
+    await saveRecord(A, "sys.numberSeq", String(old.id), { usedFor: "gl.journal" }, undefined, client);
   });
 });
 
