@@ -96,6 +96,25 @@ describe("objekty", () => {
   });
 });
 
+describe("filtry gridu na serveru", () => {
+  it("text, výčet podle popisku, odkaz podle titulku, řazení podle odkazu", async () => {
+    await saveRecord(A, "gab.subject", null, { name: "Filtr Jedna", type: "person" }, undefined, client);
+    await saveRecord(A, "gab.subject", null, { name: "Filtr Dva", type: "organization" }, undefined, client);
+    const byText = await listRecords(A, "gab.subject", { filters: { name: "filtr*" } }, client);
+    expect(byText.total).toBe(2);
+    const byEnum = await listRecords(A, "gab.subject", { filters: { name: "filtr*", type: "osoba" }, lang: "cs" }, client);
+    expect(byEnum.rows.map((r) => r.name)).toEqual(["Filtr Jedna"]);
+    const notEnum = await listRecords(A, "gab.subject", { filters: { name: "filtr*", type: "!osoba" }, lang: "cs" }, client);
+    expect(notEnum.rows.map((r) => r.name)).toEqual(["Filtr Dva"]);
+    const codes = await listRecords(A, "tax.taxCode", { filters: { accountId: "343", rate: "> 15" } }, client);
+    expect(codes.rows.map((r) => r.code).sort()).toEqual(["P21", "V21"]);
+    const sorted = await listRecords(A, "tax.taxCode", { sort: "accountId", dir: "desc" }, client);
+    expect(sorted.total).toBe(4);
+    const nothing = await listRecords(A, "tax.taxCode", { filters: { rate: "abc" } }, client);
+    expect(nothing.total).toBe(0);
+  });
+});
+
 describe("rozšíření", () => {
   it("pole rozšíření se uloží do ext a projdou validací rozšíření", async () => {
     const withExt: Ctx = { ...A, extensions: new Set(["subject-rating"]) };

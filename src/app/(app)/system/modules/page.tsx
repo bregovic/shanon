@@ -1,10 +1,9 @@
 import { notFound } from "next/navigation";
+import { FeatureList, type FeatureRow } from "@/components/feature-list";
 import { dependents } from "@/core/module";
 import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
 import { getT } from "@/server/i18n";
-import { toggleExtensionAction, toggleModuleAction } from "@/app/actions";
-import { cn } from "@/lib/cn";
 
 export default async function ModulesPage() {
   const s = await requireSession();
@@ -12,77 +11,47 @@ export default async function ModulesPage() {
   const t = await getT(s.lang, s.ctx.tenantId);
   const name = (id: string) => t(registry.modules.get(id)!.label);
 
-  const modules = [...registry.modules.values()].map((m) => {
+  const modules: FeatureRow[] = [...registry.modules.values()].map((m) => {
     const enabled = s.ctx.modules.has(m.id);
     const neededBy = dependents(registry, m.id).filter((d) => s.ctx.modules.has(d));
-    return { m, enabled, neededBy, canToggle: !m.core && (!enabled || neededBy.length === 0) };
+    return {
+      kind: "module",
+      id: m.id,
+      icon: m.icon,
+      label: t(m.label),
+      description: t(m.description),
+      enabled,
+      canToggle: !m.core && (!enabled || neededBy.length === 0),
+      notes: [
+        ...(m.dependsOn.length ? [`${t("@SYS:Requires")}: ${m.dependsOn.map(name).join(", ")}`] : []),
+        ...(enabled && neededBy.length ? [`${t("@SYS:RequiredBy")}: ${neededBy.map(name).join(", ")}`] : []),
+      ],
+    };
   });
-  const extensions = [...registry.extensions.values()].filter(
-    (x) => x.visibility === "public" || x.owner === s.ctx.tenantId,
-  );
+  const extensions: FeatureRow[] = [...registry.extensions.values()]
+    .filter((x) => x.visibility === "public" || x.owner === s.ctx.tenantId)
+    .map((x) => {
+      const enabled = s.ctx.extensions.has(x.id);
+      return {
+        kind: "extension",
+        id: x.id,
+        icon: "Apps",
+        label: t(x.label),
+        description: t(x.description),
+        enabled,
+        canToggle: enabled || x.dependsOn.every((d) => s.ctx.modules.has(d)),
+        notes: [`${t("@SYS:Requires")}: ${x.dependsOn.map(name).join(", ")}`],
+      };
+    });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      <h1 className="text-2xl font-semibold">{t("@SYS:Modules")}</h1>
-      <div className="card divide-y divide-line">
-        {modules.map(({ m, enabled, neededBy, canToggle }) => (
-          <div key={m.id} className="flex items-start gap-4 p-5">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 font-medium">
-                {t(m.label)}
-                {enabled && <span className="rounded-full bg-ok-soft px-2 py-0.5 text-xs text-ok">{t("@SYS:Enabled")}</span>}
-              </div>
-              <p className="mt-0.5 text-sm text-muted">{t(m.description)}</p>
-              {m.dependsOn.length > 0 && (
-                <p className="mt-1 text-xs text-muted">
-                  {t("@SYS:Requires")}: {m.dependsOn.map(name).join(", ")}
-                </p>
-              )}
-              {enabled && neededBy.length > 0 && (
-                <p className="mt-1 text-xs text-muted">
-                  {t("@SYS:RequiredBy")}: {neededBy.map(name).join(", ")}
-                </p>
-              )}
-            </div>
-            {canToggle && (
-              <form action={toggleModuleAction}>
-                <input type="hidden" name="module" value={m.id} />
-                <input type="hidden" name="enable" value={enabled ? "0" : "1"} />
-                <button className={cn("btn", !enabled && "btn-primary")}>{t(enabled ? "@SYS:Disable" : "@SYS:Enable")}</button>
-              </form>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <h2 className="text-lg font-semibold">{t("@SYS:Extensions")}</h2>
-      <div className="card divide-y divide-line">
-        {extensions.map((x) => {
-          const enabled = s.ctx.extensions.has(x.id);
-          const available = x.dependsOn.every((d) => s.ctx.modules.has(d));
-          return (
-            <div key={x.id} className="flex items-start gap-4 p-5">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 font-medium">
-                  {t(x.label)}
-                  {enabled && <span className="rounded-full bg-ok-soft px-2 py-0.5 text-xs text-ok">{t("@SYS:Enabled")}</span>}
-                </div>
-                <p className="mt-0.5 text-sm text-muted">{t(x.description)}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {t("@SYS:Requires")}: {x.dependsOn.map(name).join(", ")}
-                </p>
-              </div>
-              {(enabled || available) && (
-                <form action={toggleExtensionAction}>
-                  <input type="hidden" name="extension" value={x.id} />
-                  <input type="hidden" name="enable" value={enabled ? "0" : "1"} />
-                  <button className={cn("btn", !enabled && "btn-primary")}>{t(enabled ? "@SYS:Disable" : "@SYS:Enable")}</button>
-                </form>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <FeatureList
+      crumbs={[{ label: t("@SYS:Module"), href: "/sys" }, { label: t("@SYS:Modules") }]}
+      sections={[
+        { title: t("@SYS:Modules"), rows: modules },
+        { title: t("@SYS:Extensions"), rows: extensions },
+      ]}
+      labels={{ enable: t("@SYS:Enable"), disable: t("@SYS:Disable"), enabled: t("@SYS:Enabled") }}
+    />
   );
 }

@@ -50,6 +50,7 @@ export default defineModule({
   id: "tax",
   label: "@TAX:Module",
   description: "@TAX:ModuleDesc",
+  icon: "ReceiptMoney",
   dependsOn: ["gl"],
   enums: [TaxDirection],
   objects: [taxCode],

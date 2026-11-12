@@ -28,7 +28,7 @@ moderním webovém stacku.
 │ Kanály (později): e-shop · pokladna · dodavatelský portál      │  samostatné appky nad API,
 │                   konfigurace tenanta, ne generovaný kód       │  motiv a doména podle tenanta
 ├──────────────────────────────────────────────────────────────┤
-│ Admin UI (src/app) — obecné obrazovky z definic objektů        │
+│ Admin UI (src/app, Fluent UI) — obecné obrazovky z definic     │
 ├──────────────────────────────────────────────────────────────┤
 │ Rozšíření (src/extensions) — pole, labely, události            │  soukromá / veřejná
 ├──────────────────────────────────────────────────────────────┤
@@ -78,6 +78,14 @@ Každé čtení a zápis objektu jde tudy. Pořadí při uložení:
 8. `afterSave`
 
 Vše v jedné transakci s `SET LOCAL ROLE shanon_app` a `app.tenant_id` → RLS.
+
+## 4b. Filtry gridu
+
+Syntaxe ze Shanonu 1 (`src/core/filter.ts`), vyhodnocená na serveru
+(`src/server/filter-where.ts`) — do prohlížeče jde jen stránka výsledků:
+`text`, `*text*`, `text*`, `A, B`, `!text`, `""`, `> 100`, `10..20`,
+`15.12`, `15.12..`, `..31.12`, `ano/ne`. Odkaz se filtruje podle titulku
+cíle (číslo účtu), výčet podle popisku (`osoba`), řazení podle odkazu taky.
 
 ## 5. Moduly a jejich zapínání
 

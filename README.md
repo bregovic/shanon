@@ -7,7 +7,7 @@ Architektura: [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) · Pravidla vývoje: 
 
 ## Stack
 
-Next.js 16 · React 19 · TypeScript · Prisma 7 · PostgreSQL (RLS) · Tailwind 4 · Vitest
+Next.js 16 · React 19 · TypeScript · Prisma 7 · PostgreSQL (RLS) · Fluent UI v9 · Vitest
 
 ## Lokální vývoj
 

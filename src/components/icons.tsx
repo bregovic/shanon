@@ -1,0 +1,22 @@
+"use client";
+
+import {
+  Apps24Regular,
+  BookNumber24Regular,
+  BuildingBank24Regular,
+  ReceiptMoney24Regular,
+  Settings24Regular,
+} from "@fluentui/react-icons";
+
+/** Ikony modulů podle ModuleDef.icon. Nový modul s novou ikonou = přidat sem. */
+const MODULE_ICONS: Record<string, React.ComponentType> = {
+  Settings: Settings24Regular,
+  BuildingBank: BuildingBank24Regular,
+  BookNumber: BookNumber24Regular,
+  ReceiptMoney: ReceiptMoney24Regular,
+};
+
+export function ModuleIcon({ name }: { name: string }) {
+  const I = MODULE_ICONS[name] ?? Apps24Regular;
+  return <I />;
+}

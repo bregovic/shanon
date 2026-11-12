@@ -21,6 +21,45 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Do hlavní knihy jen přes `postVoucher()` (`src/modules/gl/posting.ts`).
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.
 
+## Obecné metody — žádný kód pro běžné operace
+
+Seznam, založení, úprava, mazání a akce nad záznamem jsou **jedna sada pro
+všechny objekty**. Nový objekt nepotřebuje žádnou novou stránku ani endpoint:
+
+| Operace | Server | UI |
+|---|---|---|
+| seznam, filtr, řazení, stránky | `listRecords` / `listAction` | `SmartGrid` |
+| detail | `getRecord` / `getRecordAction` | `RecordDrawer` nebo `ObjectDetailView` |
+| založení / úprava | `saveRecord` / `saveRecordAction` | `RecordForm` |
+| mazání (i hromadně, v jedné transakci) | `deleteRecord` / `deleteRecordsAction` | potvrzovací dialog |
+| akce (Zaúčtovat…) | `runAction` / `runRecordAction` | tlačítko z `ObjectDef.actions` |
+
+Vlastní stránka jen tam, kde obecná nestačí (nástěnky, průvodci, výkazy) — a i
+ta používá stejné komponenty a akce.
+
+## UI standard (převzato ze Shanonu 1, Fluent UI v9)
+
+- **Hlavička** (`AppShell`): logo → plocha aktuálního modulu, výběr modulu
+  s ikonami, přepínač firmy, nastavení, uživatel, odhlášení.
+- **Plocha modulu** (`/[modul]`): sloupce *Formuláře* a *Nastavení*, sbalovací
+  sekce podle `ModuleDef.menu`.
+- **Seznam**: `ActionBar` [drobečky] … [Nový] [Upravit] [Smazat] | [Obnovit],
+  pod ní `SmartGrid` (filtr a řazení v menu sloupce, výběr řádků).
+- **Formulář**: klik = výběr, dvojklik / Enter = otevřít. Běžný objekt se
+  otevře v šuplíku zprava (`Drawer position="end"`), doklad s řádky nebo akcemi
+  na celé stránce (`ObjectDetailView`), řádky dokladu zase v šuplíku.
+- Tlačítka v šuplíku: [Zpět] … [Uložit]. Primární akce = modré plné tlačítko.
+- Chyby: `MessageBar intent="error"` nahoře + hláška u pole. Uložit je během
+  ukládání zakázané. Mazání vždy s potvrzením.
+- Zarovnání v gridu: text vlevo, čísla vpravo, data a zaškrtnutí na střed.
+  Záporné částky červeně.
+- Zkratky (`useShortcuts`): Shift+N nový, Shift+R obnovit, Shift+D smazat,
+  Shift+S nebo Ctrl+S uložit, Esc zpět/zavřít, Enter otevřít.
+- Mobil (375 px): hlavička i lišta se posouvají do strany, grid má minimální
+  šířky sloupců a posouvá se, formulář je v jednom sloupci.
+- Barvy jen z motivu (`src/components/providers.tsx`, odstíny loga) a tokenů
+  Fluentu — žádné natvrdo psané barvy v komponentách.
+
 ## Úpravy pro zákazníky
 
 - Nikdy neměnit core kvůli jednomu tenantovi. Úprava = rozšíření v `src/extensions/`
@@ -45,5 +84,8 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - GitHub Issues se štítky Analysis → Development → Testing → Done.
 - Commity: `feat(gl): … [#123]`, `fix(gab): …`, `docs: …`.
 - Před pushem: `npm run lint && npm run typecheck && npm test && npm run schema:check`.
+- Před dokončením úkolu (dřívější SOP): build projde, nové texty jsou labely
+  v cs i en, nový objekt má test v `tests/`, změna je ověřená v prohlížeči
+  (desktop i mobil), žádné tajné údaje ani ladicí výpisy.
 - Lokální DB bez Dockeru: `npm run db:local` (PGlite), pak
   `npx prisma migrate deploy && npx tsx scripts/rls.ts && npm run db:seed`.

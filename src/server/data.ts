@@ -24,7 +24,9 @@ import {
 } from "@/core/module";
 import { coerce, missingMandatory, normalizeRecord } from "@/core/validate";
 import { registry } from "@/registry";
+import type { Lang } from "@/core/labels";
 import { prisma, withTenant, type Tx } from "./db";
+import { fieldWhere, orderByFor } from "./filter-where";
 
 export interface Ctx {
   tenantId: string;
@@ -43,6 +45,9 @@ export interface ListParams {
   pageSize?: number;
   /** přesná shoda na polích (např. řádky dokladu: { voucherId }) */
   filter?: RecordData;
+  /** filtry sloupců gridu, syntaxe viz src/core/filter.ts */
+  filters?: Record<string, string>;
+  lang?: Lang;
 }
 
 export interface ListResult {
@@ -207,6 +212,12 @@ class Session {
     for (const [k, v] of Object.entries(p.filter ?? {})) {
       if (k in def.fields) where[k] = v;
     }
+    const and: RecordData[] = [];
+    for (const [k, expr] of Object.entries(p.filters ?? {})) {
+      const w = fieldWhere(def, k, String(expr ?? ""), p.lang ?? "cs");
+      if (w) and.push(w);
+    }
+    if (and.length) where.AND = and;
     const q = p.q?.trim();
     if (q) {
       const or: RecordData[] = def.list
@@ -216,7 +227,8 @@ class Session {
     }
     const sortField = p.sort && p.sort in def.fields ? p.sort : def.defaultSort?.field;
     const dir = p.dir === "desc" || p.dir === "asc" ? p.dir : (def.defaultSort?.dir ?? "asc");
-    const orderBy = [...(sortField ? [{ [sortField]: dir }] : []), { id: "asc" }];
+    const sortBy = sortField ? orderByFor(def, sortField, dir) : null;
+    const orderBy = [...(sortBy ? [sortBy] : []), { id: "asc" }];
     const d = delegate(this.tx, def);
     const [rows, total] = await Promise.all([
       d.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize }),

@@ -35,7 +35,7 @@ export interface Edt {
   /** ref: id cílového objektu */
   refObject?: string;
   /** zobrazení v gridu */
-  align?: "left" | "right";
+  align?: "left" | "right" | "center";
   /** převod vstupu (např. velká písmena u kódů) */
   transform?: "upper" | "trim";
 }

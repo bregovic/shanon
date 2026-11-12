@@ -168,6 +168,7 @@ export default defineModule({
   id: "gl",
   label: "@GL:Module",
   description: "@GL:ModuleDesc",
+  icon: "BookNumber",
   dependsOn: ["sys"],
   enums: [AccountType, JournalStatus],
   objects: [account, costCenter, voucher, trans, journal, journalLine],

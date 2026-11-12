@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
 import { login, logout, requireSession, setCompany } from "@/server/auth";
-import { deleteRecord, getObject, refOptions, runAction, saveRecord } from "@/server/data";
+import { deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma } from "@/server/db";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
@@ -151,4 +151,80 @@ export async function toggleExtensionAction(form: FormData) {
     await prisma.sysTenantExtension.deleteMany({ where: { tenantId, extensionId: id } });
   }
   revalidatePath("/", "layout");
+}
+
+// ---------------------------------------------------------------------------
+// Grid a šuplík (volá klient, vrací data místo přesměrování)
+// ---------------------------------------------------------------------------
+
+export type ActionResult<T = undefined> =
+  | { ok: true; data: T }
+  | { ok: false; message: string; errors?: Record<string, string> };
+
+async function fail(e: unknown, lang: Parameters<typeof getT>[0], tenantId: string): Promise<{ ok: false; message: string; errors?: Record<string, string> }> {
+  const s = await userError(e, lang, tenantId);
+  return { ok: false, message: s.message ?? "", errors: s.errors };
+}
+
+export async function listAction(
+  objectId: string,
+  params: { filters?: Record<string, string>; sort?: string; dir?: "asc" | "desc"; page?: number; pageSize?: number; filter?: Record<string, string> },
+): Promise<ActionResult<{ rows: RecordData[]; total: number }>> {
+  const s = await requireSession();
+  try {
+    const r = await listRecords(s.ctx, objectId, { ...params, lang: s.lang });
+    return { ok: true, data: { rows: r.rows, total: r.total } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function getRecordAction(objectId: string, id: string): Promise<ActionResult<RecordData | null>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: await getRecord(s.ctx, objectId, id) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function saveRecordAction(
+  objectId: string,
+  id: string | null,
+  values: RecordData,
+  version?: number,
+): Promise<ActionResult<RecordData>> {
+  const s = await requireSession();
+  try {
+    const saved = await saveRecord(s.ctx, objectId, id, values, version);
+    revalidatePath(objectHref(objectId));
+    return { ok: true, data: saved };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function deleteRecordsAction(objectId: string, ids: string[]): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    // jedna transakce: buď se smažou všechny, nebo žádný
+    await inTenant(s.ctx, async (sess) => {
+      for (const id of ids) await sess.remove(objectId, id);
+    });
+    revalidatePath(objectHref(objectId));
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    await runAction(s.ctx, objectId, id, actionId);
+    revalidatePath(objectHref(objectId, id));
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
 }

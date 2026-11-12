@@ -109,6 +109,7 @@ export default defineModule({
   id: "gab",
   label: "@GAB:Module",
   description: "@GAB:ModuleDesc",
+  icon: "BuildingBank",
   dependsOn: ["sys"],
   enums: [SubjectType, AddressKind, ContactKind],
   objects: [subject, address, contact],

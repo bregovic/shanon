@@ -28,6 +28,8 @@ export interface ModuleDef {
   id: string;
   label: LabelRef;
   description: LabelRef;
+  /** název ikony z @fluentui/react-icons bez velikosti, např. "BuildingBank" */
+  icon: string;
   /** vždy zapnutý (systém) */
   core?: boolean;
   dependsOn: string[];
