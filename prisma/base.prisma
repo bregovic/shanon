@@ -1,0 +1,115 @@
+// Shanon — systémové tabulky psané ručně.
+// Tabulky objektů (moduly) generuje `npm run schema:gen` do schema.prisma
+// z definic v src/modules. schema.prisma NEUPRAVOVAT RUČNĚ.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Zákazník platformy (tenant). Data všech tabulek objektů jsou oddělená
+/// podle tenant_id a hlídá je Row Level Security (scripts/rls.ts).
+model SysTenant {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  code      String   @unique @db.VarChar(40)
+  name      String   @db.VarChar(120)
+  /// vlastní úložiště souborů tenanta (S3/R2), šifrovaná konfigurace
+  storage   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users      SysUser[]
+  modules    SysTenantModule[]
+  extensions SysTenantExtension[]
+  labels     SysLabelOverride[]
+
+  @@map("sys_tenant")
+}
+
+model SysUser {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  email        String   @unique @db.VarChar(254)
+  name         String   @db.VarChar(120)
+  passwordHash String   @map("password_hash")
+  /// admin = správa modulů a nastavení tenanta
+  role         String   @default("user") @db.VarChar(20)
+  lang         String   @default("cs") @db.VarChar(5)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant   SysTenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions SysSession[]
+
+  @@index([tenantId])
+  @@map("sys_user")
+}
+
+model SysSession {
+  /// SHA-256 tokenu z cookie (token samotný se neukládá)
+  id        String   @id @db.VarChar(64)
+  userId    String   @map("user_id") @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sys_session")
+}
+
+/// Zapnuté moduly tenanta (obdoba konfiguračních klíčů v AX).
+model SysTenantModule {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  moduleId  String   @map("module_id") @db.VarChar(40)
+  enabledAt DateTime @default(now()) @map("enabled_at")
+
+  tenant SysTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, moduleId])
+  @@map("sys_tenant_module")
+}
+
+/// Zapnutá rozšíření tenanta.
+model SysTenantExtension {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  extensionId String   @map("extension_id") @db.VarChar(60)
+  enabledAt   DateTime @default(now()) @map("enabled_at")
+
+  tenant SysTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, extensionId])
+  @@map("sys_tenant_extension")
+}
+
+/// Přepis labelu pro tenanta (vlastní názvosloví bez zásahu do kódu).
+model SysLabelOverride {
+  tenantId String @map("tenant_id") @db.Uuid
+  lang     String @db.VarChar(5)
+  labelId  String @map("label_id") @db.VarChar(80)
+  text     String @db.VarChar(255)
+
+  tenant SysTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, lang, labelId])
+  @@map("sys_label_override")
+}
+
+/// Auditní stopa změn záznamů objektů.
+model SysAudit {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  objectId  String   @map("object_id") @db.VarChar(60)
+  recordId  String   @map("record_id") @db.Uuid
+  action    String   @db.VarChar(10)
+  userId    String?  @map("user_id") @db.Uuid
+  changes   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, objectId, recordId])
+  @@map("sys_audit")
+}

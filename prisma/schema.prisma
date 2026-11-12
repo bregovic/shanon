@@ -1,0 +1,438 @@
+// !!! GENEROVÁNO — neupravovat. Zdroj: prisma/base.prisma + src/modules (npm run schema:gen)
+
+// Shanon — systémové tabulky psané ručně.
+// Tabulky objektů (moduly) generuje `npm run schema:gen` do schema.prisma
+// z definic v src/modules. schema.prisma NEUPRAVOVAT RUČNĚ.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Zákazník platformy (tenant). Data všech tabulek objektů jsou oddělená
+/// podle tenant_id a hlídá je Row Level Security (scripts/rls.ts).
+model SysTenant {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  code      String   @unique @db.VarChar(40)
+  name      String   @db.VarChar(120)
+  /// vlastní úložiště souborů tenanta (S3/R2), šifrovaná konfigurace
+  storage   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users      SysUser[]
+  modules    SysTenantModule[]
+  extensions SysTenantExtension[]
+  labels     SysLabelOverride[]
+
+  @@map("sys_tenant")
+}
+
+model SysUser {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  email        String   @unique @db.VarChar(254)
+  name         String   @db.VarChar(120)
+  passwordHash String   @map("password_hash")
+  /// admin = správa modulů a nastavení tenanta
+  role         String   @default("user") @db.VarChar(20)
+  lang         String   @default("cs") @db.VarChar(5)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant   SysTenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions SysSession[]
+
+  @@index([tenantId])
+  @@map("sys_user")
+}
+
+model SysSession {
+  /// SHA-256 tokenu z cookie (token samotný se neukládá)
+  id        String   @id @db.VarChar(64)
+  userId    String   @map("user_id") @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sys_session")
+}
+
+/// Zapnuté moduly tenanta (obdoba konfiguračních klíčů v AX).
+model SysTenantModule {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  moduleId  String   @map("module_id") @db.VarChar(40)
+  enabledAt DateTime @default(now()) @map("enabled_at")
+
+  tenant SysTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, moduleId])
+  @@map("sys_tenant_module")
+}
+
+/// Zapnutá rozšíření tenanta.
+model SysTenantExtension {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  extensionId String   @map("extension_id") @db.VarChar(60)
+  enabledAt   DateTime @default(now()) @map("enabled_at")
+
+  tenant SysTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, extensionId])
+  @@map("sys_tenant_extension")
+}
+
+/// Přepis labelu pro tenanta (vlastní názvosloví bez zásahu do kódu).
+model SysLabelOverride {
+  tenantId String @map("tenant_id") @db.Uuid
+  lang     String @db.VarChar(5)
+  labelId  String @map("label_id") @db.VarChar(80)
+  text     String @db.VarChar(255)
+
+  tenant SysTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, lang, labelId])
+  @@map("sys_label_override")
+}
+
+/// Auditní stopa změn záznamů objektů.
+model SysAudit {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  objectId  String   @map("object_id") @db.VarChar(60)
+  recordId  String   @map("record_id") @db.Uuid
+  action    String   @db.VarChar(10)
+  userId    String?  @map("user_id") @db.Uuid
+  changes   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, objectId, recordId])
+  @@map("sys_audit")
+}
+
+// ===========================================================================
+// Objekty modulů
+// ===========================================================================
+
+/// sys.company — generováno z definice objektu
+model SysCompany {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  regNo     String?  @map("reg_no") @db.VarChar(12)
+  vatId     String?  @map("vat_id") @db.VarChar(16)
+  vatPayer  Boolean  @default(true) @map("vat_payer")
+  currency  String   @default("CZK") @db.VarChar(3)
+  country   String   @default("CZ") @db.VarChar(2)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  sysNumberSeq_company  SysNumberSeq[]  @relation("SysNumberSeq_company")
+  glAccount_company     GlAccount[]     @relation("GlAccount_company")
+  glCostCenter_company  GlCostCenter[]  @relation("GlCostCenter_company")
+  glVoucher_company     GlVoucher[]     @relation("GlVoucher_company")
+  glTrans_company       GlTrans[]       @relation("GlTrans_company")
+  glJournal_company     GlJournal[]     @relation("GlJournal_company")
+  glJournalLine_company GlJournalLine[] @relation("GlJournalLine_company")
+  taxCode_company       TaxCode[]       @relation("TaxCode_company")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("sys_company")
+}
+
+/// sys.numberSeq — generováno z definice objektu
+model SysNumberSeq {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  code       String   @db.VarChar(20)
+  name       String   @db.VarChar(120)
+  format     String   @db.VarChar(40)
+  nextNumber Int      @default(1) @map("next_number")
+  ext        Json     @default("{}")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String?  @map("created_by") @db.Uuid
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("SysNumberSeq_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("sys_number_seq")
+}
+
+/// gab.subject — generováno z definice objektu
+model GabSubject {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String   @db.VarChar(120)
+  type      String   @default("organization") @db.VarChar(40)
+  regNo     String?  @map("reg_no") @db.VarChar(12)
+  vatId     String?  @map("vat_id") @db.VarChar(16)
+  email     String?  @db.VarChar(254)
+  phone     String?  @db.VarChar(30)
+  country   String?  @default("CZ") @db.VarChar(2)
+  notes     String?
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  gabAddress_subject GabAddress[] @relation("GabAddress_subject")
+  gabContact_subject GabContact[] @relation("GabContact_subject")
+
+  @@index([tenantId])
+  @@map("gab_subject")
+}
+
+/// gab.address — generováno z definice objektu
+model GabAddress {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  subjectId String   @map("subject_id") @db.Uuid
+  kind      String   @default("registered") @db.VarChar(40)
+  street    String?  @db.VarChar(120)
+  city      String   @db.VarChar(80)
+  zipCode   String?  @map("zip_code") @db.VarChar(10)
+  country   String   @default("CZ") @db.VarChar(2)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  subject GabSubject @relation("GabAddress_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([subjectId])
+  @@map("gab_address")
+}
+
+/// gab.contact — generováno z definice objektu
+model GabContact {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  subjectId   String   @map("subject_id") @db.Uuid
+  kind        String   @default("email") @db.VarChar(40)
+  value       String   @db.VarChar(254)
+  description String?  @db.VarChar(255)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  subject GabSubject @relation("GabContact_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([subjectId])
+  @@map("gab_contact")
+}
+
+/// gl.account — generováno z definice objektu
+model GlAccount {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  accountNum String   @map("account_num") @db.VarChar(10)
+  name       String   @db.VarChar(120)
+  type       String   @db.VarChar(40)
+  blocked    Boolean  @default(false)
+  ext        Json     @default("{}")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String?  @map("created_by") @db.Uuid
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.Uuid
+
+  company               SysCompany      @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glTrans_account       GlTrans[]       @relation("GlTrans_account")
+  glJournalLine_account GlJournalLine[] @relation("GlJournalLine_account")
+  taxCode_account       TaxCode[]       @relation("TaxCode_account")
+
+  @@unique([tenantId, companyId, accountNum])
+  @@index([tenantId, companyId])
+  @@map("gl_account")
+}
+
+/// gl.costCenter — generováno z definice objektu
+model GlCostCenter {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company                  SysCompany      @relation("GlCostCenter_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glTrans_costCenter       GlTrans[]       @relation("GlTrans_costCenter")
+  glJournalLine_costCenter GlJournalLine[] @relation("GlJournalLine_costCenter")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("gl_cost_center")
+}
+
+/// gl.voucher — generováno z definice objektu
+model GlVoucher {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  voucherNum   String   @map("voucher_num") @db.VarChar(30)
+  date         DateTime @db.Date
+  description  String?  @db.VarChar(255)
+  sourceObject String?  @map("source_object") @db.VarChar(255)
+  sourceId     String?  @map("source_id") @db.VarChar(255)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company           SysCompany  @relation("GlVoucher_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glTrans_voucher   GlTrans[]   @relation("GlTrans_voucher")
+  glJournal_voucher GlJournal[] @relation("GlJournal_voucher")
+
+  @@unique([tenantId, companyId, voucherNum])
+  @@index([tenantId, companyId])
+  @@map("gl_voucher")
+}
+
+/// gl.trans — generováno z definice objektu
+model GlTrans {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  voucherId    String   @map("voucher_id") @db.Uuid
+  date         DateTime @db.Date
+  accountId    String   @map("account_id") @db.Uuid
+  costCenterId String?  @map("cost_center_id") @db.Uuid
+  amount       Decimal  @db.Decimal(18, 2)
+  text         String?  @db.VarChar(255)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company    SysCompany    @relation("GlTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
+  voucher    GlVoucher     @relation("GlTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  account    GlAccount     @relation("GlTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter GlCostCenter? @relation("GlTrans_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([voucherId])
+  @@index([accountId])
+  @@index([costCenterId])
+  @@map("gl_trans")
+}
+
+/// gl.journal — generováno z definice objektu
+model GlJournal {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  journalNum  String   @map("journal_num") @db.VarChar(30)
+  date        DateTime @db.Date
+  description String   @db.VarChar(255)
+  status      String   @default("draft") @db.VarChar(40)
+  voucherId   String?  @map("voucher_id") @db.Uuid
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company               SysCompany      @relation("GlJournal_company", fields: [companyId], references: [id], onDelete: Restrict)
+  voucher               GlVoucher?      @relation("GlJournal_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  glJournalLine_journal GlJournalLine[] @relation("GlJournalLine_journal")
+
+  @@index([tenantId, companyId])
+  @@index([voucherId])
+  @@map("gl_journal")
+}
+
+/// gl.journalLine — generováno z definice objektu
+model GlJournalLine {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  journalId    String   @map("journal_id") @db.Uuid
+  accountId    String   @map("account_id") @db.Uuid
+  costCenterId String?  @map("cost_center_id") @db.Uuid
+  debit        Decimal? @db.Decimal(18, 2)
+  credit       Decimal? @db.Decimal(18, 2)
+  text         String?  @db.VarChar(255)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company    SysCompany    @relation("GlJournalLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journal    GlJournal     @relation("GlJournalLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
+  account    GlAccount     @relation("GlJournalLine_account", fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter GlCostCenter? @relation("GlJournalLine_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([journalId])
+  @@index([accountId])
+  @@index([costCenterId])
+  @@map("gl_journal_line")
+}
+
+/// tax.taxCode — generováno z definice objektu
+model TaxCode {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  code          String   @db.VarChar(20)
+  name          String   @db.VarChar(120)
+  rate          Decimal  @db.Decimal(7, 4)
+  direction     String   @db.VarChar(40)
+  reverseCharge Boolean  @default(false) @map("reverse_charge")
+  accountId     String   @map("account_id") @db.Uuid
+  reportLine    String?  @map("report_line") @db.VarChar(10)
+  khSection     String?  @map("kh_section") @db.VarChar(4)
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
+  account GlAccount  @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([accountId])
+  @@map("tax_code")
+}
