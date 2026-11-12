@@ -29,5 +29,5 @@ npm run lint && npm run typecheck && npm test && npm run schema:check
 
 ## Nasazení (Railway)
 
-`railway.json`: build `npm run build`, před startem `npm run db:deploy`
+`railway.json`: build `npm run build`, při startu `npm run db:deploy`
 (migrace + RLS). Proměnné: `DATABASE_URL`.
