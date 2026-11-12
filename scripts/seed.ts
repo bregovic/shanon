@@ -1,6 +1,7 @@
 /**
- * Ukázkový tenant pro vývoj. Heslo správce z SEED_PASSWORD (jinak náhodné, vypíše se).
- * Spuštění: npm run db:seed
+ * První tenant. Heslo správce z SEED_PASSWORD (lokálně jinak náhodné, vypíše se).
+ * Spouští se i při nasazení (db:deploy): v produkci jen když je nastavené
+ * SEED_PASSWORD, a existujícího tenanta nemění — po prvním nasazení proměnnou smazat.
  */
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
@@ -8,6 +9,7 @@ import { createPrisma } from "../src/server/db";
 import { provisionTenant } from "../src/server/provision";
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && !process.env.SEED_PASSWORD) return;
   const client = createPrisma();
   const code = process.env.SEED_TENANT ?? "demo";
   if (await client.sysTenant.findUnique({ where: { code } })) {
