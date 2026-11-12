@@ -1,0 +1,4 @@
+# Railway / Nixpacks: `npm install` místo `npm ci` — lockfile z Windows (npm 11)
+# nesedí na volitelné linuxové balíčky v build kontejneru (npm 10).
+[phases.install]
+cmds = ["npm install"]
