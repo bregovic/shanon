@@ -25,14 +25,18 @@ import {
 import { coerce, missingMandatory, normalizeRecord } from "@/core/validate";
 import { registry } from "@/registry";
 import type { Lang } from "@/core/labels";
+import { can, type Level, type Perms } from "@/core/security";
 import { prisma, withTenant, type Tx } from "./db";
 import { fieldWhere, orderByFor } from "./filter-where";
+import { storageFor } from "./storage";
 
 export interface Ctx {
   tenantId: string;
   userId: string;
   companyId: string | null;
   role: string;
+  /** oprávnění uživatele (src/core/security.ts) */
+  perms: Perms;
   modules: Set<string>;
   extensions: Set<string>;
 }
@@ -48,6 +52,8 @@ export interface ListParams {
   /** filtry sloupců gridu, syntaxe viz src/core/filter.ts */
   filters?: Record<string, string>;
   lang?: Lang;
+  /** jen pro serverový kód (export) — větší stránky než povolí grid */
+  maxPageSize?: number;
 }
 
 export interface ListResult {
@@ -96,10 +102,16 @@ function handlersFor(ctx: Ctx, objectId: string): ObjectHandlers[] {
   return list;
 }
 
-function assertAccess(ctx: Ctx, def: ObjectDef) {
+/**
+ * Zapnutý modul, vybraná firma a oprávnění uživatele. Systémové operace
+ * (logika modulů přes DataApi — např. účtování dokladu) oprávnění nekontrolují,
+ * kontroluje se operace uživatele, která je spustila.
+ */
+function assertAccess(ctx: Ctx, def: ObjectDef, need: Exclude<Level, "none">, system: boolean) {
   const mod = def.id.split(".")[0];
   if (!ctx.modules.has(mod)) throw new UserError("@SYS:InvalidValue");
   if (def.scope === "company" && !ctx.companyId) throw new UserError("@SYS:NoCompany");
+  if (!system && !can(ctx.perms, def.id, need)) throw new UserError("@SYS:NoAccess");
 }
 
 const scopeWhere = (ctx: Ctx, def: ObjectDef): RecordData =>
@@ -162,7 +174,14 @@ class Session {
   constructor(
     public tx: Tx,
     public ctx: Ctx,
+    /** systémová operace (bez kontroly oprávnění uživatele) */
+    public system = false,
   ) {}
+
+  /** stejná transakce, ale bez kontroly oprávnění — pro interní kroky */
+  sys(): Session {
+    return this.system ? this : new Session(this.tx, this.ctx, true);
+  }
 
   eventCtx(objectId: string): EventContext {
     return {
@@ -175,18 +194,19 @@ class Session {
   }
 
   api(): DataApi {
+    const s = this.sys();
     return {
-      get: (o, id) => this.get(o, id),
-      find: (o, where, opts) => this.find(o, where, opts?.take),
-      create: (o, data) => this.save(o, null, data, { system: true }),
-      update: (o, id, data) => this.save(o, id, data, { system: true }),
-      nextNumber: (seq, date) => this.nextNumber(seq, date),
+      get: (o, id) => s.get(o, id),
+      find: (o, where, opts) => s.find(o, where, opts?.take),
+      create: (o, data) => s.save(o, null, data, { system: true }),
+      update: (o, id, data) => s.save(o, id, data, { system: true }),
+      nextNumber: (seq, date) => s.nextNumber(seq, date),
     };
   }
 
   async get(objectId: string, id: string): Promise<RecordData | null> {
     const def = getObject(objectId);
-    assertAccess(this.ctx, def);
+    assertAccess(this.ctx, def, "read", this.system);
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
     const row = await delegate(this.tx, def).findFirst({ where: { id, ...scopeWhere(this.ctx, def) } });
     return row ? serialize(def, row) : null;
@@ -194,7 +214,7 @@ class Session {
 
   async find(objectId: string, where: RecordData, take = 1000): Promise<RecordData[]> {
     const def = getObject(objectId);
-    assertAccess(this.ctx, def);
+    assertAccess(this.ctx, def, "read", this.system);
     const rows = await delegate(this.tx, def).findMany({
       where: { ...toDb(def, where), ...scopeWhere(this.ctx, def) },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -205,8 +225,8 @@ class Session {
 
   async list(objectId: string, p: ListParams): Promise<ListResult> {
     const def = getObject(objectId);
-    assertAccess(this.ctx, def);
-    const pageSize = Math.min(Math.max(p.pageSize ?? 50, 1), 200);
+    assertAccess(this.ctx, def, "read", this.system);
+    const pageSize = Math.min(Math.max(p.pageSize ?? 50, 1), p.maxPageSize ?? 200);
     const page = Math.max(p.page ?? 1, 1);
     const where: RecordData = { ...scopeWhere(this.ctx, def) };
     for (const [k, v] of Object.entries(p.filter ?? {})) {
@@ -277,7 +297,7 @@ class Session {
     opts: { system?: boolean; version?: number } = {},
   ): Promise<RecordData> {
     const def = getObject(objectId);
-    assertAccess(this.ctx, def);
+    assertAccess(this.ctx, def, "write", this.system || !!opts.system);
     if (def.systemOnly && !opts.system) throw new UserError("@SYS:InvalidValue");
 
     const xf = extFields(this.ctx, objectId);
@@ -286,7 +306,7 @@ class Session {
       : def.fields;
     const { data, ext, errors } = normalizeRecord({ ...def, fields: fieldsForInput }, input, registry, xf);
 
-    const existing = id ? await this.get(objectId, id) : null;
+    const existing = id ? await this.sys().get(objectId, id) : null;
     if (id && !existing) throw new UserError("@SYS:NotFound");
     if (existing && def.lockedWhen && !opts.system && existing[def.lockedWhen.field] === def.lockedWhen.equals)
       throw new UserError("@SYS:Locked");
@@ -314,7 +334,7 @@ class Session {
     // odkazy musí mířit na záznam téhož tenanta (a firmy) — FK to neohlídá
     for (const [name, f] of Object.entries(def.fields)) {
       if (f.edt.kind !== "ref" || !(name in data) || !merged[name] || errors[name]) continue;
-      const target = await this.get(f.edt.refObject!, String(merged[name]));
+      const target = await this.sys().get(f.edt.refObject!, String(merged[name]));
       if (!target) errors[name] = "@SYS:InvalidValue";
     }
 
@@ -361,9 +381,9 @@ class Session {
 
   async remove(objectId: string, id: string): Promise<void> {
     const def = getObject(objectId);
-    assertAccess(this.ctx, def);
+    assertAccess(this.ctx, def, "delete", this.system);
     if (def.systemOnly) throw new UserError("@SYS:InvalidValue");
-    const existing = await this.get(objectId, id);
+    const existing = await this.sys().get(objectId, id);
     if (!existing) throw new UserError("@SYS:NotFound");
     if (def.lockedWhen && existing[def.lockedWhen.field] === def.lockedWhen.equals) throw new UserError("@SYS:Locked");
     const ectx = this.eventCtx(objectId);
@@ -375,22 +395,28 @@ class Session {
     for (const l of def.lines ?? []) {
       const lineDef = getObject(l.object);
       if (lineDef.systemOnly) continue;
-      for (const line of await this.find(l.object, { [l.field]: id })) await this.remove(l.object, String(line.id));
+      // řádky patří dokladu — stačí právo smazat doklad
+      const sys = this.sys();
+      for (const line of await sys.find(l.object, { [l.field]: id })) await sys.remove(l.object, String(line.id));
     }
     try {
       await delegate(this.tx, def).deleteMany({ where: { id, ...scopeWhere(this.ctx, def) } });
     } catch (e) {
       prismaError(e);
     }
+    // přílohy (DocuRef) patří záznamu — smazat i s obsahem souborů
+    const refs = await this.tx.sysDocuRef.findMany({ where: { tenantId: this.ctx.tenantId, objectId, recordId: id } });
+    for (const r of refs) if (r.storageKey) await storageFor(r.storage).remove(this.tx, this.ctx.tenantId, r.storageKey);
+    if (refs.length) await this.tx.sysDocuRef.deleteMany({ where: { id: { in: refs.map((r) => r.id) } } });
     await this.audit(objectId, id, "delete", existing, null);
   }
 
   async action(objectId: string, id: string, actionId: string): Promise<void> {
     const def = getObject(objectId);
-    assertAccess(this.ctx, def);
+    assertAccess(this.ctx, def, "write", this.system);
     const a = def.actions?.find((x) => x.id === actionId);
     if (!a) throw new UserError("@SYS:InvalidValue");
-    const record = await this.get(objectId, id);
+    const record = await this.sys().get(objectId, id);
     if (!record) throw new UserError("@SYS:NotFound");
     if (a.when && record[a.when.field] !== a.when.equals) throw new UserError("@SYS:Locked");
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];

@@ -5,6 +5,7 @@
 import bcrypt from "bcryptjs";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { dependencyClosure } from "@/core/module";
+import { ADMIN } from "@/core/security";
 import { VOUCHER_SEQ } from "@/modules/gl/posting";
 import { registry } from "@/registry";
 import { inTenant, type Ctx } from "./data";
@@ -55,6 +56,7 @@ export async function provisionTenant(client: PrismaClient, input: ProvisionInpu
     userId: tenant.users[0].id,
     companyId: null,
     role: "admin",
+    perms: ADMIN,
     modules,
     extensions: new Set(),
   };

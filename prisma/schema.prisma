@@ -41,10 +41,13 @@ model SysUser {
   role         String   @default("user") @db.VarChar(20)
   lang         String   @default("cs") @db.VarChar(5)
   active       Boolean  @default(true)
+  /// role (sys_role.id), oprávnění = sjednocení oprávnění rolí; správce má vše
+  roleIds      String[] @default([]) @map("role_ids") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant   SysTenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sessions SysSession[]
+  tenant    SysTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions  SysSession[]
+  favorites SysFavorite[]
 
   @@index([tenantId])
   @@map("sys_user")
@@ -116,6 +119,51 @@ model SysAudit {
   @@map("sys_audit")
 }
 
+/// Poznámky a soubory k libovolnému záznamu (DocuRef).
+model SysDocuRef {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  objectId   String   @map("object_id") @db.VarChar(60)
+  recordId   String   @map("record_id") @db.Uuid
+  /// note | file
+  kind       String   @db.VarChar(10)
+  name       String   @db.VarChar(255)
+  note       String?
+  mime       String?  @db.VarChar(120)
+  size       Int?
+  /// kde leží obsah souboru: db (sys_file_blob) nebo s3 (úložiště tenanta)
+  storage    String?  @db.VarChar(10)
+  storageKey String?  @map("storage_key") @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String?  @map("created_by") @db.Uuid
+
+  @@index([tenantId, objectId, recordId])
+  @@map("sys_docuref")
+}
+
+/// Obsah souborů uložených v databázi (výchozí úložiště).
+model SysFileBlob {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  data     Bytes
+
+  @@index([tenantId])
+  @@map("sys_file_blob")
+}
+
+/// Oblíbené stránky uživatele.
+model SysFavorite {
+  userId    String   @map("user_id") @db.Uuid
+  href      String   @db.VarChar(255)
+  label     String   @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, href])
+  @@map("sys_favorite")
+}
+
 // ===========================================================================
 // Objekty modulů
 // ===========================================================================
@@ -173,6 +221,48 @@ model SysNumberSeq {
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
   @@map("sys_number_seq")
+}
+
+/// sys.role — generováno z definice objektu
+model SysRole {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  sysRolePermission_role SysRolePermission[] @relation("SysRolePermission_role")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("sys_role")
+}
+
+/// sys.rolePermission — generováno z definice objektu
+model SysRolePermission {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  target    String   @db.VarChar(40)
+  level     String   @default("read") @db.VarChar(40)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  role SysRole @relation("SysRolePermission_role", fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, roleId, target])
+  @@index([tenantId])
+  @@index([roleId])
+  @@map("sys_role_permission")
 }
 
 /// gab.subject — generováno z definice objektu

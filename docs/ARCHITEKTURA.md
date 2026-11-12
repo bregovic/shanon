@@ -161,6 +161,18 @@ defineExtension({
 - **Vlastní databáze:** pozdější prémiová úroveň — oddělená databáze spravovaná
   námi, směrování podle tenanta. Tabulky přímo v cizím úložišti nepodporujeme.
 
+## 9b. Standardní funkce každého objektu
+
+Oprávnění, přílohy (DocuRef), historie změn, oblíbené a export do Excelu
+dostane každý objekt automaticky — viz tabulka v `AGENTS.md`.
+
+**Oprávnění** (obdoba security rolí v AX): role (`sys.role`) má řádky
+`sys.rolePermission` = cíl (modul nebo objekt) + úroveň (Číst / Upravovat /
+Upravovat a mazat). Uživatel (`sys_user.role_ids`) má sjednocení svých rolí;
+oprávnění na objekt má přednost před modulem. Správce tenanta má vše.
+Kontroluje se v datové službě; systémové kroky (zaúčtování dokladu) se
+kontrolují na úrovni akce, která je spustila.
+
 ## 10. Bezpečnost
 
 - RLS na všech tabulkách objektů; role `shanon_app` není vlastník ani superuser.
@@ -173,11 +185,12 @@ defineExtension({
 
 ## 11. Další kroky (pořadí)
 
-1. Uživatelé a role (oprávnění na objekty: číst / zapisovat / mazat / akce)
-2. `ar` + `ap`: faktury s DPH → účtování přes účtovací profily
-3. `cash`: banka (GPC/ABO import), pokladna, párování
-4. Uzávěrky období, výkazy (rozvaha, výsledovka, obratová předvaha)
-5. DPH: přiznání, KH, SH → XML pro EPO
-6. `inv` + `sales` → první kanál (pokladna nebo e-shop)
-7. Úložiště tenanta (R2), export dat
-8. Rozšíření od tenantů v izolovaném běhu, katalog
+1. ~~Uživatelé, role a oprávnění, přílohy, historie, oblíbené, export~~ (hotovo)
+2. Kontextová nápověda (F1), oprávnění na pole
+3. `ar` + `ap`: faktury s DPH → účtování přes účtovací profily
+4. `cash`: banka (GPC/ABO import), pokladna, párování
+5. Uzávěrky období, výkazy (rozvaha, výsledovka, obratová předvaha)
+6. DPH: přiznání, KH, SH → XML pro EPO
+7. `inv` + `sales` → první kanál (pokladna nebo e-shop)
+8. Úložiště souborů tenanta (R2/S3 — ovladač do `src/server/storage.ts`), export dat
+9. Rozšíření od tenantů v izolovaném běhu, katalog

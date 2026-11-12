@@ -14,7 +14,7 @@ import { registry } from "../src/registry";
 export const APP_ROLE = "shanon_app";
 
 export function rlsStatements(): string[] {
-  const tables = [...[...registry.objects.values()].map((o) => o.table), "sys_audit"];
+  const tables = [...[...registry.objects.values()].map((o) => o.table), "sys_audit", "sys_docuref", "sys_file_blob"];
   const sql: string[] = [
     `DO $$ BEGIN
        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${APP_ROLE}') THEN
@@ -44,7 +44,7 @@ async function main() {
     await client.query("BEGIN");
     for (const s of rlsStatements()) await client.query(s);
     await client.query("COMMIT");
-    console.log(`RLS: ${registry.objects.size + 1} tabulek`);
+    console.log(`RLS: ${registry.objects.size + 3} tabulek`);
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;

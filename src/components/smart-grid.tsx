@@ -74,6 +74,8 @@ interface Props {
   /** klíč pro zapamatování filtrů v rámci relace prohlížeče */
   storageKey?: string;
   maxHeight?: string;
+  /** aktuální filtry a řazení (pro export) */
+  onViewChange?: (view: { filters: Record<string, string>; sort?: string; dir: "asc" | "desc" }) => void;
 }
 
 interface View {
@@ -285,6 +287,7 @@ export function SmartGrid({
   reloadKey = 0,
   storageKey,
   maxHeight = "calc(100vh - 190px)",
+  onViewChange,
 }: Props) {
   const s = useStyles();
   const [view, setView] = useState<View>({ filters: {}, dir: "asc" });
@@ -344,6 +347,8 @@ export function SmartGrid({
     // initial záměrně jen při prvním běhu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, reloadKey, fetchPage, storageKey]);
+
+  useEffect(() => onViewChange?.(view), [view, onViewChange]);
 
   const selectedRows = useMemo(() => rows.filter((r) => selected.has(String(r.id))), [rows, selected]);
   useEffect(() => onSelectionChange?.(selectedRows), [selectedRows, onSelectionChange]);

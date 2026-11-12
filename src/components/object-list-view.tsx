@@ -18,10 +18,13 @@ import {
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, Delete24Regular, Edit24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Delete24Regular, Edit24Regular } from "@fluentui/react-icons";
 import { deleteRecordsAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
+import { DocuRefButton } from "./docuref-panel";
+import { FavoriteStar } from "./favorites";
+import { HistoryButton } from "./history-panel";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import type { FormGroup, Values } from "./record-form";
@@ -39,6 +42,7 @@ export interface ObjectListProps {
   groups: FormGroup[];
   defaults: Values;
   canCreate: boolean;
+  canWrite: boolean;
   canDelete: boolean;
   openInPage: boolean;
   initial: { rows: Row[]; total: number };
@@ -53,6 +57,12 @@ export function ObjectListView(p: ObjectListProps) {
   const [drawer, setDrawer] = useState<{ open: boolean; id: string | null; title: string }>({ open: false, id: null, title: "" });
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string>();
+  const [view, setView] = useState<{ filters: Record<string, string>; sort?: string; dir: "asc" | "desc" }>({ filters: {}, dir: "asc" });
+  const exportHref = () => {
+    const q = new URLSearchParams({ filters: JSON.stringify(view.filters), dir: view.dir });
+    if (view.sort) q.set("sort", view.sort);
+    return `/api/export/${p.objectId}?${q}`;
+  };
 
   const open = useCallback(
     (row: Row | null) => {
@@ -90,6 +100,7 @@ export function ObjectListView(p: ObjectListProps) {
     <>
       <ActionBar>
         <Crumbs items={p.crumbs} />
+        <FavoriteStar href={objectHref(p.objectId)} label={p.crumbs[p.crumbs.length - 1].label} />
         <Spacer />
         {p.canCreate && (
           <Button appearance="primary" icon={<Add24Regular />} title={`${p.labels.actions.new} (Shift+N)`} onClick={() => open(null)}>
@@ -105,6 +116,20 @@ export function ObjectListView(p: ObjectListProps) {
           </Button>
         )}
         <ToolbarDivider />
+        <DocuRefButton
+          objectId={p.objectId}
+          recordId={selected.length === 1 ? String(selected[0].id) : null}
+          recordTitle={selected.length === 1 ? String(selected[0][p.titleField] ?? p.label) : ""}
+          canWrite={p.canWrite}
+          labels={p.labels.docuref}
+        />
+        <HistoryButton
+          objectId={p.objectId}
+          recordId={selected.length === 1 ? String(selected[0].id) : null}
+          recordTitle={selected.length === 1 ? String(selected[0][p.titleField] ?? p.label) : ""}
+          labels={p.labels.history}
+        />
+        <Button appearance="subtle" icon={<ArrowDownload24Regular />} title={p.labels.export} aria-label={p.labels.export} onClick={() => (window.location.href = exportHref())} />
         <Button appearance="subtle" icon={<ArrowClockwise24Regular />} title={`${p.labels.actions.refresh} (Shift+R)`} onClick={() => setReload((n) => n + 1)}>
           {p.labels.actions.refresh}
         </Button>
@@ -126,6 +151,7 @@ export function ObjectListView(p: ObjectListProps) {
           storageKey={p.objectId}
           onOpen={open}
           onSelectionChange={setSelected}
+          onViewChange={setView}
         />
       </PageContent>
 
@@ -137,6 +163,7 @@ export function ObjectListView(p: ObjectListProps) {
           title={drawer.title}
           groups={p.groups}
           defaults={p.defaults}
+          readOnly={!p.canWrite}
           labels={p.labels.drawer}
           onClose={() => setDrawer((d) => ({ ...d, open: false }))}
           onSaved={() => {

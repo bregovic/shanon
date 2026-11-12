@@ -1,5 +1,6 @@
 "use server";
 
+import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
@@ -7,6 +8,8 @@ import { registry } from "@/registry";
 import { login, logout, requireSession, setCompany } from "@/server/auth";
 import { deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma } from "@/server/db";
+import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, type DocuRefItem } from "@/server/docuref";
+import { recordHistory, type HistoryEntry } from "@/server/history";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
 
@@ -172,7 +175,16 @@ export async function listAction(
 ): Promise<ActionResult<{ rows: RecordData[]; total: number }>> {
   const s = await requireSession();
   try {
-    const r = await listRecords(s.ctx, objectId, { ...params, lang: s.lang });
+    // jen povolené parametry z prohlížeče (žádné interní volby datové služby)
+    const r = await listRecords(s.ctx, objectId, {
+      filters: params.filters,
+      sort: params.sort,
+      dir: params.dir,
+      page: params.page,
+      pageSize: params.pageSize,
+      filter: params.filter,
+      lang: s.lang,
+    });
     return { ok: true, data: { rows: r.rows, total: r.total } };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
@@ -227,4 +239,128 @@ export async function runRecordAction(objectId: string, id: string, actionId: st
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Uživatelé (jen správce tenanta)
+// ---------------------------------------------------------------------------
+
+export interface UserInput {
+  id: string | null;
+  name: string;
+  email: string;
+  admin: boolean;
+  active: boolean;
+  lang: string;
+  roleIds: string[];
+  password?: string;
+}
+
+export async function saveUserAction(input: UserInput): Promise<ActionResult> {
+  const s = await requireAdmin();
+  const t = await getT(s.lang, s.ctx.tenantId);
+  const errors: Record<string, string> = {};
+  const email = input.email.trim().toLowerCase();
+  if (!input.name.trim()) errors.name = t("@SYS:Required");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = t("@SYS:InvalidEmail");
+  if ((!input.id || input.password) && (input.password ?? "").length < 10) errors.password = t("@SYS:PasswordTooShort");
+  const other = await prisma.sysUser.findUnique({ where: { email } });
+  if (other && other.id !== input.id) errors.email = t("@SYS:EmailTaken");
+  if (Object.keys(errors).length) return { ok: false, message: t("@SYS:FixErrors"), errors };
+
+  // role jen z tohoto tenanta
+  const roles = input.roleIds.length
+    ? await inTenant(s.ctx, (sess) => sess.find("sys.role", {}, 500))
+    : [];
+  const roleIds = input.roleIds.filter((id) => roles.some((r) => r.id === id));
+
+  const data = {
+    name: input.name.trim(),
+    email,
+    role: input.admin ? "admin" : "user",
+    active: input.active,
+    lang: input.lang === "en" ? "en" : "cs",
+    roleIds,
+    ...(input.password ? { passwordHash: await bcrypt.hash(input.password, 12) } : {}),
+  };
+  if (input.id) {
+    const existing = await prisma.sysUser.findFirst({ where: { id: input.id, tenantId: s.ctx.tenantId } });
+    if (!existing) return { ok: false, message: t("@SYS:NotFound") };
+    // nesmí zmizet poslední aktivní správce
+    if (existing.role === "admin" && (!input.admin || !input.active)) {
+      const admins = await prisma.sysUser.count({ where: { tenantId: s.ctx.tenantId, role: "admin", active: true } });
+      if (admins <= 1) return { ok: false, message: t("@SYS:LastAdmin") };
+    }
+    await prisma.sysUser.update({ where: { id: input.id }, data });
+    // změna hesla nebo deaktivace odhlásí ostatní relace uživatele
+    if (input.password || !input.active) await prisma.sysSession.deleteMany({ where: { userId: input.id } });
+  } else {
+    await prisma.sysUser.create({ data: { ...data, tenantId: s.ctx.tenantId, passwordHash: data.passwordHash! } });
+  }
+  revalidatePath("/system/users");
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// DocuRef (poznámky a soubory u záznamů)
+// ---------------------------------------------------------------------------
+
+export async function docuRefListAction(objectId: string, recordId: string): Promise<ActionResult<DocuRefItem[]>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: await listDocuRefs(s.ctx, objectId, recordId) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function docuRefCountAction(objectId: string, recordId: string): Promise<number> {
+  const s = await requireSession();
+  return countDocuRefs(s.ctx, objectId, recordId);
+}
+
+export async function addNoteAction(objectId: string, recordId: string, name: string, note: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    await addNote(s.ctx, objectId, recordId, name, note);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function deleteDocuRefAction(id: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    await deleteDocuRef(s.ctx, id);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Historie změn a oblíbené
+// ---------------------------------------------------------------------------
+
+export async function historyAction(objectId: string, recordId: string): Promise<ActionResult<HistoryEntry[]>> {
+  const s = await requireSession();
+  try {
+    const t = await getT(s.lang, s.ctx.tenantId);
+    return { ok: true, data: await recordHistory(s.ctx, objectId, recordId, t, s.lang) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Přidá / odebere stránku z oblíbených; vrací nový stav. */
+export async function toggleFavoriteAction(href: string, label: string): Promise<boolean> {
+  const s = await requireSession();
+  if (!href.startsWith("/") || href.startsWith("//")) return false;
+  const key = { userId_href: { userId: s.user.id, href: href.slice(0, 255) } };
+  const exists = await prisma.sysFavorite.findUnique({ where: key });
+  if (exists) await prisma.sysFavorite.delete({ where: key });
+  else await prisma.sysFavorite.create({ data: { userId: s.user.id, href: href.slice(0, 255), label: label.slice(0, 120) } });
+  revalidatePath("/", "layout");
+  return !exists;
 }

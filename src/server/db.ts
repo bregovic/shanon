@@ -4,7 +4,9 @@ import { PrismaClient } from "@/generated/prisma/client";
 export type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 
 export function createPrisma(url = process.env.DATABASE_URL) {
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+  // DB_POOL_MAX=1 pro lokální PGlite (neunese souběžná spojení); v produkci výchozí pool
+  const max = Number(process.env.DB_POOL_MAX) || undefined;
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url, ...(max ? { max } : {}) }) });
 }
 
 const g = globalThis as unknown as { prisma?: PrismaClient };

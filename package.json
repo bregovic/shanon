@@ -15,7 +15,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy && tsx scripts/rls.ts && tsx scripts/seed.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "db:local": "tsx scripts/dev-db.ts"
+    "db:local": "tsx scripts/dev-db.ts",
+    "db:new-migration": "tsx scripts/new-migration.ts"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.75.2",
@@ -24,6 +25,7 @@
     "@prisma/client": "^7.10.1",
     "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.10",
+    "exceljs": "^4.4.0",
     "next": "16.2.7",
     "pg": "^8.23.1",
     "prisma": "^7.10.1",

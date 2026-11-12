@@ -21,6 +21,7 @@ import {
 } from "@fluentui/react-components";
 import { Building24Regular, Checkmark24Regular, Home24Regular, Settings24Regular, SignOut24Regular } from "@fluentui/react-icons";
 import { logoutAction, switchCompanyAction } from "@/app/actions";
+import { FavoritesMenu } from "./favorites";
 import { ModuleIcon } from "./icons";
 
 export interface ShellModule {
@@ -113,6 +114,8 @@ export function AppShell({ modules, companies, companyId, user, labels, children
           </MenuPopover>
         </Menu>
 
+        <FavoritesMenu />
+
         <div className={s.spacer} />
 
         <div className={s.right}>
@@ -153,7 +156,17 @@ export function AppShell({ modules, companies, companyId, user, labels, children
           </Tooltip>
 
           <Tooltip content={labels.signOut} relationship="label">
-            <Button appearance="subtle" icon={<SignOut24Regular />} onClick={() => start(() => logoutAction())} />
+            <Button appearance="subtle" icon={<SignOut24Regular />} onClick={() =>
+                start(() => {
+                  // filtry gridů v relaci prohlížeče patří odhlašovanému uživateli
+                  try {
+                    sessionStorage.clear();
+                  } catch {
+                    /* úložiště nedostupné */
+                  }
+                  return logoutAction();
+                })
+              } />
           </Tooltip>
         </div>
       </header>

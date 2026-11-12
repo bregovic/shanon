@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { DEFAULT_LANG, type Lang } from "@/core/labels";
 import { dependencyClosure } from "@/core/module";
+import { ADMIN, mergePerms, type Perms } from "@/core/security";
 import { registry } from "@/registry";
 import type { Ctx } from "./data";
 import { prisma, withTenant } from "./db";
@@ -86,13 +87,19 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
       }),
   );
 
-  const companies = await withTenant(tenant.id, (tx) =>
-    tx.sysCompany.findMany({ where: { tenantId: tenant.id }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
+  const [companies, permRows] = await withTenant(tenant.id, (tx) =>
+    Promise.all([
+      tx.sysCompany.findMany({ where: { tenantId: tenant.id }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
+      user.role === "admin" || user.roleIds.length === 0
+        ? Promise.resolve([])
+        : tx.sysRolePermission.findMany({ where: { tenantId: tenant.id, roleId: { in: user.roleIds } }, select: { target: true, level: true } }),
+    ]),
   );
+  const perms: Perms = user.role === "admin" ? ADMIN : { admin: false, levels: mergePerms(permRows) };
   const companyId = companies.find((c) => c.id === session.companyId)?.id ?? companies[0]?.id ?? null;
 
   return {
-    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, modules, extensions },
+    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions },
     lang: (user.lang as Lang) ?? DEFAULT_LANG,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     tenant: { id: tenant.id, name: tenant.name },

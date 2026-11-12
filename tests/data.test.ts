@@ -15,6 +15,10 @@ import {
 } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { withTenant } from "@/server/db";
+import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
+import { recordHistory } from "@/server/history";
+import { resolveLabel } from "@/core/labels";
+import { labelTable } from "@/registry";
 
 const client = createPrisma();
 const run = Date.now().toString(36);
@@ -96,6 +100,99 @@ describe("objekty", () => {
   });
 });
 
+describe("oprávnění", () => {
+  const as = (levels: Record<string, "read" | "write" | "delete">): Ctx => ({ ...A, role: "user", perms: { admin: false, levels } });
+
+  it("čtení bez zápisu", async () => {
+    const reader = as({ gab: "read" });
+    expect((await listRecords(reader, "gab.subject", {}, client)).total).toBeGreaterThan(0);
+    await expectUserError(saveRecord(reader, "gab.subject", null, { name: "Zakázáno" }, undefined, client), "@SYS:NoAccess");
+    await expectUserError(listRecords(reader, "gl.account", {}, client), "@SYS:NoAccess");
+  });
+
+  it("oprávnění na objekt má přednost před modulem; mazání jen s úrovní delete", async () => {
+    const u = as({ gab: "read", "gab.contact": "delete" });
+    const [subj] = (await listRecords(A, "gab.subject", { pageSize: 1 }, client)).rows;
+    const c = await saveRecord(u, "gab.contact", null, { subjectId: subj.id, kind: "email", value: "a@b.cz" }, undefined, client);
+    await deleteRecord(u, "gab.contact", String(c.id), client);
+    const w = as({ gab: "write" });
+    const s2 = await saveRecord(w, "gab.subject", null, { name: "Smí zapsat" }, undefined, client);
+    await expectUserError(deleteRecord(w, "gab.subject", String(s2.id), client), "@SYS:NoAccess");
+  });
+
+  it("účtování projde i bez práva na účetní doklady (systémová operace)", async () => {
+    const accountant = as({ gl: "read", "gl.journal": "write", "gl.journalLine": "write" });
+    const j = await saveRecord(accountant, "gl.journal", null, { date: "2026-11-12", description: "Bez práv na doklad" }, undefined, client);
+    const accs = (await listRecords(accountant, "gl.account", { filters: { accountNum: "211, 411" } }, client)).rows;
+    const byNum = Object.fromEntries(accs.map((a) => [a.accountNum, a.id]));
+    await saveRecord(accountant, "gl.journalLine", null, { journalId: j.id, accountId: byNum["211"], debit: "10" }, undefined, client);
+    await saveRecord(accountant, "gl.journalLine", null, { journalId: j.id, accountId: byNum["411"], credit: "10" }, undefined, client);
+    await runAction(accountant, "gl.journal", String(j.id), "post", client);
+    expect((await getRecord(accountant, "gl.journal", String(j.id), client))!.status).toBe("posted");
+    await expectUserError(deleteRecord(accountant, "gl.journal", String(j.id), client), "@SYS:NoAccess");
+  });
+
+  it("role a oprávnění smí měnit jen správce", async () => {
+    const sysAll = as({ sys: "delete" });
+    await expectUserError(listRecords(sysAll, "sys.role", {}, client), "@SYS:NoAccess");
+    await expectUserError(saveRecord(sysAll, "sys.role", null, { code: "HACK", name: "x" }, undefined, client), "@SYS:NoAccess");
+    expect((await listRecords(sysAll, "sys.company", {}, client)).total).toBe(1);
+  });
+});
+
+describe("přílohy (DocuRef)", () => {
+  it("poznámka a soubor: přidat, číst, smazat; jiný tenant ani čtenář bez práva", async () => {
+    const subj = await saveRecord(A, "gab.subject", null, { name: "S přílohou" }, undefined, client);
+    const id = String(subj.id);
+    await addNote(A, "gab.subject", id, "", "Volat po 15. hodině", client);
+    await addFile(A, "gab.subject", id, { name: "../../smlouva.pdf", type: "application/pdf", data: Buffer.from("%PDF-1.4 test") }, client);
+    const items = await listDocuRefs(A, "gab.subject", id, client);
+    expect(items.map((i) => i.kind).sort()).toEqual(["file", "note"]);
+    const file = items.find((i) => i.kind === "file")!;
+    expect(file.name).toBe("smlouva.pdf");
+    expect((await readFile(A, file.id, client)).data.toString()).toBe("%PDF-1.4 test");
+
+    // jiný tenant: záznam „neexistuje“, soubor taky ne
+    await expectUserError(listDocuRefs(B, "gab.subject", id, client), "@SYS:NotFound");
+    await expectUserError(readFile(B, file.id, client), "@SYS:NotFound");
+    // čtenář vidí, ale nepřidá
+    const reader: Ctx = { ...A, role: "user", perms: { admin: false, levels: { gab: "read" } } };
+    expect((await listDocuRefs(reader, "gab.subject", id, client)).length).toBe(2);
+    await expectUserError(addNote(reader, "gab.subject", id, "", "x", client), "@SYS:NoAccess");
+    // příliš velký soubor
+    await expectUserError(
+      addFile(A, "gab.subject", id, { name: "big.bin", type: "", data: Buffer.alloc(11 * 1024 * 1024) }, client),
+      "@SYS:FileTooLarge",
+    );
+    // smazání záznamu smaže i přílohy a obsah souboru
+    await deleteRecord(A, "gab.subject", id, client);
+    const left = await withTenant(A.tenantId, (tx) => tx.sysDocuRef.count({ where: { recordId: id } }), client);
+    expect(left).toBe(0);
+    await expectUserError(readFile(A, file.id, client), "@SYS:NotFound");
+  });
+});
+
+describe("historie změn", () => {
+  it("založení, změna s popisky polí a titulky odkazů, přílohy", async () => {
+    const t = (ref?: string) => resolveLabel(labelTable, ref, "cs");
+    const s1 = await saveRecord(A, "gab.subject", null, { name: "Historie" }, undefined, client);
+    await saveRecord(A, "gab.subject", String(s1.id), { name: "Historie 2", vatId: "CZ12345678" }, undefined, client);
+    await addNote(A, "gab.subject", String(s1.id), "Pozn", "text", client);
+    const [acc] = (await listRecords(A, "gl.account", { filters: { accountNum: "343" } }, client)).rows;
+    const code = await saveRecord(A, "tax.taxCode", null, { code: "HX", name: "x", rate: "0", direction: "output", accountId: acc.id }, undefined, client);
+
+    const h = await recordHistory(A, "gab.subject", String(s1.id), t, "cs", client);
+    expect(h.map((e) => e.action)).toEqual(["docuref", "update", "create"]);
+    const upd = h[1].changes;
+    expect(upd).toContainEqual({ label: "Název", from: "Historie", to: "Historie 2" });
+    expect(upd).toContainEqual({ label: "DIČ", from: "", to: "CZ12345678" });
+    const hc = await recordHistory(A, "tax.taxCode", String(code.id), t, "cs", client);
+    expect(hc[0].changes).toContainEqual({ label: "Účet DPH", from: "", to: "343" });
+    // jiný tenant historii nevidí
+    await expectUserError(recordHistory(B, "gab.subject", String(s1.id), t, "cs", client), "@SYS:NotFound");
+  });
+});
+
 describe("filtry gridu na serveru", () => {
   it("text, výčet podle popisku, odkaz podle titulku, řazení podle odkazu", async () => {
     await saveRecord(A, "gab.subject", null, { name: "Filtr Jedna", type: "person" }, undefined, client);
@@ -109,7 +206,7 @@ describe("filtry gridu na serveru", () => {
     const codes = await listRecords(A, "tax.taxCode", { filters: { accountId: "343", rate: "> 15" } }, client);
     expect(codes.rows.map((r) => r.code).sort()).toEqual(["P21", "V21"]);
     const sorted = await listRecords(A, "tax.taxCode", { sort: "accountId", dir: "desc" }, client);
-    expect(sorted.total).toBe(4);
+    expect(sorted.total).toBeGreaterThanOrEqual(4);
     const nothing = await listRecords(A, "tax.taxCode", { filters: { rate: "abc" } }, client);
     expect(nothing.total).toBe(0);
   });

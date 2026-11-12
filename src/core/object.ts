@@ -55,6 +55,8 @@ export interface ObjectDef {
   defaultSort?: { field: string; dir: "asc" | "desc" };
   /** automatické číslování: pole se vyplní z číselné řady */
   numberSeq?: { field: string; seq: string };
+  /** jen pro správce tenanta (role, oprávnění) — oprávnění v rolích na ně nestačí */
+  adminOnly?: boolean;
   /** záznamy vytváří jen systém (např. účetní zápisy), v UI jen čtení */
   systemOnly?: boolean;
   /** podřízené řádky zobrazené ve formuláři (např. řádky dokladu) */

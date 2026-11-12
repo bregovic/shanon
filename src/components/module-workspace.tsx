@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, makeStyles, Text, tokens, ToolbarDivider } from "@fluentui/react-components";
 import { ChevronDown16Regular, ChevronDown24Regular, ChevronRight16Regular, ChevronUp24Regular } from "@fluentui/react-icons";
+import { FavoriteStar } from "./favorites";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 
 export interface WorkspaceColumn {
@@ -42,7 +43,8 @@ const useStyles = makeStyles({
   item: {
     display: "flex",
     alignItems: "center",
-    padding: "12px 16px",
+    padding: "6px 8px 6px 16px",
+    minHeight: "44px",
     marginBottom: "2px",
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
@@ -120,7 +122,8 @@ export function ModuleWorkspace({
                         onClick={() => router.push(it.href)}
                         onKeyDown={(e) => e.key === "Enter" && router.push(it.href)}
                       >
-                        {it.label}
+                        <span style={{ flex: 1 }}>{it.label}</span>
+                        <FavoriteStar href={it.href} label={it.label} size="small" />
                       </div>
                     ))}
                 </div>

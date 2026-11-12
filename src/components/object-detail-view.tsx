@@ -24,6 +24,8 @@ import { Add24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regu
 import { deleteRecordsAction, runRecordAction, saveRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
+import { DocuRefButton } from "./docuref-panel";
+import { HistoryButton } from "./history-panel";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
@@ -54,6 +56,8 @@ export interface ObjectDetailProps {
   version?: number;
   recordTitle: string;
   readOnly: boolean;
+  /** přílohy jdou přidávat i k zamčenému dokladu */
+  canAttach: boolean;
   canDelete: boolean;
   actions: { id: string; label: string }[];
   lines: LineSpec[];
@@ -224,6 +228,13 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             {a.label}
           </Button>
         ))}
+        {p.id && (
+          <>
+            <ToolbarDivider />
+            <DocuRefButton objectId={p.objectId} recordId={p.id} recordTitle={p.recordTitle} canWrite={p.canAttach} labels={p.labels.docuref} />
+            <HistoryButton objectId={p.objectId} recordId={p.id} recordTitle={p.recordTitle} labels={p.labels.history} />
+          </>
+        )}
         {p.canDelete && (
           <>
             <ToolbarDivider />

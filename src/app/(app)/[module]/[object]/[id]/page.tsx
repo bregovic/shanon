@@ -7,6 +7,7 @@ import { requireSession } from "@/server/auth";
 import { getRecord, listRecords } from "@/server/data";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, objectHref, uiLabels } from "@/server/ui";
+import { can } from "@/core/security";
 
 type Params = { module: string; object: string; id: string };
 
@@ -16,10 +17,12 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
   const def = registry.objects.get(`${module}.${object}`);
   if (!def || !s.ctx.modules.has(module)) notFound();
   if (def.scope === "company" && !s.ctx.companyId) notFound();
+  if (!can(s.ctx.perms, def.id, "read")) notFound();
+  const mayWrite = can(s.ctx.perms, def.id, "write");
   const t = await getT(s.lang, s.ctx.tenantId);
   const meta = fieldsMeta(s.ctx, def, t);
   const isNew = id === "new";
-  if (isNew && def.systemOnly) notFound();
+  if (isNew && (def.systemOnly || !mayWrite)) notFound();
 
   const defaults = (d: typeof def) => {
     const out: RecordData = {};
@@ -36,7 +39,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
   }
 
   const locked = !isNew && !!def.lockedWhen && record[def.lockedWhen.field] === def.lockedWhen.equals;
-  const readOnly = !!def.systemOnly || locked;
+  const readOnly = !!def.systemOnly || locked || !mayWrite;
   const recordTitle = isNew ? `${t("@SYS:New")} · ${t(def.label)}` : String(record[def.titleField] ?? t(def.label));
   const mod = registry.modules.get(module)!;
 
@@ -57,7 +60,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
               columns: ld.list.filter((f) => f !== l.field).map((f) => lm[f]),
               groups: formGroups(s.ctx, ld, t, lm, [l.field]),
               defaults: defaults(ld),
-              editable: !ld.systemOnly && !locked,
+              editable: !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               initial: { rows: initial.rows, total: initial.total },
             };
           }),
@@ -78,9 +81,10 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
       version={record.version as number | undefined}
       recordTitle={recordTitle}
       readOnly={readOnly}
-      canDelete={!isNew && !readOnly}
+      canAttach={mayWrite}
+      canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
       actions={
-        isNew
+        isNew || !mayWrite
           ? []
           : (def.actions ?? []).filter((a) => !a.when || record[a.when.field] === a.when.equals).map((a) => ({ id: a.id, label: t(a.label) }))
       }

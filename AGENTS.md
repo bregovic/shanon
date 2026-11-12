@@ -11,7 +11,7 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 ## Objekty a moduly
 
 - Nová tabulka = nový objekt v `src/modules/<modul>/index.ts` (`defineObject`),
-  ne ručně psaný model. Pak `npm run schema:gen` a `npx prisma migrate dev --name <popis>`.
+  ne ručně psaný model. Pak `npm run schema:gen` a `npm run db:new-migration -- <popis>`.
 - `prisma/schema.prisma` se **nikdy neupravuje ručně** (generuje se). Systémové
   tabulky jsou v `prisma/base.prisma`.
 - Pole používá existující typ z `Edts` nebo vlastní `defineEdt` — ne vlastní
@@ -33,6 +33,16 @@ všechny objekty**. Nový objekt nepotřebuje žádnou novou stránku ani endpoi
 | založení / úprava | `saveRecord` / `saveRecordAction` | `RecordForm` |
 | mazání (i hromadně, v jedné transakci) | `deleteRecord` / `deleteRecordsAction` | potvrzovací dialog |
 | akce (Zaúčtovat…) | `runAction` / `runRecordAction` | tlačítko z `ObjectDef.actions` |
+
+**Automaticky u každého objektu** (nic se nepíše, jen se definuje objekt):
+
+| Funkce | Kde | Poznámka |
+|---|---|---|
+| Oprávnění | `src/core/security.ts`, kontrola v `data.ts` | role → modul/objekt → Číst / Upravovat / Mazat; správce vše; `adminOnly` objekty jen správce |
+| Přílohy (DocuRef) | `src/server/docuref.ts`, tlačítko Přílohy | poznámky a soubory do 10 MB, právo = právo na záznam, mažou se se záznamem |
+| Historie změn | `sys_audit`, `src/server/history.ts`, ikona historie | kdo, kdy, co (popisky polí, titulky odkazů) |
+| Oblíbené | `sys_favorite`, hvězdička v liště a na ploše modulu | menu oblíbených v hlavičce |
+| Export do Excelu | `/api/export/<objekt>` | stejné filtry, řazení a oprávnění jako grid, max. 50 000 řádků |
 
 Vlastní stránka jen tam, kde obecná nestačí (nástěnky, průvodci, výkazy) — a i
 ta používá stejné komponenty a akce.
@@ -75,6 +85,13 @@ ta používá stejné komponenty a akce.
 ## Bezpečnost
 
 - Každá server action začíná `requireSession()`; správa jen pro `admin`.
+- Oprávnění vynucuje datová služba — UI jen skrývá tlačítka. Nový kód nikdy
+  nečte/nezapisuje data objektů mimo `data.ts` (obešel by oprávnění i RLS).
+- Byznys logika modulu (`ObjectHandlers`, `DataApi`) běží jako systémová
+  operace — oprávnění se kontroluje u akce uživatele, která ji spustila.
+- Objekty, které rozdávají práva (role), mají `adminOnly: true`.
+- Soubory se stahují jen přes `/api/files/<id>` (kontrola práva na záznam,
+  `nosniff`, nebezpečné typy jen ke stažení).
 - Žádné debug/setup/fix skripty dostupné z webu. Údržba = `scripts/` (CLI).
 - Žádná hesla, tokeny ani connection stringy v repu.
 - Nové tabulky objektů dostanou RLS automaticky (`scripts/rls.ts` po migraci).
@@ -87,5 +104,6 @@ ta používá stejné komponenty a akce.
 - Před dokončením úkolu (dřívější SOP): build projde, nové texty jsou labely
   v cs i en, nový objekt má test v `tests/`, změna je ověřená v prohlížeči
   (desktop i mobil), žádné tajné údaje ani ladicí výpisy.
-- Lokální DB bez Dockeru: `npm run db:local` (PGlite), pak
+- Lokální DB bez Dockeru: `npm run db:local` (PGlite, v `.env` `DB_POOL_MAX=1` —
+  PGlite neunese souběžná spojení), pak
   `npx prisma migrate deploy && npx tsx scripts/rls.ts && npm run db:seed`.

@@ -1,4 +1,4 @@
-import { Edts, defineEdt } from "@/core/edt";
+import { Edts, defineEdt, defineEnum, enumEdt, refEdt, type EnumDef } from "@/core/edt";
 import { defineModule } from "@/core/module";
 import { defineObject } from "@/core/object";
 
@@ -55,6 +55,61 @@ export const numberSeq = defineObject({
   defaultSort: { field: "code", dir: "asc" },
 });
 
+/** Úroveň oprávnění (vyšší zahrnuje nižší). */
+export const PermLevel = defineEnum({
+  id: "PermLevel",
+  label: "@SYS:PermLevel",
+  values: [
+    { value: "read", label: "@SYS:PermRead" },
+    { value: "write", label: "@SYS:PermWrite" },
+    { value: "delete", label: "@SYS:PermDelete" },
+  ],
+});
+
+/**
+ * Cíl oprávnění: modul ("gab") nebo objekt ("gab.subject").
+ * Hodnoty doplní registr ze všech modulů a objektů (src/registry.ts).
+ */
+export const SecurityTarget: EnumDef = { id: "SecurityTarget", label: "@SYS:SecurityTarget", values: [] };
+
+export const role = defineObject({
+  id: "sys.role",
+  table: "sys_role",
+  label: "@SYS:Role",
+  labelPlural: "@SYS:Roles",
+  scope: "tenant",
+  adminOnly: true,
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+  },
+  titleField: "code",
+  list: ["code", "name"],
+  form: [{ label: "@SYS:General", fields: ["code", "name"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+  lines: [{ object: "sys.rolePermission", field: "roleId", label: "@SYS:Permissions" }],
+});
+
+export const rolePermission = defineObject({
+  id: "sys.rolePermission",
+  table: "sys_role_permission",
+  label: "@SYS:Permission",
+  labelPlural: "@SYS:Permissions",
+  scope: "tenant",
+  adminOnly: true,
+  fields: {
+    roleId: { edt: refEdt("sys.role", "@SYS:Role"), mandatory: true },
+    target: { edt: enumEdt(SecurityTarget), mandatory: true },
+    level: { edt: enumEdt(PermLevel), mandatory: true, default: "read" },
+  },
+  titleField: "target",
+  list: ["roleId", "target", "level"],
+  form: [{ label: "@SYS:General", fields: ["roleId", "target", "level"] }],
+  unique: [["roleId", "target"]],
+  defaultSort: { field: "target", dir: "asc" },
+});
+
 export default defineModule({
   id: "sys",
   label: "@SYS:Module",
@@ -62,7 +117,8 @@ export default defineModule({
   icon: "Settings",
   core: true,
   dependsOn: [],
-  objects: [company, numberSeq],
+  enums: [PermLevel, SecurityTarget],
+  objects: [company, numberSeq, role, rolePermission],
   menu: [
     {
       label: "@SYS:Setup",
@@ -71,6 +127,10 @@ export default defineModule({
         { object: "sys.numberSeq" },
         { href: "/system/modules", label: "@SYS:Modules" },
       ],
+    },
+    {
+      label: "@SYS:Security",
+      items: [{ href: "/system/users", label: "@SYS:Users" }, { object: "sys.role" }],
     },
   ],
   labels: {
@@ -150,6 +210,42 @@ export default defineModule({
       Language: "Jazyk",
       Record: "Záznam",
       Changes: "Změny",
+      Security: "Zabezpečení",
+      Attachments: "Přílohy",
+      AddNote: "Přidat poznámku",
+      UploadFile: "Nahrát soubor",
+      FileTooLarge: "Soubor je větší než {max}.",
+      NoAttachments: "Zatím žádné přílohy.",
+      Title: "Název",
+      History: "Historie změn",
+      NoHistory: "Zatím žádné změny.",
+      Created: "Založeno",
+      Updated: "Změněno",
+      Deleted: "Smazáno",
+      AttachmentChange: "Přílohy",
+      Favorites: "Oblíbené",
+      AddFavorite: "Přidat do oblíbených",
+      RemoveFavorite: "Odebrat z oblíbených",
+      NoFavorites: "Zatím žádné oblíbené stránky.",
+      Export: "Export do Excelu",
+      Role: "Role",
+      Roles: "Role",
+      Permission: "Oprávnění",
+      Permissions: "Oprávnění",
+      PermLevel: "Úroveň",
+      PermRead: "Číst",
+      PermWrite: "Upravovat",
+      PermDelete: "Upravovat a mazat",
+      SecurityTarget: "Modul / objekt",
+      NoAccess: "K této části nemáte oprávnění.",
+      Administrator: "Správce",
+      Admin: "Správce (plný přístup)",
+      ResetPassword: "Nové heslo",
+      PasswordHelp: "Nejméně 10 znaků.",
+      PasswordTooShort: "Heslo musí mít nejméně 10 znaků.",
+      EmailTaken: "Uživatel s tímto e-mailem už existuje.",
+      LastAdmin: "Musí zůstat aspoň jeden aktivní správce.",
+      User: "Uživatel",
       Forms: "Formuláře",
       ExpandAll: "Rozbalit vše",
       CollapseAll: "Sbalit vše",
@@ -257,6 +353,42 @@ export default defineModule({
       Language: "Language",
       Record: "Record",
       Changes: "Changes",
+      Security: "Security",
+      Attachments: "Attachments",
+      AddNote: "Add note",
+      UploadFile: "Upload file",
+      FileTooLarge: "The file is larger than {max}.",
+      NoAttachments: "No attachments yet.",
+      Title: "Title",
+      History: "Change history",
+      NoHistory: "No changes yet.",
+      Created: "Created",
+      Updated: "Changed",
+      Deleted: "Deleted",
+      AttachmentChange: "Attachments",
+      Favorites: "Favorites",
+      AddFavorite: "Add to favorites",
+      RemoveFavorite: "Remove from favorites",
+      NoFavorites: "No favorite pages yet.",
+      Export: "Export to Excel",
+      Role: "Role",
+      Roles: "Roles",
+      Permission: "Permission",
+      Permissions: "Permissions",
+      PermLevel: "Level",
+      PermRead: "Read",
+      PermWrite: "Edit",
+      PermDelete: "Edit and delete",
+      SecurityTarget: "Module / object",
+      NoAccess: "You do not have access to this area.",
+      Administrator: "Administrator",
+      Admin: "Administrator (full access)",
+      ResetPassword: "New password",
+      PasswordHelp: "At least 10 characters.",
+      PasswordTooShort: "The password must have at least 10 characters.",
+      EmailTaken: "A user with this email already exists.",
+      LastAdmin: "At least one active administrator must remain.",
+      User: "User",
       Forms: "Forms",
       ExpandAll: "Expand all",
       CollapseAll: "Collapse all",

@@ -12,5 +12,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|_next/|favicon.ico|api/health).*)"],
+  // api/files: nahrávání souborů (proxy by omezilo velikost těla); relaci ověřuje route
+  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files).*)"],
 };

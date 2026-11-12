@@ -6,6 +6,7 @@ import { requireSession } from "@/server/auth";
 import { listRecords } from "@/server/data";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, uiLabels } from "@/server/ui";
+import { can } from "@/core/security";
 
 type Params = { module: string; object: string };
 
@@ -21,6 +22,9 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
   const def = registry.objects.get(`${module}.${object}`);
   if (!def || !s.ctx.modules.has(module)) notFound();
   const t = await getT(s.lang, s.ctx.tenantId);
+  if (!can(s.ctx.perms, def.id, "read")) {
+    return <p style={{ padding: 24 }}>{t("@SYS:NoAccess")}</p>;
+  }
   if (def.scope === "company" && !s.ctx.companyId) {
     return <p style={{ padding: 24 }}>{t("@SYS:NoCompany")}</p>;
   }
@@ -43,8 +47,9 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
       columns={def.list.map((f) => meta[f])}
       groups={formGroups(s.ctx, def, t, meta)}
       defaults={defaults}
-      canCreate={!def.systemOnly}
-      canDelete={!def.systemOnly}
+      canCreate={!def.systemOnly && can(s.ctx.perms, def.id, "write")}
+      canWrite={can(s.ctx.perms, def.id, "write")}
+      canDelete={!def.systemOnly && can(s.ctx.perms, def.id, "delete")}
       openInPage={openInPage || !!def.systemOnly}
       initial={{ rows: initial.rows, total: initial.total }}
       lang={s.lang}
