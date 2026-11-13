@@ -194,6 +194,14 @@ export function parseEetResponse(xml: string, txId: string | null = null): EetRe
 }
 
 /** Odeslání zprávy; po limitu odezvy vrací timeout (zprávu pak poslat znovu). */
+/** Poslední výměna se serverem EET (zpráva a odpověď) — pro protokol komunikace. */
+let lastExchange: { request: string; response: string | null; status: number } | null = null;
+export function takeLastExchange() {
+  const x = lastExchange;
+  lastExchange = null;
+  return x;
+}
+
 export async function sendEet(env: EetEnvironment, xml: string, timeoutMs = EET_TIMEOUT_MS): Promise<EetResult> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -205,8 +213,11 @@ export async function sendEet(env: EetEnvironment, xml: string, timeoutMs = EET_
       signal: ctrl.signal,
     });
     const text = await res.text();
+    // surová odpověď do protokolu komunikace (řešení chyb s Finanční správou)
+    lastExchange = { request: xml, response: text, status: res.status };
     return parseEetResponse(text, res.headers.get("X-Global-Transaction-Id"));
   } catch (e) {
+    lastExchange = { request: xml, response: null, status: 0 };
     return { status: "timeout", message: e instanceof Error ? e.message : String(e) };
   } finally {
     clearTimeout(t);

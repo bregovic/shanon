@@ -158,6 +158,9 @@ describe("napojení pokladny", () => {
     const r1 = await api((a) => sell(a, { registerId: regId, payment: "cash", lines: [{ itemId, qty: "1" }] }));
     const conn = (await api((a) => connectionsFor(a, regId))).eet!;
     expect(await api(async (a) => eetRegisterReceipt(a, C.companyId, conn, (await a.get("pos.receipt", String(r1.id)))!, true))).toBe("sent");
+    // protokol: přesná zpráva a odpověď FS
+    const [sendLog] = (await listRecords(C, "int.log", { filter: { reference: String(r1.receiptNum), operation: "eet.send" } }, client)).rows;
+    expect(String(sendLog.detail)).toMatch(/uuid_zpravy=[\s\S]*--- zpráva ---[\s\S]*Trzba[\s\S]*--- odpověď ---/);
     const rec = (await getRecord(C, "pos.receipt", String(r1.id), client))!;
     expect([rec.eetStatus, rec.eetPok]).toEqual(["sent", POK]);
     // hotovost zaokrouhlená na 50 Kč = celková tržba ve zprávě

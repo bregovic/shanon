@@ -25,6 +25,7 @@ import {
   buildEetMessage,
   openP12,
   sendEet,
+  takeLastExchange,
   type EetCert,
   type EetEnvironment,
   type EetResult,
@@ -157,6 +158,8 @@ export async function eetRegisterReceipt(
     txId: null,
   };
   let uuid: string | null = null;
+  let ms: number | null = null;
+  let exchange: { request: string; response: string | null; status: number } | null = null;
   // simulátor (testovací prostředí): testovací FIK, nic se neodesílá
   const simulated = conn.driver === "eetSimulator";
   if (simulated) {
@@ -186,10 +189,13 @@ export async function eetRegisterReceipt(
         { first, verify: false },
       );
       uuid = msg.uuid;
+      const t0 = Date.now();
       result = await sendEet(
         (conn.environment as EetEnvironment) ?? "playground",
         msg.xml,
       );
+      ms = Date.now() - t0;
+      exchange = takeLastExchange();
     } catch (e) {
       const message =
         e instanceof UserError
@@ -225,7 +231,17 @@ export async function eetRegisterReceipt(
             ? result.txId
             : null,
       message: eetMessageText(result),
-      detail: uuid ? `uuid_zpravy=${uuid}` : null,
+      // přesná zpráva a odpověď FS (podpis, BKP, chyba) — pro reklamace a řešení chyb
+      detail: [
+        uuid ? `uuid_zpravy=${uuid}` : null,
+        conn.environment ? `prostředí=${conn.environment}` : null,
+        ms !== null ? `odezva=${ms} ms` : null,
+        exchange ? `HTTP ${exchange.status}` : null,
+        exchange ? `\n--- zpráva ---\n${exchange.request}` : null,
+        exchange?.response ? `\n--- odpověď ---\n${exchange.response}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
     },
   );
   return status;
