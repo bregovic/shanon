@@ -146,6 +146,7 @@ export function uiLabels(t: T) {
     },
     actions: {
       new: t("@SYS:New"),
+      print: t("@PRT:Print"),
       duplicate: t("@SYS:DuplicateRecord"),
       edit: t("@SYS:Edit"),
       delete: t("@SYS:Delete"),

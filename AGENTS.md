@@ -131,6 +131,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Simulace provozu (jen test): `npx tsx --conditions=react-server scripts/simulate-shop.ts
   <tenant> <firma> [--receipts=60]` — směna, prodeje, boxy, pokladní kniha, faktura,
   kontrola předvahy, vyrovnanosti dokladů a DPH směny.
+- Tiskové sestavy (`src/modules/prt`, `src/core/print.ts`, `src/lib/print-render.tsx`):
+  tisknutelný doklad = `ModuleDef.printables` (dataset + katalog polí + výchozí rozvržení);
+  šablona `prt.template` (JSON rozvržení v mm), návrhář `/print/designer`, tisk
+  `/print/<objekt>/<id>`; jeden vykreslovač pro náhled, tisk i kasu. Moduly, které
+  tisknou, mají `prt` v `dependsOn`. QR platba: `spayd()`, IBAN z čísla účtu `czIban()`.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.

@@ -279,7 +279,7 @@ export default defineModule({
   label: "@POS:Module",
   description: "@POS:ModuleDesc",
   icon: "Cart",
-  dependsOn: ["inv", "gl", "tax"],
+  dependsOn: ["inv", "gl", "tax", "prt"],
   enums: [PosTemplate, PaymentMethod, ShiftStatus, EetStatus, BasketStatus],
   objects: [register, shift, receipt, receiptLine, box, basket, basketLine],
   menu: [

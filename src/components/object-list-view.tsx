@@ -18,8 +18,8 @@ import {
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Delete24Regular, Edit24Regular } from "@fluentui/react-icons";
-import { deleteRecordsAction } from "@/app/actions";
+import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Edit24Regular } from "@fluentui/react-icons";
+import { deleteRecordsAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
@@ -60,7 +60,7 @@ export function ObjectListView(p: ObjectListProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Row[]>([]);
   const [reload, setReload] = useState(0);
-  const [drawer, setDrawer] = useState<{ open: boolean; id: string | null; title: string }>({ open: false, id: null, title: "" });
+  const [drawer, setDrawer] = useState<{ open: boolean; id: string | null; title: string; values?: Values; titles?: Record<string, string> }>({ open: false, id: null, title: "" });
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string>();
   const [view, setView] = useState<{ filters: Record<string, string>; sort?: string; dir: "asc" | "desc" }>({ filters: {}, dir: "asc" });
@@ -80,6 +80,22 @@ export function ObjectListView(p: ObjectListProps) {
     },
     [p.openInPage, p.objectId, p.titleField, p.label, router],
   );
+
+  // Duplikovat vybraný záznam: nový formulář s jeho hodnotami (klíč prázdný, číslo z řady při uložení);
+  // doklad s řadou a řádky se zkopíruje rovnou a otevře
+  const duplicate = async (row: Row) => {
+    const r = await duplicateRecordAction(p.objectId, String(row.id));
+    if (!r.ok || !r.data) return setError(r.ok ? undefined : r.message);
+    setError(undefined);
+    if ("id" in r.data) {
+      if (p.openInPage) router.push(objectHref(p.objectId, r.data.id));
+      else setDrawer({ open: true, id: r.data.id, title: p.label });
+      setReload((n) => n + 1);
+      return;
+    }
+    if (p.openInPage) router.push(`${objectHref(p.objectId, "new")}?copy=${row.id}`);
+    else setDrawer({ open: true, id: null, title: "", values: { ...p.defaults, ...r.data.values }, titles: r.data.titles });
+  };
 
   // standard: Shift+N nový, Shift+R obnovit, Shift+D smazat, Esc zpět na modul
   useShortcuts(
@@ -111,6 +127,11 @@ export function ObjectListView(p: ObjectListProps) {
         {p.canCreate && (
           <Button appearance="primary" icon={<Add24Regular />} title={`${p.labels.actions.new} (Shift+N)`} onClick={() => open(null)}>
             {p.labels.actions.new}
+          </Button>
+        )}
+        {p.canCreate && (
+          <Button icon={<Copy24Regular />} disabled={selected.length !== 1} onClick={() => void duplicate(selected[0])}>
+            {p.labels.actions.duplicate}
           </Button>
         )}
         <Button icon={<Edit24Regular />} disabled={selected.length !== 1} onClick={() => open(selected[0])}>
@@ -172,7 +193,8 @@ export function ObjectListView(p: ObjectListProps) {
           open={drawer.open}
           title={drawer.title}
           groups={p.groups}
-          defaults={p.defaults}
+          defaults={drawer.values ?? p.defaults}
+          defaultTitles={drawer.titles}
           readOnly={!p.canWrite}
           labels={p.labels.drawer}
           onClose={() => setDrawer((d) => ({ ...d, open: false }))}

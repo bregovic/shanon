@@ -780,3 +780,31 @@ describe("import řádků dokladu", () => {
     expect((await getRecord(J, "gl.journal", String(j.id), client))!.status).toBe("posted");
   });
 });
+
+describe("tiskové sestavy", () => {
+  it("IBAN z čísla účtu, QR platba, výchozí šablony, data faktury a účtenky", async () => {
+    const { czIban, spayd } = await import("@/core/print");
+    expect(czIban("19-2000145399/0800")).toBe("CZ6508000000192000145399");
+    expect(czIban("nesmysl")).toBeNull();
+    expect(spayd({ iban: "CZ6508000000192000145399", amount: "1210", vs: "FV2026-0001", date: "2026-11-27", message: "Faktura FV*1" })).toBe("SPD*1.0*ACC:CZ6508000000192000145399*AM:1210.00*CC:CZK*X-VS:20260001*DT:20261127*MSG:Faktura FV 1");
+    const { printJob } = await import("@/server/print");
+    const { fillText } = await import("@/lib/print-render");
+    const P = (await provisionTenant(client, { code: `t-prt-${run}`, name: "Prt", adminEmail: `prt-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "pos", "org"], company: { code: "P", name: "Tisk s.r.o." } })).ctx;
+    const tpls = (await listRecords(P, "prt.template", {}, client)).rows.map((r) => [r.docType, r.paper, r.isDefault]);
+    expect(tpls.sort()).toEqual([["ar.invoice", "a4", true], ["pos.receipt", "receipt80", true]]);
+    // bankovní účet firmy → QR platba na faktuře
+    const [org] = (await listRecords(P, "org.entity", {}, client)).rows;
+    await saveRecord(P, "org.entity", String(org.id), { bankAccount: "19-2000145399/0800" }, undefined, client);
+    const grp = (await listRecords(P, "ar.group", {}, client)).rows[0];
+    const subj = await saveRecord(P, "gab.subject", null, { name: "Restaurace U Lípy", regNo: "12345678" }, undefined, client);
+    const cust = await saveRecord(P, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const inv = await saveRecord(P, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-13", dueDate: "2026-11-27" }, undefined, client);
+    await saveRecord(P, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Šunka 5 kg", qty: "5", unitPrice: "200" }, undefined, client);
+    const job = await printJob(P, "ar.invoice", String(inv.id), null, client);
+    const d = job.data as { doc: Record<string, unknown>; partner: Record<string, unknown>; lines: unknown[]; qr: string };
+    expect([d.partner.name, d.lines.length, d.qr.startsWith("SPD*1.0*ACC:CZ6508000000192000145399*AM:")]).toEqual(["Restaurace U Lípy", 1, true]);
+    expect(fillText("Faktura {doc.number} k úhradě {doc.due:money}", job.data, "cs-CZ")).toMatch(/^Faktura \S+ k úhradě 1\s210,00$/);
+    // tisk bez práva číst doklad nejde
+    await expect(printJob({ ...P, perms: { admin: false, levels: {} } }, "ar.invoice", String(inv.id), null, client)).rejects.toMatchObject({ label: "@SYS:NoAccess" });
+  });
+});

@@ -19,6 +19,8 @@ import inv from "@/modules/inv";
 import { invHandlers } from "@/modules/inv/handlers";
 import pos from "@/modules/pos";
 import cash from "@/modules/cash";
+import prt, { PrintDocType, prtHandlers } from "@/modules/prt";
+import { invoicePrintable, receiptPrintable } from "@/modules/prt/printables";
 import { cashHandlers } from "@/modules/cash/handlers";
 import { posHandlers } from "@/modules/pos/sale";
 import { basketHandlers } from "@/modules/pos/basket";
@@ -31,13 +33,17 @@ import { bankHandlers } from "@/modules/bank/handlers";
 import { vatReturnHandlers } from "@/modules/tax/vat-return";
 import subjectRating from "@/extensions/subject-rating";
 
-export const modules = [sys, org, gab, gl, tax, inv, ar, ap, bank, cash, pos, int, qa];
+export const modules = [sys, prt, org, gab, gl, tax, inv, ar, ap, bank, cash, pos, int, qa];
 export const extensions = [subjectRating];
 
 // dávkové úlohy modulů (definice vedle logiky, ke které patří)
 sys.jobs = rateJobs;
 gl.jobs = dimensionJobs;
 int.jobs = intJobs;
+// tisknutelné doklady (definice v Tiskových sestavách, data z modulu dokladu)
+ar.printables = [invoicePrintable];
+pos.printables = [receiptPrintable];
+PrintDocType.values = modules.flatMap((m) => (m.printables ?? []).map((p) => ({ value: p.id, label: p.label })));
 BatchClass.values = modules.flatMap((m) => (m.jobs ?? []).map((j) => ({ value: j.id, label: j.label })));
 
 // cíle oprávnění = všechny moduly a jejich objekty (modul, pak jeho objekty)
@@ -51,7 +57,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

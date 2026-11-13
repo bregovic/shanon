@@ -11,6 +11,7 @@
 import type { EnumDef } from "./edt";
 import type { LabelFile, LabelRef } from "./labels";
 import type { ReportDef } from "./report";
+import type { PrintableDef } from "./print";
 import type { FieldDef, ObjectDef } from "./object";
 import { moduleOf } from "./object";
 
@@ -58,6 +59,8 @@ export interface ModuleDef {
   reports?: ReportDef[];
   /** dávkové úlohy modulu (Správa systému → Dávkové úlohy, src/server/batch.ts) */
   jobs?: JobDef[];
+  /** tisknutelné doklady modulu (Tiskové sestavy, src/core/print.ts) */
+  printables?: PrintableDef[];
 }
 
 /**

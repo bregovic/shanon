@@ -5,6 +5,7 @@ GL-PERIODS;Fiskální roky a období;Hlavní kniha;fat;;Měsíční období, uza
 GL-PARAMS;Parametry hlavní knihy, měny a kurzy;Hlavní kniha;fat;;Účetní a vykazovací měna, zdroj kurzů ČNB/ECB, účty kurzových rozdílů.
 ORG;Organizace: údaje firmy a provozovny;Organizace;uat;;"Údaje firmy (ARES), provozovny; název, IČO a DIČ se propíší do firmy."
 CASH-BOOK;Pokladní kniha;Pokladní kniha;uat;;Pokladny hotovosti, příjmové a výdajové doklady, DPH zjednodušeného dokladu, report s průběžným zůstatkem.
+PRT;Tiskové sestavy;Tiskové sestavy;uat;;Šablony dokladů per firma, návrhář na plátně, tisk / PDF, QR platba, účtenka v kase podle šablony.
 SYS-BATCH;Dávkové úlohy;Správa systému;uat;;"Opakování, plán, historie běhů, Spustit nyní; kurzy ČNB/ECB, EET, dimenze."
 GL-REPORTS;Výkazy hlavní knihy;Hlavní kniha;uat;;"Obratová předvaha, rozvaha, výsledovka; po syntetice, filtr dimenzí, Excel."
 GL-DIMS;Finanční dimenze;Hlavní kniha;uat;;"Středisko, zakázka, partner; povinné a nepovolené podle začátku účtu; partner z dokladu."

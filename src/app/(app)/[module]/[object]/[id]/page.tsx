@@ -6,6 +6,7 @@ import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
 import { getRecord, listRecords } from "@/server/data";
 import { duplicateRecord } from "@/server/duplicate";
+import { printableObjectIds } from "@/server/print";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, hiddenFields, objectHref, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
@@ -93,6 +94,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       canAttach={mayWrite}
       canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
       canDuplicate={!isNew && !def.systemOnly && mayWrite}
+      printHref={!isNew && s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/${id}` : undefined}
       actions={
         isNew || !mayWrite
           ? []

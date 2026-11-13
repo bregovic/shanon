@@ -1,5 +1,6 @@
 "use server";
 
+import { printJob, recentDocs } from "@/server/print";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
 import { basketForBox, boxByCode, closeBasket, openBaskets, saveBasket, type BasketView } from "@/modules/pos/basket";
@@ -843,6 +844,41 @@ export async function gabCreateFromRegistryAction(query: string, opts: { vendor?
     if (o.vendor) assertCan(s.ctx.perms, "ap.vendor", "write");
     if (o.customer) assertCan(s.ctx.perms, "ar.customer", "write");
     return { ok: true, data: await inTenant(s.ctx, (sess) => createFromRegistry(sess.sys().api(), String(query).slice(0, 20), o)) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tiskové sestavy
+// ---------------------------------------------------------------------------
+
+/** Data dokladu pro náhled v návrháři. */
+export async function printPreviewAction(docType: string, recordId: string): Promise<ActionResult<Record<string, unknown>>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: (await printJob(s.ctx, String(docType), String(recordId))).data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function printRecentAction(docType: string, q: string): Promise<ActionResult<{ id: string; number: string }[]>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: await recentDocs(s.ctx, String(docType), String(q ?? "").slice(0, 40)) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Uložit rozvržení šablony (návrhář). */
+export async function printSaveLayoutAction(templateId: string, layout: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    if (layout.length > 2_000_000) throw new UserError("@PRT:ImageTooBig");
+    await saveRecord(s.ctx, "prt.template", String(templateId), { layout: String(layout) });
+    return { ok: true, data: undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

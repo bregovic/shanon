@@ -56,6 +56,9 @@ import {
   posShiftSummaryAction,
 } from "@/app/actions";
 import type { BasketView } from "@/modules/pos/basket";
+import type { PrintLayout } from "@/core/print";
+import { PrintDocument } from "@/lib/print-render";
+import { receiptData } from "@/lib/receipt-data";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
 
@@ -241,6 +244,8 @@ export function PosTerminal(p: {
   top: string[];
   /** odložené nákupy (boxy) sdílené pokladnami firmy */
   baskets: BasketView[];
+  /** tisková šablona účtenky (Tiskové sestavy); bez ní vestavěná účtenka */
+  receiptLayout?: PrintLayout | null;
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
@@ -1036,7 +1041,16 @@ export function PosTerminal(p: {
               {L.Paid}
               {receipt?.change && Number(receipt.change) > 0 ? ` · ${L.ChangeDue} ${fmt(receipt.change)}` : ""}
             </DialogTitle>
-            <DialogContent>{receipt && <Receipt r={receipt} L={L} fmt={fmt} st={st} locale={locale} />}</DialogContent>
+            <DialogContent>
+              {receipt &&
+                (p.receiptLayout ? (
+                  <div className={mergeClasses("pos-receipt", st.receipt)} style={{ width: "auto" }}>
+                    <PrintDocument layout={p.receiptLayout} data={receiptData(receipt, {}, { cash: L.Cash, card: L.Card })} locale={locale} />
+                  </div>
+                ) : (
+                  <Receipt r={receipt} L={L} fmt={fmt} st={st} locale={locale} />
+                ))}
+            </DialogContent>
             <DialogActions>
               <Button icon={<Print24Regular />} onClick={() => receipt && printReceipt(receipt)}>
                 {L.PrintReceipt}

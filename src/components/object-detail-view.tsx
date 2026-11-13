@@ -20,7 +20,7 @@ import {
   tokens,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular, Print24Regular, Save24Regular } from "@fluentui/react-icons";
 import { useRef } from "react";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
@@ -66,6 +66,8 @@ export interface ObjectDetailProps {
   canDelete: boolean;
   /** Duplikovat (i zamčený doklad — kopie je nový koncept) */
   canDuplicate?: boolean;
+  /** tisk podle šablony (Tiskové sestavy) */
+  printHref?: string;
   actions: { id: string; label: string; upload?: string; download?: boolean }[];
   lines: LineSpec[];
   lang: string;
@@ -303,6 +305,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
               {a.label}
             </Button>
           ),
+        )}
+        {p.printHref && (
+          <Button icon={<Print24Regular />} onClick={() => window.open(p.printHref, "_blank")}>
+            {p.labels.actions.print}
+          </Button>
         )}
         {p.canDuplicate && p.id && (
           <Button icon={<Copy24Regular />} disabled={busy} onClick={duplicate}>

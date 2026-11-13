@@ -1,4 +1,5 @@
 /** Prodejní terminál pokladny (šablona „Pult s váhou“). */
+import type { PrintLayout } from "@/core/print";
 import { openBaskets } from "@/modules/pos/basket";
 import { accountingCurrencyId, currencyRounding } from "@/modules/gl/posting";
 import { notFound } from "next/navigation";
@@ -49,7 +50,15 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     // zaokrouhlení hotovosti podle účetní měny (terminál jen ukazuje, počítá server)
     const rounding = await currencyRounding(api, await accountingCurrencyId(api, s.ctx.companyId));
     const baskets = await openBaskets(api);
-    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding, baskets };
+    // výchozí tisková šablona účtenky (Tiskové sestavy), jinak vestavěná účtenka
+    const [rt] = await api.find("prt.template", { docType: "pos.receipt", isDefault: true }, { take: 1 }).catch(() => []);
+    let receiptLayout: PrintLayout | null = null;
+    try {
+      receiptLayout = rt?.layout ? (JSON.parse(String(rt.layout)) as PrintLayout) : null;
+    } catch {
+      receiptLayout = null;
+    }
+    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding, baskets, receiptLayout };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -78,6 +87,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       categories={data.categories}
       top={data.top}
       baskets={data.baskets}
+      receiptLayout={data.receiptLayout}
       printer={
         data.conns.printer
           ? {

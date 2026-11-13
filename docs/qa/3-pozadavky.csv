@@ -11,7 +11,7 @@ CR-009;change;Zvoneček interních upozornění;SYS-UI;medium;new;9;Chyby integr
 CR-010;change;Poštovní server (SMTP) v Integraci;;medium;new;10;Odesílání e-mailů a upozornění.
 CR-011;change;Vytěžování dokladů přes OpenAI API;;medium;new;11;Napojení s API klíčem, přijaté faktury z PDF a fotek.
 CR-012;change;Návrhář tiskových sestav;;medium;new;12;"Plátno pro úpravu faktur, účtenek…; předvytvořené sestavy per firma."
-CR-013;change;Tisk faktur do PDF s QR platbou;AR-INVOICE;high;new;13;
+CR-013;change;Tisk faktur do PDF s QR platbou;PRT;high;uat;13;"Tiskové sestavy: šablona Faktura vydaná (A4, QR platba); na faktuře tlačítko Tisk."
 CR-014;change;Výkazy: předvaha, rozvaha, výsledovka;GL-REPORTS;high;uat;14;"Hlavní kniha → Reporty; po syntetice, filtr dimenzí, export do Excelu."
 CR-015;change;Příkazy k úhradě a výpisy camt.053;BANK-GPC;medium;new;15;
 CR-016;change;Souhrnné hlášení a přenesená daňová povinnost;TAX-VAT;medium;new;16;
@@ -39,3 +39,9 @@ CR-037;change;Produkční prostředí a instalace u klienta (Docker obraz bez zd
 CR-038;change;Adresář: založit podle IČO / DIČ (ARES, VIES), vytvořit dodavatele a odběratele;GAB-ARES;high;uat;38;"Adresář → Funkce → Založit podle IČO / DIČ; na subjektu Vytvořit dodavatele / odběratele; VIES jako datová služba v Integraci."
 CR-039;change;Import a export řádků dokladů (deník HK, faktury…) a pokladních dokladů;SYS-IMPORT;medium;uat;39;"Na stránce dokladu u řádků Import (rodič se doplní sám) a Export; sloupce Má dáti / Dal."
 CR-040;change;Mobil: reporty se posouvají, datum v českém tvaru, větší dotykové odkazy, řada boxů v kase;SYS-UI;medium;uat;40;Kontrola 375 px: bez přesahu stránky.
+CR-041;change;Návrhář tiskových sestav: faktura a účtenka;PRT;high;uat;41;"Tiskové sestavy → Návrhář sestav: přetahování prvků, pole dokladu, tabulka řádků, rekapitulace DPH, QR platba, logo; náhled s daty dokladu."
+CR-042;change;Duplikovat v liště každého seznamu;SYS-UI;medium;uat;42;"Klíč prázdný, číslo z řady se doplní při uložení; doklad s řadou a řádky se zkopíruje celý."
+CR-043;change;Nový uživatel: jméno, příjmení, přihlášení e-mailem a heslo;SYS-SECURITY;medium;analysis;43;
+CR-044;change;Založit organizaci (účtovanou firmu) podle IČO / DIČ z ARES / VIES;ORG;medium;analysis;44;
+CR-045;change;"Deníky jako v AX: hlavička + maximalizovaná mřížka řádků, druh účtu (HK, dodavatel, odběratel, banka), číslování dokladů podle nastavení deníku, ověření; společný standard pro platby, pokladnu, banku";GL-JOURNAL;high;analysis;45;"Jednořádkové i víceřádkové doklady; číslo dokladu: podle deníku / ručně / jeden pro celý deník / nový po vyrovnání."
+CR-046;change;Zpracování dokumentů (OCR přes ChatGPT): hromadné nahrání PDF, rozpoznání druhu, zápis do agendy;INT-EET;high;analysis;46;"Napojení OpenAI druhu OCR v Integraci; přehled stavů; přijatá faktura, pokladní doklad…"

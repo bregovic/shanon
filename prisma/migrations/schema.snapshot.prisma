@@ -211,6 +211,7 @@ model SysCompany {
   sysNumberSeq_company      SysNumberSeq[]      @relation("SysNumberSeq_company")
   sysBatchJob_company       SysBatchJob[]       @relation("SysBatchJob_company")
   sysBatchRun_company       SysBatchRun[]       @relation("SysBatchRun_company")
+  prtTemplate_company       PrtTemplate[]       @relation("PrtTemplate_company")
   orgEntity_company         OrgEntity[]         @relation("OrgEntity_company")
   orgSite_company           OrgSite[]           @relation("OrgSite_company")
   glParameters_company      GlParameters[]      @relation("GlParameters_company")
@@ -445,6 +446,31 @@ model SysBatchRun {
   @@index([tenantId, companyId])
   @@index([jobId])
   @@map("sys_batch_run")
+}
+
+/// prt.template — generováno z definice objektu
+model PrtTemplate {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  docType   String   @map("doc_type") @db.VarChar(40)
+  paper     String   @default("a4") @db.VarChar(40)
+  isDefault Boolean  @default(false) @map("is_default")
+  layout    String?
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("PrtTemplate_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("prt_template")
 }
 
 /// org.entity — generováno z definice objektu

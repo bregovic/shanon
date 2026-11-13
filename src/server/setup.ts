@@ -7,6 +7,7 @@
  * Systém → Výchozí nastavení.
  */
 import { setupJobs } from "@/modules/sys/batch";
+import { setupPrintTemplates } from "@/modules/prt";
 import { resolveLabel, type Lang } from "@/core/labels";
 import type { DataApi } from "@/core/module";
 import { labelTable, modules } from "@/registry";
@@ -45,6 +46,8 @@ export async function setupCompany(api: DataApi, enabled: Set<string>, lang: Lan
     await m.setup?.(counting);
     // výchozí dávkové úlohy modulu (název v jazyce uživatele)
     if (m.jobs?.length) await setupJobs(counting, m.jobs.map((j) => ({ ...j, label: resolveLabel(labelTable, j.label, lang) })));
+    // výchozí tiskové šablony dokladů modulu
+    if (m.printables?.length) await setupPrintTemplates(counting, m.printables.map((p) => ({ ...p, name: resolveLabel(labelTable, p.label, lang) })));
   }
   return created;
 }
