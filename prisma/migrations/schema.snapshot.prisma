@@ -216,6 +216,8 @@ model SysCompany {
   glJournalLine_company     GlJournalLine[]     @relation("GlJournalLine_company")
   taxCode_company           TaxCode[]           @relation("TaxCode_company")
   taxTrans_company          TaxTrans[]          @relation("TaxTrans_company")
+  taxParameters_company     TaxParameters[]     @relation("TaxParameters_company")
+  taxReturn_company         TaxReturn[]         @relation("TaxReturn_company")
   arGroup_company           ArGroup[]           @relation("ArGroup_company")
   arCustomer_company        ArCustomer[]        @relation("ArCustomer_company")
   arInvoice_company         ArInvoice[]         @relation("ArInvoice_company")
@@ -770,6 +772,80 @@ model TaxTrans {
   @@index([subjectId])
   @@index([voucherId])
   @@map("tax_trans")
+}
+
+/// tax.parameters — generováno z definice objektu
+model TaxParameters {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  taxOfficeCode     String   @map("tax_office_code") @db.VarChar(4)
+  taxOfficeBranch   String?  @map("tax_office_branch") @db.VarChar(5)
+  subjectType       String   @default("P") @map("subject_type") @db.VarChar(40)
+  filingPeriod      String   @default("month") @map("filing_period") @db.VarChar(40)
+  firstName         String?  @map("first_name") @db.VarChar(40)
+  lastName          String?  @map("last_name") @db.VarChar(40)
+  street            String?  @db.VarChar(60)
+  houseNo           String?  @map("house_no") @db.VarChar(10)
+  orientNo          String?  @map("orient_no") @db.VarChar(10)
+  city              String?  @db.VarChar(60)
+  zipCode           String?  @map("zip_code") @db.VarChar(6)
+  phone             String?  @db.VarChar(30)
+  email             String?  @db.VarChar(254)
+  dataBoxId         String?  @map("data_box_id") @db.VarChar(7)
+  preparerFirstName String?  @map("preparer_first_name") @db.VarChar(40)
+  preparerLastName  String?  @map("preparer_last_name") @db.VarChar(40)
+  ext               Json     @default("{}")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at")
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("TaxParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@map("tax_parameters")
+}
+
+/// tax.return — generováno z definice objektu
+model TaxReturn {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  companyId  String    @map("company_id") @db.Uuid
+  period     String?   @db.VarChar(7)
+  kind       String    @default("dp3") @db.VarChar(40)
+  year       Int
+  month      Int?
+  quarter    Int?
+  status     String    @default("draft") @db.VarChar(40)
+  computedAt DateTime? @map("computed_at") @db.Date
+  out21Base  Decimal?  @map("out21_base") @db.Decimal(18, 2)
+  out21Tax   Decimal?  @map("out21_tax") @db.Decimal(18, 2)
+  out12Base  Decimal?  @map("out12_base") @db.Decimal(18, 2)
+  out12Tax   Decimal?  @map("out12_tax") @db.Decimal(18, 2)
+  in21Base   Decimal?  @map("in21_base") @db.Decimal(18, 2)
+  in21Tax    Decimal?  @map("in21_tax") @db.Decimal(18, 2)
+  in12Base   Decimal?  @map("in12_base") @db.Decimal(18, 2)
+  in12Tax    Decimal?  @map("in12_tax") @db.Decimal(18, 2)
+  taxOut     Decimal?  @map("tax_out") @db.Decimal(18, 2)
+  deduction  Decimal?  @db.Decimal(18, 2)
+  result     Decimal?  @db.Decimal(18, 2)
+  a4Count    Int?      @map("a4_count")
+  b2Count    Int?      @map("b2_count")
+  warnings   String?
+  ext        Json      @default("{}")
+  version    Int       @default(1)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  createdBy  String?   @map("created_by") @db.Uuid
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?   @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("TaxReturn_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, kind, period])
+  @@index([tenantId, companyId])
+  @@map("tax_return")
 }
 
 /// ar.group — generováno z definice objektu

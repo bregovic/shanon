@@ -32,6 +32,13 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `owned: false` — se záznamem se nemažou a dvojklik otevře jejich vlastní stránku.
 - Akce se souborem (importy): `actions: [{ id, label, upload: ".gpc,.txt" }]`,
   obsluha dostane `file` jako třetí parametr. Soubor do 1 MB (limit server action).
+- Akce, které vrací soubor (XML pro úřad, PDF): `actions: [{ id, label, download: true }]`
+  + `ObjectHandlers.downloads[id]` → `/api/download/<objekt>/<id>/<akce>`, stačí právo číst.
+- Texty, které logika ukládá nebo dává do souborů, překládá `ctx.t(label, params)`
+  (jazyk uživatele) — nikdy natvrdo česky v kódu.
+- DPH: přiznání a KH se počítají z `tax.trans` podle DUZP; kam transakce patří,
+  určuje daňový kód (řádek přiznání, sazba). Pasti formátu EPO jsou v
+  `src/modules/tax/vat-return.ts` — před změnou XML je přečíst.
 - Párování plateb se nesmí hádat: automat páruje jen jednoznačnou shodu VS,
   víc kandidátů = ručně. Import výpisu se uloží jen když součty sedí na hlavičku.
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.

@@ -18,13 +18,15 @@ import {
   UserError,
   type ActionFile,
   type DataApi,
+  type DownloadFile,
   type EventContext,
   type ObjectHandlers,
   type RecordData,
   type ValidationErrors,
 } from "@/core/module";
 import { coerce, missingMandatory, normalizeRecord } from "@/core/validate";
-import { registry } from "@/registry";
+import { labelTable, registry } from "@/registry";
+import { fillLabel, resolveLabel } from "@/core/labels";
 import type { Lang } from "@/core/labels";
 import { can, type Level, type Perms } from "@/core/security";
 import { prisma, withTenant, type Tx } from "./db";
@@ -41,6 +43,8 @@ export interface Ctx {
   perms: Perms;
   modules: Set<string>;
   extensions: Set<string>;
+  /** jazyk uživatele (výchozí čeština) */
+  lang?: Lang;
 }
 
 export interface ListParams {
@@ -205,6 +209,7 @@ class Session {
       userId: this.ctx.userId,
       objectId,
       data: this.api(),
+      t: (ref, params) => fillLabel(resolveLabel(labelTable, ref, this.ctx.lang ?? "cs"), params),
     };
   }
 
@@ -463,6 +468,19 @@ class Session {
     await fn(this.eventCtx(objectId), record, file);
   }
 
+  /** Akce se souborem ke stažení — stačí právo číst záznam. */
+  async download(objectId: string, id: string, actionId: string): Promise<DownloadFile> {
+    const def = getObject(objectId);
+    assertAccess(this.ctx, def, "read", this.system);
+    const a = def.actions?.find((x) => x.id === actionId && x.download);
+    if (!a) throw new UserError("@SYS:InvalidValue");
+    const record = await this.sys().get(objectId, id);
+    if (!record) throw new UserError("@SYS:NotFound");
+    const fn = handlersFor(this.ctx, objectId).find((h) => h.downloads?.[actionId])?.downloads?.[actionId];
+    if (!fn) throw new UserError("@SYS:InvalidValue");
+    return fn(this.eventCtx(objectId), record);
+  }
+
   async audit(objectId: string, recordId: string, action: string, before: RecordData | null, after: RecordData | null) {
     const changes: RecordData = {};
     const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
@@ -511,6 +529,9 @@ export const saveRecord = (
 
 export const deleteRecord = (ctx: Ctx, objectId: string, id: string, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.remove(objectId, id), client);
+
+export const downloadFile = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient) =>
+  inTenant(ctx, (s) => s.download(objectId, id, actionId), client);
 
 export const runAction = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile) =>
   inTenant(ctx, (s) => s.action(objectId, id, actionId, file), client);

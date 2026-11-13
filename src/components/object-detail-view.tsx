@@ -20,7 +20,7 @@ import {
   tokens,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowUpload24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regular } from "@fluentui/react-icons";
 import { useRef } from "react";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
@@ -62,7 +62,7 @@ export interface ObjectDetailProps {
   /** přílohy jdou přidávat i k zamčenému dokladu */
   canAttach: boolean;
   canDelete: boolean;
-  actions: { id: string; label: string; upload?: string }[];
+  actions: { id: string; label: string; upload?: string; download?: boolean }[];
   lines: LineSpec[];
   lang: string;
   labels: UiLabels;
@@ -265,7 +265,16 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           </Button>
         )}
         {p.actions.map((a) =>
-          a.upload ? (
+          a.download ? (
+            <Button
+              key={a.id}
+              icon={<ArrowDownload24Regular />}
+              disabled={busy}
+              onClick={() => (window.location.href = `/api/download/${p.objectId}/${p.id}/${a.id}`)}
+            >
+              {a.label}
+            </Button>
+          ) : a.upload ? (
             <UploadButton key={a.id} label={a.label} accept={a.upload} disabled={busy} onFile={(f) => upload(a.id, f)} />
           ) : (
             <Button key={a.id} icon={<Play24Regular />} disabled={busy} onClick={() => act(a.id)}>

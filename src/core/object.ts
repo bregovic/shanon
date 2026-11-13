@@ -67,8 +67,11 @@ export interface ObjectDef {
    */
   lines?: { object: string; field: string; label: LabelRef; owned?: boolean }[];
   /** tlačítka ve formuláři; logika v ObjectHandlers.actions */
-  /** `upload` = akce si vyžádá soubor (přípony pro výběr, např. ".gpc,.txt") */
-  actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown }; upload?: string }[];
+  /**
+   * `upload` = akce si vyžádá soubor (přípony pro výběr, např. ".gpc,.txt");
+   * `download` = akce vrátí soubor ke stažení (ObjectHandlers.downloads)
+   */
+  actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown }; upload?: string; download?: boolean }[];
   /** záznam (i jeho řádky) nelze měnit ani mazat, když pole má danou hodnotu */
   lockedWhen?: { field: string; equals: unknown };
 }

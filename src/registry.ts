@@ -14,6 +14,7 @@ import ar, { ar as arLedger } from "@/modules/ar";
 import ap, { ap as apLedger } from "@/modules/ap";
 import bank from "@/modules/bank";
 import { bankHandlers } from "@/modules/bank/handlers";
+import { vatReturnHandlers } from "@/modules/tax/vat-return";
 import subjectRating from "@/extensions/subject-rating";
 
 export const modules = [sys, gab, gl, tax, ar, ap, bank];
@@ -30,7 +31,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

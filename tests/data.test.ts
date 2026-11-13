@@ -14,6 +14,7 @@ import {
   type Ctx,
 } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
+import { downloadFile } from "@/server/data";
 import { withTenant } from "@/server/db";
 import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
 import { recordHistory } from "@/server/history";
@@ -447,6 +448,107 @@ describe("banka a úhrady", () => {
     expect(vBalance.totals!.amount).toBe("0.00");
     // zaúčtovaný výpis nejde měnit
     await expectUserError(saveRecord(A, "bank.statementLine", String(lines[0].id), { message: "x" }, undefined, client), "@GL:Locked");
+  });
+});
+
+describe("přiznání k DPH a kontrolní hlášení", () => {
+  let V: Ctx;
+  beforeAll(async () => {
+    const r = await provisionTenant(client, {
+      code: `t-vat-${run}`,
+      name: "DPH s.r.o.",
+      adminEmail: `vat-${run}@test.local`,
+      adminPassword: "heslo-12345",
+      modules: ["gab", "tax", "ar", "ap"],
+      company: { code: "VAT", name: "DPH s.r.o.", vatId: "CZ27082440" },
+    });
+    V = r.ctx;
+  });
+
+  async function inv(kind: "ar" | "ap", name: string, vatId: string | undefined, price: string, taxDate: string, extra: Record<string, unknown> = {}) {
+    const subj = await saveRecord(V, "gab.subject", null, { name, vatId }, undefined, client);
+    const obj = kind === "ar" ? "ar.customer" : "ap.vendor";
+    const [grp] = (await listRecords(V, `${kind}.group`, {}, client)).rows;
+    const p = await saveRecord(V, obj, null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const h = await saveRecord(V, `${kind}.invoice`, null, { [kind === "ar" ? "customerId" : "vendorId"]: p.id, invoiceDate: taxDate, taxDate, ...extra }, undefined, client);
+    await saveRecord(V, `${kind}.invoiceLine`, null, { invoiceId: h.id, description: "Plnění", qty: "1", unitPrice: price }, undefined, client);
+    await runAction(V, `${kind}.invoice`, String(h.id), "post", client);
+    return (await getRecord(V, `${kind}.invoice`, String(h.id), client))!;
+  }
+
+  it("výpočet řádků přiznání, rozdělení dokladů do A.4/A.5/B.2/B.3, XML, uzavření", async () => {
+    await saveRecord(V, "tax.parameters", null, {
+      taxOfficeCode: "451",
+      taxOfficeBranch: "2009",
+      subjectType: "P",
+      street: "Na Poříčí",
+      houseNo: "1",
+      city: "Praha",
+      zipCode: "110 00",
+      dataBoxId: "abc1234",
+      preparerFirstName: "Jana",
+      preparerLastName: "Účetní",
+    }, undefined, client);
+    await expectUserError(saveRecord(V, "tax.parameters", null, { taxOfficeCode: "452" }, undefined, client), "@TAX:OneParameters");
+    await expectUserError(saveRecord(V, "tax.parameters", String((await listRecords(V, "tax.parameters", {}, client)).rows[0].id), { taxOfficeCode: "abc" }, undefined, client), "@TAX:TaxOfficeHelp", "taxOfficeCode");
+
+    const big = await inv("ar", "Velký odběratel", "CZ12345678", "20000", "2026-11-05"); // 24 200 → A.4
+    await inv("ar", "Malý odběratel", "CZ87654321", "1000", "2026-11-06"); // 1 210 → A.5
+    await inv("ap", "Velký dodavatel", "CZ11223344", "10000", "2026-11-07", { externalNum: "DF-1" }); // 12 100 → B.2
+    await inv("ap", "Bez DIČ", undefined, "9000", "2026-11-08", { externalNum: "DF-2" }); // 10 890 bez DIČ → B.3 + varování
+    await inv("ap", "Zahraniční", "DE999999999", "500", "2026-11-09", { externalNum: "DF-3" }); // → B.3 + varování
+    await inv("ar", "Jiný měsíc", "CZ12345678", "50000", "2026-10-15"); // říjen — mimo období
+    // rozpracovaná faktura s DUZP v období → varování
+    const [grp] = (await listRecords(V, "ar.group", {}, client)).rows;
+    const s2 = await saveRecord(V, "gab.subject", null, { name: "Koncept" }, undefined, client);
+    const c2 = await saveRecord(V, "ar.customer", null, { subjectId: s2.id, groupId: grp.id }, undefined, client);
+    await saveRecord(V, "ar.invoice", null, { customerId: c2.id, invoiceDate: "2026-11-20", taxDate: "2026-11-20" }, undefined, client);
+
+    await expectUserError(saveRecord(V, "tax.return", null, { kind: "dp3", year: 2026 }, undefined, client), "@TAX:PeriodRequired", "month");
+    const dp3 = await saveRecord(V, "tax.return", null, { kind: "dp3", year: 2026, month: 11 }, undefined, client);
+    expect(dp3.period).toBe("2026-11");
+    await expectUserError(saveRecord(V, "tax.return", null, { kind: "dp3", year: 2026, month: 11 }, undefined, client), "@SYS:Duplicate");
+    await runAction(V, "tax.return", String(dp3.id), "calculate", client);
+    const r = (await getRecord(V, "tax.return", String(dp3.id), client))!;
+    expect([r.out21Base, r.out21Tax, r.in21Base, r.in21Tax]).toEqual(["21000.00", "4410.00", "19500.00", "4095.00"]);
+    expect([r.taxOut, r.deduction, r.result]).toEqual(["4410.00", "4095.00", "315.00"]);
+    expect([r.a4Count, r.b2Count]).toEqual([1, 1]);
+    expect(String(r.warnings)).toContain("DF-2");
+    expect(String(r.warnings)).toContain("DE999999999");
+    expect(String(r.warnings)).toContain("1 nezaúčtovaných faktur");
+
+    const xml = String((await downloadFile(V, "tax.return", String(dp3.id), "xml", client)).data);
+    expect(xml).toContain('<DPHDP3 verzePis="01.02">');
+    expect(xml).toContain('k_uladb="B"');
+    expect(xml).toContain('mesic="11"');
+    expect(xml).toContain('c_ufo="451"');
+    expect(xml).toContain('dic="27082440"');
+    expect(xml).toContain('zkrobchjm="DPH s.r.o."');
+    expect(xml).toContain('<Veta1 obrat23="21000" dan23="4410"/>');
+    expect(xml).toContain('dano_da="315"');
+    expect(xml).not.toMatch(/<Veta\w+ \/>/);
+
+    const kh = await saveRecord(V, "tax.return", null, { kind: "kh", year: 2026, month: 11 }, undefined, client);
+    const khXml = String((await downloadFile(V, "tax.return", String(kh.id), "xml", client)).data);
+    expect(khXml).toContain('<DPHKH1 verzePis="03.01">');
+    expect(khXml).not.toContain("k_uladb");
+    expect(khXml).toContain(`<VetaA4 c_radku="1" dic_odb="12345678" c_evid_dd="${big.invoiceNum}" dppd="05.11.2026" zakl_dane1="20000.00" dan1="4200.00" kod_rezim_pl="0" zdph_44="N"/>`);
+    expect(khXml).toContain('<VetaA5 zakl_dane1="1000.00" dan1="210.00"/>');
+    expect(khXml).toContain('<VetaB2 c_radku="1" dic_dod="11223344" c_evid_dd="DF-1" dppd="07.11.2026" zakl_dane1="10000.00" dan1="2100.00" pomer="N" zdph_44="N"/>');
+    expect(khXml).toContain('<VetaB3 zakl_dane1="9500.00" dan1="1995.00"/>');
+    expect(khXml).toContain('<VetaC obrat23="21000.00" pln23="19500.00"/>');
+    expect(khXml).not.toMatch(/VetaA4[^>]*pomer/);
+
+    // čtvrtletí zahrne i říjen
+    const q = await saveRecord(V, "tax.return", null, { kind: "dp3", year: 2026, quarter: 4 }, undefined, client);
+    expect(q.period).toBe("2026-Q4");
+    await runAction(V, "tax.return", String(q.id), "calculate", client);
+    expect((await getRecord(V, "tax.return", String(q.id), client))!.out21Base).toBe("71000.00");
+
+    // podané přiznání je uzavřené
+    await runAction(V, "tax.return", String(dp3.id), "file", client);
+    await expectUserError(saveRecord(V, "tax.return", String(dp3.id), { month: 10 }, undefined, client), "@SYS:Locked");
+    await expectUserError(runAction(V, "tax.return", String(dp3.id), "calculate", client), "@SYS:Locked");
   });
 });
 

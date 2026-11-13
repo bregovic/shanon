@@ -120,7 +120,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   const adminCompanyIds = superUser ? allCompanies.map((c) => c.id) : [...assigned.values()].filter((a) => a.admin).map((a) => a.companyId);
 
   return {
-    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions },
+    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions, lang: (user.lang as Lang) ?? DEFAULT_LANG },
     lang: (user.lang as Lang) ?? DEFAULT_LANG,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     tenant: { id: tenant.id, name: tenant.name },

@@ -86,9 +86,18 @@ export interface EventContext {
   userId: string;
   objectId: string;
   data: DataApi;
+  /** překlad labelu do jazyka uživatele (texty do souborů, varování) */
+  t: (ref: LabelRef, params?: Record<string, string>) => string;
 }
 
 export type ValidationErrors = Record<string, LabelRef>;
+
+/** Soubor ke stažení z akce. */
+export interface DownloadFile {
+  name: string;
+  mime: string;
+  data: Buffer | string;
+}
 
 /** Soubor nahraný k akci (import výpisu apod.). */
 export interface ActionFile {
@@ -117,6 +126,8 @@ export interface ObjectHandlers {
   afterDelete?: (ctx: EventContext, data: RecordData) => void | Promise<void>;
   /** akce nad záznamem (tlačítka ve formuláři), klíč = id akce z ObjectDef.actions */
   actions?: Record<string, (ctx: EventContext, record: RecordData, file?: ActionFile) => Promise<void>>;
+  /** akce, které vrací soubor ke stažení (XML pro úřad, PDF…); klíč = id akce */
+  downloads?: Record<string, (ctx: EventContext, record: RecordData) => Promise<DownloadFile>>;
 }
 
 export interface ExtensionDef {

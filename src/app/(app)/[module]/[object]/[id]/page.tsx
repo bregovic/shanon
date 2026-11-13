@@ -88,7 +88,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
       actions={
         isNew || !mayWrite
           ? []
-          : (def.actions ?? []).filter((a) => !a.when || record[a.when.field] === a.when.equals).map((a) => ({ id: a.id, label: t(a.label), upload: a.upload }))
+          : (def.actions ?? []).filter((a) => !a.when || record[a.when.field] === a.when.equals).map((a) => ({ id: a.id, label: t(a.label), upload: a.upload, download: a.download }))
       }
       lines={lines}
       lang={s.lang}
