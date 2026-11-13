@@ -20,6 +20,9 @@ export interface FieldMeta {
   noTotal?: boolean;
   /** pole rozšíření (hodnota v record.ext) */
   ext?: boolean;
+  /** tajný údaj — zadává se, nezobrazuje */
+  secret?: boolean;
+  visibleWhen?: { field: string; in: unknown[] };
 }
 
 export const objectHref = (objectId: string, id?: string) =>

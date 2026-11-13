@@ -34,13 +34,27 @@ export interface FieldDef {
    * bez zapnutého cílového modulu se pole v UI nezobrazuje
    */
   optionalRef?: boolean;
+  /**
+   * tajný údaj (heslo, API klíč, certifikát): v databázi šifrovaně, uživateli
+   * se nevrací (jen maska), logika modulu ho čte přes revealSecret()
+   */
+  secret?: boolean;
+  /** pole se ve formuláři ukáže jen při dané hodnotě jiného pole */
+  visibleWhen?: VisibleWhen;
   /** další názvy sloupce při importu (CSV/XML), např. ["cena", "price"] */
   aliases?: string[];
+}
+
+export interface VisibleWhen {
+  field: string;
+  in: unknown[];
 }
 
 export interface FormGroup {
   label: LabelRef;
   fields: string[];
+  /** skupina se ukáže jen při dané hodnotě pole (např. podle druhu napojení) */
+  visibleWhen?: VisibleWhen;
 }
 
 export interface ObjectDef {

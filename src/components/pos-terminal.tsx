@@ -30,6 +30,7 @@ import {
 import {
   ArrowLeft24Regular,
   Backspace24Regular,
+  CloudArrowUp24Regular,
   Delete24Regular,
   LockClosed24Regular,
   Money24Regular,
@@ -38,7 +39,8 @@ import {
   Scales24Regular,
   Search24Regular,
 } from "@fluentui/react-icons";
-import { posCloseShiftAction, posOpenShiftAction, posSellAction, posShiftSummaryAction } from "@/app/actions";
+import { posCardStartAction, posCardStatusAction, posCloseShiftAction, posEetResendAction, posOpenShiftAction, posSellAction, posShiftSummaryAction } from "@/app/actions";
+import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
 
 export interface PosItem {
@@ -161,6 +163,9 @@ export function PosTerminal(p: {
   shift: { id: string; num: string } | null;
   items: PosItem[];
   groups: { id: string; name: string }[];
+  printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
+  payment: { driver: string } | null;
+  eet: { pending: number } | null;
   user: string;
   lang: string;
   labels: Record<string, string>;
@@ -188,6 +193,38 @@ export function PosTerminal(p: {
   const [opening, setOpening] = useState("");
   const [summary, setSummary] = useState<Record<string, string | number> | null>(null);
   const search = useRef<HTMLInputElement>(null);
+  // platební terminál: stav čekání na kartu
+  const [card, setCard] = useState<{ ref: string; state: "waiting" | "declined"; message?: string } | null>(null);
+  const cardLoop = useRef(0);
+  const [eetPending, setEetPending] = useState(p.eet?.pending ?? 0);
+  const serialPrinter = p.printer?.driver === "escposSerial";
+  const [portReady, setPortReady] = useState(false);
+  const terminalPay = !!p.payment && p.payment.driver !== "manual";
+
+  useEffect(() => {
+    if (serialPrinter) void grantedPort().then((port) => setPortReady(!!port));
+  }, [serialPrinter]);
+
+  const escpos = async (r: ReceiptPrint | null, drawerOnly = false) => {
+    const pr = p.printer!;
+    const port = await grantedPort();
+    if (!port) {
+      setPortReady(false);
+      return;
+    }
+    const width = pr.paperWidth === "58" ? 32 : 48;
+    const bytes =
+      drawerOnly || !r
+        ? Uint8Array.from(new EscPos(width, pr.codePage).drawer().bytes)
+        : receiptEscPos(r, L, fmt, { width, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale });
+    await writeToPort(port, bytes, pr.baudRate || 9600).catch((e) => setError(String(e)));
+  };
+  const printReceipt = (r: ReceiptPrint) => (serialPrinter ? escpos(r) : window.print());
+  const connectPrinter = async () => {
+    if (!serialSupported()) return setError(L.PrinterUnsupported);
+    const port = await requestPort().catch(() => null);
+    setPortReady(!!port);
+  };
 
   const total = lines.reduce((a, l) => a + Math.round(Number(l.item.price) * l.qty * 100), 0) / 100;
   const startPay = (m: "cash" | "card") => {
@@ -234,15 +271,17 @@ export function PosTerminal(p: {
     }
   };
 
-  const pay = async () => {
-    if (!payDlg) return;
+  const saleLines = () => lines.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) }));
+
+  const finishSale = async (payment: "cash" | "card", paymentRef: string | null) => {
     setBusy(true);
     setError(undefined);
     const res = await posSellAction({
       registerId: p.register.id,
-      payment: payDlg,
-      cashGiven: payDlg === "cash" && given ? given.replace(",", ".") : null,
-      lines: lines.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) })),
+      payment,
+      cashGiven: payment === "cash" && given ? given.replace(",", ".") : null,
+      paymentRef,
+      lines: saleLines(),
     });
     setBusy(false);
     if (!res.ok) {
@@ -250,9 +289,57 @@ export function PosTerminal(p: {
       return;
     }
     setPayDlg(null);
+    setCard(null);
     setGiven("");
     setLines([]);
     setReceipt(res.data);
+    if (typeof res.data.eetQueue === "number") setEetPending(res.data.eetQueue);
+    if (p.printer?.autoPrint) {
+      if (serialPrinter) void escpos(res.data);
+      else setTimeout(() => window.print(), 300);
+    } else if (serialPrinter && p.printer?.openDrawer && payment === "cash") void escpos(null, true);
+  };
+
+  /** Karta přes terminál: zahájit, čekat na výsledek, pak vystavit účtenku. */
+  const payByTerminal = async () => {
+    setBusy(true);
+    setError(undefined);
+    const start = await posCardStartAction({ registerId: p.register.id, payment: "card", lines: saleLines() });
+    setBusy(false);
+    if (!start.ok) return setError(start.message);
+    const ref = start.data.ref;
+    const loop = ++cardLoop.current;
+    setCard({ ref, state: "waiting" });
+    for (let i = 0; i < 150; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (cardLoop.current !== loop) return; // zrušeno
+      const st = await posCardStatusAction(p.register.id, ref);
+      if (cardLoop.current !== loop) return;
+      if (!st.ok) return setCard({ ref, state: "declined", message: st.message });
+      if (st.data?.state === "successful") return finishSale("card", ref);
+      if (st.data?.state === "failed") return setCard({ ref, state: "declined", message: st.data.message });
+    }
+  };
+
+  const cancelCard = async () => {
+    const ref = card?.ref;
+    cardLoop.current++;
+    setCard(null);
+    if (ref) await posCardStatusAction(p.register.id, ref, true);
+  };
+
+  const pay = async () => {
+    if (!payDlg) return;
+    if (payDlg === "card" && terminalPay) return payByTerminal();
+    return finishSale(payDlg, null);
+  };
+
+  const resendEet = async () => {
+    setBusy(true);
+    const res = await posEetResendAction(p.register.id);
+    setBusy(false);
+    if (!res.ok) return setError(res.message);
+    setEetPending(res.data.pending);
   };
 
   const openShift = async () => {
@@ -282,7 +369,7 @@ export function PosTerminal(p: {
 
   return (
     <div className={st.root}>
-      <style>{PRINT_CSS}</style>
+      <style>{PRINT_CSS.replace("72mm", p.printer?.paperWidth === "58" ? "48mm" : "72mm")}</style>
       <header className={st.bar}>
         <Button as="a" appearance="transparent" href="/pos" icon={<ArrowLeft24Regular />} aria-label={L.Back} style={{ color: "inherit" }} />
         <span className={st.barTitle}>{p.register.name}</span>
@@ -290,6 +377,16 @@ export function PosTerminal(p: {
           {shift ? `${L.Shift} ${shift.num}` : L.Closed} · {p.user}
         </span>
         <span className={st.spacer} />
+        {eetPending > 0 && (
+          <Button icon={<CloudArrowUp24Regular />} onClick={resendEet} disabled={busy} title={L.EetPendingInfo.replace("{n}", String(eetPending))}>
+            {L.EetResend} ({eetPending})
+          </Button>
+        )}
+        {serialPrinter && !portReady && (
+          <Button icon={<Print24Regular />} onClick={connectPrinter}>
+            {L.PrinterConnect}
+          </Button>
+        )}
         {shift && (
           <Button icon={<LockClosed24Regular />} onClick={showSummary} disabled={busy || lines.length > 0}>
             {L.CloseShift}
@@ -490,6 +587,43 @@ export function PosTerminal(p: {
         </DialogSurface>
       </Dialog>
 
+      {/* platba na terminálu */}
+      <Dialog open={!!card} onOpenChange={(_, d) => !d.open && card?.state === "declined" && setCard(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{card?.state === "declined" ? L.CardDeclined : L.CardWaiting}</DialogTitle>
+            <DialogContent>
+              <div className={st.big}>{fmt(due)}</div>
+              {card?.state === "waiting" ? (
+                <>
+                  <Spinner />
+                  <p style={{ textAlign: "center" }}>{L.CardWaitingInfo}</p>
+                </>
+              ) : (
+                <MessageBar intent="error">
+                  <MessageBarBody>{card?.message ?? L.CardDeclined}</MessageBarBody>
+                </MessageBar>
+              )}
+              {error && (
+                <MessageBar intent="error">
+                  <MessageBarBody>{error}</MessageBarBody>
+                </MessageBar>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={cancelCard} disabled={busy}>
+                {L.Cancel}
+              </Button>
+              {card?.state === "declined" && (
+                <Button appearance="primary" onClick={() => (setCard(null), payByTerminal())} disabled={busy}>
+                  {L.Retry}
+                </Button>
+              )}
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
       {/* účtenka */}
       <Dialog open={!!receipt} onOpenChange={(_, d) => !d.open && setReceipt(null)}>
         <DialogSurface>
@@ -500,7 +634,7 @@ export function PosTerminal(p: {
             </DialogTitle>
             <DialogContent>{receipt && <Receipt r={receipt} L={L} fmt={fmt} st={st} locale={locale} />}</DialogContent>
             <DialogActions>
-              <Button icon={<Print24Regular />} onClick={() => window.print()}>
+              <Button icon={<Print24Regular />} onClick={() => receipt && printReceipt(receipt)}>
                 {L.PrintReceipt}
               </Button>
               <Button appearance="primary" size="large" onClick={() => setReceipt(null)}>
@@ -646,6 +780,12 @@ function Receipt({
           </span>
         </div>
       ))}
+      {r.eet && (
+        <>
+          <div className={st.rSep} />
+          <div>{r.eet.pok ? `POK: ${r.eet.pok}` : L.EetLater}</div>
+        </>
+      )}
       {r.footer && (
         <>
           <div className={st.rSep} />

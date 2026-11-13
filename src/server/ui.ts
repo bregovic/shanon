@@ -30,6 +30,8 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
     noTotal: e.noTotal,
     refHref: e.refObject ? objectHref(e.refObject) : undefined,
     ext,
+    secret: f.secret,
+    visibleWhen: f.visibleWhen,
   };
 }
 
@@ -49,9 +51,13 @@ export function fieldsMeta(ctx: Ctx, def: ObjectDef, t: T): Record<string, Field
 /** Skupiny formuláře včetně skupiny polí rozšíření. */
 export function formGroups(ctx: Ctx, def: ObjectDef, t: T, meta: Record<string, FieldMeta>, hide0: string[] = []) {
   const hide = [...hide0, ...hiddenFields(ctx, def)];
-  const groups = def.form.map((g) => ({ label: t(g.label), fields: g.fields.filter((n) => !hide.includes(n)).map((n) => meta[n]) }));
+  const groups = def.form.map((g) => ({
+    label: t(g.label),
+    fields: g.fields.filter((n) => !hide.includes(n)).map((n) => meta[n]),
+    visibleWhen: g.visibleWhen,
+  }));
   const ext = Object.keys(extFields(ctx, def.id));
-  if (ext.length) groups.push({ label: t("@SYS:ExtensionFields"), fields: ext.map((n) => meta[n]) });
+  if (ext.length) groups.push({ label: t("@SYS:ExtensionFields"), fields: ext.map((n) => meta[n]), visibleWhen: undefined });
   return groups;
 }
 

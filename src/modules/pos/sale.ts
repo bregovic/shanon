@@ -23,6 +23,8 @@ export interface SaleInput {
   payment: "cash" | "card";
   /** přijatá hotovost (jen u platby hotově) */
   cashGiven?: string | null;
+  /** platba kartou přes terminál: id transakce (ověřené volajícím) */
+  paymentRef?: string | null;
 }
 
 /** Zaokrouhlení na celé koruny (half-up, symetricky). */
@@ -63,8 +65,8 @@ async function saleLine(data: DataApi, itemId: string, qtyRaw: string) {
   };
 }
 
-/** Prodej: účtenka s řádky v otevřené směně pokladny. */
-export async function sell(data: DataApi, input: SaleInput): Promise<RecordData> {
+/** Výpočet nákupu (ceny z položek) bez uložení — pro terminál a platbu kartou. */
+export async function quote(data: DataApi, input: SaleInput) {
   const reg = await data.get("pos.register", input.registerId);
   if (!reg) throw new UserError("@SYS:NotFound");
   if (reg.blocked) throw new UserError("@POS:RegisterBlocked");
@@ -72,13 +74,18 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
   if (!shift) throw new UserError("@POS:ShiftNotOpen");
   if (!input.lines.length) throw new UserError("@POS:EmptySale");
   if (input.lines.length > 500) throw new UserError("@POS:InvalidQty");
-
   const lines = [];
   for (const l of input.lines) lines.push(await saleLine(data, String(l.itemId), String(l.qty)));
   const gross = sumCents(lines.map((l) => l.gross));
   const net = sumCents(lines.map((l) => l.net));
+  const paid = input.payment === "cash" && reg.roundCash ? roundToCrowns(gross) : gross;
+  return { reg, shift, lines, gross, net, paid };
+}
+
+/** Prodej: účtenka s řádky v otevřené směně pokladny. */
+export async function sell(data: DataApi, input: SaleInput): Promise<RecordData> {
+  const { reg, shift, lines, gross, net, paid } = await quote(data, input);
   const cash = input.payment === "cash";
-  const paid = cash && reg.roundCash ? roundToCrowns(gross) : gross;
   let given: bigint | null = null;
   if (cash && input.cashGiven) {
     given = toCents(String(input.cashGiven).replace(",", "."));
@@ -97,6 +104,7 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
     amountPaid: fromCents(paid),
     cashGiven: given === null ? null : fromCents(given),
     change: given === null ? null : fromCents(given - paid),
+    paymentRef: input.payment === "card" ? (input.paymentRef ?? null) : null,
   });
   for (const l of lines) {
     await data.create("pos.receiptLine", {
@@ -246,6 +254,9 @@ export interface ReceiptPrint {
   cashGiven: string | null;
   change: string | null;
   footer: string | null;
+  eet: { status: string | null; pok: string | null } | null;
+  /** počet neodeslaných tržeb EET pokladny (vyplní akce prodeje) */
+  eetQueue?: number;
 }
 
 /** Podklady pro tisk účtenky (zjednodušený daňový doklad). */
@@ -294,5 +305,6 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
     cashGiven: (r.cashGiven as string) ?? null,
     change: (r.change as string) ?? null,
     footer: (reg?.receiptFooter as string) ?? null,
+    eet: r.eetStatus ? { status: String(r.eetStatus), pok: (r.eetPok as string) ?? null } : null,
   };
 }

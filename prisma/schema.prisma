@@ -238,6 +238,8 @@ model SysCompany {
   posShift_company          PosShift[]          @relation("PosShift_company")
   posReceipt_company        PosReceipt[]        @relation("PosReceipt_company")
   posReceiptLine_company    PosReceiptLine[]    @relation("PosReceiptLine_company")
+  intConnection_company     IntConnection[]     @relation("IntConnection_company")
+  intLog_company            IntLog[]            @relation("IntLog_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1469,13 +1471,14 @@ model PosRegister {
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy             String?  @map("updated_by") @db.Uuid
 
-  company             SysCompany   @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
-  cashAccount         GlAccount    @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
-  cardAccount         GlAccount    @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
-  roundingGainAccount GlAccount    @relation("PosRegister_roundingGainAccount", fields: [roundingGainAccountId], references: [id], onDelete: Restrict)
-  roundingLossAccount GlAccount    @relation("PosRegister_roundingLossAccount", fields: [roundingLossAccountId], references: [id], onDelete: Restrict)
-  posShift_register   PosShift[]   @relation("PosShift_register")
-  posReceipt_register PosReceipt[] @relation("PosReceipt_register")
+  company                SysCompany      @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
+  cashAccount            GlAccount       @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
+  cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
+  roundingGainAccount    GlAccount       @relation("PosRegister_roundingGainAccount", fields: [roundingGainAccountId], references: [id], onDelete: Restrict)
+  roundingLossAccount    GlAccount       @relation("PosRegister_roundingLossAccount", fields: [roundingLossAccountId], references: [id], onDelete: Restrict)
+  posShift_register      PosShift[]      @relation("PosShift_register")
+  posReceipt_register    PosReceipt[]    @relation("PosReceipt_register")
+  intConnection_register IntConnection[] @relation("IntConnection_register")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -1539,6 +1542,10 @@ model PosReceipt {
   amountPaid    Decimal? @map("amount_paid") @db.Decimal(18, 2)
   cashGiven     Decimal? @map("cash_given") @db.Decimal(18, 2)
   change        Decimal? @db.Decimal(18, 2)
+  paymentRef    String?  @map("payment_ref") @db.VarChar(255)
+  eetStatus     String?  @map("eet_status") @db.VarChar(40)
+  eetPok        String?  @map("eet_pok") @db.VarChar(255)
+  eetMessage    String?  @map("eet_message") @db.VarChar(255)
   ext           Json     @default("{}")
   version       Int      @default(1)
   createdAt     DateTime @default(now()) @map("created_at")
@@ -1594,4 +1601,79 @@ model PosReceiptLine {
   @@index([taxCodeId])
   @@index([revenueAccountId])
   @@map("pos_receipt_line")
+}
+
+/// int.connection — generováno z definice objektu
+model IntConnection {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  code           String    @db.VarChar(20)
+  name           String    @db.VarChar(120)
+  kind           String    @default("eet") @db.VarChar(40)
+  driver         String    @default("eet2") @db.VarChar(40)
+  registerId     String?   @map("register_id") @db.Uuid
+  active         Boolean   @default(true)
+  environment    String?   @default("playground") @db.VarChar(40)
+  unitId         String?   @map("unit_id") @db.VarChar(9)
+  posId          String?   @map("pos_id") @db.VarChar(20)
+  certPassword   String?   @map("cert_password") @db.VarChar(4000)
+  certData       String?   @map("cert_data")
+  certSubject    String?   @map("cert_subject") @db.VarChar(255)
+  certValidTo    DateTime? @map("cert_valid_to") @db.Date
+  paperWidth     String?   @default("80") @map("paper_width") @db.VarChar(40)
+  codePage       String?   @default("cp852") @map("code_page") @db.VarChar(40)
+  baudRate       Int?      @default(9600) @map("baud_rate")
+  openDrawer     Boolean   @default(false) @map("open_drawer")
+  autoPrint      Boolean   @default(false) @map("auto_print")
+  merchantCode   String?   @map("merchant_code") @db.VarChar(20)
+  apiKey         String?   @map("api_key") @db.VarChar(4000)
+  affiliateAppId String?   @map("affiliate_app_id") @db.VarChar(120)
+  affiliateKey   String?   @map("affiliate_key") @db.VarChar(4000)
+  pairingCode    String?   @map("pairing_code") @db.VarChar(20)
+  readerId       String?   @map("reader_id") @db.VarChar(60)
+  lastCheckAt    DateTime? @map("last_check_at") @db.Date
+  lastResult     String?   @map("last_result") @db.VarChar(255)
+  ext            Json      @default("{}")
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?   @map("updated_by") @db.Uuid
+
+  company           SysCompany   @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register          PosRegister? @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
+  intLog_connection IntLog[]     @relation("IntLog_connection")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([registerId])
+  @@map("int_connection")
+}
+
+/// int.log — generováno z definice objektu
+model IntLog {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  connectionId String   @map("connection_id") @db.Uuid
+  operation    String   @db.VarChar(40)
+  status       String   @db.VarChar(40)
+  reference    String?  @db.VarChar(255)
+  externalId   String?  @map("external_id") @db.VarChar(255)
+  message      String?  @db.VarChar(255)
+  detail       String?
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company    SysCompany    @relation("IntLog_company", fields: [companyId], references: [id], onDelete: Restrict)
+  connection IntConnection @relation("IntLog_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([connectionId])
+  @@map("int_log")
 }

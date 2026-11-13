@@ -6,6 +6,7 @@ import { requireSession } from "@/server/auth";
 import { getRecord, inTenant } from "@/server/data";
 import { getT } from "@/server/i18n";
 import { openShiftOf } from "@/modules/pos/sale";
+import { connectionsFor } from "@/modules/int/drivers";
 import pos from "@/modules/pos";
 
 export const metadata = { title: "Pokladna" };
@@ -23,8 +24,11 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     const items = await sess.find("inv.item", { blocked: false }, 5000, { name: "asc" });
     const groups = await sess.find("inv.itemGroup", {}, 500, { code: "asc" });
     const units = new Map((await sess.find("inv.unit", {}, 500)).map((u) => [String(u.id), String(u.code)]));
-    const shift = await openShiftOf(sess.sys().api(), id);
-    return { items, groups, units, shift };
+    const api = sess.sys().api();
+    const shift = await openShiftOf(api, id);
+    const conns = s.ctx.modules.has("int") ? await connectionsFor(api, id) : {};
+    const eetPending = conns.eet ? (await api.find("pos.receipt", { registerId: id, eetStatus: "pending" }, { take: 1000 })).length : 0;
+    return { items, groups, units, shift, conns, eetPending };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -47,6 +51,20 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           ean: (i.ean as string) ?? null,
         }))}
       groups={data.groups.filter((g) => used.has(String(g.id))).map((g) => ({ id: String(g.id), name: String(g.name) }))}
+      printer={
+        data.conns.printer
+          ? {
+              driver: String(data.conns.printer.driver),
+              paperWidth: String(data.conns.printer.paperWidth ?? "80"),
+              codePage: data.conns.printer.codePage === "ascii" ? "ascii" : "cp852",
+              baudRate: Number(data.conns.printer.baudRate ?? 9600),
+              openDrawer: !!data.conns.printer.openDrawer,
+              autoPrint: !!data.conns.printer.autoPrint,
+            }
+          : null
+      }
+      payment={data.conns.payment ? { driver: String(data.conns.payment.driver) } : null}
+      eet={data.conns.eet ? { pending: data.eetPending } : null}
       user={s.user.name}
       lang={s.lang}
       labels={labels}

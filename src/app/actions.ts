@@ -13,7 +13,8 @@ import { recordHistory, type HistoryEntry } from "@/server/history";
 import { importRecords, readTable, type ImportReport } from "@/server/import";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
-import { openShiftOf, receiptPrint, sell, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
+import { openShiftOf, quote, receiptPrint, sell, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
+import { assertPaid, connectionsFor, eetRegisterReceipt, eetResendPending, paymentCancel, paymentStart, paymentStatus, type PaymentState } from "@/modules/int/drivers";
 import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
@@ -320,17 +321,92 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
   const s = await requireSession();
   try {
     assertCan(s.ctx.perms, "pos.receipt", "write");
-    const sale: SaleInput = {
-      registerId: String(input.registerId),
-      payment: input.payment === "card" ? "card" : "cash",
-      cashGiven: input.cashGiven ? String(input.cashGiven) : null,
-      lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
-    };
+    const sale = saleInput(input);
+    const withInt = s.ctx.modules.has("int");
+    const receiptId = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      // platba kartou přes terminál: schválená transakce na stejnou částku
+      const conns = withInt ? await connectionsFor(api, sale.registerId) : {};
+      if (sale.payment === "card" && conns.payment && conns.payment.driver !== "manual") {
+        const q = await quote(api, sale);
+        await assertPaid(api, conns.payment, String(sale.paymentRef ?? ""), q.paid);
+      } else sale.paymentRef = null;
+      return String((await sell(api, sale)).id);
+    });
+    // EET až po uložení účtenky (síť nesmí držet transakci); pak dodatečné odeslání čekajících
     const data = await inTenant(s.ctx, async (sess) => {
       const api = sess.sys().api();
-      const r = await sell(api, sale);
-      return receiptPrint(api, s.ctx.companyId, String(r.id));
+      let eetQueue: number | undefined;
+      if (withInt) {
+        const conns = await connectionsFor(api, sale.registerId);
+        if (conns.eet) {
+          await eetRegisterReceipt(api, s.ctx.companyId, conns.eet, (await api.get("pos.receipt", receiptId))!, true);
+          eetQueue = (await eetResendPending(api, s.ctx.companyId, sale.registerId, 5)).pending;
+        }
+      }
+      return { ...(await receiptPrint(api, s.ctx.companyId, receiptId)), eetQueue };
     });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+function saleInput(input: SaleInput): SaleInput {
+  return {
+    registerId: String(input.registerId),
+    payment: input.payment === "card" ? "card" : "cash",
+    cashGiven: input.cashGiven ? String(input.cashGiven) : null,
+    paymentRef: input.paymentRef ? String(input.paymentRef) : null,
+    lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
+  };
+}
+
+/** Platba kartou na terminálu: zahájení (částku spočítá server z položek). */
+export async function posCardStartAction(input: SaleInput): Promise<ActionResult<PaymentState>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const sale = { ...saleInput(input), payment: "card" as const };
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const conn = (await connectionsFor(api, sale.registerId)).payment;
+      if (!conn) throw new UserError("@INT:NoConnection");
+      const q = await quote(api, sale);
+      return paymentStart(api, conn, q.paid, `${q.reg.code}`);
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function posCardStatusAction(registerId: string, ref: string, cancel = false): Promise<ActionResult<PaymentState | null>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const conn = (await connectionsFor(api, String(registerId))).payment;
+      if (!conn) throw new UserError("@INT:NoConnection");
+      if (cancel) {
+        await paymentCancel(api, conn, String(ref));
+        return null;
+      }
+      return paymentStatus(api, conn, String(ref));
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Ruční dodatečné odeslání neodeslaných tržeb EET. */
+export async function posEetResendAction(registerId: string): Promise<ActionResult<{ sent: number; pending: number }>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const data = await inTenant(s.ctx, (sess) => eetResendPending(sess.sys().api(), s.ctx.companyId, String(registerId), 50));
     return { ok: true, data };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);

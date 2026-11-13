@@ -33,6 +33,7 @@ import { prisma, withTenant, type Tx } from "./db";
 import { fieldWhere, orderByFor } from "./filter-where";
 import { setupCompany } from "./setup";
 import { storageFor } from "./storage";
+import { SECRET_MASK, isEncrypted, sealSecret } from "./secrets";
 
 export interface Ctx {
   tenantId: string;
@@ -129,6 +130,13 @@ const scopeWhere = (ctx: Ctx, def: ObjectDef): RecordData =>
   def.scope === "company" ? { tenantId: ctx.tenantId, companyId: ctx.companyId } : { tenantId: ctx.tenantId };
 
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Tajné údaje navenek (UI, export, historie) jen jako maska. */
+export function maskSecrets(def: ObjectDef, row: RecordData): RecordData {
+  const out = { ...row };
+  for (const [name, f] of Object.entries(def.fields)) if (f.secret) out[name] = row[name] ? SECRET_MASK : null;
+  return out;
+}
 
 /** Prisma → prosté hodnoty (Decimal → text, datum → YYYY-MM-DD). */
 function serialize(def: ObjectDef, row: RecordData): RecordData {
@@ -274,7 +282,8 @@ class Session {
       d.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize }),
       d.count({ where }),
     ]);
-    const out = rows.map((r) => serialize(def, r));
+    // seznam jde do UI a exportu — tajné údaje jen jako maska
+    const out = rows.map((r) => maskSecrets(def, serialize(def, r)));
     await this.attachRefTitles(def, out);
     let totals: Record<string, string> | undefined;
     const sumFields = def.list.filter((f) => def.fields[f]?.edt.kind === "decimal" && !def.fields[f].edt.noTotal);
@@ -348,6 +357,13 @@ class Session {
     if (existing && def.lockedWhen && !opts.system && existing[def.lockedWhen.field] === def.lockedWhen.equals)
       throw new UserError("@SYS:Locked");
 
+    // tajné údaje: maska / prázdné = beze změny, jinak zašifrovat
+    for (const [name, f] of Object.entries(def.fields)) {
+      if (!f.secret || !(name in data)) continue;
+      const v = data[name];
+      if (v === null || v === "" || v === SECRET_MASK) delete data[name];
+      else if (!isEncrypted(v)) data[name] = sealSecret(String(v));
+    }
     const isNew = !existing;
     const merged: RecordData = { ...(existing ?? {}), ...data, ext: { ...((existing?.ext as RecordData) ?? {}), ...ext } };
 
@@ -412,7 +428,7 @@ class Session {
       prismaError(e);
     }
     const result = serialize(def, saved);
-    await this.audit(objectId, String(result.id), isNew ? "create" : "update", existing, result);
+    await this.audit(objectId, String(result.id), isNew ? "create" : "update", existing && maskSecrets(def, existing), maskSecrets(def, result));
     for (const h of handlersFor(this.ctx, objectId)) await h.afterSave?.(ectx, result, isNew);
     // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
     if (isNew && def.id === "sys.company") {
@@ -450,7 +466,7 @@ class Session {
     const refs = await this.tx.sysDocuRef.findMany({ where: { tenantId: this.ctx.tenantId, objectId, recordId: id } });
     for (const r of refs) if (r.storageKey) await storageFor(r.storage).remove(this.tx, this.ctx.tenantId, r.storageKey);
     if (refs.length) await this.tx.sysDocuRef.deleteMany({ where: { id: { in: refs.map((r) => r.id) } } });
-    await this.audit(objectId, id, "delete", existing, null);
+    await this.audit(objectId, id, "delete", maskSecrets(def, existing), null);
     for (const h of handlersFor(this.ctx, objectId)) await h.afterDelete?.(ectx, existing);
   }
 
@@ -513,7 +529,7 @@ export const getRecord = (ctx: Ctx, objectId: string, id: string, client?: Prism
     async (s) => {
       const r = await s.get(objectId, id);
       if (r) await s.attachRefTitles(getObject(objectId), [r]);
-      return r;
+      return r && maskSecrets(getObject(objectId), r);
     },
     client,
   );
@@ -525,7 +541,7 @@ export const saveRecord = (
   input: RecordData,
   version?: number,
   client?: PrismaClient,
-) => inTenant(ctx, (s) => s.save(objectId, id, input, { version }), client);
+) => inTenant(ctx, async (s) => maskSecrets(getObject(objectId), await s.save(objectId, id, input, { version })), client);
 
 export const deleteRecord = (ctx: Ctx, objectId: string, id: string, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.remove(objectId, id), client);

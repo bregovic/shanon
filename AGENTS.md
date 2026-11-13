@@ -49,6 +49,17 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   (`sale.ts`), terminál `/kasa` ukazuje jen orientační součet. Hotovost se
   zaokrouhluje na koruny mimo základ DPH. Do účetnictví jde až uzávěrka směny
   (jeden doklad za směnu, `tax.trans` se `simplified` → KH oddíl A.5).
+- Integrace (`src/modules/int`): napojení = druh + ovladač (`drivers.ts`), každá
+  komunikace do `int.log`. Síť nikdy uvnitř transakce prodeje — EET se posílá po
+  uložení účtenky, nevyjde-li do 2 s, účtenka „čeká“ a odešle se dodatečně (48 h).
+  EET 2.0: `eet.ts` (SOAP, podpis exc-c14n/RSA-SHA256, tělo skládané rovnou
+  kanonicky); ověření proti Playgroundu `npx tsx scripts/eet-playground.ts <p12> <heslo>`.
+  Platba kartou: účtenka se vystaví až po schválení terminálem, server ověří
+  částku a jediné použití transakce (`assertPaid`).
+- Tajné údaje = `FieldDef.secret`: šifrovaně (AES-256-GCM, `SHANON_SECRET_KEY`
+  v prostředí — bez něj produkce tajné údaje neuloží; ztráta klíče = údaje znovu
+  zadat), ven jen maska. Čte je jen logika modulu přes `revealSecret()`.
+- Pole/skupina formuláře podle hodnoty jiného pole: `visibleWhen: { field, in: [...] }`.
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.
 
 ## Obecné metody — žádný kód pro běžné operace

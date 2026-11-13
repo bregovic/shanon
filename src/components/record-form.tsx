@@ -29,7 +29,10 @@ export type Values = Record<string, unknown>;
 export interface FormGroup {
   label: string;
   fields: FieldMeta[];
+  visibleWhen?: { field: string; in: unknown[] };
 }
+
+const shown = (w: { field: string; in: unknown[] } | undefined, values: Values) => !w || w.in.includes(values[w.field] ?? null);
 
 const useStyles = makeStyles({
   group: { display: "flex", flexDirection: "column", gap: "12px" },
@@ -71,11 +74,11 @@ export function RecordForm({
   const s = useStyles();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {groups.map((g) => (
+      {groups.filter((g) => shown(g.visibleWhen, values) && g.fields.some((f) => shown(f.visibleWhen, values))).map((g) => (
         <section key={g.label} className={s.group}>
           <div className={s.groupTitle}>{g.label}</div>
           <div className={s.grid} style={columns === 1 ? { gridTemplateColumns: "1fr" } : undefined}>
-            {g.fields.map((f) => (
+            {g.fields.filter((f) => shown(f.visibleWhen, values)).map((f) => (
               <div key={f.name} className={f.kind === "text" ? s.wide : undefined}>
                 <FieldInput
                   f={f}
@@ -167,6 +170,8 @@ function FieldInput({
     default:
       control = (
         <Input
+          type={f.secret ? "password" : undefined}
+          autoComplete={f.secret ? "new-password" : undefined}
           // zamčené číslo zobrazit česky (12 450,00), editované nechat surové
           value={disabled && v && (f.kind === "decimal" || f.kind === "int") ? displayValue(f, { [f.name]: v }, "cs") : v}
           disabled={disabled}
