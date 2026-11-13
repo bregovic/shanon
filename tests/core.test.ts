@@ -99,3 +99,16 @@ describe("účtování", () => {
     expect(journalLinesToPosting([{ accountId: "a", debit: "", credit: "5" }])[0].amount).toBe("-5.00");
   });
 });
+
+describe("evidence testování (docs/qa)", () => {
+  it("scénáře a požadavky odkazují jen na existující funkce", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { parseCsv } = await import("@/server/import");
+    const read = (f: string) => {
+      const t = parseCsv(readFileSync(`docs/qa/${f}`, "utf8").replace(/^﻿/, ""));
+      return t.rows.map((r) => Object.fromEntries(t.headers.map((h, i) => [h, r[i]])));
+    };
+    const codes = new Set(read("1-funkce.csv").map((r) => r["Kód"]));
+    for (const f of ["2-scenare.csv", "3-pozadavky.csv"]) expect(read(f).map((r) => r["Funkce"]).filter((c) => c && !codes.has(c))).toEqual([]);
+  });
+});
