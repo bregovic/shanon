@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, makeStyles, Text, tokens } from "@fluentui/react-components";
 import { ModuleIcon } from "./icons";
+import { MenuSearch } from "./menu-search";
+import type { MenuHit } from "@/lib/menu-search";
 import { ActionBar, Crumbs, PageContent } from "./page";
 
 const useStyles = makeStyles({
@@ -21,9 +23,13 @@ const useStyles = makeStyles({
 export function HomeTiles({
   title,
   modules,
+  menu,
+  labels,
 }: {
   title: string;
   modules: { id: string; label: string; description: string; icon: string }[];
+  menu: MenuHit[];
+  labels: { search: string; noResults: string; results: string };
 }) {
   const s = useStyles();
   const router = useRouter();
@@ -33,6 +39,9 @@ export function HomeTiles({
         <Crumbs items={[{ label: title }]} />
       </ActionBar>
       <PageContent>
+        <div style={{ maxWidth: 640, marginBottom: 24 }}>
+          <MenuSearch menu={menu} placeholder={labels.search} noResults={labels.noResults} inline autoFocus size="large" />
+        </div>
         <div className={s.grid}>
           {modules.map((m) => (
             <Card key={m.id} onClick={() => router.push(`/${m.id}`)} style={{ cursor: "pointer" }}>

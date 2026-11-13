@@ -36,3 +36,21 @@ describe("filtry sloupců", () => {
     expect(parseFilter("bool", "ano")).toEqual([{ op: "bool", value: true }]);
   });
 });
+
+import { searchMenu } from "@/lib/menu-search";
+
+describe("hledání v menu", () => {
+  const menu = [
+    { module: "ar", moduleLabel: "Odběratelé", icon: "x", section: "Odběratelé", label: "Vydané faktury", href: "/ar/invoice" },
+    { module: "ap", moduleLabel: "Dodavatelé", icon: "x", section: "Dodavatelé", label: "Přijaté faktury", href: "/ap/invoice" },
+    { module: "sys", moduleLabel: "Správa systému", icon: "x", section: "Nastavení", label: "Kurzy měn", href: "/sys/exchangeRate" },
+    { module: "pos", moduleLabel: "Pokladna", icon: "x", section: "Pokladna", label: "Prodej", href: "/kasa" },
+  ];
+  it("bez diakritiky, více slov, i podle modulu", () => {
+    expect(searchMenu(menu, "faktury").map((h) => h.href)).toEqual(["/ap/invoice", "/ar/invoice"]);
+    expect(searchMenu(menu, "faktury dodav").map((h) => h.href)).toEqual(["/ap/invoice"]);
+    expect(searchMenu(menu, "kurz men").map((h) => h.href)).toEqual(["/sys/exchangeRate"]);
+    expect(searchMenu(menu, "POKLADNA").map((h) => h.href)).toEqual(["/kasa"]);
+    expect(searchMenu(menu, "   ")).toEqual([]);
+  });
+});

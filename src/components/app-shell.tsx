@@ -23,6 +23,8 @@ import { Building24Regular, Checkmark24Regular, Home24Regular, Settings24Regular
 import { logoutAction, switchCompanyAction } from "@/app/actions";
 import { FavoritesMenu } from "./favorites";
 import { ModuleIcon } from "./icons";
+import { MenuSearch } from "./menu-search";
+import type { MenuHit } from "@/lib/menu-search";
 
 export interface ShellModule {
   id: string;
@@ -36,7 +38,8 @@ interface Props {
   companies: { id: string; code: string; name: string }[];
   companyId: string | null;
   user: { name: string; email: string; initials: string; admin: boolean };
-  labels: { home: string; settings: string; signOut: string };
+  labels: { home: string; settings: string; signOut: string; search: string; noResults: string };
+  menu: MenuHit[];
   children: React.ReactNode;
 }
 
@@ -58,6 +61,7 @@ const useStyles = makeStyles({
     scrollbarWidth: "none",
   },
   logo: { display: "flex", alignItems: "center", flexShrink: 0 },
+  search: { width: "280px", flexShrink: 0, "@media (max-width: 700px)": { display: "none" } },
   spacer: { flex: 1, minWidth: "16px" },
   right: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 },
   divider: { width: "1px", height: "20px", backgroundColor: tokens.colorNeutralStroke2, margin: "0 8px" },
@@ -65,7 +69,7 @@ const useStyles = makeStyles({
   muted: { color: tokens.colorNeutralForeground3, marginLeft: "8px" },
 });
 
-export function AppShell({ modules, companies, companyId, user, labels, children }: Props) {
+export function AppShell({ modules, companies, companyId, user, labels, menu, children }: Props) {
   const s = useStyles();
   const path = usePathname();
   const router = useRouter();
@@ -118,6 +122,9 @@ export function AppShell({ modules, companies, companyId, user, labels, children
 
         <div className={s.spacer} />
 
+        <div className={s.search}>
+          <MenuSearch menu={menu} placeholder={labels.search} noResults={labels.noResults} shortcut />
+        </div>
         <div className={s.right}>
           {companies.length > 0 && (
             <Menu>

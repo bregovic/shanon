@@ -114,8 +114,10 @@ ta používá stejné komponenty a akce.
 
 - **Hlavička** (`AppShell`): logo → plocha aktuálního modulu, výběr modulu
   s ikonami, přepínač firmy, nastavení, uživatel, odhlášení.
-- **Plocha modulu** (`/[modul]`): sloupce *Formuláře* a *Nastavení*, sbalovací
-  sekce podle `ModuleDef.menu`.
+- **Plocha modulu** (`/[modul]`): sloupce *Formuláře*, *Funkce*, *Reporty*,
+  *Nastavení* podle `MenuGroup.kind`, sbalovací sekce podle `ModuleDef.menu`.
+- **Hledání v menu**: přehled aplikace a hlavička (Ctrl+K, „/“); zdroj
+  `src/server/menu.ts` (jen položky, které uživatel smí vidět).
 - **Seznam**: `ActionBar` [drobečky] … [Nový] [Upravit] [Smazat] | [Obnovit],
   pod ní `SmartGrid` (filtr a řazení v menu sloupce, výběr řádků).
 - **Formulář**: klik = výběr, dvojklik / Enter = otevřít. Běžný objekt se

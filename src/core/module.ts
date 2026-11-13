@@ -22,6 +22,12 @@ export interface MenuItem {
 export interface MenuGroup {
   label: LabelRef;
   items: MenuItem[];
+  /**
+   * sloupec na ploše modulu: formuláře (výchozí), nastavení, funkce
+   * (periodické a hromadné operace), reporty. Sekce „Nastavení“ a
+   * „Zabezpečení“ jsou nastavení i bez uvedení.
+   */
+  kind?: "forms" | "setup" | "functions" | "reports";
 }
 
 export interface ModuleDef {

@@ -5,6 +5,7 @@ import { getT } from "@/server/i18n";
 import { canSeeModule } from "@/core/security";
 import { FavoritesProvider } from "@/components/favorites";
 import { prisma } from "@/server/db";
+import { menuIndex } from "@/server/menu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireSession();
@@ -36,7 +37,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       companies={s.companies}
       companyId={s.ctx.companyId}
       user={{ name: s.user.name, email: s.user.email, initials, admin: s.superUser }}
-      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), signOut: t("@SYS:SignOut") }}
+      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults") }}
+      menu={menuIndex(s, t)}
     >
       {children}
     </AppShell>
