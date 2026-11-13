@@ -96,7 +96,8 @@ export interface ObjectDef {
    * podřízené záznamy zobrazené ve formuláři. `owned: false` = jen přehled
    * (faktury odběratele) — se záznamem se nemažou, smazání pak zastaví vazba.
    */
-  lines?: { object: string; field: string; label: LabelRef; owned?: boolean }[];
+  /** `copy: false` = řádky se při Duplikovat nekopírují (diskuze, historie) */
+  lines?: { object: string; field: string; label: LabelRef; owned?: boolean; copy?: boolean }[];
   /** tlačítka ve formuláři; logika v ObjectHandlers.actions */
   /**
    * `upload` = akce si vyžádá soubor (přípony pro výběr, např. ".gpc,.txt");

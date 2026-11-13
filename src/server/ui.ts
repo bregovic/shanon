@@ -97,6 +97,7 @@ export function uiLabels(t: T) {
       close: t("@SYS:Close"),
       newTitle: t("@SYS:New"),
       open: t("@SYS:Open"),
+      duplicate: t("@SYS:DuplicateRecord"),
       image: { upload: t("@SYS:ImageUpload"), remove: t("@SYS:ImageRemove"), drop: t("@SYS:ImageDrop"), afterSave: t("@SYS:ImageAfterSave") },
     },
     history: {
@@ -145,6 +146,7 @@ export function uiLabels(t: T) {
     },
     actions: {
       new: t("@SYS:New"),
+      duplicate: t("@SYS:DuplicateRecord"),
       edit: t("@SYS:Edit"),
       delete: t("@SYS:Delete"),
       refresh: t("@SYS:Refresh"),

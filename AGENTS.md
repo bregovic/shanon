@@ -71,6 +71,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   vypne), plán v pražském čase, zmeškané běhy se nedohánějí, historie `sys.batchRun`.
 - Odkaz na číselník (cíl bez řádků/akcí) vede do seznamu `?focus=<id>` s vybraným
   řádkem (`refLink`), doklad na svou stránku.
+- Duplikovat (`src/server/duplicate.ts`, obecně): bez polí unikátního klíče (kromě
+  odkazů), čísla z řady, readOnly, obrázků a tajných údajů. Doklad s číselnou řadou
+  se zkopíruje rovnou i s vlastními řádky (`lines[].copy: false` = nekopírovat,
+  např. diskuze), jinak nový formulář s předvyplněnými hodnotami.
 - Tajné údaje = `FieldDef.secret`: šifrovaně (AES-256-GCM, `SHANON_SECRET_KEY`
   v prostředí — bez něj produkce tajné údaje neuloží; ztráta klíče = údaje znovu
   zadat), ven jen maska. Čte je jen logika modulu přes `revealSecret()`.

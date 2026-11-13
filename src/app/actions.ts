@@ -1,5 +1,6 @@
 "use server";
 
+import { duplicateRecord, type DuplicateResult } from "@/server/duplicate";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -712,4 +713,14 @@ export async function runSetupAction(allCompanies: boolean): Promise<ActionResul
   revalidatePath("/", "layout");
   const list = Object.entries(total).map(([o, n]) => `${t(registry.objects.get(o)?.labelPlural)} ${n}`);
   return { ok: true, data: list.length ? t("@SYS:SetupDone", { list: list.join(", ") }) : t("@SYS:SetupNothing") };
+}
+
+/** Duplikovat: doklad s číselnou řadou se zkopíruje i s řádky ({ id }), jinak předvyplněné hodnoty nového záznamu. */
+export async function duplicateRecordAction(objectId: string, id: string): Promise<ActionResult<DuplicateResult | null>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: await duplicateRecord(s.ctx, objectId, id) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
 }

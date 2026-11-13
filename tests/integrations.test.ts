@@ -541,3 +541,21 @@ describe("dávkové úlohy", () => {
     expect(runs.length).toBe(1);
   });
 });
+
+describe("Duplikovat", () => {
+  it("číselník → předvyplněné hodnoty bez klíče; doklad s řadou → kopie s novým číslem, bez diskuze", async () => {
+    const { duplicateRecord } = await import("@/server/duplicate");
+    const Q = (await provisionTenant(client, { code: `t-dup-${run}`, name: "Dup", adminEmail: `dup-${run}@test.local`, adminPassword: "heslo-12345", modules: ["qa", "gl"], company: { code: "D", name: "D" } })).ctx;
+    const [acc] = (await listRecords(Q, "gl.account", { filter: { accountNum: "211000" } }, client)).rows;
+    const a = await duplicateRecord(Q, "gl.account", String(acc.id), client);
+    expect(a && "values" in a && a.values.accountNum).toBeUndefined();
+    expect(a && "values" in a && a.values.name).toBe(acc.name);
+    const iss = await saveRecord(Q, "qa.issue", null, { title: "Šablona", priority: "high" }, undefined, client);
+    await saveRecord(Q, "qa.comment", null, { issueId: iss.id, text: "x" }, undefined, client);
+    const d = await duplicateRecord(Q, "qa.issue", String(iss.id), client);
+    expect(d && "id" in d).toBe(true);
+    const copy = await getRecord(Q, "qa.issue", (d as { id: string }).id, client);
+    expect([copy!.title, copy!.priority, copy!.issueNum === iss.issueNum]).toEqual(["Šablona", "high", false]);
+    expect((await listRecords(Q, "qa.comment", { filter: { issueId: copy!.id } }, client)).total).toBe(0);
+  });
+});

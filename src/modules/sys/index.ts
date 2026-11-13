@@ -231,7 +231,7 @@ export const batchJob = defineObject({
   unique: [["code"]],
   defaultSort: { field: "nextRunAt", dir: "asc" },
   actions: [{ id: "run", label: "@SYS:RunNow" }],
-  lines: [{ object: "sys.batchRun", field: "jobId", label: "@SYS:BatchRuns" }],
+  lines: [{ object: "sys.batchRun", field: "jobId", label: "@SYS:BatchRuns", copy: false }],
 });
 
 export const batchRun = defineObject({
@@ -289,6 +289,7 @@ export default defineModule({
   labels: {
     cs: {
       BatchClass: "Úloha",
+      DuplicateRecord: "Duplikovat",
       Status: "Stav",
       Recurrence: "Opakování",
       RecOnce: "Jednou",
@@ -565,6 +566,7 @@ export default defineModule({
     },
     en: {
       BatchClass: "Job",
+      DuplicateRecord: "Duplicate",
       Status: "Status",
       Recurrence: "Recurrence",
       RecOnce: "Once",

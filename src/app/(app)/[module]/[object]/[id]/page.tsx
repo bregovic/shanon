@@ -5,14 +5,16 @@ import { coerce } from "@/core/validate";
 import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
 import { getRecord, listRecords } from "@/server/data";
+import { duplicateRecord } from "@/server/duplicate";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, hiddenFields, objectHref, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
 
 type Params = { module: string; object: string; id: string };
 
-export default async function ObjectDetailPage({ params }: { params: Promise<Params> }) {
+export default async function ObjectDetailPage({ params, searchParams }: { params: Promise<Params>; searchParams: Promise<{ copy?: string }> }) {
   const { module, object, id } = await params;
+  const { copy } = await searchParams;
   const s = await requireSession();
   const def = registry.objects.get(`${module}.${object}`);
   if (!def || !s.ctx.modules.has(module)) notFound();
@@ -31,7 +33,12 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
   };
 
   let record: RecordData;
-  if (isNew) record = { ext: {}, ...defaults(def) };
+  if (isNew) {
+    record = { ext: {}, ...defaults(def) };
+    // Duplikovat: hodnoty zdrojového záznamu bez klíče
+    const dup = copy ? await duplicateRecord(s.ctx, def.id, copy) : null;
+    if (dup && "values" in dup) record = { ...record, ...dup.values, _titles: dup.titles };
+  }
   else {
     const r = await getRecord(s.ctx, def.id, id);
     if (!r) notFound();
@@ -85,6 +92,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
       readOnly={readOnly}
       canAttach={mayWrite}
       canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
+      canDuplicate={!isNew && !def.systemOnly && mayWrite}
       actions={
         isNew || !mayWrite
           ? []

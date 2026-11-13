@@ -17,7 +17,7 @@ import {
   Spinner,
 } from "@fluentui/react-components";
 import { Dismiss24Regular } from "@fluentui/react-icons";
-import { getRecordAction, saveRecordAction } from "@/app/actions";
+import { duplicateRecordAction, getRecordAction, saveRecordAction } from "@/app/actions";
 import { RecordForm, type FormGroup, type ImageLabels, type Values } from "./record-form";
 import { useShortcuts } from "./shortcuts";
 
@@ -28,6 +28,7 @@ export interface DrawerLabels {
   close: string;
   newTitle: string;
   open: string;
+  duplicate: string;
 }
 
 export interface EditorState {
@@ -68,7 +69,9 @@ export function RecordDrawer(p: DrawerProps) {
   );
 }
 
-function Editor({ objectId, id, title, groups, defaults, defaultTitles, readOnly, fixed, labels, onClose, onSaved }: DrawerProps) {
+function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles, readOnly, fixed, labels, onClose, onSaved }: DrawerProps) {
+  // Duplikovat přepne formulář na nový záznam s předvyplněnými hodnotami
+  const [id, setId] = useState(openedId);
   const [state, setState] = useState<EditorState>({ values: defaults, titles: defaultTitles ?? {}, errors: {} });
   const [loading, setLoading] = useState(!!id);
   const [saving, setSaving] = useState(false);
@@ -111,6 +114,17 @@ function Editor({ objectId, id, title, groups, defaults, defaultTitles, readOnly
       return;
     }
     onSaved(res.data);
+  };
+
+  const duplicate = async () => {
+    if (!id) return;
+    setSaving(true);
+    const r = await duplicateRecordAction(objectId, id);
+    setSaving(false);
+    if (!r.ok || !r.data) return setState((s) => ({ ...s, message: r.ok ? undefined : r.message }));
+    if ("id" in r.data) return onSaved({ id: r.data.id });
+    setId(null);
+    setState({ values: { ...defaults, ...r.data.values }, titles: r.data.titles, errors: {} });
   };
 
   useShortcuts({ save: !readOnly && !saving && !loading ? save : undefined });
@@ -156,6 +170,11 @@ function Editor({ objectId, id, title, groups, defaults, defaultTitles, readOnly
       <DrawerFooter>
         <Button onClick={onClose}>{labels.cancel}</Button>
         <span style={{ flex: 1 }} />
+        {!readOnly && id && (
+          <Button disabled={saving || loading} onClick={duplicate}>
+            {labels.duplicate}
+          </Button>
+        )}
         {!readOnly && (
           <Button appearance="primary" disabled={saving || loading} onClick={save}>
             {labels.save}

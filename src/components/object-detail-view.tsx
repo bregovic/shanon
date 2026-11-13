@@ -20,9 +20,9 @@ import {
   tokens,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regular } from "@fluentui/react-icons";
 import { useRef } from "react";
-import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction } from "@/app/actions";
+import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
@@ -63,6 +63,8 @@ export interface ObjectDetailProps {
   /** přílohy jdou přidávat i k zamčenému dokladu */
   canAttach: boolean;
   canDelete: boolean;
+  /** Duplikovat (i zamčený doklad — kopie je nový koncept) */
+  canDuplicate?: boolean;
   actions: { id: string; label: string; upload?: string; download?: boolean }[];
   lines: LineSpec[];
   lang: string;
@@ -210,6 +212,14 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       else router.refresh();
     });
 
+  // Duplikovat: doklad s řadou se zkopíruje i s řádky, jinak nový záznam s předvyplněnými hodnotami
+  const duplicate = () =>
+    start(async () => {
+      const r = await duplicateRecordAction(p.objectId, p.id!);
+      if (!r.ok || !r.data) return setMessage({ intent: "error", text: r.ok ? "" : r.message });
+      router.push("id" in r.data ? objectHref(p.objectId, r.data.id) : `${objectHref(p.objectId, "new")}?copy=${p.id}`);
+    });
+
   const act = (actionId: string) =>
     start(async () => {
       const res = await runRecordAction(p.objectId, p.id!, actionId);
@@ -283,6 +293,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
               {a.label}
             </Button>
           ),
+        )}
+        {p.canDuplicate && p.id && (
+          <Button icon={<Copy24Regular />} disabled={busy} onClick={duplicate}>
+            {p.labels.actions.duplicate}
+          </Button>
         )}
         {p.id && (
           <>

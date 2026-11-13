@@ -167,7 +167,7 @@ export const issue = defineObject({
   numberSeq: { field: "issueNum", seq: "QAISSUE" },
   defaultSort: { field: "priorityRank", dir: "asc" },
   // detail požadavku s diskuzí (příspěvky patří požadavku)
-  lines: [{ object: "qa.comment", field: "issueId", label: "@QA:Discussion" }],
+  lines: [{ object: "qa.comment", field: "issueId", label: "@QA:Discussion", copy: false }],
 });
 
 /** Příspěvek diskuze pod požadavkem (autor a čas doplní systém). */
