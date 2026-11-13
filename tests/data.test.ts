@@ -132,9 +132,9 @@ describe("oprávnění", () => {
   it("účtování projde i bez práva na účetní doklady (systémová operace)", async () => {
     const accountant = as({ gl: "read", "gl.journal": "write", "gl.journalLine": "write" });
     const j = await saveRecord(accountant, "gl.journal", null, { date: "2026-11-12", description: "Bez práv na doklad" }, undefined, client);
-    const accs = (await listRecords(accountant, "gl.account", { filters: { accountNum: "211, 411" } }, client)).rows;
+    const accs = (await listRecords(accountant, "gl.account", { filters: { accountNum: "395, 411" } }, client)).rows;
     const byNum = Object.fromEntries(accs.map((a) => [a.accountNum, a.id]));
-    await saveRecord(accountant, "gl.journalLine", null, { journalId: j.id, accountId: byNum["211"], debit: "10" }, undefined, client);
+    await saveRecord(accountant, "gl.journalLine", null, { journalId: j.id, accountId: byNum["395"], debit: "10" }, undefined, client);
     await saveRecord(accountant, "gl.journalLine", null, { journalId: j.id, accountId: byNum["411"], credit: "10" }, undefined, client);
     await runAction(accountant, "gl.journal", String(j.id), "post", client);
     expect((await getRecord(accountant, "gl.journal", String(j.id), client))!.status).toBe("posted");
@@ -214,8 +214,8 @@ describe("číselné řady a výchozí nastavení", () => {
     await saveRecord(A, "sys.numberSeq", String(old.id), { usedFor: null }, undefined, client);
     await saveRecord(A, "sys.numberSeq", null, { code: "MOJE", name: "Moje deníky", format: "MD-{####}", usedFor: "gl.journal" }, undefined, client);
     const vs = await saveRecord(A, "sys.numberSeq", null, { code: "BANKA", name: "Bankovní doklady", format: "BV{YY}/{###}" }, undefined, client);
-    const accs = Object.fromEntries((await listRecords(A, "gl.account", { filters: { accountNum: "221, 395, 518" } }, client)).rows.map((a) => [a.accountNum, a.id]));
-    const jn = await saveRecord(A, "gl.journalName", null, { code: "BAN", name: "Banka", voucherSeqId: vs.id, offsetAccountId: accs["221"] }, undefined, client);
+    const accs = Object.fromEntries((await listRecords(A, "gl.account", { filters: { accountNum: "395, 518" } }, client)).rows.map((a) => [a.accountNum, a.id]));
+    const jn = await saveRecord(A, "gl.journalName", null, { code: "BAN", name: "Banka", voucherSeqId: vs.id, offsetAccountId: accs["395"] }, undefined, client);
 
     const j = await saveRecord(A, "gl.journal", null, { date: "2026-11-12", description: "Poplatek", journalNameId: jn.id }, undefined, client);
     expect(j.journalNum).toBe("MD-0001");
@@ -226,7 +226,7 @@ describe("číselné řady a výchozí nastavení", () => {
     const v = await getRecord(A, "gl.voucher", String(posted!.voucherId), client);
     expect(v!.voucherNum).toBe("BV26/001");
     const tr = await listRecords(A, "gl.trans", { filter: { voucherId: v!.id } }, client);
-    expect(tr.rows.map((r) => `${r._titles && (r._titles as Record<string, string>).accountId}:${r.amount}`).sort()).toEqual(["221:-150.00", "518:150.00"]);
+    expect(tr.rows.map((r) => `${r._titles && (r._titles as Record<string, string>).accountId}:${r.amount}`).sort()).toEqual(["395:-150.00", "518:150.00"]);
 
     // deník bez názvu dostane GEN
     const j2 = await saveRecord(A, "gl.journal", null, { date: "2026-11-12", description: "Bez názvu" }, undefined, client);
@@ -252,10 +252,10 @@ describe("účetní období a měny", () => {
     const [nov] = (await listRecords(A, "gl.period", { filters: { code: "2026-11" } }, client)).rows;
     expect(nov).toBeTruthy();
     await saveRecord(A, "gl.period", String(nov.id), { status: "closed" }, undefined, client);
-    const j = await journalWith(A, "2026-11-12", [{ acc: "211", debit: "1" }, { acc: "411", credit: "1" }]);
+    const j = await journalWith(A, "2026-11-12", [{ acc: "395", debit: "1" }, { acc: "411", credit: "1" }]);
     await expectUserError(runAction(A, "gl.journal", String(j.id), "post", client), "@GL:PeriodClosed");
     await saveRecord(A, "gl.period", String(nov.id), { status: "open" }, undefined, client);
-    const j2 = await journalWith(A, "2031-01-05", [{ acc: "211", debit: "1" }, { acc: "411", credit: "1" }]);
+    const j2 = await journalWith(A, "2031-01-05", [{ acc: "395", debit: "1" }, { acc: "411", credit: "1" }]);
     await expectUserError(runAction(A, "gl.journal", String(j2.id), "post", client), "@GL:NoPeriod");
   });
 
@@ -263,13 +263,13 @@ describe("účetní období a měny", () => {
     const [eur] = (await listRecords(A, "sys.currency", { filters: { code: "EUR" } }, client)).rows;
     await saveRecord(A, "sys.exchangeRate", null, { currencyId: eur.id, date: "2026-11-10", amount: 1, rate: "24.335" }, undefined, client);
     const j = await journalWith(A, "2026-11-12", [
-      { acc: "221", debit: "100", currencyId: eur.id },
+      { acc: "261", debit: "100", currencyId: eur.id },
       { acc: "411", credit: "2433.50" },
     ]);
     await runAction(A, "gl.journal", String(j.id), "post", client);
     const posted = await getRecord(A, "gl.journal", String(j.id), client);
     const tr = (await listRecords(A, "gl.trans", { filter: { voucherId: posted!.voucherId } }, client)).rows;
-    const bank = tr.find((t) => (t._titles as Record<string, string>).accountId === "221")!;
+    const bank = tr.find((t) => (t._titles as Record<string, string>).accountId === "261")!;
     expect(bank.amount).toBe("2433.50");
     expect(bank.amountCur).toBe("100.00");
     expect((bank._titles as Record<string, string>).currencyId).toBe("EUR");
@@ -313,7 +313,7 @@ describe("odběratelé a dodavatelé", () => {
     h = (await getRecord(A, "ar.invoice", String(inv.id), client))!;
     expect(h.status).toBe("posted");
     const tr = (await listRecords(A, "gl.trans", { filter: { voucherId: h.voucherId } }, client)).rows;
-    expect(tr.map((t) => `${titles(t).accountId}:${t.amount}`).sort()).toEqual(["311:3025.00", "343:-525.00", "604:-2500.00"]);
+    expect(tr.map((t) => `${titles(t).accountId}:${t.amount}`).sort()).toEqual(["311001:3025.00", "343:-525.00", "604:-2500.00"]);
     const open = (await listRecords(A, "ar.trans", { filter: { customerId: cust.id }, totals: true }, client));
     expect(open.totals!.amount).toBe("3025.00");
     const tx = (await listRecords(A, "tax.trans", { filter: { sourceId: String(inv.id) } }, client)).rows;
@@ -339,7 +339,7 @@ describe("odběratelé a dodavatelé", () => {
     const rate = (await listRecords(A, "sys.exchangeRate", { filter: { currencyId: eur.id }, sort: "date", dir: "desc" }, client)).rows.find((r) => String(r.date) <= "2026-11-12")!;
     const czk = (eurAmount: number) => (Math.round(eurAmount * Number(rate.rate) * 100) / 100).toFixed(2);
     expect(tr.map((t) => `${titles(t).accountId}:${t.amount}:${t.amountCur}`).sort()).toEqual(
-      [`321:-${czk(121)}:-121.00`, `343:${czk(21)}:21.00`, `518:${czk(100)}:100.00`].sort(),
+      [`321001:-${czk(121)}:-121.00`, `343:${czk(21)}:21.00`, `518:${czk(100)}:100.00`].sort(),
     );
     const tx = (await listRecords(A, "tax.trans", { filter: { sourceId: String(inv.id) } }, client)).rows;
     expect(tx[0].documentNum).toBe("INV-2026-77");
@@ -376,8 +376,8 @@ describe("banka a úhrady", () => {
   });
 
   it("import, automatické párování, ruční protiúčet, zaúčtování úhrad do salda", async () => {
-    const accs = Object.fromEntries((await listRecords(A, "gl.account", { filters: { accountNum: "221, 518" } }, client)).rows.map((a) => [a.accountNum, a.id]));
-    const bankAcc = await saveRecord(A, "bank.account", null, { code: "KB", name: "Běžný účet", accountNum: "123456789/0100", glAccountId: accs["221"] }, undefined, client);
+    const accs = Object.fromEntries((await listRecords(A, "gl.account", { filters: { accountNum: "221001, 518" } }, client)).rows.map((a) => [a.accountNum, a.id]));
+    const bankAcc = await saveRecord(A, "bank.account", null, { code: "KB", name: "Běžný účet", accountNum: "123456789/0100", glAccountId: accs["221001"] }, undefined, client);
     // faktury: odběratel (plná úhrada), odběratel (částečná), dva doklady se stejným VS (nejednoznačné), dodavatel
     const mkCust = async (name: string) => {
       const subj = await saveRecord(A, "gab.subject", null, { name }, undefined, client);
@@ -433,7 +433,7 @@ describe("banka a úhrady", () => {
     expect(posted.status).toBe("posted");
     const gl = (await listRecords(A, "gl.trans", { filter: { voucherId: posted.voucherId }, totals: true }, client));
     expect(gl.totals!.amount).toBe("0.00");
-    expect(gl.rows.filter((t) => T(t).accountId === "221").map((t) => t.amount).sort()).toEqual(["-45.00", "-605.00", "1000.00", "121.00", "1210.00"].sort());
+    expect(gl.rows.filter((t) => T(t).accountId === "221001").map((t) => t.amount).sort()).toEqual(["-45.00", "-605.00", "1000.00", "121.00", "1210.00"].sort());
 
     // saldo: plně uhrazená vyrovnaná, částečná zbývá 1420, dodavatel vyrovnán
     const fullInv = (await getRecord(A, "ar.invoice", String(full.id), client))!;
@@ -742,7 +742,7 @@ describe("pokladna", () => {
       const acc = (await listRecords(P, "gl.account", { filter: { accountNum: num } }, client)).rows[0];
       return lines.filter((l) => l.accountId === acc.id).map((l) => l.amount);
     };
-    expect(await byAcc("211")).toEqual(["221.00"]);
+    expect(await byAcc("211001")).toEqual(["221.00"]);
     expect(await byAcc("261")).toEqual(["689.85"]);
     expect(await byAcc("548")).toEqual(["0.15"]);
     expect((await byAcc("343")).sort()).toEqual(["-0.87", "-97.07"]);
@@ -827,7 +827,7 @@ describe("hlavní kniha", () => {
 
   it("zaúčtuje vyrovnaný deník do dokladu a deník uzamkne", async () => {
     const j = await journal(A, [
-      ["211", "1000", ""],
+      ["395", "1000", ""],
       ["411", "", "1000"],
     ]);
     expect(j.journalNum).toMatch(/^DEN26-\d{5}$/);
@@ -846,7 +846,7 @@ describe("hlavní kniha", () => {
 
   it("nevyrovnaný deník nezaúčtuje a nic nezapíše", async () => {
     const j = await journal(A, [
-      ["211", "500", ""],
+      ["395", "500", ""],
       ["411", "", "499.50"],
     ]);
     const err = await expectUserError(runAction(A, "gl.journal", String(j.id), "post", client), "@GL:NotBalanced");
@@ -855,8 +855,28 @@ describe("hlavní kniha", () => {
     expect(still!.status).toBe("draft");
   });
 
+  it("účtový rozvrh: analytika pod syntetikou, druh účtu, zákaz ručního zápisu", async () => {
+    const acc = async (n: string) => (await listRecords(A, "gl.account", { filter: { accountNum: n } }, client)).rows[0];
+    const syn = await acc("311");
+    const ana = await acc("311001");
+    expect([syn.level, syn.accountClass, syn.postingType, ana.level, ana.parentId, ana.noManualEntry]).toEqual(["synthetic", 3, "customer", "analytic", syn.id, true]);
+    // analytika bez syntetiky nejde, jinak zdědí typ a druh
+    await expectUserError(saveRecord(A, "gl.account", null, { accountNum: "999001", name: "X" }, undefined, client), "Nejdřív založte syntetický účet 999.", "accountNum");
+    const a2 = await saveRecord(A, "gl.account", null, { accountNum: "311002", name: "Odběratelé EU" }, undefined, client);
+    expect([a2.type, a2.postingType, a2.parentId]).toEqual(["asset", "customer", syn.id]);
+    const exp = await saveRecord(A, "gl.account", null, { accountNum: "513", name: "Reprezentace" }, undefined, client);
+    expect([exp.type, exp.accountClass]).toEqual(["expense", 5]);
+    // ruční deník: saldokonto ani syntetika s analytikou nejdou
+    const j = await saveRecord(A, "gl.journal", null, { date: "2026-11-12", description: "Ruční" }, undefined, client);
+    await expectUserError(saveRecord(A, "gl.journalLine", null, { journalId: j.id, accountId: ana.id, debit: "1" }, undefined, client), "@GL:ManualEntryDenied");
+    await expectUserError(saveRecord(A, "gl.journalLine", null, { journalId: j.id, accountId: syn.id, debit: "1" }, undefined, client), "@GL:SyntheticHasAnalytics");
+    // zámek lze vypnout — pak ruční zápis projde
+    await saveRecord(A, "gl.account", String(a2.id), { noManualEntry: false }, undefined, client);
+    await saveRecord(A, "gl.journalLine", null, { journalId: j.id, accountId: a2.id, debit: "1" }, undefined, client);
+  });
+
   it("účet použitý v zápisech nejde smazat", async () => {
-    const [cash] = (await listRecords(A, "gl.account", { filter: { accountNum: "211" } }, client)).rows;
+    const [cash] = (await listRecords(A, "gl.account", { filter: { accountNum: "395" } }, client)).rows;
     await expectUserError(deleteRecord(A, "gl.account", String(cash.id), client), "@SYS:InUse");
   });
 });

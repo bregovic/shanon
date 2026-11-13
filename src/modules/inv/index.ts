@@ -6,6 +6,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { postingAccount } from "@/modules/gl/setup";
 
 export const ItemType = defineEnum({
   id: "ItemType",
@@ -123,7 +124,7 @@ async function invSetup(data: DataApi) {
     for (const [code, name, decimals] of UNITS) await data.create("inv.unit", { code, name, decimals });
   }
   if (!(await data.find("inv.itemGroup", {}, { take: 1 })).length) {
-    const acc = async (n: string) => (await data.find("gl.account", { accountNum: n }, { take: 1 }))[0]?.id ?? null;
+    const acc = (n: string) => postingAccount(data, n);
     const tax = async (c: string) => (await data.find("tax.taxCode", { code: c }, { take: 1 }))[0]?.id ?? null;
     await data.create("inv.itemGroup", {
       code: "ZBOZI",

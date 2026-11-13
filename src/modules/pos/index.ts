@@ -10,6 +10,7 @@
 import { Edts, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { postingAccount } from "@/modules/gl/setup";
 
 export const PosTemplate = defineEnum({
   id: "PosTemplate",
@@ -187,8 +188,9 @@ async function posSetup(data: DataApi) {
     if (!(await data.find("gl.account", { accountNum }, { take: 1 })).length) await data.create("gl.account", { accountNum, name, type });
   }
   if ((await data.find("pos.register", {}, { take: 1 })).length) return;
-  const acc = async (n: string) => (await data.find("gl.account", { accountNum: n }, { take: 1 }))[0]?.id ?? null;
+  const acc = (n: string) => postingAccount(data, n);
   const [cash, card, gain, loss] = [await acc("211"), await acc("261"), await acc("648"), await acc("548")];
+  // účty, které chybí ve starém rozvrhu, založí ACCOUNTS výše
   if (!cash || !card || !gain || !loss) return;
   await data.create("pos.register", {
     code: "KASA1",

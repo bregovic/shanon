@@ -516,21 +516,28 @@ model GabContact {
 
 /// gl.account — generováno z definice objektu
 model GlAccount {
-  id         String   @id @default(uuid(7)) @db.Uuid
-  tenantId   String   @map("tenant_id") @db.Uuid
-  companyId  String   @map("company_id") @db.Uuid
-  accountNum String   @map("account_num") @db.VarChar(10)
-  name       String   @db.VarChar(120)
-  type       String   @db.VarChar(40)
-  blocked    Boolean  @default(false)
-  ext        Json     @default("{}")
-  version    Int      @default(1)
-  createdAt  DateTime @default(now()) @map("created_at")
-  createdBy  String?  @map("created_by") @db.Uuid
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy  String?  @map("updated_by") @db.Uuid
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  accountNum    String   @map("account_num") @db.VarChar(10)
+  name          String   @db.VarChar(120)
+  type          String?  @db.VarChar(40)
+  level         String?  @db.VarChar(40)
+  parentId      String?  @map("parent_id") @db.Uuid
+  accountClass  Int?     @map("account_class")
+  postingType   String?  @map("posting_type") @db.VarChar(40)
+  noManualEntry Boolean  @default(false) @map("no_manual_entry")
+  blocked       Boolean  @default(false)
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
 
   company                         SysCompany          @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  parent                          GlAccount?          @relation("GlAccount_parent", fields: [parentId], references: [id], onDelete: Restrict)
+  glAccount_parent                GlAccount[]         @relation("GlAccount_parent")
   glTrans_account                 GlTrans[]           @relation("GlTrans_account")
   glJournalName_offsetAccount     GlJournalName[]     @relation("GlJournalName_offsetAccount")
   glJournalLine_account           GlJournalLine[]     @relation("GlJournalLine_account")
@@ -553,6 +560,7 @@ model GlAccount {
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
+  @@index([parentId])
   @@map("gl_account")
 }
 

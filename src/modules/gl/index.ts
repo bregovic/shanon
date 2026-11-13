@@ -20,6 +20,37 @@ export const AccountType = defineEnum({
   ],
 });
 
+/** Úroveň účtu: syntetický (3 číslice) / analytický (syntetika + rozlišení). */
+export const AccountLevel = defineEnum({
+  id: "AccountLevel",
+  label: "@GL:AccountLevel",
+  values: [
+    { value: "synthetic", label: "@GL:Synthetic" },
+    { value: "analytic", label: "@GL:Analytic" },
+  ],
+});
+
+/**
+ * Druh účtu (saldokonto a zvláštní účty) — obdoba „posting type“ v D365.
+ * Určuje, který modul na účet účtuje; s Zákazem ručního zápisu hlídá,
+ * aby se saldo účtu nerozjelo s pomocnou knihou.
+ */
+export const PostingType = defineEnum({
+  id: "AccountPostingType",
+  label: "@GL:PostingType",
+  values: [
+    { value: "customer", label: "@GL:PtCustomer" },
+    { value: "vendor", label: "@GL:PtVendor" },
+    { value: "bank", label: "@GL:PtBank" },
+    { value: "cash", label: "@GL:PtCash" },
+    { value: "cashInTransit", label: "@GL:PtCashInTransit" },
+    { value: "vat", label: "@GL:PtVat" },
+    { value: "employee", label: "@GL:PtEmployee" },
+    { value: "fixedAsset", label: "@GL:PtFixedAsset" },
+    { value: "inventory", label: "@GL:PtInventory" },
+  ],
+});
+
 export const JournalStatus = defineEnum({
   id: "JournalStatus",
   label: "@GL:Status",
@@ -108,14 +139,24 @@ export const account = defineObject({
   fields: {
     accountNum: { edt: AccountNum, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
-    type: { edt: enumEdt(AccountType), mandatory: true },
+    /** prázdné = podle třídy (5 náklady, 6 výnosy) nebo podle syntetického účtu */
+    type: { edt: enumEdt(AccountType) },
+    level: { edt: enumEdt(AccountLevel), readOnly: true },
+    parentId: { edt: refEdt("gl.account", "@GL:SyntheticAccount"), readOnly: true },
+    accountClass: { edt: Edts.Int, label: "@GL:AccountClass", readOnly: true },
+    postingType: { edt: enumEdt(PostingType) },
+    noManualEntry: { edt: Edts.NoYes, label: "@GL:NoManualEntry" },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "accountNum",
-  list: ["accountNum", "name", "type", "blocked"],
-  form: [{ label: "@SYS:General", fields: ["accountNum", "name", "type", "blocked"] }],
+  list: ["accountNum", "name", "level", "type", "postingType", "noManualEntry", "blocked"],
+  form: [
+    { label: "@SYS:General", fields: ["accountNum", "name", "type", "level", "parentId", "accountClass", "blocked"] },
+    { label: "@GL:Control", fields: ["postingType", "noManualEntry"] },
+  ],
   unique: [["accountNum"]],
   defaultSort: { field: "accountNum", dir: "asc" },
+  lines: [{ object: "gl.account", field: "parentId", label: "@GL:AnalyticAccounts", owned: false }],
 });
 
 export const costCenter = defineObject({
@@ -264,7 +305,7 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [AccountType, JournalStatus, PeriodStatus],
+  enums: [AccountLevel, PostingType, AccountType, JournalStatus, PeriodStatus],
   objects: [account, costCenter, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
   menu: [
     {
@@ -289,7 +330,28 @@ export default defineModule({
       Accounts: "Účtový rozvrh",
       AccountNum: "Číslo účtu",
       AccountNumHelp: "Číslo účtu má 3–10 číslic.",
-      AccountType: "Druh účtu",
+      AccountLevel: "Úroveň",
+      Synthetic: "Syntetický",
+      Analytic: "Analytický",
+      SyntheticAccount: "Syntetický účet",
+      AnalyticAccounts: "Analytické účty",
+      AccountClass: "Účtová třída",
+      PostingType: "Druh účtu",
+      PtCustomer: "Odběratelé (saldokonto)",
+      PtVendor: "Dodavatelé (saldokonto)",
+      PtBank: "Banka",
+      PtCash: "Pokladna",
+      PtCashInTransit: "Peníze na cestě",
+      PtVat: "DPH",
+      PtEmployee: "Zaměstnanci",
+      PtFixedAsset: "Dlouhodobý majetek",
+      PtInventory: "Zásoby",
+      NoManualEntry: "Zakázat ruční zápis",
+      Control: "Řízení účtu",
+      MissingSynthetic: "Nejdřív založte syntetický účet {num}.",
+      SyntheticHasAnalytics: "Účet {account} má analytické účty — účtujte na některý z nich.",
+      ManualEntryDenied: "Na účet {account} nelze účtovat ručně — účtují na něj doklady modulu (faktury, banka, pokladna).",
+      AccountType: "Typ účtu",
       Asset: "Aktiva",
       Liability: "Závazky",
       Equity: "Vlastní kapitál",
@@ -352,6 +414,27 @@ export default defineModule({
       Accounts: "Chart of accounts",
       AccountNum: "Account number",
       AccountNumHelp: "Account number has 3–10 digits.",
+      AccountLevel: "Level",
+      Synthetic: "Synthetic",
+      Analytic: "Analytic",
+      SyntheticAccount: "Synthetic account",
+      AnalyticAccounts: "Analytic accounts",
+      AccountClass: "Account class",
+      PostingType: "Posting type",
+      PtCustomer: "Customers (control account)",
+      PtVendor: "Vendors (control account)",
+      PtBank: "Bank",
+      PtCash: "Cash",
+      PtCashInTransit: "Cash in transit",
+      PtVat: "VAT",
+      PtEmployee: "Employees",
+      PtFixedAsset: "Fixed assets",
+      PtInventory: "Inventory",
+      NoManualEntry: "Do not allow manual entry",
+      Control: "Account control",
+      MissingSynthetic: "Create the synthetic account {num} first.",
+      SyntheticHasAnalytics: "Account {account} has analytic accounts — post to one of them.",
+      ManualEntryDenied: "Account {account} does not allow manual entry — module documents post to it (invoices, bank, cash).",
       AccountType: "Account type",
       Asset: "Assets",
       Liability: "Liabilities",

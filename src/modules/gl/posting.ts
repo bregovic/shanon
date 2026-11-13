@@ -4,7 +4,7 @@
  * pokladna, majetek) — každá transakce má tak obraz v hlavní knize.
  */
 import { fromCents, sumCents, toCents } from "@/core/money";
-import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { UserError, type ValidationErrors, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents, rateFor } from "@/modules/sys/currency";
 
 export interface PostingLine {
@@ -106,13 +106,30 @@ export async function createPeriods(data: DataApi, fy: RecordData): Promise<numb
   return n;
 }
 
+/**
+ * Účet musí být účtovatelný: nezablokovaný, bez analytiky (jinak na ni),
+ * a u ručního zápisu (deník) bez zákazu ručního zápisu.
+ */
+export async function assertPostable(data: DataApi, accountId: string, manual: boolean): Promise<RecordData> {
+  const acc = await data.get("gl.account", accountId);
+  if (!acc) throw new UserError("@SYS:InvalidValue");
+  const account = `${acc.accountNum} ${acc.name}`;
+  if (acc.blocked) throw new UserError("@GL:AccountBlocked", { account: String(acc.accountNum) });
+  if ((await data.find("gl.account", { parentId: acc.id }, { take: 1 })).length) throw new UserError("@GL:SyntheticHasAnalytics", { account });
+  if (manual && acc.noManualEntry) throw new UserError("@GL:ManualEntryDenied", { account });
+  return acc;
+}
+
 export async function postVoucher(data: DataApi, req: PostingRequest): Promise<RecordData> {
   checkBalanced(req.lines);
   await assertOpenPeriod(data, req.date);
+  // ruční zápis = účetní deník; doklady modulů (faktury, banka, pokladna) smí i na saldokonto
+  const manual = req.sourceObject === "gl.journal";
+  const seen = new Set<string>();
   for (const l of req.lines) {
-    const acc = await data.get("gl.account", l.accountId);
-    if (!acc) throw new UserError("@SYS:InvalidValue");
-    if (acc.blocked) throw new UserError("@GL:AccountBlocked", { account: String(acc.accountNum) });
+    if (seen.has(l.accountId)) continue;
+    seen.add(l.accountId);
+    await assertPostable(data, l.accountId, manual);
   }
   const voucher = await data.create("gl.voucher", {
     // bez řady z deníku doplní číslo datová služba podle Použití (gl.voucher)
@@ -200,8 +217,36 @@ export const glHandlers: Record<string, ObjectHandlers> = {
       },
     },
   },
+  "gl.account": {
+    async beforeSave(ctx, data): Promise<ValidationErrors | void> {
+      const num = String(data.accountNum ?? "");
+      if (!/^\d{3,10}$/.test(num)) return;
+      data.accountClass = Number(num[0]);
+      if (num.length === 3) {
+        data.level = "synthetic";
+        data.parentId = null;
+      } else {
+        data.level = "analytic";
+        const [parent] = await ctx.data.find("gl.account", { accountNum: num.slice(0, 3) }, { take: 1 });
+        if (!parent) return { accountNum: ctx.t("@GL:MissingSynthetic", { num: num.slice(0, 3) }) };
+        data.parentId = parent.id;
+        // analytika dědí typ a druh ze syntetiky
+        if (!data.type) data.type = parent.type;
+        if (!data.postingType) data.postingType = parent.postingType ?? null;
+      }
+      if (!data.type) {
+        const byClass: Record<string, string> = { "5": "expense", "6": "revenue", "7": "equity" };
+        data.type = byClass[num[0]] ?? null;
+        if (!data.type) return { type: "@SYS:Required" };
+      }
+    },
+  },
   "gl.journalLine": {
-    beforeSave: (ctx, data) => assertJournalOpen(ctx.data, data.journalId),
+    async beforeSave(ctx, data) {
+      await assertJournalOpen(ctx.data, data.journalId);
+      // ruční zápis: hned při zadání řádku, ne až při zaúčtování
+      if (data.accountId) await assertPostable(ctx.data, String(data.accountId), true);
+    },
     beforeDelete: (ctx, data) => assertJournalOpen(ctx.data, data.journalId),
   },
 };

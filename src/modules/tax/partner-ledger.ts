@@ -9,6 +9,7 @@ import type { DataApi } from "@/core/module";
 import { defineObject, type ObjectDef } from "@/core/object";
 import { JournalStatus } from "@/modules/gl";
 import { invoiceHandlers, type InvoiceConfig } from "./document";
+import { postingAccount } from "@/modules/gl/setup";
 
 /** Variabilní symbol — jen číslice, do 10 znaků (jako v příkazu k úhradě). */
 export const Vs = defineEdt({ id: "Vs", kind: "string", label: "@TAX:Vs", maxLength: 10, pattern: /^\d{1,10}$/, patternMessage: "@TAX:VsHelp" });
@@ -232,7 +233,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     setup: (groupDefaults: { code: string; name: string; summary: string; line: string; taxCode: string }) =>
       async (data: DataApi) => {
         if ((await data.find(group.id, {}, { take: 1 })).length) return;
-        const acc = async (num: string) => (await data.find("gl.account", { accountNum: num }, { take: 1 }))[0]?.id ?? null;
+        const acc = (num: string) => postingAccount(data, num);
         const summary = await acc(groupDefaults.summary);
         if (!summary) return;
         const [tc] = await data.find("tax.taxCode", { code: groupDefaults.taxCode }, { take: 1 });
