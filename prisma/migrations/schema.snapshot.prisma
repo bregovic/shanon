@@ -1867,3 +1867,92 @@ model IntLog {
   @@index([connectionId])
   @@map("int_log")
 }
+
+/// qa.feature — generováno z definice objektu
+model QaFeature {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  area        String?  @db.VarChar(60)
+  status      String   @default("planned") @db.VarChar(40)
+  owner       String?  @db.VarChar(120)
+  description String?
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  qaScenario_feature QaScenario[] @relation("QaScenario_feature")
+  qaIssue_feature    QaIssue[]    @relation("QaIssue_feature")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("qa_feature")
+}
+
+/// qa.scenario — generováno z definice objektu
+model QaScenario {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String    @db.VarChar(20)
+  title     String    @db.VarChar(255)
+  featureId String    @map("feature_id") @db.Uuid
+  stage     String    @default("fat") @db.VarChar(40)
+  steps     String?
+  expected  String?
+  result    String    @default("notRun") @db.VarChar(40)
+  testedAt  DateTime? @map("tested_at") @db.Date
+  tester    String?   @db.VarChar(120)
+  note      String?
+  ext       Json      @default("{}")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.Uuid
+
+  feature          QaFeature @relation("QaScenario_feature", fields: [featureId], references: [id], onDelete: Restrict)
+  qaIssue_scenario QaIssue[] @relation("QaIssue_scenario")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([featureId])
+  @@map("qa_scenario")
+}
+
+/// qa.issue — generováno z definice objektu
+model QaIssue {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  issueNum    String    @map("issue_num") @db.VarChar(20)
+  type        String    @default("change") @db.VarChar(40)
+  title       String    @db.VarChar(255)
+  featureId   String?   @map("feature_id") @db.Uuid
+  scenarioId  String?   @map("scenario_id") @db.Uuid
+  priority    String    @default("medium") @db.VarChar(40)
+  status      String    @default("new") @db.VarChar(40)
+  order       Int?
+  reportedBy  String?   @map("reported_by") @db.VarChar(120)
+  assignedTo  String?   @map("assigned_to") @db.VarChar(120)
+  dueDate     DateTime? @map("due_date") @db.Date
+  description String?
+  resolution  String?
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  feature  QaFeature?  @relation("QaIssue_feature", fields: [featureId], references: [id], onDelete: Restrict)
+  scenario QaScenario? @relation("QaIssue_scenario", fields: [scenarioId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, issueNum])
+  @@index([tenantId])
+  @@index([featureId])
+  @@index([scenarioId])
+  @@map("qa_issue")
+}

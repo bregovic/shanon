@@ -166,6 +166,11 @@ ta používá stejné komponenty a akce.
 
 ## Workflow
 
+- Evidence vývoje je i v aplikaci: modul **Testování a vývoj** (`qa`) — klíčové
+  funkce se stavem, UAT scénáře, požadavky (CR, chyby, úkoly). Výchozí obsah
+  v `docs/qa/*.csv` (import tlačítkem Import); nová funkce = řádek ve funkcích
+  + UAT scénář, nový požadavek = řádek v požadavcích s dalším číslem CR-nnn.
+
 - GitHub Issues se štítky Analysis → Development → Testing → Done.
 - Commity: `feat(gl): … [#123]`, `fix(gab): …`, `docs: …`.
 - Před pushem: `npm run lint && npm run typecheck && npm test && npm run schema:check`.

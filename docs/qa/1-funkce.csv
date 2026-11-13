@@ -1,0 +1,22 @@
+﻿Kód;Název;Oblast;Stav funkce;Garant;Popis
+GL-ACCOUNTS;Účtový rozvrh;Hlavní kniha;fat;;6místné účty (syntetika + analytika), druh účtu, zákaz ručního zápisu.
+GL-JOURNAL;Účetní deník a doklady;Hlavní kniha;fat;;Deník hlavička + řádky, protiúčet, číselné řady, zaúčtování do dokladu.
+GL-PERIODS;Fiskální roky a období;Hlavní kniha;fat;;Měsíční období, uzavřené a pozastavené období nejde účtovat.
+GL-PARAMS;Parametry hlavní knihy, měny a kurzy;Hlavní kniha;fat;;Účetní a vykazovací měna, zdroj kurzů ČNB/ECB, účty kurzových rozdílů.
+AR-INVOICE;Vydané faktury a saldo odběratelů;Odběratelé;fat;;Řádky s DPH a položkou, zaúčtování, otevřené položky.
+AP-INVOICE;Přijaté faktury a saldo dodavatelů;Dodavatelé;fat;;Faktury i v cizí měně, číslo dokladu dodavatele.
+BANK-GPC;Bankovní výpisy a úhrady;Banka;fat;;Import GPC, kontrola obratů, párování podle VS, zaúčtování úhrad.
+TAX-VAT;Přiznání k DPH a kontrolní hlášení;DPH;fat;;Výpočet z daňových transakcí, XML pro EPO, uzamčení podaného období.
+INV-ITEMS;Položky, ceny, marže a slevy;Položky;fat;;Cena s DPH i bez, marže, dodavatel, slevy a akce, obrázky.
+SYS-IMPORT;Import CSV, XML, Excel s obrázky;Správa systému;fat;;Spárování sloupců, kontrola bez uložení, vše nebo nic, obrázky ze složky.
+POS-SALE;Prodej v pokladně;Pokladna;fat;;Dlaždice s obrázky, váha, EAN, hotově se zaokrouhlením, kartou, účtenka.
+POS-SHIFT;Směna a uzávěrka;Pokladna;fat;;Otevření s hotovostí, uzávěrka se zaúčtováním a DPH (KH oddíl A.5).
+INT-EET;EET 2.0;Integrace;fat;;"Evidence účtenek, POK, dodatečné odeslání; ověřeno na Playgroundu FS."
+INT-PAY;Platební terminál;Integrace;development;;"Simulátor ověřen; SumUp Solo napsaný podle dokumentace, čeká na účet."
+INT-PRINT;Tiskárna účtenek ESC/POS;Integrace;development;;"Tisk z prohlížeče ověřen; ESC/POS přes USB čeká na skutečnou tiskárnu."
+ORG-ENTITY;Organizace a provozovny;Organizace;fat;;Údaje firmy, propis do firmy, hlavička účtenky.
+GAB-ARES;Adresář a ARES;Adresář;fat;;Doplnění subjektu a sídla z ARES podle IČO.
+SYS-SECURITY;Uživatelé, firmy, role a oprávnění;Správa systému;fat;;Superuživatel, správce firmy, role po firmách, RLS.
+SYS-UI;Ovládání aplikace;Správa systému;fat;;Hledání v menu (Ctrl+K), plocha modulu, Esc zpět, Moje nastavení.
+SYS-MODULES;Zapínání a vypínání modulů;Správa systému;fat;;Zapnutí s výchozím nastavením, vypnutí i se závislými, data zůstávají.
+QA;Testování a vývoj;Testování;fat;;Tato evidence: funkce, scénáře FAT/UAT, požadavky a chyby.

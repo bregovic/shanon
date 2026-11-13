@@ -367,3 +367,15 @@ describe("parametry hlavní knihy a kurzy ECB", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("testování a vývoj", () => {
+  it("funkce, scénář s výsledkem, požadavek s číslem a vazbami", async () => {
+    const Q = (await provisionTenant(client, { code: `t-qa-${run}`, name: "QA", adminEmail: `qa-${run}@test.local`, adminPassword: "heslo-12345", modules: ["qa"], company: { code: "Q", name: "Q" } })).ctx;
+    const f = await saveRecord(Q, "qa.feature", null, { code: "POS-SALE", name: "Prodej", status: "fat" }, undefined, client);
+    const sc = await saveRecord(Q, "qa.scenario", null, { code: "UAT-1", title: "Prodej na váhu", featureId: f.id, stage: "uat", result: "failed" }, undefined, client);
+    expect(sc.testedAt).toBe(new Date().toISOString().slice(0, 10));
+    const iss = await saveRecord(Q, "qa.issue", null, { type: "bug", title: "Špatné zaokrouhlení", featureId: f.id, scenarioId: sc.id, priority: "high" }, undefined, client);
+    expect(String(iss.issueNum)).toMatch(/^CR\d{2}-0001$/);
+    expect(iss.status).toBe("new");
+  });
+});

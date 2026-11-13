@@ -1,0 +1,24 @@
+﻿Kód;Název;Funkce;Fáze testu;Postup;Očekávaný výsledek;Výsledek
+UAT-GL-ACCOUNTS;Založení analytického účtu a zákaz ručního zápisu;GL-ACCOUNTS;uat;"1) Hlavní kniha → Účty → Nový, číslo 518, název Reklama.
+2) Otevřít účet 311000 a zkusit ho použít v ručním deníku.";"1) Účet se uloží jako 518000, typ Náklady.
+2) Deník řádek odmítne: na účet nelze účtovat ručně.";notRun
+UAT-GL-JOURNAL;Ruční deník s protiúčtem;GL-JOURNAL;uat;Hlavní kniha → Deníky → Nový, řádek 518000 MD 1 000, deník BAN s protiúčtem → Zaúčtovat.;Vznikne účetní doklad, MD = D, deník je uzamčený.;notRun
+UAT-GL-PERIODS;Účtování do uzavřeného období;GL-PERIODS;uat;Uzavřít období minulého měsíce a zkusit do něj zaúčtovat deník.;Zaúčtování odmítne s hláškou o uzavřeném období.;notRun
+UAT-GL-PARAMS;Kurz ECB a ruční kurz;GL-PARAMS;uat;Parametry hlavní knihy → zdroj ECB. Měny → USD → Načíst kurzy ECB. Pak zadat ruční kurz USD na dnešek.;"Načte se kurz USD vůči CZK; přijatá faktura v USD použije ruční kurz.";notRun
+UAT-AR-INVOICE;Vydaná faktura s položkou;AR-INVOICE;uat;Odběratelé → Vydané faktury → Nová, odběratel, řádek s položkou Šunka 2,5 kg → Zaúčtovat.;"Popis, cena, DPH 12 % a účet tržeb se doplní z položky; zaúčtování vytvoří saldo a daňovou transakci.";notRun
+UAT-AP-INVOICE;Přijatá faktura v EUR;AP-INVOICE;uat;Dodavatelé → Přijaté faktury → Nová v EUR, číslo dokladu dodavatele, řádek 100 EUR → Zaúčtovat.;Náklad a DPH v CZK kurzem k datu, závazek s částkou v EUR.;notRun
+UAT-BANK-GPC;Import výpisu a spárování úhrad;BANK-GPC;uat;Banka → účet → Importovat výpis (GPC) s úhradou vydané faktury podle VS.;Výpis se načte jen při sedících obratech, úhrada se spáruje a zaúčtuje do salda.;notRun
+UAT-TAX-VAT;Přiznání a KH za měsíc;TAX-VAT;uat;"DPH → Přiznání a hlášení → Nové (měsíc) → Vypočítat → Stáhnout XML; totéž kontrolní hlášení.";"Řádky přiznání odpovídají fakturám a tržbám; XML jde načíst na EPO bez chyb.";notRun
+UAT-INV-ITEMS;Marže a akční cena;INV-ITEMS;uat;Položka s nákupní cenou → zkontrolovat Marže %. Slevy a akce → akční cena na položku na dnešek.;"Marže se spočítá z ceny bez DPH; v kase je přeškrtnutá běžná cena a účtuje se akční.";notRun
+UAT-SYS-IMPORT;Import položek s obrázky;SYS-IMPORT;uat;Položky → Import → 4-polozky.csv → vybrat složku pokladna_nahledy → Zkontrolovat → Importovat.;"Položky se aktualizují podle čísla, obrázky se přiřadí; chybějící jen jako upozornění.";notRun
+UAT-POS-SALE;Prodej na váhu a hotově;POS-SALE;uat;Kasa → otevřít směnu → šunka 0,253 kg + paštika 2 ks → Hotově, přijato 500 Kč → Tisk účtenky.;Zaokrouhlení na koruny, správné vrácení, účtenka s DPH rekapitulací a údaji firmy.;notRun
+UAT-POS-SHIFT;Uzávěrka směny;POS-SHIFT;uat;Kasa → Uzávěrka → zkontrolovat souhrn → Uzavřít a zaúčtovat. Pak Hlavní kniha → Doklady.;"Jeden doklad za směnu: hotovost, karty, tržby, DPH, zaokrouhlení; v KH tržby v A.5.";notRun
+UAT-INT-EET;EET v testovacím prostředí;INT-EET;uat;Integrace → napojení EET (Playground) s certifikátem → Otestovat spojení → prodej v kase.;"Test projde, účtenka má POK končící -ff; při výpadku se odešle dodatečně.";notRun
+UAT-INT-PAY;Platba kartou (simulátor);INT-PAY;uat;Integrace → platební terminál Simulátor → v kase zaplatit kartou.;"Po ~3 s schváleno a vystaví se účtenka; částka končící ,13 Kč je zamítnuta.";notRun
+UAT-INT-PRINT;Tisk účtenky na tiskárnu;INT-PRINT;uat;Integrace → tiskárna ESC/POS → v kase Připojit tiskárnu → prodej.;"Účtenka se vytiskne s češtinou a odstřihne; při hotovosti se otevře zásuvka.";notRun
+UAT-ORG-ENTITY;Údaje organizace na účtence;ORG-ENTITY;uat;Organizace → Údaje organizace → upravit zkrácený název a adresu → prodej v kase.;"Účtenka má nový název a adresu; firma v přepínači má nový název.";notRun
+UAT-GAB-ARES;Doplnění dodavatele z ARES;GAB-ARES;uat;Dodavatelé → dodavatel s IČO → Doplnit z ARES.;Doplní se oficiální název, DIČ a sídlo.;notRun
+UAT-SYS-SECURITY;Správce firmy vidí jen své firmy;SYS-SECURITY;uat;Správa systému → Uživatelé → nový uživatel jako správce jedné firmy → přihlásit se za něj.;Vidí a spravuje jen přidělenou firmu, ne Firmy ani Moduly.;notRun
+UAT-SYS-UI;Hledání v menu a Esc zpět;SYS-UI;uat;Ctrl+K → „kurz men“ → Enter. Z položky prokliknout dodavatele a dát Esc.;"Otevřou se Kurzy měn; Esc vrátí na položky.";notRun
+UAT-SYS-MODULES;Vypnutí modulu se závislými;SYS-MODULES;uat;Správa systému → Moduly → vypnout Položky → zkontrolovat náhled → Zpět.;"Náhled ukáže i Pokladnu a počty záznamů; po zrušení zůstane vše zapnuté.";notRun
+UAT-QA;Zápis chyby z testování;QA;uat;U neúspěšného scénáře nastavit Výsledek Neprošlo a založit Požadavek typu Chyba s odkazem na scénář.;Chyba dostane číslo CR…, je vidět u funkce i scénáře.;notRun
