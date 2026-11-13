@@ -136,7 +136,7 @@ describe("napojení pokladny", () => {
     await saveRecord(C, "int.connection", String(conn.id), { certPassword: SECRET_MASK, name: "EET 2.0" }, undefined, client);
     const raw2 = await client.intConnection.findUnique({ where: { id: String(conn.id) } });
     expect(raw2!.certPassword).toBe(raw!.certPassword);
-    expect((await listRecords(C, "int.connection", {}, client)).rows[0].certPassword).toBe(SECRET_MASK);
+    expect((await listRecords(C, "int.connection", { filter: { kind: "eet" } }, client)).rows[0].certPassword).toBe(SECRET_MASK);
 
     // ovladač musí patřit k druhu; EET potřebuje jednotku a pokladní zařízení
     await expect(saveRecord(C, "int.connection", null, { code: "X", name: "X", kind: "eet", driver: "sumup" }, undefined, client)).rejects.toBeInstanceOf(UserError);
@@ -645,5 +645,49 @@ describe("výchozí dimenze a hodnoty z adresáře (CR-001)", () => {
     const j = await saveRecord(E, "gl.journal", null, { date: "2026-11-13", description: "Výchozí" }, undefined, client);
     const line = await saveRecord(E, "gl.journalLine", null, { journalId: j.id, accountId: a518.id, debit: "10" }, undefined, client);
     expect(line.dim1).toBe("KRAM");
+  });
+});
+
+describe("testovací prostředí a datové služby (CR-036)", () => {
+  it("zapnutí: testovací napojení, ostré pozastavené, EET simulátor dá testovací FIK; vypnutí vrátí ostrá", async () => {
+    const { enableTestEnv, disableTestEnv, testEnvState } = await import("@/modules/int/test-env");
+    const { withService } = await import("@/modules/int/services");
+    const { sell } = await import("@/modules/pos/sale");
+    const { eetRegisterReceipt, connectionsFor } = await import("@/modules/int/drivers");
+    const { inTenant } = await import("@/server/data");
+    const T = (await provisionTenant(client, { code: `t-env-${run}`, name: "Env", adminEmail: `env-${run}@test.local`, adminPassword: "heslo-12345", modules: ["pos", "int"], company: { code: "E", name: "E", vatId: "CZ8551015704" } })).ctx;
+    const reg = String((await listRecords(T, "pos.register", {}, client)).rows[0].id);
+    const g = (await listRecords(T, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(T, "inv.unit", { filter: { code: "KS" } }, client)).rows[0];
+    const item = String((await saveRecord(T, "inv.item", null, { itemNum: "X", name: "X", groupId: g.id, unitId: u.id, salesPrice: "10", priceInclTax: true }, undefined, client)).id);
+    await saveRecord(T, "pos.shift", null, { registerId: reg }, undefined, client);
+    // výchozí datové služby
+    const svc = (await listRecords(T, "int.connection", { filter: { kind: "service" } }, client)).rows.map((c) => c.driver).sort();
+    expect(svc).toEqual(["ares", "cnb", "ecb"]);
+    // ostré platební napojení se pozastaví
+    const real = await saveRecord(T, "int.connection", null, { code: "SUMUP", name: "SumUp", kind: "payment", driver: "manual" }, undefined, client);
+    await inTenant(T, async (s) => {
+      const api = s.sys().api();
+      await enableTestEnv(api, (x) => x, true);
+      const st = await testEnvState(api);
+      expect([st.active, st.connections.map((c) => c.code).sort(), st.paused]).toEqual([true, ["TEST-EET", "TEST-PAY", "TEST-PRINT"], ["SUMUP"]]);
+      expect((await api.find("pos.box", {}, { take: 10 })).length).toBe(5);
+      const conns = await connectionsFor(api, reg);
+      expect([conns.eet?.driver, conns.payment?.driver, conns.printer?.driver]).toEqual(["eetSimulator", "simulator", "browser"]);
+      const r = await sell(api, { registerId: reg, payment: "cash", lines: [{ itemId: item, qty: "1" }] });
+      await eetRegisterReceipt(api, T.companyId, conns.eet!, r, true);
+      const rr = (await api.get("pos.receipt", String(r.id)))!;
+      expect([rr.eetStatus, String(rr.eetPok).startsWith("TEST-")]).toEqual(["sent", true]);
+      await disableTestEnv(api);
+      expect((await api.get("int.connection", String(real.id)))!.active).toBe(true);
+      expect((await testEnvState(api)).active).toBe(false);
+      // vypnutá služba zastaví volání, zapnutá ho zapíše do logu
+      const [cnb] = await api.find("int.connection", { kind: "service", driver: "cnb" }, { take: 1 });
+      await api.update("int.connection", String(cnb.id), { active: false });
+      await expect(withService(api, "cnb", "x", async () => 1)).rejects.toMatchObject({ label: "@INT:ServiceDisabled" });
+      await api.update("int.connection", String(cnb.id), { active: true });
+      expect(await withService(api, "cnb", "rates.cnb", async () => 7, (n) => `n=${n}`)).toBe(7);
+      expect((await api.find("int.log", { connectionId: cnb.id }, { take: 5 })).map((l) => [l.operation, l.status, l.message])).toEqual([["rates.cnb", "ok", "n=7"]]);
+    }, client);
   });
 });

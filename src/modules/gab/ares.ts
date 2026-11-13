@@ -4,6 +4,7 @@
  * názvu) a doplní obchodní jméno, DIČ, právní formu a adresu sídla.
  */
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { withService } from "@/modules/int/services";
 
 const API = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty";
 
@@ -48,7 +49,7 @@ function toSubject(d: RecordData): AresSubject {
   };
 }
 
-export async function aresByIco(ico: string): Promise<AresSubject | null> {
+async function aresByIcoRaw(ico: string): Promise<AresSubject | null> {
   const clean = ico.replace(/\s/g, "").padStart(8, "0");
   if (!/^\d{8}$/.test(clean)) throw new UserError("@SYS:InvalidRegNo");
   const res = await fetch(`${API}/${clean}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
@@ -57,7 +58,7 @@ export async function aresByIco(ico: string): Promise<AresSubject | null> {
   return toSubject((await res.json()) as RecordData);
 }
 
-export async function aresSearch(name: string, limit = 10): Promise<{ total: number; items: AresSubject[] }> {
+async function aresSearchRaw(name: string, limit = 10): Promise<{ total: number; items: AresSubject[] }> {
   const res = await fetch(`${API}/vyhledat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -69,16 +70,25 @@ export async function aresSearch(name: string, limit = 10): Promise<{ total: num
   return { total: Number(d.pocetCelkem ?? 0), items: ((d.ekonomickeSubjekty as RecordData[]) ?? []).map(toSubject) };
 }
 
+/** ARES podle IČO; s `data` přes napojení v Integraci (log, vypnutí). */
+export function aresByIco(ico: string, data?: DataApi): Promise<AresSubject | null> {
+  return data ? withService(data, "ares", "ares.ico", () => aresByIcoRaw(ico), (r) => (r ? `${r.ico} ${r.name}` : `${ico}: nenalezeno`)) : aresByIcoRaw(ico);
+}
+
+export function aresSearch(name: string, limit = 10, data?: DataApi): Promise<{ total: number; items: AresSubject[] }> {
+  return data ? withService(data, "ares", "ares.search", () => aresSearchRaw(name, limit), (r) => `${name}: ${r.total}`) : aresSearchRaw(name, limit);
+}
+
 /** Doplní subjekt a jeho adresu sídla z ARES (podle IČO, jinak jednoznačně podle názvu). */
 export async function fillFromAres(data: DataApi, subjectId: string) {
   const subj = await data.get("gab.subject", subjectId);
   if (!subj) throw new UserError("@SYS:NotFound");
   let a: AresSubject | null;
   if (subj.regNo) {
-    a = await aresByIco(String(subj.regNo));
+    a = await aresByIco(String(subj.regNo), data);
     if (!a) throw new UserError("@GAB:AresNotFound", { query: String(subj.regNo) });
   } else {
-    const r = await aresSearch(String(subj.name), 2);
+    const r = await aresSearch(String(subj.name), 2, data);
     if (r.total !== 1) throw new UserError(r.total ? "@GAB:AresAmbiguous" : "@GAB:AresNotFound", { query: String(subj.name), n: String(r.total) });
     a = r.items[0];
   }

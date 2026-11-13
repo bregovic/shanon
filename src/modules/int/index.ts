@@ -7,7 +7,7 @@
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
-import { defineModule } from "@/core/module";
+import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 
 export const ConnKind = defineEnum({
@@ -18,6 +18,7 @@ export const ConnKind = defineEnum({
     { value: "printer", label: "@INT:KindPrinter" },
     { value: "payment", label: "@INT:KindPayment" },
     { value: "api", label: "@INT:KindApi" },
+    { value: "service", label: "@INT:KindService" },
   ],
 });
 
@@ -33,6 +34,10 @@ export const Driver = defineEnum({
     { value: "sumup", label: "@INT:DrvSumup" },
     { value: "simulator", label: "@INT:DrvSimulator" },
     { value: "rest", label: "@INT:DrvRest" },
+    { value: "eetSimulator", label: "@INT:DrvEetSimulator" },
+    { value: "ares", label: "@INT:DrvAres" },
+    { value: "cnb", label: "@INT:DrvCnb" },
+    { value: "ecb", label: "@INT:DrvEcb" },
   ],
 });
 
@@ -98,6 +103,8 @@ export const connection = defineObject({
     /** pokladna, pro kterou napojení platí (prázdné = všechny pokladny firmy) */
     registerId: { edt: refEdt("pos.register", "@INT:Register"), optionalRef: true },
     active: { edt: Edts.NoYes, label: "@INT:Active", default: true },
+    // ostré napojení vypnuté po dobu testovacího prostředí (vypnutím testu se zapne)
+    pausedByTest: { edt: Edts.NoYes, label: "@INT:PausedByTest", readOnly: true },
     // EET 2.0
     environment: { edt: enumEdt(EetEnv), default: "playground", visibleWhen: EET },
     unitId: { edt: Str("EetUnitId", "@INT:UnitId", 9, /^[1-9]\d{0,8}$/, "@INT:UnitIdHelp"), visibleWhen: EET },
@@ -130,7 +137,7 @@ export const connection = defineObject({
   titleField: "code",
   list: ["code", "name", "kind", "driver", "registerId", "active", "lastCheckAt", "lastResult"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "kind", "driver", "registerId", "active"] },
+    { label: "@SYS:General", fields: ["code", "name", "kind", "driver", "registerId", "active", "pausedByTest"] },
     { label: "@INT:EetSettings", fields: ["environment", "unitId", "posId", "certPassword", "certSubject", "certValidTo"], visibleWhen: EET },
     { label: "@INT:PrinterSettings", fields: ["paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
@@ -172,6 +179,19 @@ export const log = defineObject({
   ],
 });
 
+/** Výchozí datové služby firmy (ARES, ČNB, ECB) — veřejné, bez klíčů. */
+async function intSetup(data: DataApi) {
+  for (const [code, driver, name] of [
+    ["ARES", "ares", "ARES – registr subjektů"],
+    ["CNB", "cnb", "Kurzy ČNB"],
+    ["ECB", "ecb", "Kurzy ECB"],
+  ]) {
+    if (!(await data.find("int.connection", { kind: "service", driver }, { take: 1 })).length) {
+      await data.create("int.connection", { code, name, kind: "service", driver, active: true });
+    }
+  }
+}
+
 export default defineModule({
   id: "int",
   label: "@INT:Module",
@@ -180,11 +200,38 @@ export default defineModule({
   dependsOn: ["sys"],
   enums: [ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus],
   objects: [connection, log],
+  setup: intSetup,
   menu: [
     { label: "@INT:Module", items: [{ object: "int.connection" }, { object: "int.log" }] },
+    { label: "@INT:Testing", kind: "functions", items: [{ href: "/int/test-env", label: "@INT:TestEnv" }] },
   ],
   labels: {
     cs: {
+      KindService: "Datová služba",
+      DrvEetSimulator: "EET – simulátor (test)",
+      DrvAres: "ARES",
+      DrvCnb: "ČNB – kurzy",
+      DrvEcb: "ECB – kurzy",
+      PausedByTest: "Pozastaveno testem",
+      Testing: "Testování",
+      TestEnv: "Testovací prostředí",
+      TestEet: "Testovací EET (simulátor)",
+      TestPay: "Testovací platební terminál (simulátor)",
+      TestPrint: "Testovací tisk (prohlížeč)",
+      TestEnvIntro: "Jedním krokem nastaví pokladnu pro zkoušení bez ostrých účtů a zařízení. Ostrá napojení stejného druhu se po dobu testu pozastaví a vypnutím testu se zase zapnou.",
+      TestEnvWill: "Zapnutí nastaví",
+      TestEnvEet: "EET simulátor – účtenka dostane testovací FIK, nic se neodesílá na Finanční správu",
+      TestEnvPay: "Platební terminál – simulátor (platba kartou se schválí po pár vteřinách, částka končící ,13 se zamítne)",
+      TestEnvPrint: "Tisk účtenek z prohlížeče (jakákoli tiskárna nebo PDF)",
+      TestEnvBoxes: "Boxy B01–B05 pro odložené nákupy (pokud žádné nejsou)",
+      TestEnvOn: "Zapnout testovací prostředí",
+      TestEnvOff: "Vypnout testovací prostředí",
+      TestEnvActive: "Testovací prostředí je zapnuté",
+      TestEnvInactive: "Testovací prostředí je vypnuté",
+      TestEnvPaused: "Pozastavená ostrá napojení",
+      TestEnvReal: "Ostrá napojení zakládejte v Napojení ručně (certifikát EET, klíče platebního terminálu).",
+      ServiceDisabled: "Služba „{service}“ je v Integraci vypnutá.",
+      ServiceTestOk: "Služba odpovídá.",
       JobEetResend: "Dodatečné odeslání EET",
       EetResent: "Odesláno {sent}, čeká {pending}.",
       Module: "Integrace",
@@ -277,6 +324,31 @@ export default defineModule({
       TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
+      KindService: "Data service",
+      DrvEetSimulator: "EET – simulator (test)",
+      DrvAres: "ARES",
+      DrvCnb: "CNB – rates",
+      DrvEcb: "ECB – rates",
+      PausedByTest: "Paused by test",
+      Testing: "Testing",
+      TestEnv: "Test environment",
+      TestEet: "Test EET (simulator)",
+      TestPay: "Test payment terminal (simulator)",
+      TestPrint: "Test printing (browser)",
+      TestEnvIntro: "Sets up the register for trying out without live accounts or devices in one step. Live connections of the same kind are paused during the test and resumed when it is switched off.",
+      TestEnvWill: "Switching on sets up",
+      TestEnvEet: "EET simulator – receipts get a test FIK, nothing is sent to the tax office",
+      TestEnvPay: "Payment terminal – simulator (card payment approves after a few seconds, an amount ending in .13 is declined)",
+      TestEnvPrint: "Receipt printing from the browser (any printer or PDF)",
+      TestEnvBoxes: "Boxes B01–B05 for parked sales (if there are none)",
+      TestEnvOn: "Switch test environment on",
+      TestEnvOff: "Switch test environment off",
+      TestEnvActive: "Test environment is on",
+      TestEnvInactive: "Test environment is off",
+      TestEnvPaused: "Paused live connections",
+      TestEnvReal: "Create live connections in Connections manually (EET certificate, payment terminal keys).",
+      ServiceDisabled: "Service “{service}” is switched off in Integrations.",
+      ServiceTestOk: "Service responds.",
       JobEetResend: "EET resend",
       EetResent: "Sent {sent}, pending {pending}.",
       Module: "Integrations",

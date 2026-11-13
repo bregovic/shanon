@@ -65,6 +65,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   kanonicky); ověření proti Playgroundu `npx tsx scripts/eet-playground.ts <p12> <heslo>`.
   Platba kartou: účtenka se vystaví až po schválení terminálem, server ověří
   částku a jediné použití transakce (`assertPaid`).
+- Veřejné datové služby (ARES, ČNB, ECB) volat přes `withService(data, "ares"|"cnb"|"ecb", …)`
+  (`src/modules/int/services.ts`): napojení druhu „service“ (zakládá výchozí nastavení)
+  je jde vypnout, otestovat a volání jdou do `int.log`; bez Integrace běží služba bez logu.
+- Testovací prostředí (`src/modules/int/test-env.ts`, Integrace → Funkce): napojení TEST-…
+  (EET simulátor `eetSimulator`, simulátor terminálu, tisk z prohlížeče), ostrá stejného
+  druhu `pausedByTest`; ostrá napojení se zakládají ručně.
 - REST API (`/api/v1/<objekt>[/<id>[/<akce>]]`, `src/app/api/v1`): klíč z napojení
   druhu API (Integrace), v DB jen SHA-256 otisk (`src/server/api-token.ts`), rozsah
   = moduly/objekty s právem Upravovat, `sys`/`int` nikdy, mazání přes API není.

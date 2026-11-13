@@ -1,5 +1,6 @@
 "use server";
 
+import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
 import { basketForBox, boxByCode, closeBasket, openBaskets, saveBasket, type BasketView } from "@/modules/pos/basket";
 import { duplicateRecord, type DuplicateResult } from "@/server/duplicate";
 import bcrypt from "bcryptjs";
@@ -792,6 +793,24 @@ export async function posBasketCancelAction(id: string): Promise<ActionResult> {
     assertCan(s.ctx.perms, "pos.receipt", "write");
     await inTenant(s.ctx, (sess) => closeBasket(sess.sys().api(), String(id), "cancelled"));
     return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Integrace → Testovací prostředí: zapnout / vypnout (testovací napojení a data). */
+export async function intTestEnvAction(on: boolean): Promise<ActionResult<TestEnvState>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "int.connection", "write");
+    const t = await getT(s.lang, s.ctx.tenantId);
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      if (on) await enableTestEnv(api, t, s.ctx.modules.has("pos"));
+      else await disableTestEnv(api);
+      return testEnvState(api);
+    });
+    return { ok: true, data };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

@@ -2055,6 +2055,7 @@ model IntConnection {
   driver         String    @default("eet2") @db.VarChar(40)
   registerId     String?   @map("register_id") @db.Uuid
   active         Boolean   @default(true)
+  pausedByTest   Boolean   @default(false) @map("paused_by_test")
   environment    String?   @default("playground") @db.VarChar(40)
   unitId         String?   @map("unit_id") @db.VarChar(9)
   posId          String?   @map("pos_id") @db.VarChar(20)

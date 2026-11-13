@@ -3,6 +3,7 @@
  * lístek ČNB). Přepočet vždy přes celé haléře (src/core/money.ts).
  */
 import { toScaled } from "@/core/money";
+import { withService } from "@/modules/int/services";
 import { UserError, type JobDef, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 
 const CNB_URL = "https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt";
@@ -37,7 +38,7 @@ export async function fetchCnb(date: string): Promise<{ date: string; rates: Cnb
 export async function loadCnbRates(data: DataApi, date: string): Promise<number> {
   let sheet;
   try {
-    sheet = await fetchCnb(date);
+    sheet = await withService(data, "cnb", "rates.cnb", () => fetchCnb(date), (r) => `${r.date}: ${r.rates.length}`);
   } catch (e) {
     if (e instanceof UserError) throw e;
     throw new UserError("@SYS:CnbFailed");
@@ -93,7 +94,7 @@ export async function fetchEcb(date: string, base: string): Promise<{ date: stri
 
 /** Uloží kurzy ECB vůči `base` pro měny tenanta (jen chybějící). Vrací počet. */
 export async function loadEcbRates(data: DataApi, date: string, base: string): Promise<number> {
-  const sheet = await fetchEcb(date, base);
+  const sheet = await withService(data, "ecb", "rates.ecb", () => fetchEcb(date, base), (r) => `${r.date}: ${r.rates.length}`);
   let n = 0;
   for (const cur of await data.find("sys.currency", {})) {
     const r = sheet.rates.find((x) => x.code === cur.code);

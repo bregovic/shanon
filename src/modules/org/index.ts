@@ -150,7 +150,7 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
       /** údaje firmy z ARES podle IČO (jméno, forma, DIČ, sídlo); kontakty a banka zůstanou */
       async ares(ctx, rec) {
         if (!rec.regNo) throw new UserError("@ORG:RegNoFirst");
-        const a = await aresByIco(String(rec.regNo));
+        const a = await aresByIco(String(rec.regNo), ctx.data);
         if (!a) throw new UserError("@ORG:AresNotFound");
         const [first, ...rest] = a.name.split(/\s+/);
         await ctx.data.update("org.entity", String(rec.id), {
