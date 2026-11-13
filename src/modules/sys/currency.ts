@@ -46,8 +46,60 @@ export async function loadCnbRates(data: DataApi, date: string): Promise<number>
   for (const cur of await data.find("sys.currency", {})) {
     const r = sheet.rates.find((x) => x.code === cur.code);
     if (!r) continue;
-    if ((await data.find("sys.exchangeRate", { currencyId: cur.id, date: sheet.date }, { take: 1 })).length) continue;
-    await data.create("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, amount: r.amount, rate: r.rate });
+    if ((await data.find("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, base: "CZK", source: "cnb" }, { take: 1 })).length) continue;
+    await data.create("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, amount: r.amount, rate: r.rate, base: "CZK", source: "cnb" });
+    n++;
+  }
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// ECB — referenční kurzy vůči EUR (eurofxref); kurz vůči jiné měně přepočtem
+// ---------------------------------------------------------------------------
+
+const ECB_DAILY = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
+const ECB_90D = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml";
+
+/** Kurzovní lístky ECB: datum → (měna → kolik jednotek za 1 EUR). */
+export function parseEcb(xml: string): Map<string, Map<string, number>> {
+  const out = new Map<string, Map<string, number>>();
+  for (const day of xml.matchAll(/<Cube\s+time=['"](\d{4}-\d{2}-\d{2})['"]\s*>([\s\S]*?)<\/Cube>/g)) {
+    const m = new Map<string, number>([["EUR", 1]]);
+    for (const r of day[2].matchAll(/currency=['"]([A-Z]{3})['"]\s+rate=['"]([\d.]+)['"]/g)) m.set(r[1], Number(r[2]));
+    out.set(day[1], m);
+  }
+  return out;
+}
+
+/** Kurzy ECB k datu (poslední lístek nejvýš k tomu datu) vyjádřené vůči `base`. */
+export async function fetchEcb(date: string, base: string): Promise<{ date: string; rates: CnbRate[] }> {
+  const today = new Date().toISOString().slice(0, 10);
+  let res: Response;
+  try {
+    res = await fetch(date >= today ? ECB_DAILY : ECB_90D, { signal: AbortSignal.timeout(10_000) });
+  } catch {
+    throw new UserError("@SYS:EcbFailed");
+  }
+  if (!res.ok) throw new UserError("@SYS:EcbFailed");
+  const days = [...parseEcb(await res.text())].filter(([d]) => d <= date).sort(([a], [b]) => (a < b ? 1 : -1));
+  if (!days.length) throw new UserError("@SYS:EcbFailed");
+  const [d, perEur] = days[0];
+  const b = perEur.get(base);
+  if (!b) throw new UserError("@SYS:EcbFailed");
+  // 1 X = (base za EUR) / (X za EUR) jednotek base; 6 desetinných míst
+  const rates = [...perEur].filter(([c]) => c !== base).map(([code, x]) => ({ code, amount: 1, rate: (b / x).toFixed(6) }));
+  return { date: d, rates };
+}
+
+/** Uloží kurzy ECB vůči `base` pro měny tenanta (jen chybějící). Vrací počet. */
+export async function loadEcbRates(data: DataApi, date: string, base: string): Promise<number> {
+  const sheet = await fetchEcb(date, base);
+  let n = 0;
+  for (const cur of await data.find("sys.currency", {})) {
+    const r = sheet.rates.find((x) => x.code === cur.code);
+    if (!r) continue;
+    if ((await data.find("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, base, source: "ecb" }, { take: 1 })).length) continue;
+    await data.create("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, amount: r.amount, rate: r.rate, base, source: "ecb" });
     n++;
   }
   return n;
@@ -73,22 +125,35 @@ const addDays = (date: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+export interface RateConfig {
+  /** kód účetní měny, vůči které je kurz (výchozí CZK) */
+  base?: string;
+  /** upřednostněný zdroj; ruční kurz má vždy přednost */
+  source?: "cnb" | "ecb";
+  /** nejstarší použitelný kurz ve dnech (výchozí 7) */
+  maxAgeDays?: number;
+}
+
 /**
- * Kurz měny k datu: poslední zadaný kurz nejvýš 7 dní starý. Když chybí,
- * zkusí ho načíst z ČNB. Účetní měna firmy má kurz 1.
+ * Kurz měny k datu vůči účetní měně: ruční kurz, jinak ze zvoleného zdroje,
+ * nejvýš `maxAgeDays` dní starý. Když chybí, zkusí ho ze zdroje načíst.
  */
 export async function rateFor(
   data: DataApi,
   currencyId: string,
   date: string,
+  cfg: RateConfig = {},
 ): Promise<{ code: string; rate: string; amount: number }> {
   const cur = await data.get("sys.currency", currencyId);
   if (!cur) throw new UserError("@SYS:InvalidValue");
-  const find = async () =>
-    (await data.find("sys.exchangeRate", { currencyId, date: { lte: date, gte: addDays(date, -7) } }, { take: 1, orderBy: { date: "desc" } }))[0];
+  const base = cfg.base ?? "CZK";
+  const source = cfg.source ?? (base === "CZK" ? "cnb" : "ecb");
+  const range = { lte: date, gte: addDays(date, -(cfg.maxAgeDays ?? 7)) };
+  const pick = async (src: string) => (await data.find("sys.exchangeRate", { currencyId, base, source: src, date: range }, { take: 1, orderBy: { date: "desc" } }))[0];
+  const find = async () => (await pick("manual")) ?? (await pick(source));
   let r: RecordData | undefined = await find();
   if (!r) {
-    await loadCnbRates(data, date).catch(() => 0);
+    await (source === "cnb" && base === "CZK" ? loadCnbRates(data, date) : loadEcbRates(data, date, base)).catch(() => 0);
     r = await find();
   }
   if (!r) throw new UserError("@SYS:MissingRate", { cur: String(cur.code), date });
@@ -100,6 +165,11 @@ export const sysHandlers: Record<string, ObjectHandlers> = {
     actions: {
       async cnb(ctx) {
         await loadCnbRates(ctx.data, new Date().toISOString().slice(0, 10));
+      },
+      async ecb(ctx) {
+        // vůči účetní měně aktuální firmy
+        const company = ctx.companyId ? await ctx.data.get("sys.company", ctx.companyId) : null;
+        await loadEcbRates(ctx.data, new Date().toISOString().slice(0, 10), String(company?.currency ?? "CZK"));
       },
     },
   },

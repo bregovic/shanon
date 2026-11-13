@@ -81,6 +81,16 @@ export const PermLevel = defineEnum({
 export const SecurityTarget: EnumDef = { id: "SecurityTarget", label: "@SYS:SecurityTarget", values: [] };
 
 /** Kurz: kolik Kč stojí `amount` jednotek měny (jako kurzovní lístek ČNB). */
+export const RateSource = defineEnum({
+  id: "RateSource",
+  label: "@SYS:RateSource",
+  values: [
+    { value: "cnb", label: "@SYS:RateCnb" },
+    { value: "ecb", label: "@SYS:RateEcb" },
+    { value: "manual", label: "@SYS:RateManual" },
+  ],
+});
+
 const Rate = defineEdt({ id: "ExchRate", kind: "decimal", label: "@SYS:Rate", precision: 18, scale: 6, align: "right" });
 
 export const currency = defineObject({
@@ -100,7 +110,10 @@ export const currency = defineObject({
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
   lines: [{ object: "sys.exchangeRate", field: "currencyId", label: "@SYS:ExchangeRates" }],
-  actions: [{ id: "cnb", label: "@SYS:LoadCnb" }],
+  actions: [
+    { id: "cnb", label: "@SYS:LoadCnb" },
+    { id: "ecb", label: "@SYS:LoadEcb" },
+  ],
 });
 
 export const exchangeRate = defineObject({
@@ -114,11 +127,14 @@ export const exchangeRate = defineObject({
     date: { edt: Edts.TransDate, mandatory: true },
     amount: { edt: Edts.Int, label: "@SYS:RateAmount", mandatory: true, default: 1 },
     rate: { edt: Rate, mandatory: true },
+    /** měna, ve které je kurz vyjádřen (CZK u ČNB, EUR nebo přepočet u ECB) */
+    base: { edt: Edts.CurrencyCode, label: "@SYS:RateBase", mandatory: true, default: "CZK" },
+    source: { edt: enumEdt(RateSource), mandatory: true, default: "manual" },
   },
   titleField: "date",
-  list: ["currencyId", "date", "amount", "rate"],
-  form: [{ label: "@SYS:General", fields: ["currencyId", "date", "amount", "rate"] }],
-  unique: [["currencyId", "date"]],
+  list: ["currencyId", "date", "amount", "rate", "base", "source"],
+  form: [{ label: "@SYS:General", fields: ["currencyId", "date", "amount", "rate", "base", "source"] }],
+  unique: [["currencyId", "date", "base", "source"]],
   defaultSort: { field: "date", dir: "desc" },
 });
 
@@ -179,7 +195,7 @@ export default defineModule({
   icon: "Settings",
   core: true,
   dependsOn: [],
-  enums: [PermLevel, SecurityTarget, NumberedObject],
+  enums: [RateSource, PermLevel, SecurityTarget, NumberedObject],
   setup: sysSetup,
   objects: [company, numberSeq, currency, exchangeRate, role, rolePermission],
   menu: [
@@ -200,6 +216,13 @@ export default defineModule({
       ModuleDesc: "Firmy, uživatelé a role, číselné řady, moduly a výchozí nastavení.",
       ModulesAndSetup: "Moduly a výchozí nastavení",
       UserSettings: "Moje nastavení",
+      RateSource: "Zdroj kurzu",
+      RateCnb: "ČNB",
+      RateEcb: "ECB",
+      RateManual: "Ručně",
+      RateBase: "Vůči měně",
+      LoadEcb: "Načíst kurzy ECB",
+      EcbFailed: "Kurzy ECB se nepodařilo načíst. Zkuste to později.",
       Functions: "Funkce",
       Maintenance: "Údržba",
       Reports: "Reporty",
@@ -216,6 +239,9 @@ export default defineModule({
       ImageNotFound: "Obrázek „{path}“ nebyl mezi nahranými soubory.",
       ImportImages: "Obrázky ke sloupci Obrázek (složka nebo soubory)",
       ImportImagesCount: "{n} obrázků připraveno",
+      ImportImagesFiles: "nebo vybrat soubory",
+      ImportWarnings: "Uloží se, ale zkontrolujte ({n}):",
+      ImportImagesFolder: "Obrázky v souboru jsou ve složce {dir} — vyberte ji (prohlížeč smí číst jen vybranou složku).",
       Profile: "Údaje o uživateli",
       Language: "Jazyk",
       ChangePassword: "Změna hesla",
@@ -433,6 +459,13 @@ export default defineModule({
       Module: "System administration",
       ModulesAndSetup: "Modules and default setup",
       UserSettings: "My settings",
+      RateSource: "Rate source",
+      RateCnb: "CNB",
+      RateEcb: "ECB",
+      RateManual: "Manual",
+      RateBase: "Against currency",
+      LoadEcb: "Load ECB rates",
+      EcbFailed: "Loading ECB rates failed. Try again later.",
       Functions: "Functions",
       Maintenance: "Maintenance",
       Reports: "Reports",
@@ -449,6 +482,9 @@ export default defineModule({
       ImageNotFound: "Image “{path}” was not among the uploaded files.",
       ImportImages: "Images for the Image column (folder or files)",
       ImportImagesCount: "{n} images ready",
+      ImportImagesFiles: "or select files",
+      ImportWarnings: "Will be saved, but check ({n}):",
+      ImportImagesFolder: "The images in the file are in {dir} — select that folder (the browser may only read a selected folder).",
       Profile: "User details",
       Language: "Language",
       ChangePassword: "Change password",

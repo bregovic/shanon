@@ -7,8 +7,8 @@
  */
 import { fromCents, mulCents, percentOf, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
-import { convertCents, rateFor } from "@/modules/sys/currency";
-import { accountingCurrencyId, postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { convertCents } from "@/modules/sys/currency";
+import { accountingCurrencyId, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
 
 export interface InvoiceConfig {
   /** hlavička a řádky, např. ar.invoice / ar.invoiceLine */
@@ -159,7 +159,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
   // kurz k datu účtování (účetní měna = 1)
   const base = await accountingCurrencyId(data, companyId);
   const curId = (header.currencyId as string) ?? base;
-  const rate = curId && curId !== base ? await rateFor(data, curId, date) : null;
+  const rate = curId && curId !== base ? await ledgerRate(data, companyId, curId, date) : null;
   const conv = (cents: bigint) => (rate ? convertCents(fromCents(cents), rate.rate, rate.amount) : cents);
 
   const s = BigInt(cfg.side);

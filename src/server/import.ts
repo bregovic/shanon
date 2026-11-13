@@ -49,6 +49,8 @@ export interface ImportReport {
   /** povinná pole, pro která v souboru chybí sloupec */
   missing: string[];
   errors: { row: number; column: string | null; message: string }[];
+  /** neblokující: záznam se uloží (např. bez obrázku, který nebyl mezi soubory) */
+  warnings: { row: number; column: string | null; message: string }[];
   applied: boolean;
 }
 
@@ -286,7 +288,7 @@ export async function importRecords(
     .filter(([n, f]) => f.mandatory && !f.readOnly && f.default === undefined && def.numberSeq?.field !== n && !has.has(n))
     .map(([, f]) => fieldLabel(f, opts.lang));
 
-  const report: ImportReport = { total: rows.length, created: 0, updated: 0, skipped: table.rows.length - rows.length, columns, missing, errors: [], applied: false };
+  const report: ImportReport = { total: rows.length, created: 0, updated: 0, skipped: table.rows.length - rows.length, columns, missing, errors: [], warnings: [], applied: false };
   const err = (row: number, column: string | null, message: string) => {
     if (report.errors.length < 200) report.errors.push({ row, column, message });
   };
@@ -331,15 +333,13 @@ export async function importRecords(
             if (raw === "") continue;
             const f = def.fields[c.field!];
             if (f.image) {
+              // chybějící nebo vadný obrázek záznam neblokuje — uloží se bez něj
               const file = opts.images?.(raw) ?? null;
               const mime = file ? imageMime(file.data) : null;
-              if (!file) err(lineNo(i), c.header, t("@SYS:ImageNotFound", { path: raw }));
-              else if (!mime) err(lineNo(i), c.header, `${t("@SYS:ImageInvalid")} (${raw})`);
-              else {
-                images.push({ field: c.field!, file });
-                continue;
-              }
-              bad = true;
+              const warn = (message: string) => report.warnings.length < 200 && report.warnings.push({ row: lineNo(i), column: c.header, message });
+              if (!file) warn(t("@SYS:ImageNotFound", { path: raw }));
+              else if (!mime) warn(`${t("@SYS:ImageInvalid")} (${raw})`);
+              else images.push({ field: c.field!, file });
               continue;
             }
             if (f.edt.kind === "ref") {

@@ -116,6 +116,9 @@ export function uiLabels(t: T) {
       close: t("@SYS:Close"),
       images: t("@SYS:ImportImages"),
       imagesCount: t("@SYS:ImportImagesCount"),
+      imagesFolder: t("@SYS:ImportImagesFolder"),
+      imagesFiles: t("@SYS:ImportImagesFiles"),
+      warnings: t("@SYS:ImportWarnings"),
     },
     docuref: {
       attachments: t("@SYS:Attachments"),

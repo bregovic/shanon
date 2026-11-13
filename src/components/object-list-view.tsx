@@ -30,6 +30,7 @@ import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import type { FormGroup, Values } from "./record-form";
 import { useShortcuts } from "./shortcuts";
+import { goBack } from "@/lib/nav-back";
 import { SmartGrid } from "./smart-grid";
 
 type Row = Record<string, unknown>;
@@ -82,7 +83,7 @@ export function ObjectListView(p: ObjectListProps) {
       new: p.canCreate ? () => open(null) : undefined,
       refresh: () => setReload((n) => n + 1),
       delete: p.canDelete ? () => selected.length && setConfirm(true) : undefined,
-      escape: () => p.crumbs[0]?.href && router.push(p.crumbs[0].href),
+      escape: () => goBack(router, p.crumbs[0]?.href),
     },
     !drawer.open && !confirm,
   );

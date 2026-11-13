@@ -41,6 +41,17 @@ export const PostingType = defineEnum({
   ],
 });
 
+/** Parametry hlavní knihy firmy (obdoba Ledger + General ledger parameters v D365). */
+const LedgerRateSource = defineEnum({
+  id: "LedgerRateSource",
+  label: "@SYS:RateSource",
+  values: [
+    { value: "cnb", label: "@SYS:RateCnb" },
+    { value: "ecb", label: "@SYS:RateEcb" },
+  ],
+});
+export { LedgerRateSource };
+
 export const JournalStatus = defineEnum({
   id: "JournalStatus",
   label: "@GL:Status",
@@ -119,6 +130,37 @@ export const period = defineObject({
   form: [{ label: "@SYS:General", fields: ["fiscalYearId", "code", "startDate", "endDate", "status"] }],
   unique: [["code"]],
   defaultSort: { field: "startDate", dir: "asc" },
+});
+
+const AccRef = (label: string) => refEdt("gl.account", label);
+
+export const parameters = defineObject({
+  id: "gl.parameters",
+  table: "gl_parameters",
+  label: "@GL:Parameters",
+  labelPlural: "@GL:Parameters",
+  scope: "company",
+  fields: {
+    accountingCurrencyId: { edt: refEdt("sys.currency", "@GL:AccountingCurrency"), mandatory: true },
+    reportingCurrencyId: { edt: refEdt("sys.currency", "@GL:ReportingCurrency") },
+    rateSource: { edt: enumEdt(LedgerRateSource), mandatory: true, default: "cnb" },
+    rateMaxAgeDays: { edt: Edts.Int, label: "@GL:RateMaxAge", mandatory: true, default: 7 },
+    realizedGainAccountId: { edt: AccRef("@GL:RealizedGain") },
+    realizedLossAccountId: { edt: AccRef("@GL:RealizedLoss") },
+    roundingGainAccountId: { edt: AccRef("@GL:RoundingGain") },
+    roundingLossAccountId: { edt: AccRef("@GL:RoundingLoss") },
+    profitLossAccountId: { edt: AccRef("@GL:ProfitLoss") },
+    retainedEarningsAccountId: { edt: AccRef("@GL:RetainedEarnings") },
+    openingAccountId: { edt: AccRef("@GL:OpeningAccount") },
+    closingAccountId: { edt: AccRef("@GL:ClosingAccount") },
+  },
+  titleField: "accountingCurrencyId",
+  list: ["accountingCurrencyId", "reportingCurrencyId", "rateSource", "rateMaxAgeDays"],
+  form: [
+    { label: "@GL:Currencies", fields: ["accountingCurrencyId", "reportingCurrencyId", "rateSource", "rateMaxAgeDays"] },
+    { label: "@GL:ExchangeDiffs", fields: ["realizedGainAccountId", "realizedLossAccountId", "roundingGainAccountId", "roundingLossAccountId"] },
+    { label: "@GL:YearEnd", fields: ["profitLossAccountId", "retainedEarningsAccountId", "openingAccountId", "closingAccountId"] },
+  ],
 });
 
 export const account = defineObject({
@@ -295,8 +337,8 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [PostingType, AccountType, JournalStatus, PeriodStatus],
-  objects: [account, costCenter, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
+  enums: [LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus],
+  objects: [parameters, account, costCenter, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
   menu: [
     {
       label: "@GL:Module",
@@ -304,7 +346,7 @@ export default defineModule({
     },
     {
       label: "@SYS:Setup",
-      items: [{ object: "gl.account" }, { object: "gl.costCenter" }, { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
+      items: [{ object: "gl.parameters" }, { object: "gl.account" }, { object: "gl.costCenter" }, { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
     },
   ],
   numberSeqs: [
@@ -321,6 +363,23 @@ export default defineModule({
       AccountNum: "Číslo účtu",
       AccountNumHelp: "Číslo účtu má 3–10 číslic.",
       SyntheticAccount: "Syntetický účet",
+      Parameters: "Parametry hlavní knihy",
+      AccountingCurrency: "Účetní měna",
+      ReportingCurrency: "Vykazovací měna",
+      RateMaxAge: "Nejstarší použitelný kurz (dní)",
+      Currencies: "Měny a kurzy",
+      ExchangeDiffs: "Kurzové rozdíly a zaokrouhlení",
+      RealizedGain: "Kurzové zisky",
+      RealizedLoss: "Kurzové ztráty",
+      RoundingGain: "Zaokrouhlení – výnos",
+      RoundingLoss: "Zaokrouhlení – náklad",
+      YearEnd: "Uzávěrka roku",
+      ProfitLoss: "Výsledek hospodaření",
+      RetainedEarnings: "Nerozdělený zisk / neuhrazená ztráta",
+      OpeningAccount: "Počáteční účet rozvažný",
+      ClosingAccount: "Konečný účet rozvažný",
+      OneParameters: "Firma už parametry hlavní knihy má.",
+      CurrencyLocked: "Účetní měnu nelze změnit — firma už má účetní zápisy.",
       AccountNumHelp6: "Číslo účtu má 6 číslic (3 syntetika + 3 analytika); 211 se doplní na 211000.",
       AccountClass: "Účtová třída",
       PostingType: "Druh účtu",
@@ -400,6 +459,23 @@ export default defineModule({
       AccountNum: "Account number",
       AccountNumHelp: "Account number has 3–10 digits.",
       SyntheticAccount: "Synthetic account",
+      Parameters: "General ledger parameters",
+      AccountingCurrency: "Accounting currency",
+      ReportingCurrency: "Reporting currency",
+      RateMaxAge: "Oldest usable rate (days)",
+      Currencies: "Currencies and rates",
+      ExchangeDiffs: "Exchange differences and rounding",
+      RealizedGain: "Realized exchange gain",
+      RealizedLoss: "Realized exchange loss",
+      RoundingGain: "Rounding – gain",
+      RoundingLoss: "Rounding – loss",
+      YearEnd: "Year end",
+      ProfitLoss: "Profit and loss",
+      RetainedEarnings: "Retained earnings",
+      OpeningAccount: "Opening balance account",
+      ClosingAccount: "Closing balance account",
+      OneParameters: "The company already has general ledger parameters.",
+      CurrencyLocked: "The accounting currency cannot change — the company already has postings.",
       AccountNumHelp6: "The account number has 6 digits (3 synthetic + 3 analytic); 211 becomes 211000.",
       AccountClass: "Account class",
       PostingType: "Posting type",

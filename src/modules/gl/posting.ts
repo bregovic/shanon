@@ -54,10 +54,30 @@ export function journalLinesToPosting(lines: RecordData[]): PostingLine[] {
 }
 
 /** Účetní měna firmy jako záznam sys.currency (podle kódu ve firmě). */
+/** Parametry hlavní knihy firmy (nebo null, když ještě nejsou). */
+export async function ledgerParameters(data: DataApi): Promise<RecordData | null> {
+  return (await data.find("gl.parameters", {}, { take: 1 }))[0] ?? null;
+}
+
+/** Účetní měna: z parametrů hlavní knihy, jinak měna firmy. */
 export async function accountingCurrencyId(data: DataApi, companyId: string | null): Promise<string | null> {
+  const p = await ledgerParameters(data);
+  if (p?.accountingCurrencyId) return String(p.accountingCurrencyId);
   const company = companyId ? await data.get("sys.company", companyId) : null;
   const [cur] = company ? await data.find("sys.currency", { code: company.currency }, { take: 1 }) : [];
   return cur ? String(cur.id) : null;
+}
+
+/** Kurz cizí měny vůči účetní měně firmy podle parametrů hlavní knihy (zdroj, stáří). */
+export async function ledgerRate(data: DataApi, companyId: string | null, currencyId: string, date: string) {
+  const p = await ledgerParameters(data);
+  const baseId = await accountingCurrencyId(data, companyId);
+  const base = baseId ? String((await data.get("sys.currency", baseId))?.code ?? "CZK") : "CZK";
+  return rateFor(data, currencyId, date, {
+    base,
+    source: p?.rateSource === "ecb" ? "ecb" : p?.rateSource === "cnb" ? "cnb" : undefined,
+    maxAgeDays: p?.rateMaxAgeDays ? Number(p.rateMaxAgeDays) : undefined,
+  });
 }
 
 /** Řádky v cizí měně přepočte kurzem k datu; částka v měně zůstane v amountCur. */
@@ -69,7 +89,7 @@ export async function convertLines(data: DataApi, companyId: string | null, date
       out.push({ ...l, currencyId: base, amountCur: l.amountCur ?? l.amount });
       continue;
     }
-    const r = await rateFor(data, l.currencyId, date);
+    const r = await ledgerRate(data, companyId, l.currencyId, date);
     const cur = l.amountCur ?? l.amount;
     out.push({ ...l, amountCur: cur, amount: fromCents(convertCents(cur, r.rate, r.amount)) });
   }
@@ -214,6 +234,22 @@ export const glHandlers: Record<string, ObjectHandlers> = {
         });
         await ctx.data.update("gl.journal", String(journal.id), { status: "posted", voucherId: voucher.id });
       },
+    },
+  },
+  "gl.parameters": {
+    async beforeSave(ctx, data, isNew): Promise<ValidationErrors | void> {
+      if (isNew && (await ctx.data.find("gl.parameters", {}, { take: 1 })).length) throw new UserError("@GL:OneParameters");
+      if (!isNew) {
+        // účetní měnu nejde změnit, když už jsou zápisy
+        const before = await ledgerParameters(ctx.data);
+        if (before && before.accountingCurrencyId !== data.accountingCurrencyId && (await ctx.data.find("gl.trans", {}, { take: 1 })).length)
+          return { accountingCurrencyId: "@GL:CurrencyLocked" };
+      }
+    },
+    async afterSave(ctx, data) {
+      // měna firmy = účetní měna (přepínač firem, výchozí měna dokladů)
+      const cur = await ctx.data.get("sys.currency", String(data.accountingCurrencyId));
+      if (ctx.companyId && cur) await ctx.data.update("sys.company", ctx.companyId, { currency: cur.code });
     },
   },
   "gl.account": {

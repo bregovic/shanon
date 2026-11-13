@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
 import {
   Avatar,
   Button,
@@ -24,6 +24,7 @@ import { logoutAction, switchCompanyAction } from "@/app/actions";
 import { FavoritesMenu } from "./favorites";
 import { ModuleIcon } from "./icons";
 import { MenuSearch } from "./menu-search";
+import { trackNavigation } from "@/lib/nav-back";
 import type { MenuHit } from "@/lib/menu-search";
 
 export interface ShellModule {
@@ -72,6 +73,8 @@ const useStyles = makeStyles({
 export function AppShell({ modules, companies, companyId, user, labels, menu, children }: Props) {
   const s = useStyles();
   const path = usePathname();
+  // historie cest v aplikaci pro Esc „zpět, odkud jsem přišel“
+  useEffect(() => trackNavigation(path), [path]);
   const router = useRouter();
   const [, start] = useTransition();
   const current = modules.find((m) => path === m.href || path.startsWith(`${m.href}/`));

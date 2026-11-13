@@ -144,6 +144,26 @@ export async function glSetup(data: DataApi): Promise<void> {
     const fy = await data.create("gl.fiscalYear", { code: String(y), startDate: `${y}-01-01`, endDate: `${y}-12-31` });
     await createPeriods(data, fy);
   }
+  // parametry hlavní knihy: účetní měna firmy, účty podle osnovy
+  if (!(await data.find("gl.parameters", {}, { take: 1 })).length && data.companyId) {
+    const company = await data.get("sys.company", data.companyId);
+    const [cur] = await data.find("sys.currency", { code: String(company?.currency ?? "CZK") }, { take: 1 });
+    if (cur) {
+      await data.create("gl.parameters", {
+        accountingCurrencyId: cur.id,
+        rateSource: cur.code === "CZK" ? "cnb" : "ecb",
+        rateMaxAgeDays: 7,
+        realizedGainAccountId: await postingAccount(data, "663"),
+        realizedLossAccountId: await postingAccount(data, "563"),
+        roundingGainAccountId: await postingAccount(data, "648"),
+        roundingLossAccountId: await postingAccount(data, "548"),
+        profitLossAccountId: await postingAccount(data, "431"),
+        retainedEarningsAccountId: await postingAccount(data, "428"),
+        openingAccountId: await postingAccount(data, "701"),
+        closingAccountId: await postingAccount(data, "702"),
+      });
+    }
+  }
   if (!(await data.find("gl.journalName", { code: "GEN" }, { take: 1 })).length) {
     await data.create("gl.journalName", { code: "GEN", name: "Obecný deník" });
   }

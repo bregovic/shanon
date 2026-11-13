@@ -49,6 +49,8 @@ export function ImportButton({ objectId, labels, onDone, hasImages = false }: { 
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [images, setImages] = useState<File[]>([]);
+  const [imageDir, setImageDir] = useState<string | null>(null);
+  const filesInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState<string>();
@@ -104,9 +106,13 @@ export function ImportButton({ objectId, labels, onDone, hasImages = false }: { 
                   accept=".csv,.txt,.xml,.xlsx"
                   aria-label={labels.title}
                   onChange={(e) => {
-                    setFile(e.target.files?.[0] ?? null);
+                    const f = e.target.files?.[0] ?? null;
+                    setFile(f);
                     setReport(null);
                     setError(undefined);
+                    setImageDir(null);
+                    // cesty k obrázkům v souboru → složka, kterou je třeba vybrat
+                    if (f && hasImages) void f.text().then((t) => setImageDir(commonImageDir(t)));
                   }}
                 />
                 <Link href={`/api/import-template/${objectId}`}>{labels.template}</Link>
@@ -114,6 +120,11 @@ export function ImportButton({ objectId, labels, onDone, hasImages = false }: { 
               {hasImages && (
                 <div className={st.file}>
                   <Text>{labels.images}</Text>
+                  {imageDir && (
+                    <Text weight="semibold" style={{ width: "100%" }}>
+                      {labels.imagesFolder.replace("{dir}", imageDir)}
+                    </Text>
+                  )}
                   <input
                     type="file"
                     multiple
@@ -123,6 +134,21 @@ export function ImportButton({ objectId, labels, onDone, hasImages = false }: { 
                     {...({ webkitdirectory: "" } as Record<string, string>)}
                     onChange={(e) => {
                       setImages([...(e.target.files ?? [])].filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f.name)));
+                      setReport(null);
+                    }}
+                  />
+                  <Button size="small" onClick={() => filesInput.current?.click()}>
+                    {labels.imagesFiles}
+                  </Button>
+                  <input
+                    ref={filesInput}
+                    type="file"
+                    multiple
+                    hidden
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    aria-label={labels.imagesFiles}
+                    onChange={(e) => {
+                      setImages([...(e.target.files ?? [])]);
                       setReport(null);
                     }}
                   />
@@ -144,6 +170,20 @@ export function ImportButton({ objectId, labels, onDone, hasImages = false }: { 
                         : fill(report.applied ? labels.done : labels.checkOk, { created: report.created, updated: report.updated })}
                     </MessageBarBody>
                   </MessageBar>
+                  {!!report.warnings.length && (
+                    <MessageBar intent="warning">
+                      <MessageBarBody>
+                        {labels.warnings.replace("{n}", String(report.warnings.length))}
+                        <ul style={{ margin: "4px 0 0", paddingLeft: 18, maxHeight: 120, overflowY: "auto" }}>
+                          {report.warnings.slice(0, 50).map((w, i) => (
+                            <li key={i}>
+                              {labels.row} {w.row}: {w.message}
+                            </li>
+                          ))}
+                        </ul>
+                      </MessageBarBody>
+                    </MessageBar>
+                  )}
                   {!!report.missing.length && (
                     <MessageBar intent="warning">
                       <MessageBarBody>{fill(labels.missing, { fields: report.missing.join(", ") })}</MessageBarBody>
@@ -206,4 +246,17 @@ export function ImportButton({ objectId, labels, onDone, hasImages = false }: { 
       </Dialog>
     </>
   );
+}
+
+/**
+ * Společná složka absolutních cest k obrázkům v souboru (C:\\…\\nahledy\\x.jpg
+ * → C:\\…\\nahledy). Prohlížeč smí číst jen složku, kterou uživatel vybere.
+ */
+function commonImageDir(text: string): string | null {
+  const paths = [...text.matchAll(/(?:[A-Za-z]:[\\/]|\\\\|\/)[^;,\t\r\n"]+\.(?:jpe?g|png|webp|gif)/gi)].map((m) => m[0].replace(/\//g, "\\"));
+  if (!paths.length) return null;
+  const parts = paths.map((p) => p.split("\\").slice(0, -1));
+  const common: string[] = [];
+  for (let i = 0; parts.every((p) => i < p.length && p[i].toLowerCase() === parts[0][i].toLowerCase()); i++) common.push(parts[0][i]);
+  return common.length ? common.join("\\") : null;
 }

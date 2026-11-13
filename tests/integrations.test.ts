@@ -321,16 +321,15 @@ describe("obrázky položek", () => {
     const win = ["C:", "Data", "nahledy", "antoni", "002_spek.jpg"].join(String.fromCharCode(92));
     const csv = `Číslo položky;Název;Skupina;MJ;Obrázek\nA1;Šunka;ZBOZI;KG;${win}\nA2;Salám;ZBOZI;KG;chybi.jpg`;
     const uploads = imagesFromUploads([{ path: "nahledy/antoni/002_spek.jpg", data: jpg }]);
-    const bad = await importRecords(C, "inv.item", parseCsv(csv), { dryRun: false, lang: "cs", images: uploads }, client);
-    expect(bad.applied).toBe(false);
-    expect(bad.errors[0]).toMatchObject({ row: 3, column: "Obrázek" });
-    const ok = await importRecords(C, "inv.item", parseCsv(csv.split("\n").slice(0, 2).join("\n")), { dryRun: false, lang: "cs", images: uploads }, client);
-    expect([ok.created, ok.applied]).toEqual([1, true]);
-    const it1 = (await listRecords(C, "inv.item", {}, client)).rows[0];
+    const first = await importRecords(C, "inv.item", parseCsv(csv), { dryRun: false, lang: "cs", images: uploads }, client);
+    // chybějící obrázek položku neblokuje — jen upozornění
+    expect([first.applied, first.created, first.errors.length]).toEqual([true, 2, 0]);
+    expect(first.warnings[0]).toMatchObject({ row: 3, column: "Obrázek" });
+    const it1 = (await listRecords(C, "inv.item", { filter: { itemNum: "A1" } }, client)).rows[0];
     expect(it1.image).toMatch(/^[0-9a-f-]{36}$/);
     // znovu stejný soubor → beze změny
     await importRecords(C, "inv.item", parseCsv(csv.split("\n").slice(0, 2).join("\n")), { dryRun: false, lang: "cs", images: uploads }, client);
-    expect((await listRecords(C, "inv.item", {}, client)).rows[0].image).toBe(it1.image);
+    expect((await listRecords(C, "inv.item", { filter: { itemNum: "A1" } }, client)).rows[0].image).toBe(it1.image);
     // ruční nahrání: jiný soubor nahradí starý, ne-obrázek odmítne, odebrání
     await expect(setImage(C, "inv.item", String(it1.id), "image", { name: "x.txt", data: Buffer.from("ahoj") }, client)).rejects.toMatchObject({ label: "@SYS:ImageInvalid" });
     const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(50)]);
@@ -339,5 +338,32 @@ describe("obrázky položek", () => {
     expect(await client.sysDocuRef.count({ where: { id: String(it1.image) } })).toBe(0);
     await setImage(C, "inv.item", String(it1.id), "image", null, client);
     expect((await getRecord(C, "inv.item", String(it1.id), client))!.image).toBeNull();
+  });
+});
+
+describe("parametry hlavní knihy a kurzy ECB", () => {
+  it("výchozí parametry, kurz ze zvoleného zdroje vůči účetní měně, ruční kurz má přednost", async () => {
+    const { parseEcb } = await import("@/modules/sys/currency");
+    const { ledgerRate } = await import("@/modules/gl/posting");
+    const xml = `<gesmes:Envelope><Cube><Cube time='2026-11-12'><Cube currency='USD' rate='1.0800'/><Cube currency='CZK' rate='25.000'/></Cube></Cube></gesmes:Envelope>`;
+    const days = parseEcb(xml);
+    expect(days.get("2026-11-12")!.get("CZK")).toBe(25);
+    const G = (await provisionTenant(client, { code: `t-gl-${run}`, name: "GL", adminEmail: `gl-${run}@test.local`, adminPassword: "heslo-12345", modules: ["gl"], company: { code: "G", name: "G" } })).ctx;
+    const [p] = (await listRecords(G, "gl.parameters", {}, client)).rows;
+    expect([p.rateSource, p.rateMaxAgeDays, (p._titles as Record<string, string>).accountingCurrencyId]).toEqual(["cnb", 7, "CZK"]);
+    expect((p._titles as Record<string, string>).realizedGainAccountId).toBe("663000");
+    await expect(saveRecord(G, "gl.parameters", null, { accountingCurrencyId: p.accountingCurrencyId }, undefined, client)).rejects.toMatchObject({ label: "@GL:OneParameters" });
+    // přepnout na ECB: kurz USD se dopočte přes EUR (25 / 1,08)
+    await saveRecord(G, "gl.parameters", String(p.id), { rateSource: "ecb" }, undefined, client);
+    vi.stubGlobal("fetch", async () => new Response(xml.replace("2026-11-12", new Date().toISOString().slice(0, 10)), { status: 200 }));
+    const usd = (await listRecords(G, "sys.currency", { filter: { code: "USD" } }, client)).rows[0];
+    const today = new Date().toISOString().slice(0, 10);
+    const r = await inTenant(G, (s) => ledgerRate(s.sys().api(), G.companyId, String(usd.id), today), client);
+    expect([r.rate, r.amount]).toEqual(["23.148148", 1]);
+    // ruční kurz téhož dne má přednost
+    await saveRecord(G, "sys.exchangeRate", null, { currencyId: usd.id, date: today, rate: "22", base: "CZK", source: "manual" }, undefined, client);
+    const r2 = await inTenant(G, (s) => ledgerRate(s.sys().api(), G.companyId, String(usd.id), today), client);
+    expect(r2.rate).toBe("22.000000");
+    vi.unstubAllGlobals();
   });
 });

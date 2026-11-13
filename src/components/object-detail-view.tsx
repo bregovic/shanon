@@ -31,6 +31,7 @@ import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
 import { useShortcuts } from "./shortcuts";
+import { goBack } from "@/lib/nav-back";
 import { SmartGrid } from "./smart-grid";
 
 type Row = Record<string, unknown>;
@@ -249,7 +250,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
     {
       save: !p.readOnly ? () => !drawerOpen() && save() : undefined,
       delete: p.canDelete ? () => !drawerOpen() && setConfirm(true) : undefined,
-      escape: () => p.crumbs[p.crumbs.length - 1]?.href && router.push(p.crumbs[p.crumbs.length - 1].href!),
+      // Esc = zpět tam, odkud uživatel přišel (třeba z faktury na dodavatele), jinak na seznam
+      escape: () => goBack(router, p.crumbs[p.crumbs.length - 1]?.href),
     },
     !confirm,
   );
