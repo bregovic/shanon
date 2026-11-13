@@ -80,6 +80,20 @@ export const PermLevel = defineEnum({
  */
 export const SecurityTarget: EnumDef = { id: "SecurityTarget", label: "@SYS:SecurityTarget", values: [] };
 
+/** Způsob zaokrouhlení (matematicky, nahoru, dolů). */
+export const RoundingMethod = defineEnum({
+  id: "RoundingMethod",
+  label: "@SYS:RoundingMethod",
+  values: [
+    { value: "nearest", label: "@SYS:RoundNearest" },
+    { value: "up", label: "@SYS:RoundUp" },
+    { value: "down", label: "@SYS:RoundDown" },
+  ],
+});
+
+/** Jednotka zaokrouhlení měny (0,01 = haléře, 1 = koruny, 0,05 …). */
+const RoundingUnit = defineEdt({ id: "RoundingUnit", kind: "decimal", label: "@SYS:RoundingUnit", precision: 10, scale: 4, align: "right", noTotal: true });
+
 /** Kurz: kolik Kč stojí `amount` jednotek měny (jako kurzovní lístek ČNB). */
 export const RateSource = defineEnum({
   id: "RateSource",
@@ -103,10 +117,17 @@ export const currency = defineObject({
     code: { edt: Edts.CurrencyCode, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
     symbol: { edt: { id: "CurrencySymbol", kind: "string", label: "@SYS:Symbol", maxLength: 5 } },
+    // zaokrouhlení: obecné (částky dokladů) a hotovosti (platba v hotovosti, CZK na koruny)
+    roundingUnit: { edt: RoundingUnit, label: "@SYS:GeneralRounding", mandatory: true, default: "0.01" },
+    cashRoundingUnit: { edt: RoundingUnit, label: "@SYS:CashRounding", mandatory: true, default: "0.01" },
+    cashRoundingMethod: { edt: enumEdt(RoundingMethod), mandatory: true, default: "nearest" },
   },
   titleField: "code",
-  list: ["code", "name", "symbol"],
-  form: [{ label: "@SYS:General", fields: ["code", "name", "symbol"] }],
+  list: ["code", "name", "symbol", "roundingUnit", "cashRoundingUnit", "cashRoundingMethod"],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "symbol"] },
+    { label: "@SYS:Rounding", fields: ["roundingUnit", "cashRoundingUnit", "cashRoundingMethod"] },
+  ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
   lines: [{ object: "sys.exchangeRate", field: "currencyId", label: "@SYS:ExchangeRates" }],
@@ -260,7 +281,8 @@ async function sysSetup(data: DataApi) {
     ["EUR", "Euro", "€"],
     ["USD", "Americký dolar", "$"],
   ]) {
-    await data.create("sys.currency", { code, name, symbol });
+    // hotovost v CZK se zaokrouhluje na koruny (zákon o oběhu bankovek a mincí)
+    await data.create("sys.currency", { code, name, symbol, cashRoundingUnit: code === "CZK" ? "1" : "0.01" });
   }
 }
 
@@ -271,7 +293,7 @@ export default defineModule({
   icon: "Settings",
   core: true,
   dependsOn: [],
-  enums: [RateSource, PermLevel, SecurityTarget, NumberedObject, BatchClass, BatchRecurrence, BatchStatus],
+  enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, BatchClass, BatchRecurrence, BatchStatus],
   setup: sysSetup,
   objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun],
   menu: [
@@ -288,6 +310,14 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      RoundingMethod: "Způsob zaokrouhlení hotovosti",
+      RoundNearest: "Matematicky",
+      RoundUp: "Nahoru",
+      RoundDown: "Dolů",
+      RoundingUnit: "Zaokrouhlení",
+      GeneralRounding: "Zaokrouhlení obecné",
+      CashRounding: "Zaokrouhlení hotovosti",
+      Rounding: "Zaokrouhlení",
       BatchClass: "Úloha",
       DuplicateRecord: "Duplikovat",
       Status: "Stav",
@@ -565,6 +595,14 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      RoundingMethod: "Cash rounding method",
+      RoundNearest: "Nearest",
+      RoundUp: "Up",
+      RoundDown: "Down",
+      RoundingUnit: "Rounding",
+      GeneralRounding: "General rounding",
+      CashRounding: "Cash rounding",
+      Rounding: "Rounding",
       BatchClass: "Job",
       DuplicateRecord: "Duplicate",
       Status: "Status",

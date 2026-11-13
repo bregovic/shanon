@@ -53,3 +53,18 @@ export function mulCents(a: unknown, aScale: number, b: unknown, bScale: number)
 export function percentOf(cents: bigint, rate: unknown): bigint {
   return rescale(cents * toScaled(rate, 4), 2 + 4 + 2, 2);
 }
+
+/**
+ * Zaokrouhlí částku v haléřích na jednotku (0,01 = beze změny, 1 = koruny,
+ * 0,05 …). `method`: nearest (polovina od nuly), up / down (v absolutní hodnotě).
+ */
+export function roundCents(cents: bigint, unit: string | number, method: "nearest" | "up" | "down" = "nearest"): bigint {
+  const step = BigInt(Math.round(Number(unit) * 100));
+  if (step <= BigInt(1)) return cents;
+  const neg = cents < BigInt(0);
+  const a = neg ? -cents : cents;
+  const rest = a % step;
+  let r = a - rest;
+  if (rest > BigInt(0) && (method === "up" || (method === "nearest" && rest * BigInt(2) >= step))) r += step;
+  return neg ? -r : r;
+}

@@ -288,3 +288,20 @@ export const glHandlers: Record<string, ObjectHandlers> = {
     beforeDelete: (ctx, data) => assertJournalOpen(ctx.data, data.journalId),
   },
 };
+
+/** Účet pro automatickou transakci (Hlavní kniha → Systémové účty). */
+export async function systemAccount(data: DataApi, type: string): Promise<string> {
+  const [row] = await data.find("gl.systemAccount", { postingType: type }, { take: 1 });
+  if (!row?.accountId) throw new UserError("@GL:SystemAccountMissing", { type: `@GL:Sp${type[0].toUpperCase()}${type.slice(1)}` });
+  return String(row.accountId);
+}
+
+/** Zaokrouhlení měny (obecné a hotovosti); bez měny haléře / beze změny. */
+export async function currencyRounding(data: DataApi, currencyId: string | null) {
+  const cur = currencyId ? await data.get("sys.currency", currencyId) : null;
+  return {
+    unit: String(cur?.roundingUnit ?? "0.01"),
+    cashUnit: String(cur?.cashRoundingUnit ?? "0.01"),
+    cashMethod: (String(cur?.cashRoundingMethod ?? "nearest") as "nearest" | "up" | "down"),
+  };
+}

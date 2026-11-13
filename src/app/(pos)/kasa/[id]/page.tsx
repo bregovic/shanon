@@ -1,4 +1,5 @@
 /** Prodejní terminál pokladny (šablona „Pult s váhou“). */
+import { accountingCurrencyId, currencyRounding } from "@/modules/gl/posting";
 import { notFound } from "next/navigation";
 import { PosTerminal } from "@/components/pos-terminal";
 import { can } from "@/core/security";
@@ -44,7 +45,9 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       if (d) promo.set(String(i.id), fromCents(d.price));
     }
     const top = await topItems(api, id);
-    return { items, groups, units, shift, conns, eetPending, promo, categories, top };
+    // zaokrouhlení hotovosti podle účetní měny (terminál jen ukazuje, počítá server)
+    const rounding = await currencyRounding(api, await accountingCurrencyId(api, s.ctx.companyId));
+    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -52,7 +55,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
 
   return (
     <PosTerminal
-      register={{ id, code: String(reg.code), name: String(reg.name), roundCash: !!reg.roundCash }}
+      register={{ id, code: String(reg.code), name: String(reg.name), cashRounding: { unit: Number(data.rounding.cashUnit), method: data.rounding.cashMethod } }}
       shift={data.shift ? { id: String(data.shift.id), num: String(data.shift.shiftNum) } : null}
       items={data.items
         .filter((i) => i.priceGross !== null)

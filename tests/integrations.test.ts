@@ -351,7 +351,16 @@ describe("parametry hlavní knihy a kurzy ECB", () => {
     const G = (await provisionTenant(client, { code: `t-gl-${run}`, name: "GL", adminEmail: `gl-${run}@test.local`, adminPassword: "heslo-12345", modules: ["gl"], company: { code: "G", name: "G" } })).ctx;
     const [p] = (await listRecords(G, "gl.parameters", {}, client)).rows;
     expect([p.rateSource, p.rateMaxAgeDays, (p._titles as Record<string, string>).accountingCurrencyId]).toEqual(["cnb", 7, "CZK"]);
-    expect((p._titles as Record<string, string>).realizedGainAccountId).toBe("663000");
+    // systémové účty podle osnovy, chybějící hlásí srozumitelně
+    const sys = (await listRecords(G, "gl.systemAccount", {}, client)).rows;
+    expect(Object.fromEntries(sys.map((r) => [r.postingType, (r._titles as Record<string, string>).accountId.slice(0, 6)]))).toMatchObject({ realizedGain: "663000", roundingGain: "648000", error: "395000", profitLoss: "431000" });
+    const { systemAccount } = await import("@/modules/gl/posting");
+    const { inTenant } = await import("@/server/data");
+    // druh jen jednou; bez nastaveného účtu srozumitelná chyba
+    await expect(saveRecord(G, "gl.systemAccount", null, { postingType: "roundingGain", accountId: sys[0].accountId }, undefined, client)).rejects.toBeTruthy();
+    const pg = sys.find((r) => r.postingType === "pennyGain")!;
+    await inTenant(G, async (s) => expect(await systemAccount(s.sys().api(), "pennyGain")).toBe(pg.accountId), client);
+    await expect(inTenant(G, (s) => systemAccount(s.sys().api(), "nothing"), client)).rejects.toMatchObject({ label: "@GL:SystemAccountMissing" });
     await expect(saveRecord(G, "gl.parameters", null, { accountingCurrencyId: p.accountingCurrencyId }, undefined, client)).rejects.toMatchObject({ label: "@GL:OneParameters" });
     // přepnout na ECB: kurz USD se dopočte přes EUR (25 / 1,08)
     await saveRecord(G, "gl.parameters", String(p.id), { rateSource: "ecb" }, undefined, client);
@@ -557,5 +566,14 @@ describe("Duplikovat", () => {
     const copy = await getRecord(Q, "qa.issue", (d as { id: string }).id, client);
     expect([copy!.title, copy!.priority, copy!.issueNum === iss.issueNum]).toEqual(["Šablona", "high", false]);
     expect((await listRecords(Q, "qa.comment", { filter: { issueId: copy!.id } }, client)).total).toBe(0);
+  });
+});
+
+describe("zaokrouhlení podle měny", () => {
+  it("roundCents: koruny, nahoru, dolů, 0,05, záporné", async () => {
+    const { roundCents } = await import("@/core/money");
+    const c = (n: number) => BigInt(n);
+    expect([roundCents(c(12349), "1"), roundCents(c(12350), "1"), roundCents(c(12301), "1", "up"), roundCents(c(12399), "1", "down")]).toEqual([c(12300), c(12400), c(12400), c(12300)]);
+    expect([roundCents(c(1232), "0.05"), roundCents(c(1233), "0.05"), roundCents(c(-12350), "1"), roundCents(c(12345), "0.01")]).toEqual([c(1230), c(1235), c(-12400), c(12345)]);
   });
 });

@@ -52,7 +52,8 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   víc kandidátů = ručně. Import výpisu se uloží jen když součty sedí na hlavičku.
 - Pokladna (`src/modules/pos`): ceny a DPH počítá vždy server z položek
   (`sale.ts`), terminál `/kasa` ukazuje jen orientační součet. Hotovost se
-  zaokrouhluje na koruny mimo základ DPH. Do účetnictví jde až uzávěrka směny
+  zaokrouhluje podle účetní měny (`sys.currency.cashRoundingUnit`, CZK = 1 Kč,
+  `roundCents`) mimo základ DPH. Do účetnictví jde až uzávěrka směny
   (jeden doklad za směnu, `tax.trans` se `simplified` → KH oddíl A.5).
 - Integrace (`src/modules/int`): napojení = druh + ovladač (`drivers.ts`), každá
   komunikace do `int.log`. Síť nikdy uvnitř transakce prodeje — EET se posílá po
@@ -75,6 +76,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   odkazů), čísla z řady, readOnly, obrázků a tajných údajů. Doklad s číselnou řadou
   se zkopíruje rovnou i s vlastními řádky (`lines[].copy: false` = nekopírovat,
   např. diskuze), jinak nový formulář s předvyplněnými hodnotami.
+- Účty automatických transakcí (zaokrouhlení, haléřové a kurzové rozdíly, technický
+  účet, rozvažné účty) jen přes `systemAccount(data, druh)` (`gl.systemAccount`,
+  Hlavní kniha → Systémové účty) — nikdy vlastní pole „účet zaokrouhlení“ v modulu.
+  Zaokrouhlení částek podle měny: `currencyRounding()` + `roundCents()`.
 - Tajné údaje = `FieldDef.secret`: šifrovaně (AES-256-GCM, `SHANON_SECRET_KEY`
   v prostředí — bez něj produkce tajné údaje neuloží; ztráta klíče = údaje znovu
   zadat), ven jen maska. Čte je jen logika modulu přes `revealSecret()`.

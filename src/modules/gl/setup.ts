@@ -2,6 +2,7 @@
  * Výchozí nastavení hlavní knihy pro novou firmu (nebo po zapnutí modulu).
  * Zakládá jen to, co chybí — účtový rozvrh, jen když je úplně prázdný.
  */
+import { SYSTEM_DEFAULTS } from "./index";
 import type { DataApi, RecordData } from "@/core/module";
 import { createPeriods } from "./posting";
 
@@ -153,16 +154,17 @@ export async function glSetup(data: DataApi): Promise<void> {
         accountingCurrencyId: cur.id,
         rateSource: cur.code === "CZK" ? "cnb" : "ecb",
         rateMaxAgeDays: 7,
-        realizedGainAccountId: await postingAccount(data, "663"),
-        realizedLossAccountId: await postingAccount(data, "563"),
-        roundingGainAccountId: await postingAccount(data, "648"),
-        roundingLossAccountId: await postingAccount(data, "548"),
-        profitLossAccountId: await postingAccount(data, "431"),
-        retainedEarningsAccountId: await postingAccount(data, "428"),
-        openingAccountId: await postingAccount(data, "701"),
-        closingAccountId: await postingAccount(data, "702"),
       });
     }
+  }
+  // systémové účty: chybějící druhy podle osnovy (existující nepřepisovat)
+  for (const [postingType, synthetic] of Object.entries(SYSTEM_DEFAULTS)) {
+    if ((await data.find("gl.systemAccount", { postingType }, { take: 1 })).length) continue;
+    let accountId = await postingAccount(data, synthetic);
+    // starší rozvrh bez účtu: doplnit ho z osnovy (kurzové rozdíly, rozvažné účty…)
+    const def = DEFAULT_ACCOUNTS.find((a) => a[0] === `${synthetic}000`);
+    if (!accountId && def) accountId = String((await data.create("gl.account", { accountNum: def[0], name: def[1], type: def[2], postingType: def[3] ?? null, noManualEntry: !!def[4] })).id);
+    if (accountId) await data.create("gl.systemAccount", { postingType, accountId });
   }
   // finanční dimenze (sdílené v tenantovi): středisko, zakázka, partner
   for (const [code, name, position, source] of [

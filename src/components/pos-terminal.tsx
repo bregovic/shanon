@@ -216,7 +216,7 @@ const PRINT_CSS = `@media print {
 }`;
 
 export function PosTerminal(p: {
-  register: { id: string; code: string; name: string; roundCash: boolean };
+  register: { id: string; code: string; name: string; cashRounding: { unit: number; method: "nearest" | "up" | "down" } };
   shift: { id: string; num: string } | null;
   items: PosItem[];
   groups: { id: string; name: string }[];
@@ -318,7 +318,7 @@ export function PosTerminal(p: {
   const startPay = (m: "cash" | "card") => {
     setError(undefined);
     setMethod(m);
-    setDue(m === "cash" && p.register.roundCash ? Math.round(total) : total);
+    setDue(m === "cash" ? roundCash(total, p.register.cashRounding) : total);
     setPayDlg(m);
   };
   const toPay = due;
@@ -889,6 +889,16 @@ const foldText = (s: string) =>
     .toLowerCase();
 
 const LONG_PRESS_MS = 500;
+
+/** Orientační zaokrouhlení hotovosti podle měny (závazně počítá server, roundCents). */
+function roundCash(total: number, r: { unit: number; method: "nearest" | "up" | "down" }): number {
+  const step = Math.round(r.unit * 100);
+  const c = Math.round(Math.abs(total) * 100);
+  if (step <= 1) return total;
+  const rest = c % step;
+  const v = c - rest + (rest > 0 && (r.method === "up" || (r.method === "nearest" && rest * 2 >= step)) ? step : 0);
+  return (Math.sign(total) * v) / 100;
+}
 
 type WeightUnit = "kg" | "dkg" | "g";
 const W_FACTOR: Record<WeightUnit, number> = { kg: 1, dkg: 0.01, g: 0.001 };

@@ -60,10 +60,7 @@ export const register = defineObject({
     template: { edt: enumEdt(PosTemplate), mandatory: true, default: "counter" },
     cashAccountId: { edt: AccountRef("@POS:CashAccount"), mandatory: true },
     cardAccountId: { edt: AccountRef("@POS:CardAccount"), mandatory: true },
-    roundingGainAccountId: { edt: AccountRef("@POS:RoundingGain"), mandatory: true },
-    roundingLossAccountId: { edt: AccountRef("@POS:RoundingLoss"), mandatory: true },
     /** hotovost se zaokrouhluje na celé koruny (mince pod 1 Kč nejsou) */
-    roundCash: { edt: Edts.NoYes, label: "@POS:RoundCash", default: true },
     receiptFooter: { edt: Edts.Description, label: "@POS:ReceiptFooter" },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
@@ -71,7 +68,7 @@ export const register = defineObject({
   list: ["code", "name", "template", "cashAccountId", "cardAccountId", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["code", "name", "template", "receiptFooter", "blocked"] },
-    { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId", "roundCash", "roundingGainAccountId", "roundingLossAccountId"] },
+    { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -197,18 +194,15 @@ async function posSetup(data: DataApi) {
   }
   if ((await data.find("pos.register", {}, { take: 1 })).length) return;
   const acc = (n: string) => postingAccount(data, n);
-  const [cash, card, gain, loss] = [await acc("211"), await acc("261"), await acc("648"), await acc("548")];
+  const [cash, card] = [await acc("211"), await acc("261")];
   // účty, které chybí ve starém rozvrhu, založí ACCOUNTS výše
-  if (!cash || !card || !gain || !loss) return;
+  if (!cash || !card) return;
   await data.create("pos.register", {
     code: "KASA1",
     name: "Pokladna 1",
     template: "counter",
     cashAccountId: cash,
     cardAccountId: card,
-    roundingGainAccountId: gain,
-    roundingLossAccountId: loss,
-    roundCash: true,
   });
 }
 

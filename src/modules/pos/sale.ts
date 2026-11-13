@@ -9,9 +9,9 @@
  *   D tržby (účty skupin položek) + D DPH po kódech ± zaokrouhlení,
  *   a založí daňové transakce jako zjednodušené doklady (KH oddíl A.5).
  */
-import { fromCents, mulCents, sumCents, toCents } from "@/core/money";
+import { fromCents, mulCents, roundCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
-import { postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { accountingCurrencyId, currencyRounding, postVoucher, systemAccount, type PostingLine } from "@/modules/gl/posting";
 import { bestDiscount, netFromGross } from "@/modules/inv/handlers";
 import { addressLine, orgOf } from "@/modules/org";
 
@@ -28,13 +28,6 @@ export interface SaleInput {
   paymentRef?: string | null;
 }
 
-/** Zaokrouhlení na celé koruny (half-up, symetricky). */
-export function roundToCrowns(cents: bigint): bigint {
-  const neg = cents < zero;
-  const a = neg ? -cents : cents;
-  const r = ((a + BigInt(50)) / BigInt(100)) * BigInt(100);
-  return neg ? -r : r;
-}
 
 export async function openShiftOf(data: DataApi, registerId: string): Promise<RecordData | null> {
   return (await data.find("pos.shift", { registerId, status: "open" }, { take: 1 }))[0] ?? null;
@@ -85,7 +78,9 @@ export async function quote(data: DataApi, input: SaleInput) {
   for (const l of input.lines) lines.push(await saleLine(data, String(l.itemId), String(l.qty)));
   const gross = sumCents(lines.map((l) => l.gross));
   const net = sumCents(lines.map((l) => l.net));
-  const paid = input.payment === "cash" && reg.roundCash ? roundToCrowns(gross) : gross;
+  // hotovost: zaokrouhlení podle účetní měny (CZK na koruny), mimo základ DPH
+  const r = await currencyRounding(data, await accountingCurrencyId(data, data.companyId ?? null));
+  const paid = input.payment === "cash" ? roundCents(gross, r.cashUnit, r.cashMethod) : gross;
   return { reg, shift, lines, gross, net, paid };
 }
 
@@ -190,8 +185,8 @@ export async function closeShift(data: DataApi, shift: RecordData) {
       const code = await data.get("tax.taxCode", codeId);
       lines.push({ accountId: String(code!.accountId), amount: fromCents(-x.tax) });
     }
-    if (t.rounding > zero) lines.push({ accountId: String(reg.roundingGainAccountId), amount: fromCents(-t.rounding) });
-    if (t.rounding < zero) lines.push({ accountId: String(reg.roundingLossAccountId), amount: fromCents(-t.rounding) });
+    if (t.rounding > zero) lines.push({ accountId: await systemAccount(data, "roundingGain"), amount: fromCents(-t.rounding) });
+    if (t.rounding < zero) lines.push({ accountId: await systemAccount(data, "roundingLoss"), amount: fromCents(-t.rounding) });
     const voucher = await postVoucher(data, {
       date,
       description: `${shift.shiftNum} · ${reg.name}`,

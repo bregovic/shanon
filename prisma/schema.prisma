@@ -214,6 +214,7 @@ model SysCompany {
   orgEntity_company         OrgEntity[]         @relation("OrgEntity_company")
   orgSite_company           OrgSite[]           @relation("OrgSite_company")
   glParameters_company      GlParameters[]      @relation("GlParameters_company")
+  glSystemAccount_company   GlSystemAccount[]   @relation("GlSystemAccount_company")
   glDimensionRule_company   GlDimensionRule[]   @relation("GlDimensionRule_company")
   glAccount_company         GlAccount[]         @relation("GlAccount_company")
   glFiscalYear_company      GlFiscalYear[]      @relation("GlFiscalYear_company")
@@ -285,17 +286,20 @@ model SysNumberSeq {
 
 /// sys.currency — generováno z definice objektu
 model SysCurrency {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  code      String   @db.VarChar(3)
-  name      String   @db.VarChar(120)
-  symbol    String?  @db.VarChar(5)
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  code               String   @db.VarChar(3)
+  name               String   @db.VarChar(120)
+  symbol             String?  @db.VarChar(5)
+  roundingUnit       Decimal  @default(0.01) @map("rounding_unit") @db.Decimal(10, 4)
+  cashRoundingUnit   Decimal  @default(0.01) @map("cash_rounding_unit") @db.Decimal(10, 4)
+  cashRoundingMethod String   @default("nearest") @map("cash_rounding_method") @db.VarChar(40)
+  ext                Json     @default("{}")
+  version            Int      @default(1)
+  createdAt          DateTime @default(now()) @map("created_at")
+  createdBy          String?  @map("created_by") @db.Uuid
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy          String?  @map("updated_by") @db.Uuid
 
   sysExchangeRate_currency        SysExchangeRate[] @relation("SysExchangeRate_currency")
   glParameters_accountingCurrency GlParameters[]    @relation("GlParameters_accountingCurrency")
@@ -584,52 +588,51 @@ model GabContact {
 
 /// gl.parameters — generováno z definice objektu
 model GlParameters {
-  id                        String   @id @default(uuid(7)) @db.Uuid
-  tenantId                  String   @map("tenant_id") @db.Uuid
-  companyId                 String   @map("company_id") @db.Uuid
-  accountingCurrencyId      String   @map("accounting_currency_id") @db.Uuid
-  reportingCurrencyId       String?  @map("reporting_currency_id") @db.Uuid
-  rateSource                String   @default("cnb") @map("rate_source") @db.VarChar(40)
-  rateMaxAgeDays            Int      @default(7) @map("rate_max_age_days")
-  realizedGainAccountId     String?  @map("realized_gain_account_id") @db.Uuid
-  realizedLossAccountId     String?  @map("realized_loss_account_id") @db.Uuid
-  roundingGainAccountId     String?  @map("rounding_gain_account_id") @db.Uuid
-  roundingLossAccountId     String?  @map("rounding_loss_account_id") @db.Uuid
-  profitLossAccountId       String?  @map("profit_loss_account_id") @db.Uuid
-  retainedEarningsAccountId String?  @map("retained_earnings_account_id") @db.Uuid
-  openingAccountId          String?  @map("opening_account_id") @db.Uuid
-  closingAccountId          String?  @map("closing_account_id") @db.Uuid
-  ext                       Json     @default("{}")
-  version                   Int      @default(1)
-  createdAt                 DateTime @default(now()) @map("created_at")
-  createdBy                 String?  @map("created_by") @db.Uuid
-  updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy                 String?  @map("updated_by") @db.Uuid
+  id                   String   @id @default(uuid(7)) @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  companyId            String   @map("company_id") @db.Uuid
+  accountingCurrencyId String   @map("accounting_currency_id") @db.Uuid
+  reportingCurrencyId  String?  @map("reporting_currency_id") @db.Uuid
+  rateSource           String   @default("cnb") @map("rate_source") @db.VarChar(40)
+  rateMaxAgeDays       Int      @default(7) @map("rate_max_age_days")
+  ext                  Json     @default("{}")
+  version              Int      @default(1)
+  createdAt            DateTime @default(now()) @map("created_at")
+  createdBy            String?  @map("created_by") @db.Uuid
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy            String?  @map("updated_by") @db.Uuid
 
-  company                 SysCompany   @relation("GlParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
-  accountingCurrency      SysCurrency  @relation("GlParameters_accountingCurrency", fields: [accountingCurrencyId], references: [id], onDelete: Restrict)
-  reportingCurrency       SysCurrency? @relation("GlParameters_reportingCurrency", fields: [reportingCurrencyId], references: [id], onDelete: Restrict)
-  realizedGainAccount     GlAccount?   @relation("GlParameters_realizedGainAccount", fields: [realizedGainAccountId], references: [id], onDelete: Restrict)
-  realizedLossAccount     GlAccount?   @relation("GlParameters_realizedLossAccount", fields: [realizedLossAccountId], references: [id], onDelete: Restrict)
-  roundingGainAccount     GlAccount?   @relation("GlParameters_roundingGainAccount", fields: [roundingGainAccountId], references: [id], onDelete: Restrict)
-  roundingLossAccount     GlAccount?   @relation("GlParameters_roundingLossAccount", fields: [roundingLossAccountId], references: [id], onDelete: Restrict)
-  profitLossAccount       GlAccount?   @relation("GlParameters_profitLossAccount", fields: [profitLossAccountId], references: [id], onDelete: Restrict)
-  retainedEarningsAccount GlAccount?   @relation("GlParameters_retainedEarningsAccount", fields: [retainedEarningsAccountId], references: [id], onDelete: Restrict)
-  openingAccount          GlAccount?   @relation("GlParameters_openingAccount", fields: [openingAccountId], references: [id], onDelete: Restrict)
-  closingAccount          GlAccount?   @relation("GlParameters_closingAccount", fields: [closingAccountId], references: [id], onDelete: Restrict)
+  company            SysCompany   @relation("GlParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  accountingCurrency SysCurrency  @relation("GlParameters_accountingCurrency", fields: [accountingCurrencyId], references: [id], onDelete: Restrict)
+  reportingCurrency  SysCurrency? @relation("GlParameters_reportingCurrency", fields: [reportingCurrencyId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([accountingCurrencyId])
   @@index([reportingCurrencyId])
-  @@index([realizedGainAccountId])
-  @@index([realizedLossAccountId])
-  @@index([roundingGainAccountId])
-  @@index([roundingLossAccountId])
-  @@index([profitLossAccountId])
-  @@index([retainedEarningsAccountId])
-  @@index([openingAccountId])
-  @@index([closingAccountId])
   @@map("gl_parameters")
+}
+
+/// gl.systemAccount — generováno z definice objektu
+model GlSystemAccount {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  postingType String   @map("posting_type") @db.VarChar(40)
+  accountId   String   @map("account_id") @db.Uuid
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("GlSystemAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  account GlAccount  @relation("GlSystemAccount_account", fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, postingType])
+  @@index([tenantId, companyId])
+  @@index([accountId])
+  @@map("gl_system_account")
 }
 
 /// gl.dimension — generováno z definice objektu
@@ -730,34 +733,25 @@ model GlAccount {
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy     String?  @map("updated_by") @db.Uuid
 
-  company                              SysCompany          @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
-  glParameters_realizedGainAccount     GlParameters[]      @relation("GlParameters_realizedGainAccount")
-  glParameters_realizedLossAccount     GlParameters[]      @relation("GlParameters_realizedLossAccount")
-  glParameters_roundingGainAccount     GlParameters[]      @relation("GlParameters_roundingGainAccount")
-  glParameters_roundingLossAccount     GlParameters[]      @relation("GlParameters_roundingLossAccount")
-  glParameters_profitLossAccount       GlParameters[]      @relation("GlParameters_profitLossAccount")
-  glParameters_retainedEarningsAccount GlParameters[]      @relation("GlParameters_retainedEarningsAccount")
-  glParameters_openingAccount          GlParameters[]      @relation("GlParameters_openingAccount")
-  glParameters_closingAccount          GlParameters[]      @relation("GlParameters_closingAccount")
-  glTrans_account                      GlTrans[]           @relation("GlTrans_account")
-  glJournalName_offsetAccount          GlJournalName[]     @relation("GlJournalName_offsetAccount")
-  glJournalLine_account                GlJournalLine[]     @relation("GlJournalLine_account")
-  taxCode_account                      TaxCode[]           @relation("TaxCode_account")
-  invItemGroup_revenueAccount          InvItemGroup[]      @relation("InvItemGroup_revenueAccount")
-  invItemGroup_costAccount             InvItemGroup[]      @relation("InvItemGroup_costAccount")
-  arGroup_receivableAccount            ArGroup[]           @relation("ArGroup_receivableAccount")
-  arGroup_revenueAccount               ArGroup[]           @relation("ArGroup_revenueAccount")
-  arInvoiceLine_revenueAccount         ArInvoiceLine[]     @relation("ArInvoiceLine_revenueAccount")
-  apGroup_payableAccount               ApGroup[]           @relation("ApGroup_payableAccount")
-  apGroup_expenseAccount               ApGroup[]           @relation("ApGroup_expenseAccount")
-  apInvoiceLine_expenseAccount         ApInvoiceLine[]     @relation("ApInvoiceLine_expenseAccount")
-  bankAccount_glAccount                BankAccount[]       @relation("BankAccount_glAccount")
-  bankStatementLine_offsetAccount      BankStatementLine[] @relation("BankStatementLine_offsetAccount")
-  posRegister_cashAccount              PosRegister[]       @relation("PosRegister_cashAccount")
-  posRegister_cardAccount              PosRegister[]       @relation("PosRegister_cardAccount")
-  posRegister_roundingGainAccount      PosRegister[]       @relation("PosRegister_roundingGainAccount")
-  posRegister_roundingLossAccount      PosRegister[]       @relation("PosRegister_roundingLossAccount")
-  posReceiptLine_revenueAccount        PosReceiptLine[]    @relation("PosReceiptLine_revenueAccount")
+  company                         SysCompany          @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glSystemAccount_account         GlSystemAccount[]   @relation("GlSystemAccount_account")
+  glTrans_account                 GlTrans[]           @relation("GlTrans_account")
+  glJournalName_offsetAccount     GlJournalName[]     @relation("GlJournalName_offsetAccount")
+  glJournalLine_account           GlJournalLine[]     @relation("GlJournalLine_account")
+  taxCode_account                 TaxCode[]           @relation("TaxCode_account")
+  invItemGroup_revenueAccount     InvItemGroup[]      @relation("InvItemGroup_revenueAccount")
+  invItemGroup_costAccount        InvItemGroup[]      @relation("InvItemGroup_costAccount")
+  arGroup_receivableAccount       ArGroup[]           @relation("ArGroup_receivableAccount")
+  arGroup_revenueAccount          ArGroup[]           @relation("ArGroup_revenueAccount")
+  arInvoiceLine_revenueAccount    ArInvoiceLine[]     @relation("ArInvoiceLine_revenueAccount")
+  apGroup_payableAccount          ApGroup[]           @relation("ApGroup_payableAccount")
+  apGroup_expenseAccount          ApGroup[]           @relation("ApGroup_expenseAccount")
+  apInvoiceLine_expenseAccount    ApInvoiceLine[]     @relation("ApInvoiceLine_expenseAccount")
+  bankAccount_glAccount           BankAccount[]       @relation("BankAccount_glAccount")
+  bankStatementLine_offsetAccount BankStatementLine[] @relation("BankStatementLine_offsetAccount")
+  posRegister_cashAccount         PosRegister[]       @relation("PosRegister_cashAccount")
+  posRegister_cardAccount         PosRegister[]       @relation("PosRegister_cardAccount")
+  posReceiptLine_revenueAccount   PosReceiptLine[]    @relation("PosReceiptLine_revenueAccount")
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
@@ -1791,31 +1785,26 @@ model BankStatementLine {
 
 /// pos.register — generováno z definice objektu
 model PosRegister {
-  id                    String   @id @default(uuid(7)) @db.Uuid
-  tenantId              String   @map("tenant_id") @db.Uuid
-  companyId             String   @map("company_id") @db.Uuid
-  code                  String   @db.VarChar(20)
-  name                  String   @db.VarChar(120)
-  template              String   @default("counter") @db.VarChar(40)
-  cashAccountId         String   @map("cash_account_id") @db.Uuid
-  cardAccountId         String   @map("card_account_id") @db.Uuid
-  roundingGainAccountId String   @map("rounding_gain_account_id") @db.Uuid
-  roundingLossAccountId String   @map("rounding_loss_account_id") @db.Uuid
-  roundCash             Boolean  @default(true) @map("round_cash")
-  receiptFooter         String?  @map("receipt_footer") @db.VarChar(255)
-  blocked               Boolean  @default(false)
-  ext                   Json     @default("{}")
-  version               Int      @default(1)
-  createdAt             DateTime @default(now()) @map("created_at")
-  createdBy             String?  @map("created_by") @db.Uuid
-  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy             String?  @map("updated_by") @db.Uuid
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  code          String   @db.VarChar(20)
+  name          String   @db.VarChar(120)
+  template      String   @default("counter") @db.VarChar(40)
+  cashAccountId String   @map("cash_account_id") @db.Uuid
+  cardAccountId String   @map("card_account_id") @db.Uuid
+  receiptFooter String?  @map("receipt_footer") @db.VarChar(255)
+  blocked       Boolean  @default(false)
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
 
   company                SysCompany      @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
   cashAccount            GlAccount       @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
   cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
-  roundingGainAccount    GlAccount       @relation("PosRegister_roundingGainAccount", fields: [roundingGainAccountId], references: [id], onDelete: Restrict)
-  roundingLossAccount    GlAccount       @relation("PosRegister_roundingLossAccount", fields: [roundingLossAccountId], references: [id], onDelete: Restrict)
   posShift_register      PosShift[]      @relation("PosShift_register")
   posReceipt_register    PosReceipt[]    @relation("PosReceipt_register")
   intConnection_register IntConnection[] @relation("IntConnection_register")
@@ -1824,8 +1813,6 @@ model PosRegister {
   @@index([tenantId, companyId])
   @@index([cashAccountId])
   @@index([cardAccountId])
-  @@index([roundingGainAccountId])
-  @@index([roundingLossAccountId])
   @@map("pos_register")
 }
 

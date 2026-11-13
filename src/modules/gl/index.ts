@@ -220,6 +220,61 @@ export const dimensionRule = defineObject({
   defaultSort: { field: "accountMask", dir: "asc" },
 });
 
+/** Druhy systémových účtů (obdoba „Účty pro automatické transakce“ v AX). */
+export const SystemPosting = defineEnum({
+  id: "GlSystemPosting",
+  label: "@GL:SystemPosting",
+  values: [
+    { value: "roundingGain", label: "@GL:SpRoundingGain" },
+    { value: "roundingLoss", label: "@GL:SpRoundingLoss" },
+    { value: "pennyGain", label: "@GL:SpPennyGain" },
+    { value: "pennyLoss", label: "@GL:SpPennyLoss" },
+    { value: "realizedGain", label: "@GL:SpRealizedGain" },
+    { value: "realizedLoss", label: "@GL:SpRealizedLoss" },
+    { value: "unrealizedGain", label: "@GL:SpUnrealizedGain" },
+    { value: "unrealizedLoss", label: "@GL:SpUnrealizedLoss" },
+    { value: "error", label: "@GL:SpError" },
+    { value: "profitLoss", label: "@GL:SpProfitLoss" },
+    { value: "retainedEarnings", label: "@GL:SpRetainedEarnings" },
+    { value: "opening", label: "@GL:SpOpening" },
+    { value: "closing", label: "@GL:SpClosing" },
+  ],
+});
+
+/** Výchozí účty podle české osnovy (syntetika → první účet / xxx000). */
+export const SYSTEM_DEFAULTS: Record<string, string> = {
+  roundingGain: "648",
+  roundingLoss: "548",
+  pennyGain: "648",
+  pennyLoss: "548",
+  realizedGain: "663",
+  realizedLoss: "563",
+  unrealizedGain: "663",
+  unrealizedLoss: "563",
+  error: "395",
+  profitLoss: "431",
+  retainedEarnings: "428",
+  opening: "701",
+  closing: "702",
+};
+
+export const systemAccount = defineObject({
+  id: "gl.systemAccount",
+  table: "gl_system_account",
+  label: "@GL:SystemAccount",
+  labelPlural: "@GL:SystemAccounts",
+  scope: "company",
+  fields: {
+    postingType: { edt: enumEdt(SystemPosting), mandatory: true },
+    accountId: { edt: AccRef("@GL:Account"), mandatory: true },
+  },
+  titleField: "postingType",
+  list: ["postingType", "accountId"],
+  form: [{ label: "@SYS:General", fields: ["postingType", "accountId"] }],
+  unique: [["postingType"]],
+  defaultSort: { field: "postingType", dir: "asc" },
+});
+
 export const parameters = defineObject({
   id: "gl.parameters",
   table: "gl_parameters",
@@ -231,21 +286,11 @@ export const parameters = defineObject({
     reportingCurrencyId: { edt: refEdt("sys.currency", "@GL:ReportingCurrency") },
     rateSource: { edt: enumEdt(LedgerRateSource), mandatory: true, default: "cnb" },
     rateMaxAgeDays: { edt: Edts.Int, label: "@GL:RateMaxAge", mandatory: true, default: 7 },
-    realizedGainAccountId: { edt: AccRef("@GL:RealizedGain") },
-    realizedLossAccountId: { edt: AccRef("@GL:RealizedLoss") },
-    roundingGainAccountId: { edt: AccRef("@GL:RoundingGain") },
-    roundingLossAccountId: { edt: AccRef("@GL:RoundingLoss") },
-    profitLossAccountId: { edt: AccRef("@GL:ProfitLoss") },
-    retainedEarningsAccountId: { edt: AccRef("@GL:RetainedEarnings") },
-    openingAccountId: { edt: AccRef("@GL:OpeningAccount") },
-    closingAccountId: { edt: AccRef("@GL:ClosingAccount") },
   },
   titleField: "accountingCurrencyId",
   list: ["accountingCurrencyId", "reportingCurrencyId", "rateSource", "rateMaxAgeDays"],
   form: [
     { label: "@GL:Currencies", fields: ["accountingCurrencyId", "reportingCurrencyId", "rateSource", "rateMaxAgeDays"] },
-    { label: "@GL:ExchangeDiffs", fields: ["realizedGainAccountId", "realizedLossAccountId", "roundingGainAccountId", "roundingLossAccountId"] },
-    { label: "@GL:YearEnd", fields: ["profitLossAccountId", "retainedEarningsAccountId", "openingAccountId", "closingAccountId"] },
   ],
 });
 
@@ -414,8 +459,8 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus],
-  objects: [parameters, dimension, dimensionValue, dimensionRule, account, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
+  enums: [DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus, SystemPosting],
+  objects: [parameters, systemAccount, dimension, dimensionValue, dimensionRule, account, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
   reports: glReports,
   menu: [
     {
@@ -434,7 +479,7 @@ export default defineModule({
     {
       label: "@SYS:Setup",
       items: [
-        { object: "gl.parameters" },
+        { object: "gl.parameters" }, { object: "gl.systemAccount" },
         { object: "sys.currency" },
         { object: "sys.exchangeRate" },
         { object: "gl.account" },
@@ -450,6 +495,23 @@ export default defineModule({
   setup: glSetup,
   labels: {
     cs: {
+      SystemPosting: "Druh",
+      SystemAccount: "Systémový účet",
+      SystemAccounts: "Systémové účty",
+      SpRoundingGain: "Zaokrouhlení – výnos",
+      SpRoundingLoss: "Zaokrouhlení – náklad",
+      SpPennyGain: "Haléřové rozdíly – výnos",
+      SpPennyLoss: "Haléřové rozdíly – náklad",
+      SpRealizedGain: "Kurzové zisky realizované",
+      SpRealizedLoss: "Kurzové ztráty realizované",
+      SpUnrealizedGain: "Kurzové zisky nerealizované",
+      SpUnrealizedLoss: "Kurzové ztráty nerealizované",
+      SpError: "Technický účet (chyby, nezařazené)",
+      SpProfitLoss: "Výsledek hospodaření ve schvalovacím řízení",
+      SpRetainedEarnings: "Nerozdělený zisk / neuhrazená ztráta",
+      SpOpening: "Počáteční účet rozvažný",
+      SpClosing: "Konečný účet rozvažný",
+      SystemAccountMissing: "Chybí systémový účet „{type}“ — doplňte ho v Hlavní kniha → Systémové účty.",
       JobDimensionRules: "Pravidla dimenzí do účtů",
       DimRulesApplied: "Upraveno účtů: {n}.",
       Module: "Hlavní kniha",
@@ -589,6 +651,23 @@ export default defineModule({
       AmountCur: "Částka v měně",
     },
     en: {
+      SystemPosting: "Type",
+      SystemAccount: "System account",
+      SystemAccounts: "System accounts",
+      SpRoundingGain: "Rounding – gain",
+      SpRoundingLoss: "Rounding – loss",
+      SpPennyGain: "Penny difference – gain",
+      SpPennyLoss: "Penny difference – loss",
+      SpRealizedGain: "Realized exchange gain",
+      SpRealizedLoss: "Realized exchange loss",
+      SpUnrealizedGain: "Unrealized exchange gain",
+      SpUnrealizedLoss: "Unrealized exchange loss",
+      SpError: "Suspense account (errors)",
+      SpProfitLoss: "Profit / loss for approval",
+      SpRetainedEarnings: "Retained earnings",
+      SpOpening: "Opening balance account",
+      SpClosing: "Closing balance account",
+      SystemAccountMissing: "System account “{type}” is missing — set it in General ledger → System accounts.",
       JobDimensionRules: "Apply dimension rules to accounts",
       DimRulesApplied: "Accounts updated: {n}.",
       Module: "General ledger",

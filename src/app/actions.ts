@@ -62,7 +62,9 @@ async function userError(e: unknown, lang: Parameters<typeof getT>[0], tenantId:
   const t = await getT(lang, tenantId);
   const errors: Record<string, string> = {};
   for (const [k, v] of Object.entries(e.fields ?? {})) errors[k] = t(v);
-  return { message: t(e.label, e.params), errors };
+  // parametr může být label (název druhu, pole) — přeložit
+  const params = Object.fromEntries(Object.entries(e.params ?? {}).map(([k, v]) => [k, v.startsWith("@") ? t(v) : v]));
+  return { message: t(e.label, params), errors };
 }
 
 export async function saveAction(_: FormState, form: FormData): Promise<FormState> {
