@@ -308,3 +308,36 @@ describe("položky: marže, slevy, ARES", () => {
     expect([addr.street, addr.city, addr.zipCode, addr.kind]).toEqual(["Na náměstí 97", "Davle", "252 06", "registered"]);
   });
 });
+
+describe("obrázky položek", () => {
+  it("import se složkou obrázků (spárování podle cesty), stejný soubor se neukládá znovu, ruční nahrání a odebrání", async () => {
+    const { importRecords, parseCsv, imagesFromUploads } = await import("@/server/import");
+    const { setImage } = await import("@/server/docuref");
+    const C = (
+      await provisionTenant(client, { code: `t-img-${run}`, name: "Img", adminEmail: `img-${run}@test.local`, adminPassword: "heslo-12345", modules: ["inv"], company: { code: "I", name: "I" } })
+    ).ctx;
+    const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]);
+    // cesta z Windows (zpětná lomítka), soubory ze složky v prohlížeči (dopředná)
+    const win = ["C:", "Data", "nahledy", "antoni", "002_spek.jpg"].join(String.fromCharCode(92));
+    const csv = `Číslo položky;Název;Skupina;MJ;Obrázek\nA1;Šunka;ZBOZI;KG;${win}\nA2;Salám;ZBOZI;KG;chybi.jpg`;
+    const uploads = imagesFromUploads([{ path: "nahledy/antoni/002_spek.jpg", data: jpg }]);
+    const bad = await importRecords(C, "inv.item", parseCsv(csv), { dryRun: false, lang: "cs", images: uploads }, client);
+    expect(bad.applied).toBe(false);
+    expect(bad.errors[0]).toMatchObject({ row: 3, column: "Obrázek" });
+    const ok = await importRecords(C, "inv.item", parseCsv(csv.split("\n").slice(0, 2).join("\n")), { dryRun: false, lang: "cs", images: uploads }, client);
+    expect([ok.created, ok.applied]).toEqual([1, true]);
+    const it1 = (await listRecords(C, "inv.item", {}, client)).rows[0];
+    expect(it1.image).toMatch(/^[0-9a-f-]{36}$/);
+    // znovu stejný soubor → beze změny
+    await importRecords(C, "inv.item", parseCsv(csv.split("\n").slice(0, 2).join("\n")), { dryRun: false, lang: "cs", images: uploads }, client);
+    expect((await listRecords(C, "inv.item", {}, client)).rows[0].image).toBe(it1.image);
+    // ruční nahrání: jiný soubor nahradí starý, ne-obrázek odmítne, odebrání
+    await expect(setImage(C, "inv.item", String(it1.id), "image", { name: "x.txt", data: Buffer.from("ahoj") }, client)).rejects.toMatchObject({ label: "@SYS:ImageInvalid" });
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(50)]);
+    const newId = await setImage(C, "inv.item", String(it1.id), "image", { name: "nova.png", data: png }, client);
+    expect(newId).not.toBe(it1.image);
+    expect(await client.sysDocuRef.count({ where: { id: String(it1.image) } })).toBe(0);
+    await setImage(C, "inv.item", String(it1.id), "image", null, client);
+    expect((await getRecord(C, "inv.item", String(it1.id), client))!.image).toBeNull();
+  });
+});

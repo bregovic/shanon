@@ -44,10 +44,11 @@ const useStyles = makeStyles({
 type L = UiLabels["importer"];
 const fill = (s: string, p: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(p[k] ?? ""));
 
-export function ImportButton({ objectId, labels, onDone }: { objectId: string; labels: L; onDone: () => void }) {
+export function ImportButton({ objectId, labels, onDone, hasImages = false }: { objectId: string; labels: L; onDone: () => void; hasImages?: boolean }) {
   const st = useStyles();
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [images, setImages] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState<string>();
@@ -61,6 +62,8 @@ export function ImportButton({ objectId, labels, onDone }: { objectId: string; l
     fd.set("objectId", objectId);
     fd.set("file", file);
     fd.set("dryRun", dryRun ? "1" : "0");
+    // relativní cesta ve složce (antoni/002_spek.jpg) slouží ke spárování se sloupcem Obrázek
+    for (const im of images) fd.append("images", im, (im as File & { webkitRelativePath?: string }).webkitRelativePath || im.name);
     const res = await importAction(fd);
     setBusy(false);
     if (!res.ok) {
@@ -76,6 +79,7 @@ export function ImportButton({ objectId, labels, onDone }: { objectId: string; l
     setOpen(o);
     if (!o) {
       setFile(null);
+      setImages([]);
       setReport(null);
       setError(undefined);
     }
@@ -107,6 +111,24 @@ export function ImportButton({ objectId, labels, onDone }: { objectId: string; l
                 />
                 <Link href={`/api/import-template/${objectId}`}>{labels.template}</Link>
               </div>
+              {hasImages && (
+                <div className={st.file}>
+                  <Text>{labels.images}</Text>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    aria-label={labels.images}
+                    // složka i s podsložkami (Chrome, Edge, Firefox, Safari)
+                    {...({ webkitdirectory: "" } as Record<string, string>)}
+                    onChange={(e) => {
+                      setImages([...(e.target.files ?? [])].filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f.name)));
+                      setReport(null);
+                    }}
+                  />
+                  {images.length > 0 && <Text>{labels.imagesCount.replace("{n}", String(images.length))}</Text>}
+                </div>
+              )}
               {busy && <Spinner size="tiny" />}
               {error && (
                 <MessageBar intent="error">

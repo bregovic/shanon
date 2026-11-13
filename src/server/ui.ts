@@ -31,6 +31,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
     refHref: e.refObject ? objectHref(e.refObject) : undefined,
     ext,
     secret: f.secret,
+    image: f.image,
     visibleWhen: f.visibleWhen,
   };
 }
@@ -79,7 +80,14 @@ export function uiLabels(t: T) {
       total: t("@SYS:Total"),
       help: FILTER_HELP.map(([code, label]) => [code, t(label)] as [string, string]),
     },
-    drawer: { save: t("@SYS:Save"), cancel: t("@SYS:Cancel"), close: t("@SYS:Close"), newTitle: t("@SYS:New"), open: t("@SYS:Open") },
+    drawer: {
+      save: t("@SYS:Save"),
+      cancel: t("@SYS:Cancel"),
+      close: t("@SYS:Close"),
+      newTitle: t("@SYS:New"),
+      open: t("@SYS:Open"),
+      image: { upload: t("@SYS:ImageUpload"), remove: t("@SYS:ImageRemove"), drop: t("@SYS:ImageDrop"), afterSave: t("@SYS:ImageAfterSave") },
+    },
     history: {
       history: t("@SYS:History"),
       noHistory: t("@SYS:NoHistory"),
@@ -106,6 +114,8 @@ export function uiLabels(t: T) {
       done: t("@SYS:ImportDone"),
       failed: t("@SYS:ImportFailed"),
       close: t("@SYS:Close"),
+      images: t("@SYS:ImportImages"),
+      imagesCount: t("@SYS:ImportImagesCount"),
     },
     docuref: {
       attachments: t("@SYS:Attachments"),

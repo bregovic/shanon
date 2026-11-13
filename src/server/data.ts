@@ -197,7 +197,7 @@ function prismaError(e: unknown): never {
 // Operace v rámci transakce
 // ---------------------------------------------------------------------------
 
-class Session {
+export class Session {
   constructor(
     public tx: Tx,
     public ctx: Ctx,
@@ -520,6 +520,27 @@ class Session {
 export function inTenant<T>(ctx: Ctx, fn: (s: Session) => Promise<T>, client?: PrismaClient): Promise<T> {
   return withTenant(ctx.tenantId, (tx) => fn(new Session(tx, ctx)), client ?? prisma);
 }
+
+/**
+ * Nastaví pole s obrázkem (id souboru) bez zvýšení verze záznamu — otevřený
+ * formulář tak po nahrání obrázku dál uloží bez konfliktu. Zapíše historii.
+ */
+export const setImageField = (ctx: Ctx, objectId: string, id: string, field: string, value: string | null, client?: PrismaClient) =>
+  inTenant(
+    ctx,
+    async (s) => {
+      const def = getObject(objectId);
+      if (!def.fields[field]?.image) throw new UserError("@SYS:InvalidValue");
+      assertAccess(ctx, def, "write", false);
+      const before = await s.sys().get(objectId, id);
+      if (!before) throw new UserError("@SYS:NotFound");
+      if (def.lockedWhen && before[def.lockedWhen.field] === def.lockedWhen.equals) throw new UserError("@SYS:Locked");
+      await delegate(s.tx, def).updateMany({ where: { id, ...scopeWhere(ctx, def) }, data: { [field]: value, updatedBy: ctx.userId } });
+      await s.audit(objectId, id, "update", { [field]: before[field] ?? null }, { [field]: value });
+      return before[field] as string | null;
+    },
+    client,
+  );
 
 /** Počet záznamů objektu v celém tenantovi (všechny firmy) — pro správu modulů. */
 export const countAllRecords = (tenantId: string, objectId: string, client?: PrismaClient) =>

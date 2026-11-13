@@ -8,9 +8,9 @@ import { registry } from "@/registry";
 import { isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
 import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma } from "@/server/db";
-import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, type DocuRefItem } from "@/server/docuref";
+import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
-import { importRecords, readTable, type ImportReport } from "@/server/import";
+import { importRecords, imagesFromUploads, readTable, type ImportReport } from "@/server/import";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
 import { openShiftOf, quote, receiptPrint, sell, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
@@ -308,7 +308,10 @@ export async function importAction(form: FormData): Promise<ActionResult<ImportR
   try {
     if (!(file instanceof File) || !file.size) throw new UserError("@SYS:Required");
     const table = await readTable(file.name, Buffer.from(await file.arrayBuffer()));
-    const report = await importRecords(s.ctx, objectId, table, { dryRun: form.get("dryRun") === "1", lang: s.lang });
+    // obrázky ke sloupci Obrázek: soubory ze zvolené složky (název = relativní cesta)
+    const uploads: { path: string; data: Buffer }[] = [];
+    for (const f of form.getAll("images")) if (f instanceof File && f.size) uploads.push({ path: f.name, data: Buffer.from(await f.arrayBuffer()) });
+    const report = await importRecords(s.ctx, objectId, table, { dryRun: form.get("dryRun") === "1", lang: s.lang, images: imagesFromUploads(uploads) });
     if (report.applied) revalidatePath(objectHref(objectId));
     return { ok: true, data: report };
   } catch (e) {
@@ -467,6 +470,23 @@ export async function posCloseShiftAction(registerId: string): Promise<ActionRes
     });
     revalidatePath(objectHref("pos.shift"));
     return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Obrázek záznamu (nahrání / odebrání). Vrací id nového souboru. */
+export async function uploadImageAction(form: FormData): Promise<ActionResult<string | null>> {
+  const s = await requireSession();
+  const objectId = String(form.get("objectId"));
+  const id = String(form.get("id"));
+  const field = String(form.get("field"));
+  const file = form.get("file");
+  try {
+    const data = file instanceof File && file.size ? { name: file.name, data: Buffer.from(await file.arrayBuffer()) } : null;
+    const res = await setImage(s.ctx, objectId, id, field, data);
+    revalidatePath(objectHref(objectId));
+    return { ok: true, data: res };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

@@ -22,6 +22,8 @@ export interface FieldMeta {
   ext?: boolean;
   /** tajný údaj — zadává se, nezobrazuje */
   secret?: boolean;
+  /** obrázek (hodnota = id souboru, /api/files/<id>) */
+  image?: boolean;
   visibleWhen?: { field: string; in: unknown[] };
 }
 

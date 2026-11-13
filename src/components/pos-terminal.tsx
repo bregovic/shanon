@@ -54,6 +54,8 @@ export interface PosItem {
   regular?: string | null;
   weighed: boolean;
   ean: string | null;
+  /** id souboru obrázku (/api/files/<id>) */
+  image?: string | null;
 }
 
 interface Line {
@@ -89,7 +91,7 @@ const useStyles = makeStyles({
     overflowY: "auto",
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-    gridAutoRows: "minmax(104px, auto)",
+    gridAutoRows: "max-content",
     gap: "10px",
     alignContent: "start",
     paddingBottom: "8px",
@@ -99,8 +101,11 @@ const useStyles = makeStyles({
     flexDirection: "column",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: "6px",
+    minHeight: "104px",
+    overflow: "hidden",
     textAlign: "left",
-    padding: "12px",
+    padding: "10px 12px",
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground1,
@@ -113,6 +118,7 @@ const useStyles = makeStyles({
     ":active": { backgroundColor: tokens.colorBrandBackground2 },
   },
   regular: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
+  tileImg: { width: "100%", height: "96px", objectFit: "contain", borderRadius: tokens.borderRadiusMedium, flexShrink: 0 },
   tileName: { fontWeight: tokens.fontWeightSemibold, lineHeight: tokens.lineHeightBase400 },
   tilePrice: { display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   cart: {
@@ -437,6 +443,10 @@ export function PosTerminal(p: {
             <div className={st.tiles}>
               {visible.map((i) => (
                 <button key={i.id} type="button" className={st.tile} onClick={() => pick(i)}>
+                  {i.image && (
+                    // eslint-disable-next-line @next/next/no-img-element -- soubor za přihlášením, prohlížeč ho cachuje
+                    <img src={`/api/files/${i.image}`} alt="" loading="lazy" className={st.tileImg} />
+                  )}
                   <span className={st.tileName}>{i.name}</span>
                   <span className={st.tilePrice}>
                     {i.weighed && <Scales24Regular fontSize={16} />}

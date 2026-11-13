@@ -130,7 +130,7 @@ export function ObjectListView(p: ObjectListProps) {
           recordTitle={selected.length === 1 ? String(selected[0][p.titleField] ?? p.label) : ""}
           labels={p.labels.history}
         />
-        {p.canCreate && <ImportButton objectId={p.objectId} labels={p.labels.importer} onDone={() => setReload((n) => n + 1)} />}
+        {p.canCreate && <ImportButton objectId={p.objectId} labels={p.labels.importer} hasImages={p.columns.some((c) => c.image) || p.groups.some((g) => g.fields.some((f) => f.image))} onDone={() => setReload((n) => n + 1)} />}
         <Button appearance="subtle" icon={<ArrowDownload24Regular />} title={p.labels.export} aria-label={p.labels.export} onClick={() => (window.location.href = exportHref())} />
         <Button appearance="subtle" icon={<ArrowClockwise24Regular />} title={`${p.labels.actions.refresh} (Shift+R)`} onClick={() => setReload((n) => n + 1)}>
           {p.labels.actions.refresh}

@@ -2,12 +2,12 @@
  * Údržba: import souboru (CSV, XML, Excel) do objektu — stejná logika jako
  * tlačítko Import (validace, události, vše nebo nic). Data do repa nepatří.
  *
- *   npx tsx --conditions=react-server scripts/import-file.ts <tenant> <kód firmy> <objekt> <soubor> [--check]
+ *   npx tsx --conditions=react-server scripts/import-file.ts <tenant> <kód firmy> <objekt> <soubor> [--check] [--images=<složka>]
  *   npx tsx --conditions=react-server scripts/import-file.ts <tenant> <kód firmy> --ares     (sídla subjektů s IČO z ARES)
  */
 import "dotenv/config";
-import { readFileSync } from "node:fs";
-import { basename } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { dependencyClosure } from "../src/core/module";
 import { ADMIN } from "../src/core/security";
 import { registry } from "../src/registry";
@@ -34,7 +34,12 @@ async function main() {
       }
     }
   } else {
-    const r = await importRecords(ctx, objectId, await readTable(basename(file), readFileSync(file)), { dryRun: process.argv.includes("--check"), lang: "cs" }, client);
+    const imgDir = process.argv.find((a) => a.startsWith("--images="))?.slice(9) ?? dirname(file);
+    const images = (p: string) => {
+      const full = isAbsolute(p) ? p : join(imgDir, p);
+      return existsSync(full) ? { name: basename(full), data: readFileSync(full) } : null;
+    };
+    const r = await importRecords(ctx, objectId, await readTable(basename(file), readFileSync(file)), { dryRun: process.argv.includes("--check"), lang: "cs", images }, client);
     console.log(`${basename(file)} → ${objectId}: nových ${r.created}, upravených ${r.updated}, ${r.applied ? "uloženo" : "NEULOŽENO"}`);
     const ignored = r.columns.filter((x) => x.status !== "mapped").map((x) => x.header);
     if (ignored.length) console.log(`  nepoužité sloupce: ${ignored.join(", ")}`);

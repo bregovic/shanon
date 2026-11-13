@@ -1034,6 +1034,7 @@ model InvItem {
   weighed        Boolean  @default(false)
   description    String?
   blocked        Boolean  @default(false)
+  image          String?  @db.VarChar(36)
   ext            Json     @default("{}")
   version        Int      @default(1)
   createdAt      DateTime @default(now()) @map("created_at")

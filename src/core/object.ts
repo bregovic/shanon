@@ -39,6 +39,11 @@ export interface FieldDef {
    * se nevrací (jen maska), logika modulu ho čte přes revealSecret()
    */
   secret?: boolean;
+  /**
+   * obrázek: pole drží id souboru (DocuRef); formulář ukáže náhled, nahrání
+   * tlačítkem i přetažením, grid miniaturu, import bere cestu k souboru
+   */
+  image?: boolean;
   /** pole se ve formuláři ukáže jen při dané hodnotě jiného pole */
   visibleWhen?: VisibleWhen;
   /** další názvy sloupce při importu (CSV/XML), např. ["cena", "price"] */

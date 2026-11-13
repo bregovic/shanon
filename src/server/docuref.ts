@@ -6,7 +6,7 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { UserError } from "@/core/module";
 import { can } from "@/core/security";
-import { getObject, inTenant, type Ctx } from "./data";
+import { getObject, inTenant, setImageField, type Ctx } from "./data";
 import { defaultStorage, storageFor } from "./storage";
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -122,6 +122,53 @@ export async function addFile(
     },
     client,
   );
+}
+
+const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Typ obrázku podle obsahu (ne podle přípony). */
+export function imageMime(data: Buffer): string | null {
+  if (data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return "image/jpeg";
+  if (data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (data.subarray(0, 4).toString("latin1") === "RIFF" && data.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  if (data.subarray(0, 4).toString("latin1") === "GIF8") return "image/gif";
+  return null;
+}
+
+/**
+ * Obrázek záznamu: uloží soubor jako přílohu (DocuRef) a jeho id do pole;
+ * předchozí obrázek smaže. `file = null` obrázek odebere.
+ */
+export async function setImage(
+  ctx: Ctx,
+  objectId: string,
+  recordId: string,
+  field: string,
+  file: { name: string; data: Buffer } | null,
+  client?: PrismaClient,
+): Promise<string | null> {
+  await checkRecord(ctx, objectId, recordId, "write", client);
+  let id: string | null = null;
+  if (file) {
+    const mime = imageMime(file.data);
+    if (!mime) throw new UserError("@SYS:ImageInvalid");
+    if (file.data.length > IMAGE_MAX_BYTES) throw new UserError("@SYS:FileTooLarge", { max: "2 MB" });
+    const storage = defaultStorage();
+    id = await inTenant(
+      ctx,
+      async (s) => {
+        const key = await storage.put(s.tx, ctx.tenantId, file.data);
+        const r = await s.tx.sysDocuRef.create({
+          data: { tenantId: ctx.tenantId, objectId, recordId, kind: "file", name: safeFileName(file.name), mime, size: file.data.length, storage: storage.id, storageKey: key, createdBy: ctx.userId },
+        });
+        return r.id;
+      },
+      client,
+    );
+  }
+  const previous = await setImageField(ctx, objectId, recordId, field, id, client);
+  if (previous && previous !== id) await deleteDocuRef(ctx, previous, client).catch(() => undefined);
+  return id;
 }
 
 export async function deleteDocuRef(ctx: Ctx, id: string, client?: PrismaClient) {

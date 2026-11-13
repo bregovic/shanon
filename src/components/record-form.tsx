@@ -21,7 +21,7 @@ import {
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { Open24Regular } from "@fluentui/react-icons";
-import { searchRefs } from "@/app/actions";
+import { searchRefs, uploadImageAction } from "@/app/actions";
 import { displayValue, type FieldMeta } from "@/lib/meta";
 
 export type Values = Record<string, unknown>;
@@ -59,6 +59,7 @@ export function RecordForm({
   onChange,
   columns = 2,
   openLabel,
+  record,
 }: {
   groups: FormGroup[];
   values: Values;
@@ -70,6 +71,8 @@ export function RecordForm({
   columns?: 1 | 2;
   /** popisek tlačítka pro proskok na odkazovaný záznam */
   openLabel: string;
+  /** záznam (pro pole s obrázkem: nahrání k uloženému záznamu) */
+  record?: { objectId: string; id: string | null; labels: ImageLabels };
 }) {
   const s = useStyles();
   return (
@@ -79,7 +82,10 @@ export function RecordForm({
           <div className={s.groupTitle}>{g.label}</div>
           <div className={s.grid} style={columns === 1 ? { gridTemplateColumns: "1fr" } : undefined}>
             {g.fields.filter((f) => shown(f.visibleWhen, values)).map((f) => (
-              <div key={f.name} className={f.kind === "text" ? s.wide : undefined}>
+              <div key={f.name} className={f.kind === "text" || f.image ? s.wide : undefined}>
+                {f.image ? (
+                  <ImageField f={f} value={values[f.name] as string | null} record={record} disabled={readOnly} onChange={onChange} />
+                ) : (
                 <FieldInput
                   f={f}
                   value={values[f.name]}
@@ -89,6 +95,7 @@ export function RecordForm({
                   onChange={onChange}
                   openLabel={openLabel}
                 />
+                )}
               </div>
             ))}
           </div>
@@ -271,5 +278,105 @@ function RefCombobox({
       {/* proskok na odkazovaný záznam (číselník, nastavení, subjekt…) */}
       {value && <OpenRef href={`${f.refHref}/${value}`} label={openLabel} />}
     </div>
+  );
+}
+
+export interface ImageLabels {
+  upload: string;
+  remove: string;
+  drop: string;
+  afterSave: string;
+}
+
+/** Obrázek záznamu: náhled, nahrání tlačítkem nebo přetažením, odebrání. */
+function ImageField({
+  f,
+  value,
+  record,
+  disabled,
+  onChange,
+}: {
+  f: FieldMeta;
+  value: string | null;
+  record?: { objectId: string; id: string | null; labels: ImageLabels };
+  disabled: boolean;
+  onChange: (name: string, value: unknown) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const [over, setOver] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const L = record?.labels;
+  const can = !!record?.id && !disabled;
+  const send = async (file: File | null) => {
+    if (!record?.id) return;
+    setBusy(true);
+    setError(undefined);
+    const fd = new FormData();
+    fd.set("objectId", record.objectId);
+    fd.set("id", record.id);
+    fd.set("field", f.name);
+    if (file) fd.set("file", file);
+    const r = await uploadImageAction(fd);
+    setBusy(false);
+    if (!r.ok) setError(r.message);
+    else onChange(f.name, r.data);
+  };
+  return (
+    <Field label={f.label} validationMessage={error}>
+      <div
+        onDragOver={(e) => {
+          if (!can) return;
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          if (can && e.dataTransfer.files[0]) void send(e.dataTransfer.files[0]);
+        }}
+        style={{
+          display: "flex",
+          gap: 16,
+          alignItems: "center",
+          padding: 12,
+          border: `1px dashed ${over ? tokens.colorBrandStroke1 : tokens.colorNeutralStroke1}`,
+          borderRadius: tokens.borderRadiusMedium,
+          background: over ? tokens.colorBrandBackground2 : undefined,
+        }}
+      >
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element -- soubor za přihlášením, ne statický obrázek
+          <img src={`/api/files/${value}`} alt="" width={128} height={128} style={{ objectFit: "contain", borderRadius: tokens.borderRadiusMedium, background: tokens.colorNeutralBackground3 }} />
+        ) : (
+          <div style={{ width: 128, height: 128, borderRadius: tokens.borderRadiusMedium, background: tokens.colorNeutralBackground3 }} />
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {can ? <span style={{ color: tokens.colorNeutralForeground3 }}>{L?.drop}</span> : <span style={{ color: tokens.colorNeutralForeground3 }}>{record?.id ? "" : L?.afterSave}</span>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button disabled={!can || busy} onClick={() => input.current?.click()}>
+              {L?.upload}
+            </Button>
+            {value && (
+              <Button appearance="subtle" disabled={!can || busy} onClick={() => send(null)}>
+                {L?.remove}
+              </Button>
+            )}
+          </div>
+        </div>
+        <input
+          ref={input}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null;
+            e.target.value = "";
+            if (file) void send(file);
+          }}
+        />
+      </div>
+    </Field>
   );
 }

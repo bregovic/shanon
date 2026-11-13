@@ -21,7 +21,9 @@ import { coerce } from "@/core/validate";
 import { fillLabel, resolveLabel, type Lang } from "@/core/labels";
 import { labelTable, registry } from "@/registry";
 import { can } from "@/core/security";
-import { getObject, inTenant, type Ctx } from "./data";
+import { getObject, inTenant, type Ctx, type Session } from "./data";
+import { imageMime, safeFileName } from "./docuref";
+import { defaultStorage, storageFor } from "./storage";
 
 export const IMPORT_MAX_ROWS = 5000;
 
@@ -191,7 +193,8 @@ export function mapColumns(def: ObjectDef, headers: string[], lang: Lang): Impor
     if (!field || used.has(field)) return { header, field: null, label: null, status: "ignored" as const };
     used.add(field);
     const f = def.fields[field];
-    return { header, field, label: fieldLabel(f, lang), status: f.readOnly ? ("computed" as const) : ("mapped" as const) };
+    // obrázek je jen pro čtení ve formuláři, ale import ho nastaví ze souboru
+    return { header, field, label: fieldLabel(f, lang), status: f.readOnly && !f.image ? ("computed" as const) : ("mapped" as const) };
   });
 }
 
@@ -239,11 +242,32 @@ class Rollback extends Error {
   }
 }
 
+/** Soubory obrázků k importu: cesta (jak ji zná uživatel) → obsah. */
+export type ImageSource = (path: string) => { name: string; data: Buffer } | null;
+
+const normPath = (p: string) => p.trim().replace(/\\/g, "/").replace(/^\.?\//, "").toLowerCase();
+
+/** Obrázky nahrané v prohlížeči (složka): spárování podle konce cesty, jinak podle názvu souboru. */
+export function imagesFromUploads(files: { path: string; data: Buffer }[]): ImageSource {
+  const list = files.map((f) => ({ key: normPath(f.path), name: f.path.split(/[\\/]/).pop()!, data: f.data }));
+  return (raw) => {
+    const p = normPath(raw);
+    const hit =
+      list.find((f) => f.key === p || f.key.endsWith(`/${p}`) || p.endsWith(`/${f.key}`)) ??
+      (() => {
+        const base = p.split("/").pop();
+        const same = list.filter((f) => f.key.split("/").pop() === base);
+        return same.length === 1 ? same[0] : undefined;
+      })();
+    return hit ? { name: hit.name, data: hit.data } : null;
+  };
+}
+
 export async function importRecords(
   ctx: Ctx,
   objectId: string,
   table: ImportTable,
-  opts: { dryRun: boolean; lang: Lang },
+  opts: { dryRun: boolean; lang: Lang; images?: ImageSource },
   client?: PrismaClient,
 ): Promise<ImportReport> {
   const def = getObject(objectId);
@@ -300,13 +324,28 @@ export async function importRecords(
         for (let i = 0; i < rows.length; i++) {
           const cells = rows[i];
           const values: RecordData = {};
+          const images: { field: string; file: { name: string; data: Buffer } }[] = [];
           let bad = false;
           for (const c of mapped) {
             const raw = (cells[c.i] ?? "").trim();
             if (raw === "") continue;
             const f = def.fields[c.field!];
+            if (f.image) {
+              const file = opts.images?.(raw) ?? null;
+              const mime = file ? imageMime(file.data) : null;
+              if (!file) err(lineNo(i), c.header, t("@SYS:ImageNotFound", { path: raw }));
+              else if (!mime) err(lineNo(i), c.header, `${t("@SYS:ImageInvalid")} (${raw})`);
+              else {
+                images.push({ field: c.field!, file });
+                continue;
+              }
+              bad = true;
+              continue;
+            }
             if (f.edt.kind === "ref") {
-              const id = (await lookup(f.edt.refObject!)).get(norm(raw));
+              const map = await lookup(f.edt.refObject!);
+              // účet zadaný syntetikou (604) = 604000
+              const id = map.get(norm(raw)) ?? (f.edt.refObject === "gl.account" && /^\d{3}$/.test(raw) ? map.get(`${raw}000`) : undefined);
               if (!id) {
                 err(lineNo(i), c.header, t(id === null ? "@SYS:ImportAmbiguous" : "@SYS:ImportNotFound", { value: raw }));
                 bad = true;
@@ -329,7 +368,8 @@ export async function importRecords(
           }
           await s.tx.$executeRawUnsafe("SAVEPOINT shanon_import_row");
           try {
-            await s.save(objectId, existingId, values);
+            const saved = await s.save(objectId, existingId, values);
+            for (const im of images) await storeImage(s, objectId, String(saved.id), im.field, saved[im.field] as string | null, im.file);
             await s.tx.$executeRawUnsafe("RELEASE SAVEPOINT shanon_import_row");
             if (existingId) report.updated++;
             else report.created++;
@@ -356,9 +396,32 @@ export async function importRecords(
   }
 }
 
+/**
+ * Obrázek záznamu v transakci importu: stejný soubor (název a velikost) se
+ * znovu neukládá, jinak nová příloha a stará se smaže.
+ */
+async function storeImage(s: Session, objectId: string, recordId: string, field: string, current: string | null, file: { name: string; data: Buffer }) {
+  const tenantId = s.ctx.tenantId;
+  const name = safeFileName(file.name);
+  if (current) {
+    const old = await s.tx.sysDocuRef.findFirst({ where: { id: current, tenantId } });
+    if (old && old.name === name && old.size === file.data.length) return;
+    if (old) {
+      if (old.storageKey) await storageFor(old.storage).remove(s.tx, tenantId, old.storageKey);
+      await s.tx.sysDocuRef.delete({ where: { id: old.id } });
+    }
+  }
+  const storage = defaultStorage();
+  const key = await storage.put(s.tx, tenantId, file.data);
+  const ref = await s.tx.sysDocuRef.create({
+    data: { tenantId, objectId, recordId, kind: "file", name, mime: imageMime(file.data)!, size: file.data.length, storage: storage.id, storageKey: key, createdBy: s.ctx.userId },
+  });
+  await s.save(objectId, recordId, { [field]: ref.id }, { system: true });
+}
+
 /** Šablona CSV: hlavička z popisků polí, která lze importovat. */
 export function importTemplate(def: ObjectDef, lang: Lang, hidden: string[] = []): string {
-  const cols = Object.entries(def.fields).filter(([n, f]) => !f.readOnly && !hidden.includes(n));
+  const cols = Object.entries(def.fields).filter(([n, f]) => (!f.readOnly || f.image) && !hidden.includes(n));
   const cell = (s: string) => (/[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
   return "﻿" + cols.map(([, f]) => cell(fieldLabel(f, lang))).join(";") + "\r\n";
 }

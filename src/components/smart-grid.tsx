@@ -448,7 +448,12 @@ export function SmartGrid({
                     const neg = c.kind === "decimal" && String(r[c.name] ?? "").startsWith("-");
                     return (
                       <TableCell key={c.name} className={`${s.cell} ${neg ? s.neg : ""}`} style={{ textAlign: c.align }}>
-                        {c.kind === "ref" && r[c.name] && text ? (
+                        {c.image ? (
+                          r[c.name] ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- soubor za přihlášením
+                            <img src={`/api/files/${r[c.name]}`} alt="" width={32} height={32} loading="lazy" style={{ objectFit: "contain", display: "block" }} />
+                          ) : null
+                        ) : c.kind === "ref" && r[c.name] && text ? (
                           // proskok na odkazovaný záznam; klik neoznačí řádek
                           <NextLink
                             href={`${c.refHref}/${r[c.name]}`}

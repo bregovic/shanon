@@ -60,6 +60,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           regular: data.promo.has(String(i.id)) ? String(i.priceGross) : null,
           weighed: !!i.weighed,
           ean: (i.ean as string) ?? null,
+          image: (i.image as string) ?? null,
         }))}
       groups={data.groups.filter((g) => used.has(String(g.id))).map((g) => ({ id: String(g.id), name: String(g.name) }))}
       printer={

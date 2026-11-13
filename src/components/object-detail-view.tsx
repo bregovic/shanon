@@ -313,6 +313,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             errors={errors}
             readOnly={p.readOnly}
             openLabel={p.labels.drawer.open}
+            record={{ objectId: p.objectId, id: p.id, labels: p.labels.drawer.image }}
             onChange={(name, value, t) => {
               setValues((v) => ({ ...v, [name]: value }));
               if (t !== undefined) setTitles((x) => ({ ...x, [name]: t }));

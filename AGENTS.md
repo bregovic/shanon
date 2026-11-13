@@ -64,6 +64,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Tajné údaje = `FieldDef.secret`: šifrovaně (AES-256-GCM, `SHANON_SECRET_KEY`
   v prostředí — bez něj produkce tajné údaje neuloží; ztráta klíče = údaje znovu
   zadat), ven jen maska. Čte je jen logika modulu přes `revealSecret()`.
+- Obrázek = pole s `image: true` (hodnota = id přílohy): formulář ukáže náhled,
+  nahrání tlačítkem i přetažením (`setImage`, bez zvýšení verze záznamu), grid
+  miniaturu, import ho nastaví ze sloupce s cestou + složky obrázků
+  (`imagesFromUploads`, párování podle konce cesty / názvu souboru).
 - Pole/skupina formuláře podle hodnoty jiného pole: `visibleWhen: { field, in: [...] }`.
 - ARES (`src/modules/gab/ares.ts`): veřejná služba bez klíče; akce „Doplnit z ARES“
   na subjektu i partnerovi (podle IČO, jinak jednoznačně podle názvu) doplní jméno,

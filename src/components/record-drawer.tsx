@@ -18,10 +18,11 @@ import {
 } from "@fluentui/react-components";
 import { Dismiss24Regular } from "@fluentui/react-icons";
 import { getRecordAction, saveRecordAction } from "@/app/actions";
-import { RecordForm, type FormGroup, type Values } from "./record-form";
+import { RecordForm, type FormGroup, type ImageLabels, type Values } from "./record-form";
 import { useShortcuts } from "./shortcuts";
 
 export interface DrawerLabels {
+  image: ImageLabels;
   save: string;
   cancel: string;
   close: string;
@@ -140,6 +141,7 @@ function Editor({ objectId, id, title, groups, defaults, defaultTitles, readOnly
             readOnly={!!readOnly}
             columns={1}
             openLabel={labels.open}
+            record={{ objectId, id, labels: labels.image }}
             onChange={(name, value, t) =>
               setState((s) => ({
                 ...s,

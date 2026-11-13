@@ -20,7 +20,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         "Content-Length": String(f.data.length),
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "sandbox; default-src 'none'",
-        "Cache-Control": "private, no-store",
+        // obrázek se nikdy nemění (nový = nové id) — kasa ho nemusí stahovat znovu
+        "Cache-Control": f.mime.startsWith("image/") ? "private, max-age=31536000, immutable" : "private, no-store",
       },
     });
   } catch (e) {
