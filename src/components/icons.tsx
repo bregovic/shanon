@@ -5,6 +5,7 @@ import {
   BuildingShop24Regular,
   PeopleMoney24Regular,
   BookNumber24Regular,
+  Box24Regular,
   BuildingBank24Regular,
   ReceiptMoney24Regular,
   Settings24Regular,
@@ -18,6 +19,7 @@ const MODULE_ICONS: Record<string, React.ComponentType> = {
   ReceiptMoney: ReceiptMoney24Regular,
   PeopleMoney: PeopleMoney24Regular,
   BuildingShop: BuildingShop24Regular,
+  Box: Box24Regular,
 };
 
 export function ModuleIcon({ name }: { name: string }) {

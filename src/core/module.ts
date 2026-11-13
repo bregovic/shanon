@@ -198,7 +198,7 @@ export function buildRegistry(
           const target = reg.objects.get(f.edt.refObject!);
           if (!target) throw new Error(`${o.id}.${name}: neznámý cíl odkazu ${f.edt.refObject}`);
           const tm = moduleOf(target.id);
-          if (tm !== m.id && !dependencyClosure(reg, [m.id]).has(tm))
+          if (tm !== m.id && !f.optionalRef && !dependencyClosure(reg, [m.id]).has(tm))
             throw new Error(`${o.id}.${name}: modul ${m.id} musí záviset na ${tm}`);
           if (o.scope === "tenant" && target.scope === "company")
             throw new Error(`${o.id}.${name}: sdílený objekt nemůže odkazovat na objekt firmy`);

@@ -218,6 +218,9 @@ model SysCompany {
   taxTrans_company          TaxTrans[]          @relation("TaxTrans_company")
   taxParameters_company     TaxParameters[]     @relation("TaxParameters_company")
   taxReturn_company         TaxReturn[]         @relation("TaxReturn_company")
+  invUnit_company           InvUnit[]           @relation("InvUnit_company")
+  invItemGroup_company      InvItemGroup[]      @relation("InvItemGroup_company")
+  invItem_company           InvItem[]           @relation("InvItem_company")
   arGroup_company           ArGroup[]           @relation("ArGroup_company")
   arCustomer_company        ArCustomer[]        @relation("ArCustomer_company")
   arInvoice_company         ArInvoice[]         @relation("ArInvoice_company")
@@ -455,6 +458,8 @@ model GlAccount {
   glJournalName_offsetAccount     GlJournalName[]     @relation("GlJournalName_offsetAccount")
   glJournalLine_account           GlJournalLine[]     @relation("GlJournalLine_account")
   taxCode_account                 TaxCode[]           @relation("TaxCode_account")
+  invItemGroup_revenueAccount     InvItemGroup[]      @relation("InvItemGroup_revenueAccount")
+  invItemGroup_costAccount        InvItemGroup[]      @relation("InvItemGroup_costAccount")
   arGroup_receivableAccount       ArGroup[]           @relation("ArGroup_receivableAccount")
   arGroup_revenueAccount          ArGroup[]           @relation("ArGroup_revenueAccount")
   arInvoiceLine_revenueAccount    ArInvoiceLine[]     @relation("ArInvoiceLine_revenueAccount")
@@ -720,13 +725,16 @@ model TaxCode {
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy     String?  @map("updated_by") @db.Uuid
 
-  company               SysCompany      @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
-  account               GlAccount       @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
-  taxTrans_taxCode      TaxTrans[]      @relation("TaxTrans_taxCode")
-  arGroup_taxCode       ArGroup[]       @relation("ArGroup_taxCode")
-  arInvoiceLine_taxCode ArInvoiceLine[] @relation("ArInvoiceLine_taxCode")
-  apGroup_taxCode       ApGroup[]       @relation("ApGroup_taxCode")
-  apInvoiceLine_taxCode ApInvoiceLine[] @relation("ApInvoiceLine_taxCode")
+  company                      SysCompany      @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
+  account                      GlAccount       @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
+  taxTrans_taxCode             TaxTrans[]      @relation("TaxTrans_taxCode")
+  invItemGroup_taxCode         InvItemGroup[]  @relation("InvItemGroup_taxCode")
+  invItemGroup_purchaseTaxCode InvItemGroup[]  @relation("InvItemGroup_purchaseTaxCode")
+  invItem_taxCode              InvItem[]       @relation("InvItem_taxCode")
+  arGroup_taxCode              ArGroup[]       @relation("ArGroup_taxCode")
+  arInvoiceLine_taxCode        ArInvoiceLine[] @relation("ArInvoiceLine_taxCode")
+  apGroup_taxCode              ApGroup[]       @relation("ApGroup_taxCode")
+  apInvoiceLine_taxCode        ApInvoiceLine[] @relation("ApInvoiceLine_taxCode")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -848,6 +856,107 @@ model TaxReturn {
   @@map("tax_return")
 }
 
+/// inv.unit — generováno z definice objektu
+model InvUnit {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  decimals  Int?     @default(0)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company            SysCompany      @relation("InvUnit_company", fields: [companyId], references: [id], onDelete: Restrict)
+  invItem_unit       InvItem[]       @relation("InvItem_unit")
+  arInvoiceLine_unit ArInvoiceLine[] @relation("ArInvoiceLine_unit")
+  apInvoiceLine_unit ApInvoiceLine[] @relation("ApInvoiceLine_unit")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("inv_unit")
+}
+
+/// inv.itemGroup — generováno z definice objektu
+model InvItemGroup {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  code              String   @db.VarChar(20)
+  name              String   @db.VarChar(120)
+  taxCodeId         String?  @map("tax_code_id") @db.Uuid
+  revenueAccountId  String?  @map("revenue_account_id") @db.Uuid
+  purchaseTaxCodeId String?  @map("purchase_tax_code_id") @db.Uuid
+  costAccountId     String?  @map("cost_account_id") @db.Uuid
+  ext               Json     @default("{}")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at")
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  company         SysCompany @relation("InvItemGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  taxCode         TaxCode?   @relation("InvItemGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  revenueAccount  GlAccount? @relation("InvItemGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  purchaseTaxCode TaxCode?   @relation("InvItemGroup_purchaseTaxCode", fields: [purchaseTaxCodeId], references: [id], onDelete: Restrict)
+  costAccount     GlAccount? @relation("InvItemGroup_costAccount", fields: [costAccountId], references: [id], onDelete: Restrict)
+  invItem_group   InvItem[]  @relation("InvItem_group")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([taxCodeId])
+  @@index([revenueAccountId])
+  @@index([purchaseTaxCodeId])
+  @@index([costAccountId])
+  @@map("inv_item_group")
+}
+
+/// inv.item — generováno z definice objektu
+model InvItem {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  itemNum       String   @map("item_num") @db.VarChar(20)
+  name          String   @db.VarChar(120)
+  itemType      String   @default("item") @map("item_type") @db.VarChar(40)
+  groupId       String   @map("group_id") @db.Uuid
+  unitId        String   @map("unit_id") @db.Uuid
+  ean           String?  @db.VarChar(14)
+  salesPrice    Decimal? @map("sales_price") @db.Decimal(18, 2)
+  priceInclTax  Boolean  @default(false) @map("price_incl_tax")
+  taxCodeId     String?  @map("tax_code_id") @db.Uuid
+  priceNet      Decimal? @map("price_net") @db.Decimal(18, 2)
+  priceGross    Decimal? @map("price_gross") @db.Decimal(18, 2)
+  purchasePrice Decimal? @map("purchase_price") @db.Decimal(18, 2)
+  weighed       Boolean  @default(false)
+  description   String?
+  blocked       Boolean  @default(false)
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  company            SysCompany      @relation("InvItem_company", fields: [companyId], references: [id], onDelete: Restrict)
+  group              InvItemGroup    @relation("InvItem_group", fields: [groupId], references: [id], onDelete: Restrict)
+  unit               InvUnit         @relation("InvItem_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  taxCode            TaxCode?        @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  arInvoiceLine_item ArInvoiceLine[] @relation("ArInvoiceLine_item")
+  apInvoiceLine_item ApInvoiceLine[] @relation("ApInvoiceLine_item")
+
+  @@unique([tenantId, companyId, itemNum])
+  @@index([tenantId, companyId])
+  @@index([groupId])
+  @@index([unitId])
+  @@index([taxCodeId])
+  @@map("inv_item")
+}
+
 /// ar.group — generováno z definice objektu
 model ArGroup {
   id                  String   @id @default(uuid(7)) @db.Uuid
@@ -960,9 +1069,11 @@ model ArInvoiceLine {
   tenantId         String   @map("tenant_id") @db.Uuid
   companyId        String   @map("company_id") @db.Uuid
   invoiceId        String   @map("invoice_id") @db.Uuid
-  description      String   @db.VarChar(255)
+  itemId           String?  @map("item_id") @db.Uuid
+  description      String?  @db.VarChar(255)
   qty              Decimal  @default(1) @db.Decimal(18, 4)
-  unitPrice        Decimal  @map("unit_price") @db.Decimal(18, 2)
+  unitId           String?  @map("unit_id") @db.Uuid
+  unitPrice        Decimal? @map("unit_price") @db.Decimal(18, 2)
   revenueAccountId String?  @map("revenue_account_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   costCenterId     String?  @map("cost_center_id") @db.Uuid
@@ -977,12 +1088,16 @@ model ArInvoiceLine {
 
   company        SysCompany    @relation("ArInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
   invoice        ArInvoice     @relation("ArInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  item           InvItem?      @relation("ArInvoiceLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit           InvUnit?      @relation("ArInvoiceLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
   revenueAccount GlAccount?    @relation("ArInvoiceLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
   taxCode        TaxCode?      @relation("ArInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   costCenter     GlCostCenter? @relation("ArInvoiceLine_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([invoiceId])
+  @@index([itemId])
+  @@index([unitId])
   @@index([revenueAccountId])
   @@index([taxCodeId])
   @@index([costCenterId])
@@ -1142,9 +1257,11 @@ model ApInvoiceLine {
   tenantId         String   @map("tenant_id") @db.Uuid
   companyId        String   @map("company_id") @db.Uuid
   invoiceId        String   @map("invoice_id") @db.Uuid
-  description      String   @db.VarChar(255)
+  itemId           String?  @map("item_id") @db.Uuid
+  description      String?  @db.VarChar(255)
   qty              Decimal  @default(1) @db.Decimal(18, 4)
-  unitPrice        Decimal  @map("unit_price") @db.Decimal(18, 2)
+  unitId           String?  @map("unit_id") @db.Uuid
+  unitPrice        Decimal? @map("unit_price") @db.Decimal(18, 2)
   expenseAccountId String?  @map("expense_account_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   costCenterId     String?  @map("cost_center_id") @db.Uuid
@@ -1159,12 +1276,16 @@ model ApInvoiceLine {
 
   company        SysCompany    @relation("ApInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
   invoice        ApInvoice     @relation("ApInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  item           InvItem?      @relation("ApInvoiceLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit           InvUnit?      @relation("ApInvoiceLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
   expenseAccount GlAccount?    @relation("ApInvoiceLine_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
   taxCode        TaxCode?      @relation("ApInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   costCenter     GlCostCenter? @relation("ApInvoiceLine_costCenter", fields: [costCenterId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([invoiceId])
+  @@index([itemId])
+  @@index([unitId])
   @@index([expenseAccountId])
   @@index([taxCodeId])
   @@index([costCenterId])

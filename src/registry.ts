@@ -13,11 +13,13 @@ import tax from "@/modules/tax";
 import ar, { ar as arLedger } from "@/modules/ar";
 import ap, { ap as apLedger } from "@/modules/ap";
 import bank from "@/modules/bank";
+import inv from "@/modules/inv";
+import { invHandlers } from "@/modules/inv/handlers";
 import { bankHandlers } from "@/modules/bank/handlers";
 import { vatReturnHandlers } from "@/modules/tax/vat-return";
 import subjectRating from "@/extensions/subject-rating";
 
-export const modules = [sys, gab, gl, tax, ar, ap, bank];
+export const modules = [sys, gab, gl, tax, inv, ar, ap, bank];
 export const extensions = [subjectRating];
 
 // cíle oprávnění = všechny moduly a jejich objekty (modul, pak jeho objekty)
@@ -31,7 +33,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

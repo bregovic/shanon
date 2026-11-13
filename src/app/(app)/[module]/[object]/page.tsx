@@ -5,7 +5,7 @@ import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
 import { listRecords } from "@/server/data";
 import { getT } from "@/server/i18n";
-import { fieldsMeta, formGroups, uiLabels } from "@/server/ui";
+import { fieldsMeta, formGroups, hiddenFields, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
 
 type Params = { module: string; object: string };
@@ -44,7 +44,7 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
       crumbs={[{ label: t(mod.label), href: `/${module}` }, { label: t(def.labelPlural) }]}
       label={t(def.label)}
       titleField={def.titleField}
-      columns={def.list.map((f) => meta[f])}
+      columns={def.list.filter((f) => !hiddenFields(s.ctx, def).includes(f)).map((f) => meta[f])}
       groups={formGroups(s.ctx, def, t, meta)}
       defaults={defaults}
       canCreate={!def.systemOnly && can(s.ctx.perms, def.id, "write")}

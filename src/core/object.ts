@@ -29,6 +29,13 @@ export interface FieldDef {
   default?: string | number | boolean;
   /** jen pro čtení ve formuláři (vyplňuje systém) */
   readOnly?: boolean;
+  /**
+   * odkaz do modulu, na kterém modul nezávisí (položka na řádku faktury):
+   * bez zapnutého cílového modulu se pole v UI nezobrazuje
+   */
+  optionalRef?: boolean;
+  /** další názvy sloupce při importu (CSV/XML), např. ["cena", "price"] */
+  aliases?: string[];
 }
 
 export interface FormGroup {

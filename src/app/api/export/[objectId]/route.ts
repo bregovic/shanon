@@ -9,7 +9,7 @@ import { registry } from "@/registry";
 import { getSession } from "@/server/auth";
 import { inTenant } from "@/server/data";
 import { getT } from "@/server/i18n";
-import { fieldsMeta } from "@/server/ui";
+import { fieldsMeta, hiddenFields } from "@/server/ui";
 
 const MAX_ROWS = 50_000;
 const PAGE = 2_000;
@@ -32,7 +32,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ objectId
   const dir = url.searchParams.get("dir") === "desc" ? "desc" : "asc";
   const t = await getT(s.lang, s.ctx.tenantId);
   const meta = fieldsMeta(s.ctx, def, t);
-  const columns = def.list.map((f) => meta[f]);
+  const columns = def.list.filter((f) => !hiddenFields(s.ctx, def).includes(f)).map((f) => meta[f]);
 
   let rows: RecordData[];
   try {

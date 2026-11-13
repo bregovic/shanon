@@ -25,6 +25,8 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 | Odběratelé, vydané faktury, saldo | Customers, free text invoices, customer transactions |
 | Bankovní účty, import výpisů GPC, párování, úhrady do salda | Bank accounts, bank statements, reconciliation, settlement |
 | Přiznání k DPH a kontrolní hlášení (XML pro EPO), daňové parametry | Sales tax settlement, VAT return / control statement (ER) |
+| Položky, skupiny položek, měrné jednotky, ceny s DPH / bez | Released products, item groups, units, sales price |
+| Import číselníků z CSV / XML / Excelu | Data management (import projects) |
 | Dodavatelé, přijaté faktury, saldo | Vendors, vendor invoices, vendor transactions |
 | Přílohy | Document management (DocuRef) |
 | Historie změn | Database log |

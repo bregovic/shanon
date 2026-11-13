@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<polozky>
+  <polozka kod="SUN-KOST">
+    <nazev>Šunka od kosti</nazev>
+    <skupina>UZENINY</skupina>
+    <mj>KG</mj>
+    <cena>459.90</cena>
+    <s_dph>ano</s_dph>
+    <na_vahu>ano</na_vahu>
+    <popis>Vepřová kýta vařená na kosti, ručně solená.</popis>
+  </polozka>
+  <polozka kod="SUN-PRAZ">
+    <nazev>Pražská šunka</nazev>
+    <skupina>UZENINY</skupina>
+    <mj>KG</mj>
+    <cena>399.90</cena>
+    <s_dph>ano</s_dph>
+    <na_vahu>ano</na_vahu>
+    <popis>Tradiční pražská šunka, uzená bukovým dřevem.</popis>
+  </polozka>
+  <polozka kod="SAL-LOV">
+    <nazev>Lovecký salám</nazev>
+    <skupina>UZENINY</skupina>
+    <mj>KG</mj>
+    <cena>389.00</cena>
+    <s_dph>ano</s_dph>
+    <na_vahu>ano</na_vahu>
+    <popis>Trvanlivý salám z vepřového a hovězího masa.</popis>
+  </polozka>
+  <polozka kod="SAL-UHER">
+    <nazev>Uherský salám</nazev>
+    <skupina>UZENINY</skupina>
+    <mj>KG</mj>
+    <cena>549.00</cena>
+    <s_dph>ano</s_dph>
+    <na_vahu>ano</na_vahu>
+    <popis>Fermentovaný salám s ušlechtilou plísní.</popis>
+  </polozka>
+  <polozka kod="KLOB-VEP">
+    <nazev>Vepřová klobása</nazev>
+    <skupina>UZENINY</skupina>
+    <mj>KG</mj>
+    <cena>259.00</cena>
+    <s_dph>ano</s_dph>
+    <na_vahu>ano</na_vahu>
+    <popis>Uzená klobása, 85 % masa.</popis>
+  </polozka>
+  <polozka kod="KLOB-CHIL">
+    <nazev>Klobása s chilli</nazev>
+    <skupina>UZENINY</skupina>
+    <mj>KG</mj>
+    <cena>279.00</cena>
+    <s_dph>ano</s_dph>
+    <na_vahu>ano</na_vahu>
+  </polozka>
+</polozky>

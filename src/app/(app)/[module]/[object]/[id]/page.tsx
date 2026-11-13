@@ -6,7 +6,7 @@ import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
 import { getRecord, listRecords } from "@/server/data";
 import { getT } from "@/server/i18n";
-import { fieldsMeta, formGroups, objectHref, uiLabels } from "@/server/ui";
+import { fieldsMeta, formGroups, hiddenFields, objectHref, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
 
 type Params = { module: string; object: string; id: string };
@@ -57,7 +57,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
               field: l.field,
               label: t(l.label),
               titleField: ld.titleField,
-              columns: ld.list.filter((f) => f !== l.field).map((f) => lm[f]),
+              columns: ld.list.filter((f) => f !== l.field && !hiddenFields(s.ctx, ld).includes(f)).map((f) => lm[f]),
               groups: formGroups(s.ctx, ld, t, lm, [l.field]),
               defaults: defaults(ld),
               // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít

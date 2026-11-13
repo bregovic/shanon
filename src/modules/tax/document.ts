@@ -31,6 +31,8 @@ export interface InvoiceConfig {
   docNumField: string;
   /** z čeho se dopočítá VS, když ho uživatel nevyplní */
   vsSourceField: string;
+  /** výchozí hodnoty z položky: cena (pole položky), DPH a účet (pole skupiny položek) */
+  item: { price: string; tax: string; groupAccount: string };
   /** +1 = vydaná (pohledávka MD, výnosy D), −1 = přijatá (závazek D, náklady MD) */
   side: 1 | -1;
 }
@@ -101,6 +103,22 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         const h = await assertDraft(ctx.data, cfg, data[cfg.lineHeaderField]);
         if (!h) return;
         const { group } = await partnerAndGroup(ctx.data, cfg, h[cfg.partnerField]);
+        // položka: doplní jen to, co uživatel nevyplnil
+        if (data.itemId) {
+          const item = await ctx.data.get("inv.item", String(data.itemId));
+          if (item) {
+            const ig = await ctx.data.get("inv.itemGroup", String(item.groupId));
+            if (!data.description) data.description = item.name;
+            if (!data.unitId) data.unitId = item.unitId;
+            if (data.unitPrice === null || data.unitPrice === undefined || data.unitPrice === "") data.unitPrice = item[cfg.item.price] ?? null;
+            if (isNew && !data.taxCodeId) data.taxCodeId = (cfg.side === 1 ? item.taxCodeId : null) ?? ig?.[cfg.item.tax] ?? null;
+            if (isNew && !data[cfg.lineAccountField]) data[cfg.lineAccountField] = ig?.[cfg.item.groupAccount] ?? null;
+          }
+        }
+        const missing: Record<string, string> = {};
+        if (!data.description) missing.description = "@SYS:Required";
+        if (data.unitPrice === null || data.unitPrice === undefined || data.unitPrice === "") missing.unitPrice = "@SYS:Required";
+        if (Object.keys(missing).length) return missing;
         // výchozí hodnoty jen u nového řádku — uživatel může DPH i účet změnit
         if (isNew && !data[cfg.lineAccountField]) data[cfg.lineAccountField] = group[cfg.groupLineAccountField] ?? null;
         if (isNew && !data.taxCodeId) data.taxCodeId = group.taxCodeId ?? null;

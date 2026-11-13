@@ -148,9 +148,13 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     scope: "company",
     fields: {
       invoiceId: { edt: refEdt(id("invoice"), L("Invoice")), mandatory: true },
-      description: { edt: Edts.Description, mandatory: true },
+      /** položka doplní popis, cenu, DPH a účet (když nejsou vyplněné) */
+      itemId: { edt: refEdt("inv.item", "@TAX:Item"), optionalRef: true },
+      // povinnost hlídá událost — vyplní je i položka
+      description: { edt: Edts.Description },
       qty: { edt: Edts.Qty, mandatory: true, default: 1 },
-      unitPrice: { edt: Edts.Price, label: "@TAX:UnitPrice", mandatory: true },
+      unitId: { edt: refEdt("inv.unit", "@TAX:Unit"), optionalRef: true },
+      unitPrice: { edt: Edts.Price, label: "@TAX:UnitPrice" },
       [sp.lineAccountField]: { edt: AccountRef(L("LineAccount")) },
       taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode") },
       costCenterId: { edt: refEdt("gl.costCenter", "@GL:CostCenter") },
@@ -158,9 +162,9 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
     },
     titleField: "description",
-    list: ["description", "qty", "unitPrice", sp.lineAccountField, "taxCodeId", "costCenterId", "amountNet", "taxAmount"],
+    list: ["itemId", "description", "qty", "unitId", "unitPrice", sp.lineAccountField, "taxCodeId", "costCenterId", "amountNet", "taxAmount"],
     form: [
-      { label: "@SYS:General", fields: ["invoiceId", "description", "qty", "unitPrice"] },
+      { label: "@SYS:General", fields: ["invoiceId", "itemId", "description", "qty", "unitId", "unitPrice"] },
       { label: "@GL:Posting", fields: [sp.lineAccountField, "taxCodeId", "costCenterId", "amountNet", "taxAmount"] },
     ],
   });
@@ -208,6 +212,9 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     groupLineAccountField: sp.lineAccountField,
     vsSourceField: sp.externalNum ? "externalNum" : "invoiceNum",
     lineAccountField: sp.lineAccountField,
+    item: sp.side === 1
+      ? { price: "priceNet", tax: "taxCodeId", groupAccount: "revenueAccountId" }
+      : { price: "purchasePrice", tax: "purchaseTaxCodeId", groupAccount: "costAccountId" },
     partnerTrans: trans.id,
     docNumField: sp.externalNum ? "externalNum" : "invoiceNum",
     side: sp.side,

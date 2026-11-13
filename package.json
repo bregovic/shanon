@@ -27,6 +27,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.10",
     "exceljs": "^4.4.0",
+    "fast-xml-parser": "^5.12.1",
     "next": "16.2.7",
     "pg": "^8.23.1",
     "prisma": "^7.10.1",

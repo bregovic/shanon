@@ -15,6 +15,7 @@ import {
 } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { downloadFile } from "@/server/data";
+import { importRecords, parseCsv, readTable } from "@/server/import";
 import { withTenant } from "@/server/db";
 import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
 import { recordHistory } from "@/server/history";
@@ -549,6 +550,116 @@ describe("přiznání k DPH a kontrolní hlášení", () => {
     await runAction(V, "tax.return", String(dp3.id), "file", client);
     await expectUserError(saveRecord(V, "tax.return", String(dp3.id), { month: 10 }, undefined, client), "@SYS:Locked");
     await expectUserError(runAction(V, "tax.return", String(dp3.id), "calculate", client), "@SYS:Locked");
+  });
+});
+
+describe("položky a import", () => {
+  let I: Ctx;
+  beforeAll(async () => {
+    const r = await provisionTenant(client, {
+      code: `t-inv-${run}`,
+      name: "Uzeniny",
+      adminEmail: `inv-${run}@test.local`,
+      adminPassword: "heslo-12345",
+      modules: ["gab", "tax", "inv", "ar"],
+      company: { code: "UZ", name: "Uzeniny" },
+    });
+    I = r.ctx;
+  });
+
+  it("výchozí jednotky, skupina, ceny s DPH i bez", async () => {
+    const units = (await listRecords(I, "inv.unit", {}, client)).rows.map((r) => r.code);
+    expect(units).toEqual(expect.arrayContaining(["KS", "KG", "BAL"]));
+    const [grp] = (await listRecords(I, "inv.itemGroup", {}, client)).rows;
+    expect(grp.code).toBe("ZBOZI");
+    const v12 = (await listRecords(I, "tax.taxCode", { filter: { code: "V12" } }, client)).rows[0];
+    await saveRecord(I, "inv.itemGroup", null, { code: "UZENINY", name: "Uzeniny", taxCodeId: v12.id }, undefined, client);
+  });
+
+  it("CSV z českého Excelu (Windows-1250, středníky, čárky), aktualizace podle čísla, vše nebo nic", async () => {
+    const csv = [
+      "Kód;Název;Skupina;MJ;Cena;Cena včetně DPH;Prodej na váhu;EAN;Poznámka navíc",
+      'SUN01;Šunka od kosti;Uzeniny;kg;459,90;ano;ano;;x',
+      'PAS01;"Játrová paštika ""Babiččina"" 120 g";UZENINY;ks;"1 234,50";ne;ne;8594001234567;',
+      "",
+    ].join("\r\n");
+    const cp1250 = Buffer.from(
+      [...csv].map((ch) => ({ "Š": 0x8a, "š": 0x9a, "á": 0xe1, "í": 0xed, "č": 0xe8, "ů": 0xf9, "ó": 0xf3, "ž": 0x9e, "é": 0xe9, "ě": 0xec, "ř": 0xf8, "ý": 0xfd, "ú": 0xfa, "Č": 0xc8 })[ch] ?? ch.charCodeAt(0)),
+    );
+    const table = await readTable("polozky.csv", cp1250);
+    expect(table.headers[1]).toBe("Název");
+
+    const check = await importRecords(I, "inv.item", table, { dryRun: true, lang: "cs" }, client);
+    expect(check.errors).toEqual([]);
+    expect([check.created, check.updated, check.applied]).toEqual([2, 0, false]);
+    expect(check.columns.find((c) => c.header === "Poznámka navíc")!.status).toBe("ignored");
+    expect(check.columns.find((c) => c.header === "MJ")!.field).toBe("unitId");
+    expect((await listRecords(I, "inv.item", {}, client)).total).toBe(0);
+
+    const done = await importRecords(I, "inv.item", table, { dryRun: false, lang: "cs" }, client);
+    expect([done.created, done.applied]).toEqual([2, true]);
+    const items = (await listRecords(I, "inv.item", { sort: "itemNum" }, client)).rows;
+    const sun = items.find((r) => r.itemNum === "SUN01")!;
+    expect([sun.name, sun.priceGross, sun.priceNet, sun.weighed]).toEqual(["Šunka od kosti", "459.90", "410.63", true]);
+    const pas = items.find((r) => r.itemNum === "PAS01")!;
+    expect([pas.name, pas.priceNet, pas.priceGross, pas.ean]).toEqual(['Játrová paštika "Babiččina" 120 g', "1234.50", "1382.64", "8594001234567"]);
+
+    // druhý import: aktualizace ceny, prázdná buňka nic nemaže; chyba = nic se neuloží
+    const upd = parseCsv("Kód;Cena;EAN\nSUN01;479,90;\nNOVA;10;\nXX;abc;");
+    const bad = await importRecords(I, "inv.item", upd, { dryRun: false, lang: "cs" }, client);
+    expect(bad.applied).toBe(false);
+    expect(bad.errors.map((e) => [e.row, e.column])).toEqual(expect.arrayContaining([[3, "Název"], [4, "Cena"]]));
+    expect(bad.missing).toEqual(expect.arrayContaining(["Název", "Skupina položek", "Jednotka"]));
+    expect((await listRecords(I, "inv.item", {}, client)).total).toBe(2);
+    expect((await listRecords(I, "inv.item", { filter: { itemNum: "SUN01" } }, client)).rows[0].priceGross).toBe("459.90");
+
+    const ok = await importRecords(I, "inv.item", parseCsv("Kód;Cena\nsun01;479,90"), { dryRun: false, lang: "cs" }, client);
+    expect([ok.updated, ok.created]).toEqual([1, 0]);
+    const sun2 = (await listRecords(I, "inv.item", { filter: { itemNum: "SUN01" } }, client)).rows[0];
+    expect([sun2.priceGross, sun2.weighed, sun2.name]).toEqual(["479.90", true, "Šunka od kosti"]);
+
+    // neznámá jednotka
+    const unk = await importRecords(I, "inv.item", parseCsv("Kód,Název,Skupina,Jednotka\nX1,Test,UZENINY,tuna"), { dryRun: true, lang: "cs" }, client);
+    expect(unk.errors[0]).toMatchObject({ row: 2, column: "Jednotka" });
+    expect(unk.errors[0].message).toContain("tuna");
+  });
+
+  it("XML s atributy i prvky, Excel", async () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<polozky>
+  <polozka kod="LOV01"><nazev>Lovecký salám</nazev><skupina>UZENINY</skupina><jednotka>KG</jednotka><cena>389.00</cena><s_dph>1</s_dph></polozka>
+  <polozka kod="KLO01"><nazev>Klobása</nazev><skupina>UZENINY</skupina><jednotka>KG</jednotka><cena>259</cena></polozka>
+</polozky>`;
+    const t = await readTable("data.xml", Buffer.from(xml));
+    expect(t.headers).toEqual(expect.arrayContaining(["kod", "nazev", "cena"]));
+    const r = await importRecords(I, "inv.item", t, { dryRun: false, lang: "cs" }, client);
+    expect(r.errors).toEqual([]);
+    expect(r.created).toBe(2);
+    const lov = (await listRecords(I, "inv.item", { filter: { itemNum: "LOV01" } }, client)).rows[0];
+    expect([lov.priceGross, lov.priceNet]).toEqual(["389.00", "347.32"]);
+
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Položky");
+    ws.addRow(["Číslo položky", "Název", "Skupina položek", "Jednotka", "Prodejní cena"]);
+    ws.addRow(["TLA01", "Tlačenka", "UZENINY", "KG", 149.9]);
+    const xr = await importRecords(I, "inv.item", await readTable("x.xlsx", Buffer.from(await wb.xlsx.writeBuffer())), { dryRun: false, lang: "cs" }, client);
+    expect([xr.created, xr.errors.length]).toEqual([1, 0]);
+  });
+
+  it("položka na řádku vydané faktury doplní popis, jednotku, cenu, DPH a účet", async () => {
+    const [grp] = (await listRecords(I, "ar.group", {}, client)).rows;
+    const subj = await saveRecord(I, "gab.subject", null, { name: "Restaurace U Zlatého" }, undefined, client);
+    const cust = await saveRecord(I, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const inv = await saveRecord(I, "ar.invoice", null, { customerId: cust.id }, undefined, client);
+    const sun = (await listRecords(I, "inv.item", { filter: { itemNum: "SUN01" } }, client)).rows[0];
+    const line = await saveRecord(I, "ar.invoiceLine", null, { invoiceId: inv.id, itemId: sun.id, qty: "2,5" }, undefined, client);
+    const v12 = (await listRecords(I, "tax.taxCode", { filter: { code: "V12" } }, client)).rows[0];
+    const kg = (await listRecords(I, "inv.unit", { filter: { code: "KG" } }, client)).rows[0];
+    const acc604 = (await listRecords(I, "gl.account", { filter: { accountNum: "604" } }, client)).rows[0];
+    expect([line.description, line.unitId, line.unitPrice, line.taxCodeId, line.revenueAccountId]).toEqual(["Šunka od kosti", kg.id, sun.priceNet, v12.id, acc604.id]);
+    expect([line.amountNet, line.taxAmount]).toEqual(["1071.20", "128.54"]); // 2,5 × 428,48
+    await expectUserError(saveRecord(I, "ar.invoiceLine", null, { invoiceId: inv.id, qty: "1" }, undefined, client), "@SYS:Required", "description");
   });
 });
 

@@ -10,6 +10,7 @@ import { deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, 
 import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
+import { importRecords, readTable, type ImportReport } from "@/server/import";
 import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
@@ -273,6 +274,22 @@ export async function runUploadAction(form: FormData): Promise<ActionResult> {
     });
     revalidatePath(objectHref(objectId, id));
     return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Import CSV/XML/Excel do číselníku; `dryRun` = jen kontrola, nic se neuloží. */
+export async function importAction(form: FormData): Promise<ActionResult<ImportReport>> {
+  const s = await requireSession();
+  const objectId = String(form.get("objectId"));
+  const file = form.get("file");
+  try {
+    if (!(file instanceof File) || !file.size) throw new UserError("@SYS:Required");
+    const table = await readTable(file.name, Buffer.from(await file.arrayBuffer()));
+    const report = await importRecords(s.ctx, objectId, table, { dryRun: form.get("dryRun") === "1", lang: s.lang });
+    if (report.applied) revalidatePath(objectHref(objectId));
+    return { ok: true, data: report };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

@@ -28,10 +28,14 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   + labely, ne nový kód.
 - Typy polí: `Edts.Amount` se sčítá v řádku Celkem, `Edts.Price`, `Edts.Qty`,
   `Edts.AmountCur` ne (`noTotal`). Výchozí datum „dnes“ = `default: "$today"`.
+- Odkaz do modulu, na kterém modul nezávisí (položka na řádku faktury), má
+  `optionalRef: true` — bez zapnutého cílového modulu se pole skryje.
+- Údaje konkrétních firem (IČO, DIČ, adresy) nepatří do repa (je veřejné) —
+  nastavují se přes UI nebo `scripts/company-profile.ts` se souborem zvenku.
 - Řádky, které záznamu nepatří (faktury odběratele, výpisy účtu), mají v `lines`
   `owned: false` — se záznamem se nemažou a dvojklik otevře jejich vlastní stránku.
 - Akce se souborem (importy): `actions: [{ id, label, upload: ".gpc,.txt" }]`,
-  obsluha dostane `file` jako třetí parametr. Soubor do 1 MB (limit server action).
+  obsluha dostane `file` jako třetí parametr. Soubor do 5 MB (`serverActions.bodySizeLimit`).
 - Akce, které vrací soubor (XML pro úřad, PDF): `actions: [{ id, label, download: true }]`
   + `ObjectHandlers.downloads[id]` → `/api/download/<objekt>/<id>/<akce>`, stačí právo číst.
 - Texty, které logika ukládá nebo dává do souborů, překládá `ctx.t(label, params)`
@@ -69,6 +73,7 @@ všechny objekty**. Nový objekt nepotřebuje žádnou novou stránku ani endpoi
 | Historie změn | `sys_audit`, `src/server/history.ts`, ikona historie | kdo, kdy, co (popisky polí, titulky odkazů) |
 | Oblíbené | `sys_favorite`, hvězdička v liště a na ploše modulu | menu oblíbených v hlavičce |
 | Export do Excelu | `/api/export/<objekt>` | stejné filtry, řazení a oprávnění jako grid, max. 50 000 řádků |
+| Import (CSV, XML, Excel) | `src/server/import.ts`, tlačítko Import, `/api/import-template/<objekt>` | sloupce podle názvu pole, popisku nebo `FieldDef.aliases`; odkazy podle kódu/názvu; aktualizace podle prvního `unique` klíče; vše nebo nic (savepoint na řádek), Zkontrolovat = suchý běh |
 
 Vlastní stránka jen tam, kde obecná nestačí (nástěnky, průvodci, výkazy) — a i
 ta používá stejné komponenty a akce.

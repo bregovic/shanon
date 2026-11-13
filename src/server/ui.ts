@@ -33,6 +33,12 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
   };
 }
 
+/** Pole odkazující do vypnutého modulu se v UI nezobrazují. */
+export const hiddenFields = (ctx: Ctx, def: ObjectDef) =>
+  Object.entries(def.fields)
+    .filter(([, f]) => f.edt.refObject && !ctx.modules.has(f.edt.refObject.split(".")[0]))
+    .map(([n]) => n);
+
 export function fieldsMeta(ctx: Ctx, def: ObjectDef, t: T): Record<string, FieldMeta> {
   const out: Record<string, FieldMeta> = {};
   for (const [n, f] of Object.entries(def.fields)) out[n] = meta(n, f, t);
@@ -41,7 +47,8 @@ export function fieldsMeta(ctx: Ctx, def: ObjectDef, t: T): Record<string, Field
 }
 
 /** Skupiny formuláře včetně skupiny polí rozšíření. */
-export function formGroups(ctx: Ctx, def: ObjectDef, t: T, meta: Record<string, FieldMeta>, hide: string[] = []) {
+export function formGroups(ctx: Ctx, def: ObjectDef, t: T, meta: Record<string, FieldMeta>, hide0: string[] = []) {
+  const hide = [...hide0, ...hiddenFields(ctx, def)];
   const groups = def.form.map((g) => ({ label: t(g.label), fields: g.fields.filter((n) => !hide.includes(n)).map((n) => meta[n]) }));
   const ext = Object.keys(extFields(ctx, def.id));
   if (ext.length) groups.push({ label: t("@SYS:ExtensionFields"), fields: ext.map((n) => meta[n]) });
@@ -75,6 +82,25 @@ export function uiLabels(t: T) {
     },
     favorites: { add: t("@SYS:AddFavorite"), remove: t("@SYS:RemoveFavorite") },
     export: t("@SYS:Export"),
+    importer: {
+      import: t("@SYS:Import"),
+      title: t("@SYS:ImportTitle"),
+      help: t("@SYS:ImportHelp"),
+      template: t("@SYS:ImportTemplate"),
+      check: t("@SYS:ImportCheck"),
+      run: t("@SYS:ImportRun"),
+      columns: t("@SYS:ImportColumns"),
+      ignored: t("@SYS:ImportIgnored"),
+      computed: t("@SYS:ImportComputed"),
+      missing: t("@SYS:ImportMissing"),
+      row: t("@SYS:ImportRow"),
+      column: t("@SYS:ImportColumn"),
+      message: t("@SYS:ImportMessage"),
+      checkOk: t("@SYS:ImportCheckOk"),
+      done: t("@SYS:ImportDone"),
+      failed: t("@SYS:ImportFailed"),
+      close: t("@SYS:Close"),
+    },
     docuref: {
       attachments: t("@SYS:Attachments"),
       addNote: t("@SYS:AddNote"),
