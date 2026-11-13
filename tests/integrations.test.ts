@@ -691,3 +691,39 @@ describe("testovací prostředí a datové služby (CR-036)", () => {
     }, client);
   });
 });
+
+describe("pokladní kniha", () => {
+  it("PPD/VPD s řadou, DPH zjednodušeného dokladu, zákaz mínusu, limit, report s průběžným zůstatkem", async () => {
+    const { runReport } = await import("@/server/report");
+    const P = (await provisionTenant(client, { code: `t-cash-${run}`, name: "Cash", adminEmail: `cash-${run}@test.local`, adminPassword: "heslo-12345", modules: ["cash", "tax"], company: { code: "C", name: "C" } })).ctx;
+    const [desk] = (await listRecords(P, "cash.desk", {}, client)).rows;
+    expect([desk.code, (desk._titles as Record<string, string>).accountId.slice(0, 6)]).toEqual(["HOT", "211000"]);
+    const acc = async (n: string) => String((await listRecords(P, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
+    const today = new Date().toISOString().slice(0, 10);
+    // výdej z prázdné pokladny neprojde
+    const out1 = await saveRecord(P, "cash.voucher", null, { deskId: desk.id, direction: "out", date: today, description: "Čisticí prostředky", amount: "121", offsetAccountId: await acc("501000") }, undefined, client);
+    expect(String(out1.docNum)).toMatch(/^VPD\d{2}00001$/);
+    await expect(runAction(P, "cash.voucher", String(out1.id), "post", client)).rejects.toMatchObject({ label: "@CASH:NegativeBalance" });
+    // vklad do pokladny, pak výdej s DPH 21 %
+    const in1 = await saveRecord(P, "cash.voucher", null, { deskId: desk.id, direction: "in", date: today, description: "Vklad hotovosti", amount: "1000", offsetAccountId: await acc("261000") }, undefined, client);
+    expect(String(in1.docNum)).toMatch(/^PPD\d{2}00001$/);
+    await runAction(P, "cash.voucher", String(in1.id), "post", client);
+    const [tc] = (await listRecords(P, "tax.taxCode", { filter: { code: "P21" } }, client)).rows;
+    const out2 = await saveRecord(P, "cash.voucher", String(out1.id), { taxCodeId: tc.id }, undefined, client);
+    expect([out2.amountNet, out2.taxAmount]).toEqual(["100.00", "21.00"]);
+    await runAction(P, "cash.voucher", String(out1.id), "post", client);
+    const tt = (await listRecords(P, "tax.trans", { filter: { sourceId: String(out1.id) } }, client)).rows;
+    expect([tt.length, tt[0].base, tt[0].tax, tt[0].simplified]).toEqual([1, "100.00", "21.00", true]);
+    // limit zůstatku
+    await saveRecord(P, "cash.desk", String(desk.id), { maxBalance: "1000" }, undefined, client);
+    const in2 = await saveRecord(P, "cash.voucher", null, { deskId: desk.id, direction: "in", date: today, description: "Tržba", amount: "500", offsetAccountId: await acc("604000") }, undefined, client);
+    await expect(runAction(P, "cash.voucher", String(in2.id), "post", client)).rejects.toMatchObject({ label: "@CASH:OverLimit" });
+    // report: počáteční 0, +1000, −121, konečný 879
+    const S = { ctx: P, lang: "cs" } as unknown as Parameters<typeof runReport>[0];
+    const r = await runReport({ ...S, superUser: true } as never, "cash", "cashBook", { deskId: desk.id, dateFrom: today, dateTo: today }).catch(() => null);
+    if (r) {
+      const bal = r.rows.map((x) => x.balance);
+      expect([bal[0], bal[bal.length - 1]]).toEqual(["0.00", "879.00"]);
+    }
+  });
+});

@@ -9,6 +9,7 @@ import {
   Input,
   MessageBar,
   MessageBarBody,
+  Select,
   Spinner,
   Table,
   TableBody,
@@ -47,7 +48,7 @@ export function ReportView(p: {
   report: string;
   crumbs: { label: string; href?: string }[];
   description: string;
-  params: { name: string; kind: "date" | "bool" | "dimension"; label: string }[];
+  params: { name: string; kind: "date" | "bool" | "dimension" | "ref"; label: string; options?: { value: string; label: string }[] }[];
   initial: { params: Row; columns: Col[]; rows: Row[] };
   lang: string;
   labels: { run: string; export: string; total: string; empty: string };
@@ -72,7 +73,7 @@ export function ReportView(p: {
   const totals = Object.fromEntries(
     res.columns.filter((c) => c.total).map((c) => [c.name, res.rows.filter((r) => !r._level).reduce((a, r) => a + Math.round(Number(r[c.name] ?? 0) * 100), 0) / 100 || 0]),
   );
-  const cell = (c: Col, v: unknown) => (c.kind === "amount" ? nf.format(Number(v ?? 0)) : String(v ?? ""));
+  const cell = (c: Col, v: unknown) => (c.kind === "amount" ? (v === null || v === undefined || v === "" ? "" : nf.format(Number(v))) : String(v ?? ""));
 
   return (
     <>
@@ -87,7 +88,17 @@ export function ReportView(p: {
         {p.description && <Text className={st.desc}>{p.description}</Text>}
         <div className={st.params}>
           {p.params.map((x) =>
-            x.kind === "bool" ? (
+            x.kind === "ref" ? (
+              <Field key={x.name} label={x.label}>
+                <Select value={String(values[x.name] ?? x.options?.[0]?.value ?? "")} onChange={(_, d) => setValues((v) => ({ ...v, [x.name]: d.value }))}>
+                  {(x.options ?? []).map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : x.kind === "bool" ? (
               <Checkbox key={x.name} label={x.label} checked={!!values[x.name]} onChange={(_, d) => setValues((v) => ({ ...v, [x.name]: !!d.checked }))} />
             ) : (
               <Field key={x.name} label={x.label}>

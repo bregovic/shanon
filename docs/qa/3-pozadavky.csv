@@ -2,7 +2,7 @@
 CR-001;change;Finanční dimenze místo střediska;GL-ACCOUNTS;high;uat;1;Dimenze (středisko, partner, projekt…), povolené a povinné podle účtu / syntetiky, periodické přiřazení.
 CR-002;change;Kurzy ČNB a ECB jako napojení s plánovaným stahováním;GL-PARAMS;medium;new;2;Napojení v Integraci, denní stažení dávkovou úlohou.
 CR-003;change;Dávkové úlohy s opakováním a jejich přehled;;high;new;3;Jako batch v AX: třídy úloh, plán s rekurencí, historie běhů, přehled v Organizaci.
-CR-004;change;Pokladní deník;POS-SHIFT;high;new;4;Příjmové a výdajové pokladní doklady, zůstatek, uzávěrka směny do deníku.
+CR-004;change;Pokladní deník;CASH-BOOK;high;uat;4;Modul Pokladní kniha: pokladny hotovosti, PPD/VPD s protiúčtem a DPH, zákaz mínusu, limit, report Pokladní kniha.
 CR-005;change;Seznamy: kód jako odkaz na detail, šířka sloupců podle obsahu;SYS-UI;medium;uat;5;"Číslo záznamu jako hypertext; automatická šířka s maximem."
 CR-006;change;Kasa na tablet: nejčastější položky a kategorie;POS-SALE;medium;uat;6;Záložka Nejčastější (30 dní), strom kategorií prodeje s podkategoriemi, rychlé hledání bez diakritiky.
 CR-007;change;Odložené košíky s kódem (váha → pokladna);POS-SALE;medium;new;7;Košík s kódem, plnění z váhy nebo pultu, načtení v kase a vyúčtování.

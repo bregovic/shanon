@@ -24,6 +24,7 @@ export function reportParams(def: ReportDef, input: RecordData): RecordData {
     const v = input[p.name];
     if (v === undefined || v === null || v === "") continue;
     if (p.kind === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(String(v))) continue;
+    if (p.kind === "ref" && !/^[0-9a-f-]{36}$/i.test(String(v))) continue;
     out[p.name] = p.kind === "bool" ? v === true || v === "true" : String(v).slice(0, 40);
   }
   return out;

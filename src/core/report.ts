@@ -7,7 +7,7 @@
 import type { DataApi, RecordData } from "./module";
 import type { LabelRef } from "./labels";
 
-export type ReportParamKind = "date" | "bool" | "dimension";
+export type ReportParamKind = "date" | "bool" | "dimension" | "ref";
 
 export interface ReportParam {
   name: string;
@@ -15,6 +15,8 @@ export interface ReportParam {
   kind: ReportParamKind;
   /** výchozí: "$monthStart", "$today", "$yearStart" nebo hodnota */
   default?: string | boolean;
+  /** kind "ref": objekt, ze kterého se vybírá (výběr nabídne jeho záznamy) */
+  refObject?: string;
 }
 
 export interface ReportColumn {

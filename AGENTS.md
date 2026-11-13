@@ -65,6 +65,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   kanonicky); ověření proti Playgroundu `npx tsx scripts/eet-playground.ts <p12> <heslo>`.
   Platba kartou: účtenka se vystaví až po schválení terminálem, server ověří
   částku a jediné použití transakce (`assertPaid`).
+- Pokladní kniha (`src/modules/cash`): pokladna = účet 211xxx, doklady PPD/VPD (řady
+  CASHIN/CASHOUT), DPH zjednodušeného dokladu do `tax.trans` (`simplified`), výdej do
+  mínusu nejde; report čte `gl.trans` účtu pokladny (i uzávěrky směn z kasy).
+  Reporty umí parametr `kind: "ref"` (výběr záznamu objektu `refObject`).
 - Veřejné datové služby (ARES, ČNB, ECB) volat přes `withService(data, "ares"|"cnb"|"ecb", …)`
   (`src/modules/int/services.ts`): napojení druhu „service“ (zakládá výchozí nastavení)
   je jde vypnout, otestovat a volání jdou do `int.log`; bez Integrace běží služba bez logu.
