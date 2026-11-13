@@ -129,6 +129,9 @@ const useStyles = makeStyles({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: "6px",
+    // dotyk: bez zpoždění a přiblížení dvojitým ťuknutím, bez výběru textu
+    touchAction: "manipulation",
+    userSelect: "none",
     minHeight: "104px",
     overflow: "hidden",
     textAlign: "left",
@@ -1132,35 +1135,60 @@ const W_FACTOR: Record<WeightUnit, number> = { kg: 1, dkg: 0.01, g: 0.001 };
 const W_PRESETS: Record<WeightUnit, string[]> = { kg: ["0,25", "0,5", "1"], dkg: ["10", "15", "20", "30", "50"], g: ["100", "150", "200", "300", "500"] };
 const SWIPE_REMOVE_PX = 90;
 
-/** Ťuknutí vs. podržení prstu (myš i dotyk). */
+/**
+ * Ťuknutí vs. podržení prstu (myš i dotyk). Ťuknutí = běžné kliknutí (spolehlivé
+ * i při překreslení kasy, funguje i z klávesnice); podržení spustí časovač a
+ * následné kliknutí se pak ignoruje. Stav drží prvek, ne render.
+ */
+/** Po podržení zahodit jedno následné kliknutí (trefilo by pozadí otevřeného dialogu). */
+function swallowNextClick() {
+  const swallow = (ev: Event) => {
+    ev.stopPropagation();
+    ev.preventDefault();
+  };
+  window.addEventListener("click", swallow, { capture: true, once: true });
+  setTimeout(() => window.removeEventListener("click", swallow, true), 1000);
+}
+
+type PressState = { timer: ReturnType<typeof setTimeout> | null; long: boolean; x: number; y: number };
+const pressOf = (el: EventTarget) => {
+  const t = el as HTMLElement & { _press?: PressState };
+  return (t._press ??= { timer: null, long: false, x: 0, y: 0 });
+};
 function pressHandlers(onTap: () => void, onLong: () => void) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let long = false;
-  let start = { x: 0, y: 0 };
-  const clear = () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
+  const clear = (st: PressState) => {
+    if (st.timer) clearTimeout(st.timer);
+    st.timer = null;
   };
   return {
     onPointerDown: (e: React.PointerEvent) => {
-      long = false;
-      start = { x: e.clientX, y: e.clientY };
-      clear();
-      timer = setTimeout(() => {
-        long = true;
+      const st = pressOf(e.currentTarget);
+      clear(st);
+      st.long = false;
+      st.x = e.clientX;
+      st.y = e.clientY;
+      st.timer = setTimeout(() => {
+        st.timer = null;
+        st.long = true;
+        swallowNextClick();
         onLong();
       }, LONG_PRESS_MS);
     },
     onPointerMove: (e: React.PointerEvent) => {
-      if (Math.abs(e.clientX - start.x) > 10 || Math.abs(e.clientY - start.y) > 10) clear();
+      const st = pressOf(e.currentTarget);
+      // posun prstu = posouvání seznamu, ne podržení
+      if (Math.abs(e.clientX - st.x) > 10 || Math.abs(e.clientY - st.y) > 10) clear(st);
     },
-    onPointerUp: () => {
-      const wasTimer = !!timer;
-      clear();
-      if (!long && wasTimer) onTap();
+    onPointerUp: (e: React.PointerEvent) => clear(pressOf(e.currentTarget)),
+    onPointerCancel: (e: React.PointerEvent) => clear(pressOf(e.currentTarget)),
+    onClick: (e: React.MouseEvent) => {
+      const st = pressOf(e.currentTarget);
+      if (st.long) {
+        st.long = false;
+        return;
+      }
+      onTap();
     },
-    onPointerLeave: clear,
-    onPointerCancel: clear,
   };
 }
 
@@ -1220,6 +1248,7 @@ function CartLine(p: {
           const d = { x: e.clientX, y: e.clientY, active: false, long: false, timer: null as ReturnType<typeof setTimeout> | null };
           d.timer = setTimeout(() => {
             d.long = true;
+            swallowNextClick();
             p.onEdit();
           }, LONG_PRESS_MS);
           drag.current = d;

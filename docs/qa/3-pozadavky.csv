@@ -45,3 +45,5 @@ CR-043;change;Nový uživatel: jméno, příjmení, přihlášení e-mailem a he
 CR-044;change;Založit organizaci (účtovanou firmu) podle IČO / DIČ z ARES / VIES;ORG;medium;analysis;44;
 CR-045;change;"Deníky jako v AX: hlavička + maximalizovaná mřížka řádků, druh účtu (HK, dodavatel, odběratel, banka), číslování dokladů podle nastavení deníku, ověření; společný standard pro platby, pokladnu, banku";GL-JOURNAL;high;analysis;45;"Jednořádkové i víceřádkové doklady; číslo dokladu: podle deníku / ručně / jeden pro celý deník / nový po vyrovnání."
 CR-046;change;Zpracování dokumentů (OCR přes ChatGPT): hromadné nahrání PDF, rozpoznání druhu, zápis do agendy;INT-EET;high;analysis;46;"Napojení OpenAI druhu OCR v Integraci; přehled stavů; přijatá faktura, pokladní doklad…"
+CR-047;bug;Kasa na dotyk: krátké ťuknutí nepřidalo položku, dialog po podržení se hned zavřel;POS-SALE;critical;uat;47;"Ťuknutí = běžné kliknutí, stav stisku drží dlaždice; po podržení se zahodí kliknutí na pozadí dialogu. Ověřeno na telefonu i tabletu."
+CR-048;change;Nedávné: posledních 5 otevřených funkcí vedle oblíbených;SYS-UI;low;uat;48;

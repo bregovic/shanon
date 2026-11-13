@@ -22,6 +22,7 @@ import {
 import { Building24Regular, Checkmark24Regular, Home24Regular, Settings24Regular, SignOut24Regular } from "@fluentui/react-icons";
 import { logoutAction, switchCompanyAction } from "@/app/actions";
 import { FavoritesMenu } from "./favorites";
+import { RecentMenu } from "./recent-menu";
 import { ModuleIcon } from "./icons";
 import { MenuSearch } from "./menu-search";
 import { trackNavigation } from "@/lib/nav-back";
@@ -39,7 +40,7 @@ interface Props {
   companies: { id: string; code: string; name: string }[];
   companyId: string | null;
   user: { name: string; email: string; initials: string; admin: boolean };
-  labels: { home: string; settings: string; signOut: string; search: string; noResults: string };
+  labels: { home: string; settings: string; signOut: string; search: string; noResults: string; recent: string; noRecent: string };
   menu: MenuHit[];
   children: React.ReactNode;
 }
@@ -122,6 +123,7 @@ export function AppShell({ modules, companies, companyId, user, labels, menu, ch
         </Menu>
 
         <FavoritesMenu />
+        <RecentMenu menu={menu} labels={{ title: labels.recent, empty: labels.noRecent }} />
 
         <div className={s.spacer} />
 

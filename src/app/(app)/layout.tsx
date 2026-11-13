@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       companies={s.companies}
       companyId={s.ctx.companyId}
       user={{ name: s.user.name, email: s.user.email, initials, admin: s.superUser }}
-      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults") }}
+      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults"), recent: t("@SYS:Recent"), noRecent: t("@SYS:NoRecent") }}
       menu={menuIndex(s, t)}
     >
       {children}
