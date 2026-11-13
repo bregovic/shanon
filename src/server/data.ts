@@ -493,9 +493,9 @@ export class Session {
   /** Akce se souborem ke stažení — stačí právo číst záznam. */
   async download(objectId: string, id: string, actionId: string): Promise<DownloadFile> {
     const def = getObject(objectId);
-    assertAccess(this.ctx, def, "read", this.system);
     const a = def.actions?.find((x) => x.id === actionId && x.download);
     if (!a) throw new UserError("@SYS:InvalidValue");
+    assertAccess(this.ctx, def, a.downloadNeedsWrite ? "write" : "read", this.system);
     const record = await this.sys().get(objectId, id);
     if (!record) throw new UserError("@SYS:NotFound");
     const fn = handlersFor(this.ctx, objectId).find((h) => h.downloads?.[actionId])?.downloads?.[actionId];

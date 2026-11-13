@@ -1919,6 +1919,9 @@ model IntConnection {
   affiliateKey   String?   @map("affiliate_key") @db.VarChar(4000)
   pairingCode    String?   @map("pairing_code") @db.VarChar(20)
   readerId       String?   @map("reader_id") @db.VarChar(60)
+  scopes         String?   @db.VarChar(400)
+  tokenPrefix    String?   @map("token_prefix") @db.VarChar(40)
+  tokenHash      String?   @map("token_hash") @db.VarChar(64)
   lastCheckAt    DateTime? @map("last_check_at") @db.Date
   lastResult     String?   @map("last_result") @db.VarChar(255)
   ext            Json      @default("{}")

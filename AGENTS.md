@@ -61,6 +61,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   kanonicky); ověření proti Playgroundu `npx tsx scripts/eet-playground.ts <p12> <heslo>`.
   Platba kartou: účtenka se vystaví až po schválení terminálem, server ověří
   částku a jediné použití transakce (`assertPaid`).
+- REST API (`/api/v1/<objekt>[/<id>[/<akce>]]`, `src/app/api/v1`): klíč z napojení
+  druhu API (Integrace), v DB jen SHA-256 otisk (`src/server/api-token.ts`), rozsah
+  = moduly/objekty s právem Upravovat, `sys`/`int` nikdy, mazání přes API není.
+  Vše přes datovou službu; autor zápisů „API · název napojení“.
 - Tajné údaje = `FieldDef.secret`: šifrovaně (AES-256-GCM, `SHANON_SECRET_KEY`
   v prostředí — bez něj produkce tajné údaje neuloží; ztráta klíče = údaje znovu
   zadat), ven jen maska. Čte je jen logika modulu přes `revealSecret()`.

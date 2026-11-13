@@ -8,12 +8,15 @@
 import { randomUUID } from "node:crypto";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
+import { newToken } from "@/server/api-token";
+import { registry } from "@/registry";
 import { EET_RESEND_HOURS, buildEetMessage, openP12, sendEet, type EetCert, type EetEnvironment, type EetResult } from "./eet";
 
 export const DRIVERS: Record<string, string[]> = {
   eet: ["eet2"],
   printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator"],
+  api: ["rest"],
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -248,7 +251,24 @@ export const intHandlers: Record<string, ObjectHandlers> = {
       if (!DRIVERS[String(d.kind)]?.includes(String(d.driver))) e.driver = "@INT:WrongDriver";
       if (d.kind === "eet" && !d.unitId) e.unitId = "@SYS:Required";
       if (d.kind === "eet" && !d.posId) e.posId = "@SYS:Required";
+      if (d.kind === "api") {
+        const scopes = String(d.scopes ?? "").split(/[,\s]+/).filter(Boolean);
+        if (!scopes.length) e.scopes = "@INT:ScopesRequired";
+        // jen existující moduly a objekty; správa systému a integrace přes API nikdy
+        const bad = scopes.find((s) => !(registry.modules.has(s) || registry.objects.has(s)) || s === "sys" || s === "int" || s.startsWith("sys.") || s.startsWith("int."));
+        if (bad) e.scopes = "@INT:ScopeUnknown";
+      }
       if (Object.keys(e).length) return e;
+    },
+    downloads: {
+      /** nový klíč API: v databázi jen otisk, uživatel ho dostane jednou jako soubor */
+      async token(ctx, conn) {
+        if (conn.kind !== "api") throw new UserError("@INT:ApiOnly");
+        const { token, hash, prefix } = newToken(ctx.tenantId);
+        await ctx.data.update("int.connection", String(conn.id), { tokenHash: hash, tokenPrefix: prefix });
+        await writeLog(ctx.data, conn, "api.token", "ok", { message: prefix });
+        return { name: `shanon-api-${String(conn.code).toLowerCase()}.txt`, mime: "text/plain; charset=utf-8", data: `${ctx.t("@INT:TokenFileHeader")}\n\n${token}\n` };
+      },
     },
     actions: {
       async uploadCert(ctx: EventContext, conn, file) {

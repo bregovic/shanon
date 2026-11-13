@@ -24,4 +24,4 @@ CR-022;change;Kasa: výrazné množství, ťuk = 1 ks, +/−, podržení = zadat
 CR-023;change;Měny a kurzy přesunout do Hlavní knihy;GL-PARAMS;low;uat;23;Hlavní kniha → Nastavení: Parametry, Měny, Kurzy měn.
 CR-024;change;Požadavky: barevné štítky priority a stavu, řazení podle priority;QA;medium;uat;24;Štítky výčtů obecně (stavy dokladů, EET…).
 CR-025;change;Testování: diskuze pod požadavkem, printscreeny ze schránky, přiřazení vývoje;QA;medium;uat;25;"Příspěvky s autorem a datem; v Přílohách Ctrl+V vloží obrázek; stav Vývoj → řeší Claude."
-CR-026;change;API napojení pro správu požadavků zvenku;QA;medium;analysis;26;"Klíč omezený na modul Testování; zakládání a posun požadavků, čtení výsledků testů."
+CR-026;change;API napojení pro správu požadavků zvenku;QA;medium;uat;26;"Klíč omezený na modul Testování; zakládání a posun požadavků, čtení výsledků testů."

@@ -17,6 +17,7 @@ export const ConnKind = defineEnum({
     { value: "eet", label: "@INT:KindEet" },
     { value: "printer", label: "@INT:KindPrinter" },
     { value: "payment", label: "@INT:KindPayment" },
+    { value: "api", label: "@INT:KindApi" },
   ],
 });
 
@@ -31,6 +32,7 @@ export const Driver = defineEnum({
     { value: "manual", label: "@INT:DrvManual" },
     { value: "sumup", label: "@INT:DrvSumup" },
     { value: "simulator", label: "@INT:DrvSimulator" },
+    { value: "rest", label: "@INT:DrvRest" },
   ],
 });
 
@@ -80,6 +82,7 @@ const EET = { field: "kind", in: ["eet"] };
 const PRINTER = { field: "kind", in: ["printer"] };
 const SUMUP = { field: "driver", in: ["sumup"] };
 const SERIAL = { field: "driver", in: ["escposSerial"] };
+const API = { field: "kind", in: ["api"] };
 
 export const connection = defineObject({
   id: "int.connection",
@@ -116,6 +119,10 @@ export const connection = defineObject({
     affiliateKey: { edt: Secret("SumupAffKey", "@INT:AffiliateKey"), secret: true, visibleWhen: SUMUP },
     pairingCode: { edt: Str("SumupPairing", "@INT:PairingCode", 20), visibleWhen: SUMUP },
     readerId: { edt: Str("SumupReader", "@INT:ReaderId", 60), readOnly: true, visibleWhen: SUMUP },
+    // REST API: rozsah (moduly / objekty) a otisk klíče
+    scopes: { edt: Str("ApiScopes", "@INT:Scopes", 400), visibleWhen: API },
+    tokenPrefix: { edt: Str("ApiTokenPrefix", "@INT:TokenPrefix", 40), readOnly: true, visibleWhen: API },
+    tokenHash: { edt: Str("ApiTokenHash", "@INT:TokenPrefix", 64), readOnly: true },
     // stav
     lastCheckAt: { edt: Edts.TransDate, label: "@INT:LastCheck", readOnly: true },
     lastResult: { edt: Edts.Description, label: "@INT:LastResult", readOnly: true },
@@ -127,6 +134,7 @@ export const connection = defineObject({
     { label: "@INT:EetSettings", fields: ["environment", "unitId", "posId", "certPassword", "certSubject", "certValidTo"], visibleWhen: EET },
     { label: "@INT:PrinterSettings", fields: ["paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
+    { label: "@INT:ApiSettings", fields: ["scopes", "tokenPrefix"], visibleWhen: API },
     { label: "@INT:State", fields: ["lastCheckAt", "lastResult"] },
   ],
   unique: [["code"]],
@@ -135,6 +143,7 @@ export const connection = defineObject({
   actions: [
     { id: "uploadCert", label: "@INT:UploadCert", upload: ".p12,.pfx", when: { field: "kind", equals: "eet" } },
     { id: "pair", label: "@INT:Pair", when: { field: "driver", equals: "sumup" } },
+    { id: "token", label: "@INT:NewToken", download: true, downloadNeedsWrite: true, when: { field: "kind", equals: "api" } },
     { id: "test", label: "@INT:Test" },
   ],
 });
@@ -254,6 +263,16 @@ export default defineModule({
       ManualOk: "Ruční potvrzení nepotřebuje spojení.",
       Paired: "Čtečka spárována.",
       NoConnection: "Napojení nenalezeno nebo není aktivní.",
+      KindApi: "API (REST)",
+      DrvRest: "REST API Shanonu",
+      ApiSettings: "API",
+      Scopes: "Rozsah (moduly nebo objekty, oddělené čárkou)",
+      TokenPrefix: "Klíč",
+      NewToken: "Vygenerovat klíč",
+      ScopesRequired: "Vyplňte rozsah, např. qa.",
+      ScopeUnknown: "Neznámý modul nebo objekt: {scope}.",
+      ApiOnly: "Klíč jde vygenerovat jen u napojení druhu API.",
+      TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
       Module: "Integrations",
@@ -334,6 +353,16 @@ export default defineModule({
       ManualOk: "Manual confirmation needs no connection.",
       Paired: "Reader paired.",
       NoConnection: "Connection not found or not active.",
+      KindApi: "API (REST)",
+      DrvRest: "Shanon REST API",
+      ApiSettings: "API",
+      Scopes: "Scope (modules or objects, comma separated)",
+      TokenPrefix: "Key",
+      NewToken: "Generate key",
+      ScopesRequired: "Fill in the scope, e.g. qa.",
+      ScopeUnknown: "Unknown module or object: {scope}.",
+      ApiOnly: "A key can only be generated for an API connection.",
+      TokenFileHeader: "Shanon REST API key — store it safely, it is not shown again. The previous key no longer works.",
     },
   },
 });

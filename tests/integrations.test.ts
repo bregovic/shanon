@@ -479,3 +479,29 @@ describe("diskuze u požadavků", () => {
     expect([c.author, c.postedAt]).toEqual(["Václav", new Date().toISOString().slice(0, 10)]);
   });
 });
+
+describe("REST API", () => {
+  it("klíč s rozsahem qa: čte a zakládá požadavky, jinam ne, bez klíče 401", async () => {
+    const { GET, POST, PATCH } = await import("@/app/api/v1/[...path]/route");
+    const A = (await provisionTenant(client, { code: `t-api-${run}`, name: "API", adminEmail: `api-${run}@test.local`, adminPassword: "heslo-12345", modules: ["qa", "int", "inv"], company: { code: "A", name: "A" } })).ctx;
+    await expect(saveRecord(A, "int.connection", null, { code: "BAD", name: "x", kind: "api", driver: "rest", scopes: "sys" }, undefined, client)).rejects.toMatchObject({ fields: { scopes: "@INT:ScopeUnknown" } });
+    const conn = await saveRecord(A, "int.connection", null, { code: "CLAUDE", name: "Claude", kind: "api", driver: "rest", scopes: "qa" }, undefined, client);
+    const file = await inTenant(A, (s) => s.download("int.connection", String(conn.id), "token"), client);
+    const token = String(file.data).trim().split("\n").pop()!;
+    const call = (m: typeof GET, path: string[], init: RequestInit = {}, auth = `Bearer ${token}`) =>
+      m(new Request(`http://x/api/v1/${path.join("/")}`, { ...init, headers: { authorization: auth, "content-type": "application/json" } }), { params: Promise.resolve({ path }) });
+    expect((await call(GET, ["qa.issue"], {}, "Bearer shn.nic")).status).toBe(401);
+    const created = await call(POST, ["qa.issue"], { method: "POST", body: JSON.stringify({ title: "Z API", status: "development" }) });
+    expect(created.status).toBe(201);
+    const iss = await created.json();
+    expect(iss.assignedTo).toBe("Claude (vývoj)");
+    const upd = await (await call(PATCH, ["qa.issue", iss.id], { method: "PATCH", body: JSON.stringify({ status: "uat" }) })).json();
+    expect(upd.status).toBe("uat");
+    const c = await (await call(POST, ["qa.comment"], { method: "POST", body: JSON.stringify({ issueId: iss.id, text: "Hotovo k testu." }) })).json();
+    expect(c.author).toBe("API · Claude");
+    const list = await (await call(GET, ["qa.issue"])).json();
+    expect(list.rows.some((r: { id: string }) => r.id === iss.id)).toBe(true);
+    expect((await call(GET, ["inv.item"])).status).toBe(403);
+    expect((await call(POST, ["qa.issue"], { method: "POST", body: JSON.stringify({ status: "uat" }) })).status).toBe(400);
+  });
+});
