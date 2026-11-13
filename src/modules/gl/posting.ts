@@ -115,7 +115,6 @@ export async function assertPostable(data: DataApi, accountId: string, manual: b
   if (!acc) throw new UserError("@SYS:InvalidValue");
   const account = `${acc.accountNum} ${acc.name}`;
   if (acc.blocked) throw new UserError("@GL:AccountBlocked", { account: String(acc.accountNum) });
-  if ((await data.find("gl.account", { parentId: acc.id }, { take: 1 })).length) throw new UserError("@GL:SyntheticHasAnalytics", { account });
   if (manual && acc.noManualEntry) throw new UserError("@GL:ManualEntryDenied", { account });
   return acc;
 }
@@ -219,20 +218,16 @@ export const glHandlers: Record<string, ObjectHandlers> = {
   },
   "gl.account": {
     async beforeSave(ctx, data): Promise<ValidationErrors | void> {
-      const num = String(data.accountNum ?? "");
-      if (!/^\d{3,10}$/.test(num)) return;
+      let num = String(data.accountNum ?? "");
+      if (/^\d{3}$/.test(num)) num = data.accountNum = `${num}000`;
+      if (!/^\d{6}$/.test(num)) return;
+      data.synthetic = num.slice(0, 3);
       data.accountClass = Number(num[0]);
-      if (num.length === 3) {
-        data.level = "synthetic";
-        data.parentId = null;
-      } else {
-        data.level = "analytic";
-        const [parent] = await ctx.data.find("gl.account", { accountNum: num.slice(0, 3) }, { take: 1 });
-        if (!parent) return { accountNum: ctx.t("@GL:MissingSynthetic", { num: num.slice(0, 3) }) };
-        data.parentId = parent.id;
-        // analytika dědí typ a druh ze syntetiky
-        if (!data.type) data.type = parent.type;
-        if (!data.postingType) data.postingType = parent.postingType ?? null;
+      // nový účet stejné syntetiky převezme typ a druh od existujícího
+      if (!data.type || !data.postingType) {
+        const [sib] = (await ctx.data.find("gl.account", { synthetic: data.synthetic }, { take: 5, orderBy: { accountNum: "asc" } })).filter((a) => a.id !== data.id);
+        if (sib && !data.type) data.type = sib.type;
+        if (sib && !data.postingType && data.postingType !== null) data.postingType = sib.postingType ?? null;
       }
       if (!data.type) {
         const byClass: Record<string, string> = { "5": "expense", "6": "revenue", "7": "equity" };

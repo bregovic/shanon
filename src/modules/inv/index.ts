@@ -160,13 +160,13 @@ const UNITS: [string, string, number][] = [
 
 /** Účty, které položky potřebují a ve výchozí osnově nejsou. */
 const ACCOUNTS: [string, string, string][] = [
-  ["504", "Prodané zboží", "expense"],
-  ["601", "Tržby za vlastní výrobky", "revenue"],
+  ["504000", "Prodané zboží", "expense"],
+  ["601000", "Tržby za vlastní výrobky", "revenue"],
 ];
 
 async function invSetup(data: DataApi) {
   for (const [accountNum, name, type] of ACCOUNTS) {
-    if (!(await data.find("gl.account", { accountNum }, { take: 1 })).length) await data.create("gl.account", { accountNum, name, type });
+    if (!(await postingAccount(data, accountNum))) await data.create("gl.account", { accountNum, name, type });
   }
   if (!(await data.find("inv.unit", {}, { take: 1 })).length) {
     for (const [code, name, decimals] of UNITS) await data.create("inv.unit", { code, name, decimals });

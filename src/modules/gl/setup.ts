@@ -8,69 +8,112 @@ import { createPeriods } from "./posting";
 type Acc = [num: string, name: string, type: string, postingType?: string, noManualEntry?: boolean];
 
 /**
- * Výřez směrné účtové osnovy pro malou firmu (firma si ho doplní).
- * Saldokontní a peněžní účty mají analytiku (…001) a zákaz ručního zápisu —
- * účtují na ně jen doklady modulů (faktury, banka, pokladna, DPH).
+ * Výřez směrné účtové osnovy pro malou firmu — účty 6místné (syntetika + 000,
+ * analytiky si firma doplní). Peněžní, saldokontní a daňové účty mají zákaz
+ * ručního zápisu — účtují na ně jen doklady modulů.
  */
 export const DEFAULT_ACCOUNTS: Acc[] = [
-  ["013", "Software", "asset", "fixedAsset"],
-  ["022", "Hmotné movité věci a jejich soubory", "asset", "fixedAsset"],
-  ["073", "Oprávky k softwaru", "asset", "fixedAsset"],
-  ["082", "Oprávky k hmotným movitým věcem", "asset", "fixedAsset"],
-  ["112", "Materiál na skladě", "asset", "inventory"],
-  ["132", "Zboží na skladě", "asset", "inventory"],
-  ["211", "Pokladna", "asset", "cash"],
-  ["211001", "Pokladna CZK", "asset", "cash", true],
-  ["221", "Bankovní účty", "asset", "bank"],
-  ["221001", "Běžný účet", "asset", "bank", true],
-  ["261", "Peníze na cestě", "asset", "cashInTransit"],
-  ["311", "Odběratelé", "asset", "customer"],
-  ["311001", "Odběratelé tuzemsko", "asset", "customer", true],
-  ["314", "Poskytnuté zálohy", "asset", "vendor"],
-  ["321", "Dodavatelé", "liability", "vendor"],
-  ["321001", "Dodavatelé tuzemsko", "liability", "vendor", true],
-  ["324", "Přijaté zálohy", "liability", "customer"],
-  ["331", "Zaměstnanci", "liability", "employee"],
-  ["336", "Zúčtování s institucemi sociálního a zdravotního pojištění", "liability"],
-  ["341", "Daň z příjmů", "liability"],
-  ["342", "Ostatní přímé daně", "liability"],
-  ["343", "Daň z přidané hodnoty", "liability", "vat", true],
-  ["395", "Vnitřní zúčtování", "asset"],
-  ["411", "Základní kapitál", "equity"],
-  ["428", "Nerozdělený zisk minulých let", "equity"],
-  ["431", "Výsledek hospodaření ve schvalovacím řízení", "equity"],
-  ["501", "Spotřeba materiálu", "expense"],
-  ["502", "Spotřeba energie", "expense"],
-  ["504", "Prodané zboží", "expense"],
-  ["511", "Opravy a udržování", "expense"],
-  ["512", "Cestovné", "expense"],
-  ["518", "Ostatní služby", "expense"],
-  ["521", "Mzdové náklady", "expense"],
-  ["524", "Zákonné sociální a zdravotní pojištění", "expense"],
-  ["548", "Ostatní provozní náklady", "expense"],
-  ["551", "Odpisy dlouhodobého majetku", "expense"],
-  ["562", "Úroky", "expense"],
-  ["568", "Ostatní finanční náklady", "expense"],
-  ["601", "Tržby za vlastní výrobky", "revenue"],
-  ["602", "Tržby z prodeje služeb", "revenue"],
-  ["604", "Tržby za zboží", "revenue"],
-  ["648", "Ostatní provozní výnosy", "revenue"],
-  ["662", "Úroky", "revenue"],
-  ["668", "Ostatní finanční výnosy", "revenue"],
-  ["701", "Počáteční účet rozvažný", "equity"],
-  ["702", "Konečný účet rozvažný", "equity"],
-  ["710", "Účet zisků a ztrát", "equity"],
+  ["013000", "Software", "asset", "fixedAsset"],
+  ["018000", "Drobný dlouhodobý nehmotný majetek", "asset", "fixedAsset"],
+  ["021000", "Stavby", "asset", "fixedAsset"],
+  ["022000", "Hmotné movité věci a jejich soubory", "asset", "fixedAsset"],
+  ["028000", "Drobný dlouhodobý hmotný majetek", "asset", "fixedAsset"],
+  ["031000", "Pozemky", "asset", "fixedAsset"],
+  ["042000", "Nedokončený dlouhodobý hmotný majetek", "asset", "fixedAsset"],
+  ["073000", "Oprávky k softwaru", "asset", "fixedAsset"],
+  ["081000", "Oprávky ke stavbám", "asset", "fixedAsset"],
+  ["082000", "Oprávky k hmotným movitým věcem", "asset", "fixedAsset"],
+  ["111000", "Pořízení materiálu", "asset", "inventory"],
+  ["112000", "Materiál na skladě", "asset", "inventory"],
+  ["131000", "Pořízení zboží", "asset", "inventory"],
+  ["132000", "Zboží na skladě", "asset", "inventory"],
+  ["211000", "Pokladna", "asset", "cash", true],
+  ["213000", "Ceniny", "asset", "cash"],
+  ["221000", "Bankovní účty", "asset", "bank", true],
+  ["231000", "Krátkodobé úvěry", "liability"],
+  ["261000", "Peníze na cestě", "asset", "cashInTransit"],
+  ["311000", "Odběratelé", "asset", "customer", true],
+  ["314000", "Poskytnuté zálohy", "asset", "vendor"],
+  ["315000", "Ostatní pohledávky", "asset"],
+  ["321000", "Dodavatelé", "liability", "vendor", true],
+  ["324000", "Přijaté zálohy", "liability", "customer"],
+  ["325000", "Ostatní závazky", "liability"],
+  ["331000", "Zaměstnanci", "liability", "employee"],
+  ["333000", "Ostatní závazky vůči zaměstnancům", "liability", "employee"],
+  ["335000", "Pohledávky za zaměstnanci", "asset", "employee"],
+  ["336000", "Zúčtování s institucemi sociálního a zdravotního pojištění", "liability"],
+  ["341000", "Daň z příjmů", "liability"],
+  ["342000", "Ostatní přímé daně", "liability"],
+  ["343000", "Daň z přidané hodnoty", "liability", "vat", true],
+  ["345000", "Ostatní daně a poplatky", "liability"],
+  ["365000", "Ostatní závazky ke společníkům", "liability"],
+  ["378000", "Jiné pohledávky", "asset"],
+  ["379000", "Jiné závazky", "liability"],
+  ["381000", "Náklady příštích období", "asset"],
+  ["383000", "Výdaje příštích období", "liability"],
+  ["384000", "Výnosy příštích období", "liability"],
+  ["388000", "Dohadné účty aktivní", "asset"],
+  ["389000", "Dohadné účty pasivní", "liability"],
+  ["395000", "Vnitřní zúčtování", "asset"],
+  ["411000", "Základní kapitál", "equity"],
+  ["413000", "Ostatní kapitálové fondy", "equity"],
+  ["428000", "Nerozdělený zisk minulých let", "equity"],
+  ["429000", "Neuhrazená ztráta minulých let", "equity"],
+  ["431000", "Výsledek hospodaření ve schvalovacím řízení", "equity"],
+  ["461000", "Dlouhodobé úvěry", "liability"],
+  ["491000", "Účet individuálního podnikatele", "equity"],
+  ["501000", "Spotřeba materiálu", "expense"],
+  ["502000", "Spotřeba energie", "expense"],
+  ["503000", "Spotřeba ostatních neskladovatelných dodávek", "expense"],
+  ["504000", "Prodané zboží", "expense"],
+  ["511000", "Opravy a udržování", "expense"],
+  ["512000", "Cestovné", "expense"],
+  ["513000", "Náklady na reprezentaci", "expense"],
+  ["518000", "Ostatní služby", "expense"],
+  ["518100", "Nájemné", "expense"],
+  ["518200", "Telefony a internet", "expense"],
+  ["518300", "Účetní a poradenské služby", "expense"],
+  ["518400", "Software a licence", "expense"],
+  ["521000", "Mzdové náklady", "expense"],
+  ["524000", "Zákonné sociální a zdravotní pojištění", "expense"],
+  ["527000", "Zákonné sociální náklady", "expense"],
+  ["531000", "Daň silniční", "expense"],
+  ["538000", "Ostatní daně a poplatky", "expense"],
+  ["543000", "Dary", "expense"],
+  ["544000", "Smluvní pokuty a úroky z prodlení", "expense"],
+  ["545000", "Ostatní pokuty a penále", "expense"],
+  ["546000", "Odpis pohledávky", "expense"],
+  ["548000", "Ostatní provozní náklady", "expense"],
+  ["549000", "Manka a škody", "expense"],
+  ["551000", "Odpisy dlouhodobého majetku", "expense"],
+  ["562000", "Úroky", "expense"],
+  ["563000", "Kurzové ztráty", "expense"],
+  ["568000", "Ostatní finanční náklady", "expense"],
+  ["591000", "Daň z příjmů splatná", "expense"],
+  ["601000", "Tržby za vlastní výrobky", "revenue"],
+  ["602000", "Tržby z prodeje služeb", "revenue"],
+  ["604000", "Tržby za zboží", "revenue"],
+  ["641000", "Tržby z prodeje dlouhodobého majetku", "revenue"],
+  ["644000", "Smluvní pokuty a úroky z prodlení", "revenue"],
+  ["648000", "Ostatní provozní výnosy", "revenue"],
+  ["662000", "Úroky", "revenue"],
+  ["663000", "Kurzové zisky", "revenue"],
+  ["668000", "Ostatní finanční výnosy", "revenue"],
+  ["701000", "Počáteční účet rozvažný", "equity"],
+  ["702000", "Konečný účet rozvažný", "equity"],
+  ["710000", "Účet zisků a ztrát", "equity"],
 ];
 
 /**
- * Účet, na který se dá účtovat: zadaný, a má-li analytiku, její první účet.
+ * Účet syntetiky, na který se účtuje: xxx000, jinak první účet té syntetiky.
  * Pro výchozí nastavení modulů (skupiny odběratelů, pokladny, banky…).
  */
-export async function postingAccount(data: DataApi, num: string): Promise<string | null> {
-  const [acc] = await data.find("gl.account", { accountNum: num }, { take: 1 });
-  if (!acc) return null;
-  const [child] = await data.find("gl.account", { parentId: acc.id, blocked: false }, { take: 1, orderBy: { accountNum: "asc" } });
-  return String((child ?? acc).id);
+export async function postingAccount(data: DataApi, synthetic: string): Promise<string | null> {
+  const syn = synthetic.slice(0, 3);
+  const [exact] = await data.find("gl.account", { accountNum: `${syn}000` }, { take: 1 });
+  if (exact && !exact.blocked) return String(exact.id);
+  const [first] = await data.find("gl.account", { synthetic: syn, blocked: false }, { take: 1, orderBy: { accountNum: "asc" } });
+  return first ? String(first.id) : null;
 }
 
 export async function glSetup(data: DataApi): Promise<void> {
@@ -80,9 +123,13 @@ export async function glSetup(data: DataApi): Promise<void> {
       await data.create("gl.account", { accountNum, name, type, postingType: postingType ?? null, noManualEntry: !!noManualEntry });
     }
   } else {
-    // stávající rozvrh: dopočítat úroveň a třídu (zakládá je až událost účtu)
-    for (const a of await data.find("gl.account", { level: null }, { take: 5000, orderBy: { accountNum: "asc" } })) {
-      await data.update("gl.account", String(a.id), { accountNum: a.accountNum });
+    // stávající rozvrh: 3místné účty doplnit na 6 míst (211 → 211000), dopočítat syntetiku a třídu
+    for (const a of await data.find("gl.account", { synthetic: null }, { take: 5000, orderBy: { accountNum: "asc" } })) {
+      const num = String(a.accountNum);
+      const padded = num.length === 3 ? `${num}000` : num;
+      // 211 i 211000 zároveň (nemělo by nastat) — nechat, firma to vyřeší ručně
+      if (padded !== num && (await data.find("gl.account", { accountNum: padded }, { take: 1 })).length) continue;
+      await data.update("gl.account", String(a.id), { accountNum: padded });
     }
     // jen doplnit chybějící druh účtu u známých účtů (nic nepřepisovat)
     for (const [accountNum, , , postingType] of DEFAULT_ACCOUNTS) {

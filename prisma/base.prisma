@@ -39,6 +39,10 @@ model SysUser {
   role         String   @default("user") @db.VarChar(20)
   lang         String   @default("cs") @db.VarChar(5)
   active       Boolean  @default(true)
+  /// PIN do pokladny (bcrypt) — rychlé přihlášení pokladní u terminálu
+  posPinHash   String?  @map("pos_pin_hash")
+  /// e-mailová upozornění, která si uživatel zapnul: { dailySummary, overdueInvoices, integrationErrors }
+  notify       Json     @default("{}")
   createdAt    DateTime @default(now()) @map("created_at")
 
   tenant    SysTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)

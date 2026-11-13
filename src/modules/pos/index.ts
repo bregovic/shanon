@@ -186,14 +186,14 @@ export const receiptLine = defineObject({
 
 /** Účty pokladny, které ve výchozí osnově nejsou. */
 const ACCOUNTS: [string, string, string][] = [
-  ["261", "Peníze na cestě", "asset"],
-  ["548", "Ostatní provozní náklady", "expense"],
-  ["648", "Ostatní provozní výnosy", "revenue"],
+  ["261000", "Peníze na cestě", "asset"],
+  ["548000", "Ostatní provozní náklady", "expense"],
+  ["648000", "Ostatní provozní výnosy", "revenue"],
 ];
 
 async function posSetup(data: DataApi) {
   for (const [accountNum, name, type] of ACCOUNTS) {
-    if (!(await data.find("gl.account", { accountNum }, { take: 1 })).length) await data.create("gl.account", { accountNum, name, type });
+    if (!(await postingAccount(data, accountNum))) await data.create("gl.account", { accountNum, name, type });
   }
   if ((await data.find("pos.register", {}, { take: 1 })).length) return;
   const acc = (n: string) => postingAccount(data, n);

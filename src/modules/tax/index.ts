@@ -7,6 +7,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { postingAccount } from "@/modules/gl/setup";
 
 export const TaxDirection = defineEnum({
   id: "TaxDirection",
@@ -49,8 +50,9 @@ export const taxCode = defineObject({
 /** Výchozí daňové kódy (jen pokud firma žádné nemá). */
 async function taxSetup(data: DataApi) {
   if ((await data.find("tax.taxCode", {}, { take: 1 })).length) return;
-  const [vat] = await data.find("gl.account", { accountNum: "343" }, { take: 1 });
-  if (!vat) return;
+  const vatId = await postingAccount(data, "343");
+  if (!vatId) return;
+  const vat = { id: vatId };
   const codes: [string, string, string, string, string, string][] = [
     ["V21", "DPH na výstupu 21 %", "21", "output", "1", "A4"],
     ["V12", "DPH na výstupu 12 %", "12", "output", "2", "A4"],

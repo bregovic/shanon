@@ -22,11 +22,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Do hlavní knihy jen přes `postVoucher()` (`src/modules/gl/posting.ts`) — hlídá
   vyrovnanost a otevřené účetní období. Cizí měna: `convertLines` / `rateFor`
   (kurz ČNB, nejvýš 7 dní starý, chybějící se načte samo).
-- Účtový rozvrh: syntetika (3 číslice) a analytika (syntetika + rozlišení, vazba
-  `parentId` se dopočítá). Na syntetiku s analytikou se neúčtuje; účty se zákazem
-  ručního zápisu (`noManualEntry`, saldokonto, banka, pokladna, DPH) odmítne
-  účetní deník, doklady modulů na ně účtují. Výchozí nastavení modulů bere účet
-  přes `postingAccount(data, "311")` (první analytika, jinak syntetika).
+- Účtový rozvrh: účty jsou 6místné (3 syntetika + 3 analytika, `synthetic` se
+  dopočítá; zadání „211“ se doplní na 211000). Účty se zákazem ručního zápisu
+  (`noManualEntry`: saldokonto, banka, pokladna, DPH) odmítne účetní deník,
+  doklady modulů na ně účtují. Výchozí nastavení modulů bere účet přes
+  `postingAccount(data, "311")` (xxx000, jinak první účet syntetiky).
 - Doklady s řádky a DPH (faktury) nepsat znovu: `src/modules/tax/document.ts`
   (výpočet, součty, zaúčtování, saldo, daňové transakce). Pomocná kniha partnerů
   (AR, AP) vzniká továrnou `partner-ledger.ts` — nový podobný modul = parametry

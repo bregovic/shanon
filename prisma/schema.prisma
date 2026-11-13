@@ -41,6 +41,10 @@ model SysUser {
   role         String   @default("user") @db.VarChar(20)
   lang         String   @default("cs") @db.VarChar(5)
   active       Boolean  @default(true)
+  /// PIN do pokladny (bcrypt) — rychlé přihlášení pokladní u terminálu
+  posPinHash   String?  @map("pos_pin_hash")
+  /// e-mailová upozornění, která si uživatel zapnul: { dailySummary, overdueInvoices, integrationErrors }
+  notify       Json     @default("{}")
   createdAt    DateTime @default(now()) @map("created_at")
 
   tenant    SysTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -520,11 +524,10 @@ model GlAccount {
   id            String   @id @default(uuid(7)) @db.Uuid
   tenantId      String   @map("tenant_id") @db.Uuid
   companyId     String   @map("company_id") @db.Uuid
-  accountNum    String   @map("account_num") @db.VarChar(10)
+  accountNum    String   @map("account_num") @db.VarChar(6)
   name          String   @db.VarChar(120)
   type          String?  @db.VarChar(40)
-  level         String?  @db.VarChar(40)
-  parentId      String?  @map("parent_id") @db.Uuid
+  synthetic     String?  @db.VarChar(3)
   accountClass  Int?     @map("account_class")
   postingType   String?  @map("posting_type") @db.VarChar(40)
   noManualEntry Boolean  @default(false) @map("no_manual_entry")
@@ -537,8 +540,6 @@ model GlAccount {
   updatedBy     String?  @map("updated_by") @db.Uuid
 
   company                         SysCompany          @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
-  parent                          GlAccount?          @relation("GlAccount_parent", fields: [parentId], references: [id], onDelete: Restrict)
-  glAccount_parent                GlAccount[]         @relation("GlAccount_parent")
   glTrans_account                 GlTrans[]           @relation("GlTrans_account")
   glJournalName_offsetAccount     GlJournalName[]     @relation("GlJournalName_offsetAccount")
   glJournalLine_account           GlJournalLine[]     @relation("GlJournalLine_account")
@@ -561,7 +562,6 @@ model GlAccount {
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
-  @@index([parentId])
   @@map("gl_account")
 }
 

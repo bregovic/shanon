@@ -473,6 +473,44 @@ export async function posCloseShiftAction(registerId: string): Promise<ActionRes
 }
 
 // ---------------------------------------------------------------------------
+// Moje nastavení (každý přihlášený jen sám sobě)
+// ---------------------------------------------------------------------------
+
+const NOTIFY_KEYS = ["dailySummary", "overdueInvoices", "integrationErrors"] as const;
+
+export async function saveProfileAction(input: { name: string; lang: string; notify: Record<string, boolean> }): Promise<ActionResult> {
+  const s = await requireSession();
+  const t = await getT(s.lang, s.ctx.tenantId);
+  const name = String(input.name ?? "").trim();
+  if (!name || name.length > 120) return { ok: false, message: t("@SYS:FixErrors"), errors: { name: t("@SYS:Required") } };
+  const notify = Object.fromEntries(NOTIFY_KEYS.map((k) => [k, !!input.notify?.[k]]));
+  await prisma.sysUser.update({ where: { id: s.user.id }, data: { name, lang: input.lang === "en" ? "en" : "cs", notify } });
+  revalidatePath("/", "layout");
+  return { ok: true, data: undefined };
+}
+
+export async function changePasswordAction(input: { current: string; next: string; repeat: string }): Promise<ActionResult> {
+  const s = await requireSession();
+  const t = await getT(s.lang, s.ctx.tenantId);
+  const next = String(input.next ?? "");
+  if (next.length < 10) return { ok: false, message: t("@SYS:PasswordRules"), errors: { next: t("@SYS:PasswordRules") } };
+  if (next !== input.repeat) return { ok: false, message: t("@SYS:PasswordMismatch"), errors: { repeat: t("@SYS:PasswordMismatch") } };
+  const u = await prisma.sysUser.findUniqueOrThrow({ where: { id: s.user.id } });
+  if (!(await bcrypt.compare(String(input.current ?? ""), u.passwordHash))) return { ok: false, message: t("@SYS:WrongPassword"), errors: { current: t("@SYS:WrongPassword") } };
+  await prisma.sysUser.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(next, 12) } });
+  return { ok: true, data: undefined };
+}
+
+export async function setPosPinAction(pin: string): Promise<ActionResult> {
+  const s = await requireSession();
+  const t = await getT(s.lang, s.ctx.tenantId);
+  const p = String(pin ?? "");
+  if (p && !/^\d{4,6}$/.test(p)) return { ok: false, message: t("@SYS:PosPinInvalid"), errors: { pin: t("@SYS:PosPinInvalid") } };
+  await prisma.sysUser.update({ where: { id: s.user.id }, data: { posPinHash: p ? await bcrypt.hash(p, 10) : null } });
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
 // Uživatelé (superuživatel všechny, správce firmy jen ve svých firmách)
 // ---------------------------------------------------------------------------
 
