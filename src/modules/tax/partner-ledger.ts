@@ -98,6 +98,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     ],
     unique: [["accountNum"], ["subjectId"]],
     numberSeq: { field: "accountNum", seq: sp.partnerSeq },
+    // v odkazech a výběru „číslo · název subjektu“, hledání i podle názvu
+    titleRef: "subjectId",
     defaultSort: { field: "accountNum", dir: "asc" },
     actions: [{ id: "ares", label: "@GAB:FromAres" }],
     lines: [

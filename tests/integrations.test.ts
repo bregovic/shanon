@@ -673,9 +673,11 @@ describe("testovací prostředí a datové služby (CR-036)", () => {
       expect([st.active, st.connections.map((c) => c.code).sort(), st.paused]).toEqual([true, ["TEST-EET", "TEST-PAY", "TEST-PRINT"], ["SUMUP"]]);
       expect((await api.find("pos.box", {}, { take: 10 })).length).toBe(5);
       const conns = await connectionsFor(api, reg);
-      expect([conns.eet?.driver, conns.payment?.driver, conns.printer?.driver]).toEqual(["eetSimulator", "simulator", "browser"]);
+      expect([conns.eet?.driver, conns.eet?.environment, conns.eet?.certSubject, conns.payment?.driver, conns.printer?.driver]).toEqual(["eet2", "playground", "CZ8551015704", "simulator", "browser"]);
+      // EET simulátor (ručně založené napojení) dá testovací FIK bez sítě
+      const sim = await api.create("int.connection", { code: "SIM-EET", name: "Sim", kind: "eet", driver: "eetSimulator", active: false });
       const r = await sell(api, { registerId: reg, payment: "cash", lines: [{ itemId: item, qty: "1" }] });
-      await eetRegisterReceipt(api, T.companyId, conns.eet!, r, true);
+      await eetRegisterReceipt(api, T.companyId, sim, r, true);
       const rr = (await api.get("pos.receipt", String(r.id)))!;
       expect([rr.eetStatus, String(rr.eetPok).startsWith("TEST-")]).toEqual(["sent", true]);
       await disableTestEnv(api);
@@ -892,5 +894,25 @@ describe("deníky jako v AX (CR-045)", () => {
     // ruční řádek přímo na saldokonto 311 nejde, přes druh Odběratel ano (výše)
     const j6 = await journal(await jn("BAD", "balance"));
     await expect(line(j6, { accountId: await acc("311000"), debit: "1" })).rejects.toMatchObject({ label: "@GL:ManualEntryDenied" });
+  });
+});
+
+describe("výběr odběratele", () => {
+  it("nabídka ukazuje číslo i název, hledá podle obou (i víc slov), na faktuře „číslo · název“", async () => {
+    const { refOptions } = await import("@/server/data");
+    const R = (await provisionTenant(client, { code: `t-ref-${run}`, name: "Ref", adminEmail: `ref-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar"], company: { code: "R", name: "R" } })).ctx;
+    const grp = (await listRecords(R, "ar.group", {}, client)).rows[0];
+    for (const name of ["Bistro U Lípy", "Masna Novák", "Bistro Centrum"]) {
+      const s = await saveRecord(R, "gab.subject", null, { name }, undefined, client);
+      await saveRecord(R, "ar.customer", null, { subjectId: s.id, groupId: grp.id }, undefined, client);
+    }
+    const byName = await refOptions(R, "ar.customer", "bistro", client);
+    expect(byName.map((o) => o.subtitle).sort()).toEqual(["Bistro Centrum", "Bistro U Lípy"]);
+    expect(byName[0].title).toMatch(/^\S+$/);
+    expect((await refOptions(R, "ar.customer", "bistro lípy", client)).map((o) => o.subtitle)).toEqual(["Bistro U Lípy"]);
+    const num = String(byName[0].title);
+    expect((await refOptions(R, "ar.customer", num, client)).length).toBe(1);
+    const inv = await saveRecord(R, "ar.invoice", null, { customerId: byName[0].id, invoiceDate: "2026-11-13" }, undefined, client);
+    expect(((await getRecord(R, "ar.invoice", String(inv.id), client))!._titles as Record<string, string>).customerId).toBe(`${num} · ${byName[0].subtitle}`);
   });
 });

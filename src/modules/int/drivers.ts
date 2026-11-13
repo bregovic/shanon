@@ -116,6 +116,15 @@ async function companyDic(
   return dic;
 }
 
+/**
+ * DIČ do zprávy EET: na Playgroundu DIČ testovacího certifikátu (veřejné
+ * testovací certifikáty patří fiktivním DIČ), na ostrém prostředí DIČ firmy.
+ */
+async function eetDic(data: DataApi, companyId: string | null, conn: RecordData, cert: EetCert): Promise<string> {
+  if ((conn.environment ?? "playground") === "playground" && cert.subject) return cert.subject;
+  return companyDic(data, companyId);
+}
+
 function eetMessageText(r: EetResult): string {
   switch (r.status) {
     case "ok":
@@ -163,7 +172,7 @@ export async function eetRegisterReceipt(
   if (!simulated)
     try {
       const cert = eetCertOf(conn);
-      const eic = await companyDic(data, companyId);
+      const eic = await eetDic(data, companyId, conn, cert);
       const msg = buildEetMessage(
         {
           eic,
@@ -581,7 +590,7 @@ export const intHandlers: Record<string, ObjectHandlers> = {
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
         if (conn.kind === "eet") {
           const cert = eetCertOf(conn);
-          const eic = await companyDic(ctx.data, ctx.companyId);
+          const eic = await eetDic(ctx.data, ctx.companyId, conn, cert);
           if (cert.validTo < new Date())
             throw new UserError("@INT:CertExpired", {
               date: cert.validTo.toISOString().slice(0, 10),

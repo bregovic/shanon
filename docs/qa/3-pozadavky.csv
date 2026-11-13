@@ -48,3 +48,8 @@ CR-046;change;Zpracování dokumentů (OCR přes ChatGPT): hromadné nahrání P
 CR-047;bug;Kasa na dotyk: krátké ťuknutí nepřidalo položku, dialog po podržení se hned zavřel;POS-SALE;critical;uat;47;"Ťuknutí = běžné kliknutí, stav stisku drží dlaždice; po podržení se zahodí kliknutí na pozadí dialogu. Ověřeno na telefonu i tabletu."
 CR-048;change;Nedávné: posledních 5 otevřených funkcí vedle oblíbených;SYS-UI;low;uat;48;
 CR-049;change;Kasa na dotyku: bez automatické klávesnice, začíná se v přehledu zboží;POS-SALE;medium;uat;49;"Hledání se otevře až ťuknutím; čtečka EAN píše do hledání i bez fokusu; dialog množství používá vlastní klávesnici."
+CR-050;change;Testovací prostředí: skutečný EET Playground Finanční správy s veřejným testovacím certifikátem;INT-EET;high;uat;50;"Na Playgroundu se posílá DIČ z certifikátu; účtenka dostane testovací FIK od FS."
+CR-051;bug;Účtenka: FIK a další řádky se překrývaly, když se text zalomil;PRT;medium;uat;51;Účtenka (papír bez pevné výšky) skládá prvky pod sebe podle obsahu.
+CR-052;change;"Výběr odběratele/dodavatele: číslo i název, hledání podle obou; na faktuře „číslo · název“";SYS-UI;medium;uat;52;
+CR-053;change;"Odběratelé: prodejní objednávka, volná faktura, zálohová faktura; Dodavatelé: nákupní objednávka, faktura dodavatele, zálohová faktura";AR-INVOICE;high;analysis;53;Zálohová faktura = pohledávka/závazek mimo účetnictví do úhrady.
+CR-054;change;Integrace: parametr sdílených rozhraní (veřejné služby zakládat automaticky, EET ne);INT-EET;low;analysis;54;

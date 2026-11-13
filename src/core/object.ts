@@ -103,6 +103,11 @@ export interface ObjectDef {
   lines?: { object: string; field: string; label: LabelRef; owned?: boolean; copy?: boolean; inline?: boolean }[];
   /** stránka dokladu: hlavička jako jeden řádek nahoře, řádky přes celou stránku */
   compactHeader?: boolean;
+  /**
+   * odkaz, jehož titulek se připojí k titulku záznamu („DOD00001 · Masna Novák“)
+   * a podle něhož jde záznam hledat (odběratel / dodavatel → subjekt adresáře)
+   */
+  titleRef?: string;
   /** tlačítka ve formuláři; logika v ObjectHandlers.actions */
   /**
    * `upload` = akce si vyžádá soubor (přípony pro výběr, např. ".gpc,.txt");

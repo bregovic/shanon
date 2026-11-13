@@ -85,14 +85,29 @@ function Table({ el, rows, locale, fontSize }: { el: PrintElement; rows: Record<
 }
 
 /** Jeden prvek na absolutní pozici (mimo tabulku řádků). */
-export function ElementView({ el, data, locale, fontSize, designMode = false }: { el: PrintElement; data: PrintData; locale: string; fontSize: number; designMode?: boolean }) {
+export function ElementView({
+  el,
+  data,
+  locale,
+  fontSize,
+  designMode = false,
+  flow = false,
+}: {
+  el: PrintElement;
+  data: PrintData;
+  locale: string;
+  fontSize: number;
+  designMode?: boolean;
+  /** v toku (účtenka): bez absolutní pozice a pevné výšky textu */
+  flow?: boolean;
+}) {
   const s = el.style ?? {};
   const box: React.CSSProperties = {
-    position: "absolute",
-    left: `${el.x}mm`,
-    top: `${el.y}mm`,
+    position: flow ? "relative" : "absolute",
+    left: flow ? undefined : `${el.x}mm`,
+    top: flow ? undefined : `${el.y}mm`,
     width: `${el.w}mm`,
-    height: el.type === "table" || el.type === "vat" ? undefined : `${el.h}mm`,
+    height: el.type === "table" || el.type === "vat" || (flow && el.type === "text") ? undefined : `${el.h}mm`,
     fontSize: pt(s.size ?? fontSize),
     fontWeight: s.bold ? 700 : 400,
     fontStyle: s.italic ? "italic" : undefined,
@@ -134,6 +149,25 @@ export function ElementView({ el, data, locale, fontSize, designMode = false }: 
 /** Celý doklad: hlavička (absolutně), tabulka řádků (teče), zbytek pod ní. */
 export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: PrintLayout; data: PrintData; locale?: string }) {
   const paper = PAPERS[layout.paper] ?? PAPERS.a4;
+  const fs0 = layout.fontSize || 9;
+  // účtenka (papír bez pevné výšky): prvky pod sebou podle obsahu — delší text nebo
+  // víc sazeb DPH posune vše pod sebou, nic se nepřekrývá
+  if (!paper.h) {
+    const sorted = [...layout.elements].sort((a, b) => a.y - b.y || a.x - b.x);
+    // mezera nad prvkem = odstup od spodku předchozích prvků v návrhu
+    const gaps = sorted.map((el, i) => Math.max(0, el.y - Math.max(0, ...sorted.slice(0, i).map((x) => x.y + x.h))));
+    return (
+      <div className="print-page" style={{ width: `${paper.w}mm`, fontFamily: "Arial, Helvetica, sans-serif", color: "#000", background: "#fff" }}>
+        {sorted.map((el, i) => {
+          return (
+            <div key={el.id} style={{ position: "relative", marginTop: `${gaps[i]}mm`, marginLeft: `${el.x}mm`, width: `${el.w}mm`, minHeight: el.type === "text" ? undefined : `${el.h}mm` }}>
+              <ElementView el={{ ...el, x: 0, y: 0 }} data={data} locale={locale} fontSize={fs0} flow />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
   const table = layout.elements.find((e) => e.type === "table");
   const page: React.CSSProperties = { width: `${paper.w}mm`, position: "relative", fontFamily: "Arial, Helvetica, sans-serif", color: "#000", background: "#fff" };
   const fs = layout.fontSize || 9;

@@ -7,9 +7,11 @@
  * Testovací napojení mají kód TEST-…; nemažou se (drží je log), jen vypínají.
  */
 import type { DataApi, RecordData } from "@/core/module";
+import { PLAYGROUND_CERT_DIC, PLAYGROUND_CERT_P12, PLAYGROUND_CERT_PASSWORD } from "./assets/eet-playground";
 
 const TEST_CONNECTIONS = [
-  { code: "TEST-EET", kind: "eet", driver: "eetSimulator", name: "@INT:TestEet", extra: { unitId: "1", posId: "TEST", environment: "playground" } },
+  // skutečný EET Playground Finanční správy s veřejným testovacím certifikátem (vrací testovací FIK)
+  { code: "TEST-EET", kind: "eet", driver: "eet2", name: "@INT:TestEet", extra: { unitId: "1", posId: "TEST", environment: "playground", certPassword: PLAYGROUND_CERT_PASSWORD, certData: PLAYGROUND_CERT_P12, certSubject: PLAYGROUND_CERT_DIC, certValidTo: "2027-05-14" } },
   { code: "TEST-PAY", kind: "payment", driver: "simulator", name: "@INT:TestPay", extra: {} },
   { code: "TEST-PRINT", kind: "printer", driver: "browser", name: "@INT:TestPrint", extra: { paperWidth: "80" } },
 ] as const;
@@ -39,7 +41,8 @@ export async function enableTestEnv(data: DataApi, t: (ref: string) => string, w
       await data.update("int.connection", String(c.id), { active: false, pausedByTest: true });
     }
     const have = all.find((x) => x.code === def.code);
-    if (have) await data.update("int.connection", String(have.id), { active: true });
+    // starší testovací napojení (simulátor) převést na aktuální nastavení
+    if (have) await data.update("int.connection", String(have.id), { active: true, driver: def.driver, ...def.extra });
     else await data.create("int.connection", { code: def.code, name: t(def.name), kind: def.kind, driver: def.driver, active: true, ...def.extra });
   }
   // testovací data: boxy pro odložené nákupy
