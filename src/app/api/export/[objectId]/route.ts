@@ -28,6 +28,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ objectId
   } catch {
     /* neplatné filtry = bez filtrů */
   }
+  // přesná shoda (řádky dokladu: ?filter={"journalId":"…"})
+  let filter: Record<string, string> = {};
+  try {
+    const f = JSON.parse(url.searchParams.get("filter") ?? "{}");
+    if (f && typeof f === "object") filter = Object.fromEntries(Object.entries(f).filter(([k]) => k in def.fields).map(([k, v]) => [k, String(v)]));
+  } catch {
+    /* neplatný filtr = bez filtru */
+  }
   const sort = url.searchParams.get("sort") ?? undefined;
   const dir = url.searchParams.get("dir") === "desc" ? "desc" : "asc";
   const t = await getT(s.lang, s.ctx.tenantId);
@@ -39,7 +47,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ objectId
     rows = await inTenant(s.ctx, async (sess) => {
       const out: RecordData[] = [];
       for (let page = 1; out.length < MAX_ROWS; page++) {
-        const r = await sess.list(objectId, { filters, sort, dir, page, pageSize: PAGE, maxPageSize: PAGE, lang: s.lang });
+        const r = await sess.list(objectId, { filters, filter, sort, dir, page, pageSize: PAGE, maxPageSize: PAGE, lang: s.lang });
         out.push(...r.rows);
         if (r.rows.length < PAGE) break;
       }

@@ -44,7 +44,20 @@ const useStyles = makeStyles({
 type L = UiLabels["importer"];
 const fill = (s: string, p: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(p[k] ?? ""));
 
-export function ImportButton({ objectId, labels, onDone, hasImages = false }: { objectId: string; labels: L; onDone: () => void; hasImages?: boolean }) {
+export function ImportButton({
+  objectId,
+  labels,
+  onDone,
+  hasImages = false,
+  fixed,
+}: {
+  objectId: string;
+  labels: L;
+  onDone: () => void;
+  hasImages?: boolean;
+  /** pevné hodnoty každého řádku (řádky dokladu: odkaz na rodiče) */
+  fixed?: Record<string, string>;
+}) {
   const st = useStyles();
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -64,6 +77,7 @@ export function ImportButton({ objectId, labels, onDone, hasImages = false }: { 
     fd.set("objectId", objectId);
     fd.set("file", file);
     fd.set("dryRun", dryRun ? "1" : "0");
+    if (fixed) fd.set("fixed", JSON.stringify(fixed));
     // relativní cesta ve složce (antoni/002_spek.jpg) slouží ke spárování se sloupcem Obrázek
     for (const im of images) fd.append("images", im, (im as File & { webkitRelativePath?: string }).webkitRelativePath || im.name);
     const res = await importAction(fd);

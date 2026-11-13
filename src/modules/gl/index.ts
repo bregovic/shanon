@@ -455,8 +455,8 @@ export const journalLine = defineObject({
     ...dimFields(),
     /** prázdné = účetní měna firmy */
     currencyId: { edt: CurrencyRef },
-    debit: { edt: Edts.Amount, label: "@GL:Debit" },
-    credit: { edt: Edts.Amount, label: "@GL:Credit" },
+    debit: { edt: Edts.Amount, label: "@GL:Debit", aliases: ["má dáti", "ma dati", "debet", "debit"] },
+    credit: { edt: Edts.Amount, label: "@GL:Credit", aliases: ["dal", "kredit", "credit"] },
     text: { edt: Edts.Description, label: "@GL:Text" },
   },
   titleField: "text",

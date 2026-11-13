@@ -27,6 +27,7 @@ import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
 import { HistoryButton } from "./history-panel";
+import { ImportButton } from "./import-dialog";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
@@ -97,6 +98,15 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
     <section>
       <div className={s.linesHead}>
         <div className={s.linesTitle}>{spec.label}</div>
+        {/* export řádků dokladu; import do vlastních řádků (rodič je pevný) */}
+        {spec.editable && <ImportButton objectId={spec.objectId} labels={labels.importer} fixed={{ [spec.field]: parentId }} onDone={() => (setReload((n) => n + 1), router.refresh())} />}
+        <Button
+          appearance="subtle"
+          icon={<ArrowDownload24Regular />}
+          title={labels.export}
+          aria-label={labels.export}
+          onClick={() => (window.location.href = `/api/export/${spec.objectId}?filter=${encodeURIComponent(JSON.stringify({ [spec.field]: parentId }))}`)}
+        />
         {spec.editable && (
           <>
             <Button icon={<Add24Regular />} onClick={() => open(null)}>

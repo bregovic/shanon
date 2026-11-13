@@ -765,3 +765,18 @@ describe("adresář: založení z registru, dodavatel a odběratel", () => {
     await expect(runAction(A, "gab.subject", String(sub.id), "createVendor", client)).rejects.toMatchObject({ label: "@GAB:PartnerExists" });
   });
 });
+
+describe("import řádků dokladu", () => {
+  it("řádky deníku hlavní knihy ze souboru do konkrétního deníku (rodič pevně)", async () => {
+    const { importRecords, parseCsv } = await import("@/server/import");
+    const J = (await provisionTenant(client, { code: `t-jl-${run}`, name: "JL", adminEmail: `jl-${run}@test.local`, adminPassword: "heslo-12345", modules: ["gl"], company: { code: "J", name: "J" } })).ctx;
+    const j = await saveRecord(J, "gl.journal", null, { date: "2026-11-13", description: "Import řádků" }, undefined, client);
+    const csv = "Účet;Má dáti;Dal;Text\n518000;1000;;Nájem\n395000;;1000;Nájem\n";
+    const dry = await importRecords(J, "gl.journalLine", parseCsv(csv), { dryRun: true, lang: "cs", fixed: { journalId: String(j.id) } }, client);
+    expect([dry.errors, dry.missing]).toEqual([[], []]);
+    const r = await importRecords(J, "gl.journalLine", parseCsv(csv), { dryRun: false, lang: "cs", fixed: { journalId: String(j.id) } }, client);
+    expect([r.created, r.errors.length]).toEqual([2, 0]);
+    await runAction(J, "gl.journal", String(j.id), "post", client);
+    expect((await getRecord(J, "gl.journal", String(j.id), client))!.status).toBe("posted");
+  });
+});

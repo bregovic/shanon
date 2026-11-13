@@ -318,7 +318,14 @@ export async function importAction(form: FormData): Promise<ActionResult<ImportR
     // obrázky ke sloupci Obrázek: soubory ze zvolené složky (název = relativní cesta)
     const uploads: { path: string; data: Buffer }[] = [];
     for (const f of form.getAll("images")) if (f instanceof File && f.size) uploads.push({ path: f.name, data: Buffer.from(await f.arrayBuffer()) });
-    const report = await importRecords(s.ctx, objectId, table, { dryRun: form.get("dryRun") === "1", lang: s.lang, images: imagesFromUploads(uploads) });
+    // řádky dokladu: pevný odkaz na rodiče (jen pole typu odkaz daného objektu)
+    let fixed: Record<string, string> | undefined;
+    if (form.get("fixed")) {
+      const def = registry.objects.get(objectId);
+      const raw = JSON.parse(String(form.get("fixed"))) as Record<string, unknown>;
+      fixed = Object.fromEntries(Object.entries(raw).filter(([k, v]) => def?.fields[k]?.edt.kind === "ref" && /^[0-9a-f-]{36}$/i.test(String(v))).map(([k, v]) => [k, String(v)]));
+    }
+    const report = await importRecords(s.ctx, objectId, table, { dryRun: form.get("dryRun") === "1", lang: s.lang, images: imagesFromUploads(uploads), fixed });
     if (report.applied) revalidatePath(objectHref(objectId));
     return { ok: true, data: report };
   } catch (e) {

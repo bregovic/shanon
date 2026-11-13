@@ -126,6 +126,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Slevy (`inv.discount`): procento nebo akční cena, na položku / skupinu / vše,
   od–do; pokladna bere nejvýhodnější (`bestDiscount`), na řádku účtenky zůstane
   běžná cena a sleva.
+- Import řádků dokladu: `importRecords(…, { fixed: { journalId } })` — rodič pevně,
+  v UI tlačítko Import u řádků na stránce dokladu; export řádků `/api/export/<obj>?filter={…}`.
+- Simulace provozu (jen test): `npx tsx --conditions=react-server scripts/simulate-shop.ts
+  <tenant> <firma> [--receipts=60]` — směna, prodeje, boxy, pokladní kniha, faktura,
+  kontrola předvahy, vyrovnanosti dokladů a DPH směny.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.

@@ -41,6 +41,12 @@ const useStyles = makeStyles({
   section: { fontWeight: tokens.fontWeightSemibold, backgroundColor: tokens.colorNeutralBackground2 },
   total: { fontWeight: tokens.fontWeightBold, borderTop: `2px solid ${tokens.colorNeutralStroke1}` },
   desc: { color: tokens.colorNeutralForeground3, display: "block", marginBottom: "12px" },
+  // mobil: tabulka se posouvá do strany, text sloupců se nezalamuje po znacích
+  table: { minWidth: "640px" },
+  text: { minWidth: "120px" },
+  nowrap: { whiteSpace: "nowrap" },
+  // na úzké obrazovce jen ikona (popisek zůstane v title)
+  btnLabel: { "@media (max-width: 600px)": { display: "none" } },
 });
 
 export function ReportView(p: {
@@ -73,15 +79,24 @@ export function ReportView(p: {
   const totals = Object.fromEntries(
     res.columns.filter((c) => c.total).map((c) => [c.name, res.rows.filter((r) => !r._level).reduce((a, r) => a + Math.round(Number(r[c.name] ?? 0) * 100), 0) / 100 || 0]),
   );
-  const cell = (c: Col, v: unknown) => (c.kind === "amount" ? (v === null || v === undefined || v === "" ? "" : nf.format(Number(v))) : String(v ?? ""));
+  const df = useMemo(() => new Intl.DateTimeFormat(p.lang === "en" ? "en-GB" : "cs-CZ"), [p.lang]);
+  // částky formátované, prázdné bez „0,00“; datum (RRRR-MM-DD) v místním tvaru
+  const cell = (c: Col, v: unknown) =>
+    c.kind === "amount"
+      ? v === null || v === undefined || v === ""
+        ? ""
+        : nf.format(Number(v))
+      : typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)
+        ? df.format(new Date(`${v}T00:00:00`))
+        : String(v ?? "");
 
   return (
     <>
       <ActionBar>
         <Crumbs items={p.crumbs} />
         <Spacer />
-        <Button icon={<ArrowDownload24Regular />} onClick={() => (window.location.href = `/api/report/${p.module}/${p.report}?${query}`)}>
-          {p.labels.export}
+        <Button icon={<ArrowDownload24Regular />} title={p.labels.export} onClick={() => (window.location.href = `/api/report/${p.module}/${p.report}?${query}`)}>
+          <span className={st.btnLabel}>{p.labels.export}</span>
         </Button>
       </ActionBar>
       <PageContent>
@@ -122,7 +137,7 @@ export function ReportView(p: {
           </MessageBar>
         )}
         <div className={st.card}>
-          <Table size="small">
+          <Table size="small" className={st.table}>
             <TableHeader>
               <TableRow>
                 {res.columns.map((c) => (
@@ -141,7 +156,7 @@ export function ReportView(p: {
               {res.rows.map((r, i) => (
                 <TableRow key={i} className={r._level ? st.section : undefined}>
                   {res.columns.map((c) => (
-                    <TableCell key={c.name} className={c.kind === "amount" ? `${st.num} ${Number(r[c.name]) < 0 ? st.neg : ""}` : undefined}>
+                    <TableCell key={c.name} className={c.kind === "amount" ? `${st.num} ${Number(r[c.name]) < 0 ? st.neg : ""}` : String(r[c.name] ?? "").length <= 14 ? st.nowrap : st.text}>
                       {cell(c, r[c.name])}
                     </TableCell>
                   ))}

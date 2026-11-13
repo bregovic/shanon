@@ -100,6 +100,8 @@ const useStyles = makeStyles({
     background: "none",
     border: "none",
     padding: 0,
+    // dotyk: dostatečně vysoký cíl
+    minHeight: "32px",
     font: "inherit",
     color: tokens.colorBrandForegroundLink,
     cursor: "pointer",

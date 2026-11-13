@@ -269,7 +269,7 @@ export async function importRecords(
   ctx: Ctx,
   objectId: string,
   table: ImportTable,
-  opts: { dryRun: boolean; lang: Lang; images?: ImageSource },
+  opts: { dryRun: boolean; lang: Lang; images?: ImageSource; fixed?: RecordData },
   client?: PrismaClient,
 ): Promise<ImportReport> {
   const def = getObject(objectId);
@@ -284,8 +284,10 @@ export async function importRecords(
   const has = new Set(mapped.map((c) => c.field));
   // klíč pro aktualizaci: první unikátní kombinace, kterou soubor obsahuje
   const key = def.unique?.find((u) => u.every((f) => has.has(f))) ?? null;
+  // pevné hodnoty (řádky dokladu: rodič) se do souboru nepíší
+  const fixed = opts.fixed ?? {};
   const missing = Object.entries(def.fields)
-    .filter(([n, f]) => f.mandatory && !f.readOnly && f.default === undefined && def.numberSeq?.field !== n && !has.has(n))
+    .filter(([n, f]) => f.mandatory && !f.readOnly && f.default === undefined && def.numberSeq?.field !== n && !has.has(n) && !(n in fixed))
     .map(([, f]) => fieldLabel(f, opts.lang));
 
   const report: ImportReport = { total: rows.length, created: 0, updated: 0, skipped: table.rows.length - rows.length, columns, missing, errors: [], warnings: [], applied: false };
@@ -368,6 +370,7 @@ export async function importRecords(
           }
           await s.tx.$executeRawUnsafe("SAVEPOINT shanon_import_row");
           try {
+            Object.assign(values, fixed);
             const saved = await s.save(objectId, existingId, values);
             // odkaz na záznam téhož souboru (strom kategorií): přidat do vyhledávání
             const self = lookups.get(objectId);

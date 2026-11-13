@@ -104,7 +104,8 @@ const useStyles = makeStyles({
   },
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
-  baskets: { display: "flex", gap: "6px", flexWrap: "wrap", padding: "8px 12px 0" },
+  // jedna posuvná řada (i při mnoha boxech zůstane místo pro zboží a košík)
+  baskets: { display: "flex", gap: "6px", flexWrap: "nowrap", overflowX: "auto", flexShrink: 0, padding: "8px 12px 4px", "& > *": { flexShrink: 0 } },
   wUnits: { display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px", alignItems: "center" },
   wSep: { width: "8px" },
   chips: { display: "flex", gap: "8px", overflowX: "auto", flexShrink: 0, paddingBottom: "4px" },
