@@ -23,6 +23,7 @@ export default defineModule({
   description: "@AR:ModuleDesc",
   icon: "PeopleMoney",
   dependsOn: ["gab", "gl", "tax"],
+  enums: ar.enums,
   objects: ar.objects,
   menu: ar.menu,
   numberSeqs: [

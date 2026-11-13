@@ -20,8 +20,9 @@ import {
   tokens,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regular } from "@fluentui/react-icons";
-import { deleteRecordsAction, runRecordAction, saveRecordAction } from "@/app/actions";
+import { Add24Regular, ArrowUpload24Regular, Delete24Regular, Edit24Regular, Play24Regular, Save24Regular } from "@fluentui/react-icons";
+import { useRef } from "react";
+import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
@@ -43,6 +44,8 @@ export interface LineSpec {
   groups: FormGroup[];
   defaults: Values;
   editable: boolean;
+  /** řádky jsou samostatné doklady — dvojklik otevře jejich stránku */
+  overview: boolean;
   initial: { rows: Row[]; total: number; totals?: Record<string, string> };
 }
 
@@ -59,7 +62,7 @@ export interface ObjectDetailProps {
   /** přílohy jdou přidávat i k zamčenému dokladu */
   canAttach: boolean;
   canDelete: boolean;
-  actions: { id: string; label: string }[];
+  actions: { id: string; label: string; upload?: string }[];
   lines: LineSpec[];
   lang: string;
   labels: UiLabels;
@@ -132,7 +135,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
         selectable={spec.editable}
         reloadKey={reload}
         maxHeight="420px"
-        onOpen={spec.editable ? open : undefined}
+        onOpen={spec.overview ? (row) => router.push(objectHref(spec.objectId, String(row.id))) : spec.editable ? open : undefined}
         onSelectionChange={setSelected}
       />
       {spec.editable && (
@@ -153,6 +156,29 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
         />
       )}
     </section>
+  );
+}
+
+/** Akce, která si vyžádá soubor (import výpisu apod.). */
+function UploadButton({ label, accept, disabled, onFile }: { label: string; accept: string; disabled: boolean; onFile: (f: File) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <Button icon={<ArrowUpload24Regular />} disabled={disabled} onClick={() => ref.current?.click()}>
+        {label}
+      </Button>
+      <input
+        ref={ref}
+        type="file"
+        accept={accept}
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+          e.target.value = "";
+        }}
+      />
+    </>
   );
 }
 
@@ -193,6 +219,21 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       }
     });
 
+  const upload = (actionId: string, file: File) =>
+    start(async () => {
+      const fd = new FormData();
+      fd.set("objectId", p.objectId);
+      fd.set("id", p.id!);
+      fd.set("actionId", actionId);
+      fd.set("file", file);
+      const res = await runUploadAction(fd);
+      if (!res.ok) setMessage({ intent: "error", text: res.message });
+      else {
+        setMessage({ intent: "success", text: p.labels.actions.saved });
+        router.refresh();
+      }
+    });
+
   const remove = () =>
     start(async () => {
       setConfirm(false);
@@ -223,11 +264,15 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             {p.labels.actions.save}
           </Button>
         )}
-        {p.actions.map((a) => (
-          <Button key={a.id} icon={<Play24Regular />} disabled={busy} onClick={() => act(a.id)}>
-            {a.label}
-          </Button>
-        ))}
+        {p.actions.map((a) =>
+          a.upload ? (
+            <UploadButton key={a.id} label={a.label} accept={a.upload} disabled={busy} onFile={(f) => upload(a.id, f)} />
+          ) : (
+            <Button key={a.id} icon={<Play24Regular />} disabled={busy} onClick={() => act(a.id)}>
+              {a.label}
+            </Button>
+          ),
+        )}
         {p.id && (
           <>
             <ToolbarDivider />

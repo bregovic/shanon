@@ -259,6 +259,25 @@ export async function runRecordAction(objectId: string, id: string, actionId: st
   }
 }
 
+/** Akce se souborem (import výpisu…). Soubor do 1 MB — víc server action nepřijme. */
+export async function runUploadAction(form: FormData): Promise<ActionResult> {
+  const s = await requireSession();
+  const objectId = String(form.get("objectId"));
+  const id = String(form.get("id"));
+  const file = form.get("file");
+  try {
+    if (!(file instanceof File)) throw new UserError("@SYS:Required");
+    await runAction(s.ctx, objectId, id, String(form.get("actionId")), undefined, {
+      name: file.name,
+      data: Buffer.from(await file.arrayBuffer()),
+    });
+    revalidatePath(objectHref(objectId, id));
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Uživatelé (superuživatel všechny, správce firmy jen ve svých firmách)
 // ---------------------------------------------------------------------------

@@ -60,7 +60,9 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
               columns: ld.list.filter((f) => f !== l.field).map((f) => lm[f]),
               groups: formGroups(s.ctx, ld, t, lm, [l.field]),
               defaults: defaults(ld),
-              editable: !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
+              // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít
+              overview: l.owned === false || !!ld.systemOnly,
+              editable: l.owned !== false && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               initial: { rows: initial.rows, total: initial.total, totals: initial.totals },
             };
           }),
@@ -86,7 +88,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<Par
       actions={
         isNew || !mayWrite
           ? []
-          : (def.actions ?? []).filter((a) => !a.when || record[a.when.field] === a.when.equals).map((a) => ({ id: a.id, label: t(a.label) }))
+          : (def.actions ?? []).filter((a) => !a.when || record[a.when.field] === a.when.equals).map((a) => ({ id: a.id, label: t(a.label), upload: a.upload }))
       }
       lines={lines}
       lang={s.lang}

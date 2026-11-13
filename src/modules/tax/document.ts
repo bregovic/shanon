@@ -29,6 +29,8 @@ export interface InvoiceConfig {
   partnerTrans: string;
   /** číslo dokladu pro daňové transakce a otevřenou položku */
   docNumField: string;
+  /** z čeho se dopočítá VS, když ho uživatel nevyplní */
+  vsSourceField: string;
   /** +1 = vydaná (pohledávka MD, výnosy D), −1 = přijatá (závazek D, náklady MD) */
   side: 1 | -1;
 }
@@ -77,6 +79,11 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         if (!data.invoiceDate) data.invoiceDate = today();
         if (!data.taxDate) data.taxDate = data.invoiceDate;
         if (isNew && !data.currencyId) data.currencyId = partner.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
+        // VS = číslice z čísla faktury (vydaná) / z čísla dodavatele (přijatá), nejvýš 10
+        if (!data.vs && data[cfg.vsSourceField]) {
+          const digits = String(data[cfg.vsSourceField]).replace(/\D/g, "").slice(-10);
+          if (digits) data.vs = digits;
+        }
         if (!data.dueDate) {
           const days = Number(partner.paymentDays ?? group.paymentDays ?? 14);
           data.dueDate = addDays(String(data.invoiceDate), days);
@@ -215,10 +222,14 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     voucherId: voucher.id,
     date,
     dueDate: header.dueDate ?? date,
+    kind: "invoice",
     documentNum: docNum,
+    vs: header.vs ?? null,
     currencyId: curId,
     amount: fromCents(grossAcc),
     amountCur: fromCents(grossCur),
+    paidAmount: "0",
+    closed: false,
   });
   await data.update(cfg.header, String(header.id), { status: "posted", voucherId: voucher.id });
 }

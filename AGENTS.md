@@ -28,8 +28,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   + labely, ne nový kód.
 - Typy polí: `Edts.Amount` se sčítá v řádku Celkem, `Edts.Price`, `Edts.Qty`,
   `Edts.AmountCur` ne (`noTotal`). Výchozí datum „dnes“ = `default: "$today"`.
-- Řádky, které záznamu nepatří (faktury odběratele), mají v `lines` `owned: false`
-  — se záznamem se nemažou.
+- Řádky, které záznamu nepatří (faktury odběratele, výpisy účtu), mají v `lines`
+  `owned: false` — se záznamem se nemažou a dvojklik otevře jejich vlastní stránku.
+- Akce se souborem (importy): `actions: [{ id, label, upload: ".gpc,.txt" }]`,
+  obsluha dostane `file` jako třetí parametr. Soubor do 1 MB (limit server action).
+- Párování plateb se nesmí hádat: automat páruje jen jednoznačnou shodu VS,
+  víc kandidátů = ručně. Import výpisu se uloží jen když součty sedí na hlavičku.
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.
 
 ## Obecné metody — žádný kód pro běžné operace

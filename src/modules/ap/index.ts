@@ -24,6 +24,7 @@ export default defineModule({
   description: "@AP:ModuleDesc",
   icon: "BuildingShop",
   dependsOn: ["gab", "gl", "tax"],
+  enums: ap.enums,
   objects: ap.objects,
   menu: ap.menu,
   numberSeqs: [

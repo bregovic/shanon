@@ -90,6 +90,12 @@ export interface EventContext {
 
 export type ValidationErrors = Record<string, LabelRef>;
 
+/** Soubor nahraný k akci (import výpisu apod.). */
+export interface ActionFile {
+  name: string;
+  data: Buffer;
+}
+
 /** Chyba pro uživatele — text je label. */
 export class UserError extends Error {
   constructor(
@@ -110,7 +116,7 @@ export interface ObjectHandlers {
   /** po smazání (např. přepočet součtů hlavičky dokladu) */
   afterDelete?: (ctx: EventContext, data: RecordData) => void | Promise<void>;
   /** akce nad záznamem (tlačítka ve formuláři), klíč = id akce z ObjectDef.actions */
-  actions?: Record<string, (ctx: EventContext, record: RecordData) => Promise<void>>;
+  actions?: Record<string, (ctx: EventContext, record: RecordData, file?: ActionFile) => Promise<void>>;
 }
 
 export interface ExtensionDef {

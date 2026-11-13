@@ -16,6 +16,7 @@ import type { FieldDef, ObjectDef } from "@/core/object";
 import { delegateName } from "@/core/object";
 import {
   UserError,
+  type ActionFile,
   type DataApi,
   type EventContext,
   type ObjectHandlers,
@@ -448,7 +449,7 @@ class Session {
     for (const h of handlersFor(this.ctx, objectId)) await h.afterDelete?.(ectx, existing);
   }
 
-  async action(objectId: string, id: string, actionId: string): Promise<void> {
+  async action(objectId: string, id: string, actionId: string, file?: ActionFile): Promise<void> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system);
     const a = def.actions?.find((x) => x.id === actionId);
@@ -458,7 +459,8 @@ class Session {
     if (a.when && record[a.when.field] !== a.when.equals) throw new UserError("@SYS:Locked");
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];
     if (!fn) throw new UserError("@SYS:InvalidValue");
-    await fn(this.eventCtx(objectId), record);
+    if (a.upload && !file) throw new UserError("@SYS:Required");
+    await fn(this.eventCtx(objectId), record, file);
   }
 
   async audit(objectId: string, recordId: string, action: string, before: RecordData | null, after: RecordData | null) {
@@ -510,8 +512,8 @@ export const saveRecord = (
 export const deleteRecord = (ctx: Ctx, objectId: string, id: string, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.remove(objectId, id), client);
 
-export const runAction = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient) =>
-  inTenant(ctx, (s) => s.action(objectId, id, actionId), client);
+export const runAction = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile) =>
+  inTenant(ctx, (s) => s.action(objectId, id, actionId, file), client);
 
 /** Možnosti pro výběr odkazu (combobox ve formuláři). */
 export const refOptions = (ctx: Ctx, objectId: string, q: string, client?: PrismaClient) =>

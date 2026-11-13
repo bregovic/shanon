@@ -4,11 +4,24 @@
  * faktura s řádky a otevřené položky; liší se jen názvy, účty a stranou
  * účtování. Modul dodá parametry a labely, objekty a logika jsou společné.
  */
-import { Edts, enumEdt, refEdt } from "@/core/edt";
+import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import type { DataApi } from "@/core/module";
 import { defineObject, type ObjectDef } from "@/core/object";
 import { JournalStatus } from "@/modules/gl";
 import { invoiceHandlers, type InvoiceConfig } from "./document";
+
+/** Variabilní symbol — jen číslice, do 10 znaků (jako v příkazu k úhradě). */
+export const Vs = defineEdt({ id: "Vs", kind: "string", label: "@TAX:Vs", maxLength: 10, pattern: /^\d{1,10}$/, patternMessage: "@TAX:VsHelp" });
+
+/** Druh otevřené položky. */
+export const TransKind = defineEnum({
+  id: "PartnerTransKind",
+  label: "@TAX:TransKind",
+  values: [
+    { value: "invoice", label: "@TAX:KindInvoice" },
+    { value: "payment", label: "@TAX:KindPayment" },
+  ],
+});
 
 export interface PartnerLedgerSpec {
   /** id modulu, např. "ar" */
@@ -95,10 +108,13 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     taxDate: { edt: Edts.TransDate, label: "@TAX:TaxDate" },
     dueDate: { edt: Edts.TransDate, label: "@TAX:DueDate" },
     currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
+    /** prázdné = číslice z čísla faktury (u přijaté z čísla dodavatele) */
+    vs: { edt: Vs },
     description: { edt: Edts.Description },
     amountNet: { edt: Edts.Amount, label: "@TAX:AmountNet", readOnly: true },
     taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
     amountGross: { edt: Edts.Amount, label: "@TAX:AmountGross", readOnly: true },
+    paidAmount: { edt: Edts.Amount, label: "@TAX:PaidAmount", readOnly: true },
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
     voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher"), readOnly: true },
   };
@@ -111,11 +127,11 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     scope: "company",
     fields: invoiceFields,
     titleField: "invoiceNum",
-    list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "invoiceDate", "dueDate", "currencyId", "amountNet", "taxAmount", "amountGross", "status"],
+    list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
     form: [
       { label: "@TAX:Header", fields: headerFields },
-      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId"] },
-      { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "status", "voucherId"] },
+      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs"] },
+      { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "paidAmount", "status", "voucherId"] },
     ],
     numberSeq: { field: "invoiceNum", seq: sp.invoiceSeq },
     defaultSort: { field: "invoiceDate", dir: "desc" },
@@ -160,16 +176,24 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       [partnerId]: { edt: refEdt(id(sp.partner), L("Partner")), mandatory: true },
       invoiceId: { edt: refEdt(id("invoice"), L("Invoice")) },
       voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher") },
+      kind: { edt: enumEdt(TransKind), mandatory: true, default: "invoice" },
       documentNum: { edt: Edts.Description, label: "@TAX:DocumentNum" },
+      vs: { edt: Vs },
       date: { edt: Edts.TransDate, mandatory: true },
       dueDate: { edt: Edts.TransDate, label: "@TAX:DueDate" },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
       amount: { edt: Edts.Amount, label: "@TAX:OpenAmount", mandatory: true },
       amountCur: { edt: Edts.AmountCur, label: "@GL:AmountCur" },
+      /** u faktury: kolik už bylo uhrazeno (součet úhrad) */
+      paidAmount: { edt: Edts.AmountCur, label: "@TAX:PaidAmount" },
+      closed: { edt: Edts.NoYes, label: "@TAX:Closed" },
     },
     titleField: "documentNum",
-    list: [partnerId, "documentNum", "date", "dueDate", "currencyId", "amountCur", "amount", "voucherId"],
-    form: [{ label: "@SYS:General", fields: [partnerId, "invoiceId", "documentNum", "date", "dueDate", "currencyId", "amountCur", "amount", "voucherId"] }],
+    list: [partnerId, "kind", "documentNum", "vs", "date", "dueDate", "currencyId", "amountCur", "amount", "paidAmount", "closed", "voucherId"],
+    form: [
+      { label: "@SYS:General", fields: [partnerId, "kind", "invoiceId", "documentNum", "vs", "date", "dueDate"] },
+      { label: "@TAX:Amounts", fields: ["currencyId", "amountCur", "amount", "paidAmount", "closed", "voucherId"] },
+    ],
     defaultSort: { field: "date", dir: "desc" },
   });
 
@@ -182,6 +206,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     groupObject: group.id,
     groupSummaryField: sp.summaryField,
     groupLineAccountField: sp.lineAccountField,
+    vsSourceField: sp.externalNum ? "externalNum" : "invoiceNum",
     lineAccountField: sp.lineAccountField,
     partnerTrans: trans.id,
     docNumField: sp.externalNum ? "externalNum" : "invoiceNum",
@@ -189,6 +214,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   };
 
   return {
+    enums: [TransKind],
     objects: [group, partner, invoice, invoiceLine, trans],
     handlers: invoiceHandlers(cfg),
     menu: [

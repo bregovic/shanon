@@ -23,6 +23,7 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 | Měny a kurzy, načítání kurzů ČNB, deník a faktury v cizí měně | Currencies, exchange rates, rate providers |
 | Skupiny odběratelů/dodavatelů jako účtovací profil | Customer/vendor groups, posting profiles |
 | Odběratelé, vydané faktury, saldo | Customers, free text invoices, customer transactions |
+| Bankovní účty, import výpisů GPC, párování, úhrady do salda | Bank accounts, bank statements, reconciliation, settlement |
 | Dodavatelé, přijaté faktury, saldo | Vendors, vendor invoices, vendor transactions |
 | Přílohy | Document management (DocuRef) |
 | Historie změn | Database log |
@@ -63,7 +64,7 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 |---|---|---|
 | 24 | Odběratelé (AR): ~~odběratelé, skupiny, vydané faktury, saldo~~ hotovo; zbývá **úhrady a párování**, dobropisy, upomínky, úroky z prodlení | P1 |
 | 25 | Dodavatelé (AP): ~~dodavatelé, přijaté faktury, saldo~~ hotovo; zbývá **úhrady, příkazy k úhradě**, schválení faktur | P1 |
-| 26 | Banka a pokladna: bankovní účty, import výpisů (GPC/ABO/camt), párování, pokladní doklady | P1 |
+| 26 | Banka: ~~účty, import GPC, párování, úhrady~~ hotovo; zbývá **camt.053**, **příkazy k úhradě** (ABO/SEPA), kurzové rozdíly, pokladna | P1 |
 | 27 | ~~Výpočet DPH na řádcích, daňové transakce~~ hotovo; zbývá **přiznání, KH, SH (XML EPO)**, přenesená daňová povinnost | P1 |
 | 28 | Uzávěrka: přecenění měn, zavření období, převod výsledku | P2 |
 | 29 | Výkazy: obratová předvaha, rozvaha, výsledovka, hlavní kniha, saldokonto (Financial reporting) | P1 |
@@ -75,8 +76,8 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 ## Doporučené pořadí
 
 1. ~~Období + měny + účtovací profily~~, ~~faktury AR/AP se saldem a DPH~~ (hotovo).
-2. **Banka a úhrady** (#26, párování s otevřenými položkami), **přiznání a KH** (#27),
-   **tisk faktur** (#10) a **výkazy** (#29) → první ostré nasazení.
+2. ~~Banka a úhrady~~ (hotovo). Zbývá **přiznání a KH** (#27), **tisk faktur** (#10)
+   a **výkazy** (#29) → první ostré nasazení; k bance pak příkazy k úhradě a camt.053.
 3. **Šablony záznamů a uložená zobrazení** (#5, #6) — „výchozí hodnoty kdekoli“ a personalizace.
 4. **Workflow schvalování** (#4) — propojit se Schvaleem.
 5. **Import dat, dávky, upozornění** (#7–9).

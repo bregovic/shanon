@@ -19,6 +19,8 @@ import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
 import { recordHistory } from "@/server/history";
 import { setupCompany } from "@/server/setup";
 import { convertCents, parseCnb } from "@/modules/sys/currency";
+import { checkStatement, gpcHeader, gpcLine, parseGpc } from "@/modules/bank/gpc";
+import { gpcAccountKey } from "@/modules/bank/handlers";
 import { fromCents } from "@/core/money";
 import { inTenant } from "@/server/data";
 import { resolveLabel } from "@/core/labels";
@@ -49,7 +51,7 @@ beforeAll(async () => {
       name: `Tenant ${x}`,
       adminEmail: `admin-${x}-${run}@test.local`,
       adminPassword: "heslo-12345",
-      modules: ["gab", "tax", "ar", "ap"],
+      modules: ["gab", "tax", "ar", "ap", "bank"],
       company: { code: x.toUpperCase(), name: `Firma ${x}` },
     });
   A = (await mk("a")).ctx;
@@ -339,6 +341,112 @@ describe("odběratelé a dodavatelé", () => {
     const tx = (await listRecords(A, "tax.trans", { filter: { sourceId: String(inv.id) } }, client)).rows;
     expect(tx[0].documentNum).toBe("INV-2026-77");
     expect(tx[0].direction).toBe("input");
+  });
+});
+
+describe("banka a úhrady", () => {
+  const T = (r: Record<string, unknown>) => (r._titles as Record<string, string>) ?? {};
+  const c = (v: string) => BigInt(Math.round(Number(v) * 100));
+
+  function gpc(num: string, opening: string, lines: { amount: string; vs: string; msg: string }[], account = "123456789") {
+    const cents = lines.map((l) => c(l.amount));
+    const credit = cents.filter((x) => x > BigInt(0)).reduce((a, b) => a + b, BigInt(0));
+    const debit = -cents.filter((x) => x < BigInt(0)).reduce((a, b) => a + b, BigInt(0));
+    const o = c(opening);
+    return Buffer.from(
+      [
+        gpcHeader({ account, name: "Firma", num, date: "2026-11-12", opening: o, closing: o + credit - debit, debit, credit }),
+        ...lines.map((l, i) => gpcLine({ counter: "998877" + i, cents: cents[i], vs: l.vs, date: "2026-11-12", message: l.msg })),
+      ].join("\r\n"),
+    );
+  }
+
+  it("GPC: pozice polí, znaménka, kontrola součtů, číslo účtu", () => {
+    const [st] = parseGpc(gpc("7", "1000", [{ amount: "250.50", vs: "123", msg: "Platba" }, { amount: "-19.90", vs: "", msg: "Poplatek" }]).toString());
+    expect([st.account, st.statementNum, st.date]).toEqual(["123456789", "007", "2026-11-12"]);
+    expect(st.lines.map((l) => [l.cents, l.vs, l.message])).toEqual([[BigInt(25050), "123", "Platba"], [BigInt(-1990), null, "Poplatek"]]);
+    expect(checkStatement(st)).toBeNull();
+    st.lines[0].cents = BigInt(25051);
+    expect(checkStatement(st)).toContain("příjmy");
+    expect(gpcAccountKey("19-123456789/0800")).toBe("190123456789"); // 000019 + 0123456789
+    expect(gpcAccountKey("123456789/0100")).toBe("123456789");
+  });
+
+  it("import, automatické párování, ruční protiúčet, zaúčtování úhrad do salda", async () => {
+    const accs = Object.fromEntries((await listRecords(A, "gl.account", { filters: { accountNum: "221, 518" } }, client)).rows.map((a) => [a.accountNum, a.id]));
+    const bankAcc = await saveRecord(A, "bank.account", null, { code: "KB", name: "Běžný účet", accountNum: "123456789/0100", glAccountId: accs["221"] }, undefined, client);
+    // faktury: odběratel (plná úhrada), odběratel (částečná), dva doklady se stejným VS (nejednoznačné), dodavatel
+    const mkCust = async (name: string) => {
+      const subj = await saveRecord(A, "gab.subject", null, { name }, undefined, client);
+      const [grp] = (await listRecords(A, "ar.group", { filters: { code: "TUZ" } }, client)).rows;
+      return saveRecord(A, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    };
+    const invoice = async (obj: "ar" | "ap", partner: Record<string, unknown>, price: string, extra: Record<string, unknown> = {}) => {
+      const inv = await saveRecord(A, `${obj}.invoice`, null, { [obj === "ar" ? "customerId" : "vendorId"]: partner.id, invoiceDate: "2026-11-10", ...extra }, undefined, client);
+      await saveRecord(A, `${obj}.invoiceLine`, null, { invoiceId: inv.id, description: "Položka", qty: "1", unitPrice: price }, undefined, client);
+      await runAction(A, `${obj}.invoice`, String(inv.id), "post", client);
+      return (await getRecord(A, `${obj}.invoice`, String(inv.id), client))!;
+    };
+    const c1 = await mkCust("Plátce Plný");
+    const c2 = await mkCust("Plátce Částečný");
+    const full = await invoice("ar", c1, "1000"); // 1210 s DPH
+    const part = await invoice("ar", c2, "2000"); // 2420
+    const dupA = await invoice("ar", c1, "100", { vs: "777777" });
+    await invoice("ar", c2, "100", { vs: "777777" });
+    const vsubj = await saveRecord(A, "gab.subject", null, { name: "Dodavatel Úhrady" }, undefined, client);
+    const [vgrp] = (await listRecords(A, "ap.group", { filters: { code: "TUZ" } }, client)).rows;
+    const vend = await saveRecord(A, "ap.vendor", null, { subjectId: vsubj.id, groupId: vgrp.id }, undefined, client);
+    const vinv = await invoice("ap", vend, "500", { externalNum: "DF-2026-0042" }); // 605, VS 20260042
+
+    const file = gpc("001", "50000", [
+      { amount: "1210", vs: String(full.vs), msg: "Úhrada plná" },
+      { amount: "1000", vs: String(part.vs), msg: "Úhrada část" },
+      { amount: "121", vs: "777777", msg: "Nejasné" },
+      { amount: "-605", vs: "20260042", msg: "Dodavatel" },
+      { amount: "-45", vs: "", msg: "Poplatek" },
+    ]);
+    // jiný účet a vadné součty se odmítnou
+    await expectUserError(runAction(A, "bank.account", String(bankAcc.id), "import", client, { name: "x.gpc", data: gpc("002", "0", [{ amount: "1", vs: "1", msg: "x" }], "999") }), "@BANK:ImportOtherAccount");
+    const broken = Buffer.from(file.toString().replace("00000121000", "00000121100"));
+    await expectUserError(runAction(A, "bank.account", String(bankAcc.id), "import", client, { name: "x.gpc", data: broken }), "@BANK:ImportCheck");
+
+    await runAction(A, "bank.account", String(bankAcc.id), "import", client, { name: "vypis.gpc", data: file });
+    await expectUserError(runAction(A, "bank.account", String(bankAcc.id), "import", client, { name: "vypis.gpc", data: file }), "@BANK:ImportDuplicate");
+    const [st] = (await listRecords(A, "bank.statement", { filter: { bankAccountId: bankAcc.id } }, client)).rows;
+    expect([st.openingBalance, st.credit, st.debit, st.closingBalance]).toEqual(["50000.00", "2331.00", "650.00", "51681.00"]);
+    const lines = (await listRecords(A, "bank.statementLine", { filter: { statementId: st.id }, sort: "lineNum" }, client)).rows;
+    expect(lines.map((l) => l.matchKind)).toEqual(["customer", "customer", "none", "vendor", "none"]);
+
+    // nespárované řádky zastaví zaúčtování
+    await expectUserError(runAction(A, "bank.statement", String(st.id), "post", client), "@BANK:Unmatched");
+    // nejasný VS: ručně k faktuře dupA, poplatek na účet 518
+    const [dupTrans] = (await listRecords(A, "ar.trans", { filter: { invoiceId: dupA.id } }, client)).rows;
+    await expectUserError(saveRecord(A, "bank.statementLine", String(lines[4].id), { customerTransId: dupTrans.id }, undefined, client), "@BANK:WrongDirection", "customerTransId");
+    await saveRecord(A, "bank.statementLine", String(lines[2].id), { customerTransId: dupTrans.id }, undefined, client);
+    await saveRecord(A, "bank.statementLine", String(lines[4].id), { offsetAccountId: accs["518"] }, undefined, client);
+    await runAction(A, "bank.statement", String(st.id), "post", client);
+
+    const posted = (await getRecord(A, "bank.statement", String(st.id), client))!;
+    expect(posted.status).toBe("posted");
+    const gl = (await listRecords(A, "gl.trans", { filter: { voucherId: posted.voucherId }, totals: true }, client));
+    expect(gl.totals!.amount).toBe("0.00");
+    expect(gl.rows.filter((t) => T(t).accountId === "221").map((t) => t.amount).sort()).toEqual(["-45.00", "-605.00", "1000.00", "121.00", "1210.00"].sort());
+
+    // saldo: plně uhrazená vyrovnaná, částečná zbývá 1420, dodavatel vyrovnán
+    const fullInv = (await getRecord(A, "ar.invoice", String(full.id), client))!;
+    expect(fullInv.paidAmount).toBe("1210.00");
+    const [fullTrans] = (await listRecords(A, "ar.trans", { filter: { invoiceId: full.id, kind: "invoice" } }, client)).rows;
+    expect(fullTrans.closed).toBe(true);
+    const [partTrans] = (await listRecords(A, "ar.trans", { filter: { invoiceId: part.id, kind: "invoice" } }, client)).rows;
+    expect([partTrans.paidAmount, partTrans.closed]).toEqual(["1000.00", false]);
+    const c2Balance = await listRecords(A, "ar.trans", { filter: { customerId: c2.id }, totals: true }, client);
+    expect(c2Balance.totals!.amount).toBe(String((2420 - 1000 + 121).toFixed(2)));
+    const [vTrans] = (await listRecords(A, "ap.trans", { filter: { invoiceId: vinv.id, kind: "invoice" } }, client)).rows;
+    expect(vTrans.closed).toBe(true);
+    const vBalance = await listRecords(A, "ap.trans", { filter: { vendorId: vend.id }, totals: true }, client);
+    expect(vBalance.totals!.amount).toBe("0.00");
+    // zaúčtovaný výpis nejde měnit
+    await expectUserError(saveRecord(A, "bank.statementLine", String(lines[0].id), { message: "x" }, undefined, client), "@GL:Locked");
   });
 });
 
