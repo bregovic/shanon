@@ -45,6 +45,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `src/modules/tax/vat-return.ts` — před změnou XML je přečíst.
 - Párování plateb se nesmí hádat: automat páruje jen jednoznačnou shodu VS,
   víc kandidátů = ručně. Import výpisu se uloží jen když součty sedí na hlavičku.
+- Pokladna (`src/modules/pos`): ceny a DPH počítá vždy server z položek
+  (`sale.ts`), terminál `/kasa` ukazuje jen orientační součet. Hotovost se
+  zaokrouhluje na koruny mimo základ DPH. Do účetnictví jde až uzávěrka směny
+  (jeden doklad za směnu, `tax.trans` se `simplified` → KH oddíl A.5).
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.
 
 ## Obecné metody — žádný kód pro běžné operace

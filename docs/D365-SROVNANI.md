@@ -27,6 +27,7 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 | Přiznání k DPH a kontrolní hlášení (XML pro EPO), daňové parametry | Sales tax settlement, VAT return / control statement (ER) |
 | Položky, skupiny položek, měrné jednotky, ceny s DPH / bez | Released products, item groups, units, sales price |
 | Import číselníků z CSV / XML / Excelu | Data management (import projects) |
+| Pokladna: terminál, směny, účtenky, uzávěrka se zaúčtováním | Store commerce (POS), shifts, statement posting |
 | Dodavatelé, přijaté faktury, saldo | Vendors, vendor invoices, vendor transactions |
 | Přílohy | Document management (DocuRef) |
 | Historie změn | Database log |

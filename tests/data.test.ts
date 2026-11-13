@@ -16,6 +16,7 @@ import {
 import { provisionTenant } from "@/server/provision";
 import { downloadFile } from "@/server/data";
 import { importRecords, parseCsv, readTable } from "@/server/import";
+import { receiptPrint, sell, type ReceiptPrint } from "@/modules/pos/sale";
 import { withTenant } from "@/server/db";
 import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
 import { recordHistory } from "@/server/history";
@@ -660,6 +661,105 @@ describe("položky a import", () => {
     expect([line.description, line.unitId, line.unitPrice, line.taxCodeId, line.revenueAccountId]).toEqual(["Šunka od kosti", kg.id, sun.priceNet, v12.id, acc604.id]);
     expect([line.amountNet, line.taxAmount]).toEqual(["1071.20", "128.54"]); // 2,5 × 428,48
     await expectUserError(saveRecord(I, "ar.invoiceLine", null, { invoiceId: inv.id, qty: "1" }, undefined, client), "@SYS:Required", "description");
+  });
+});
+
+describe("pokladna", () => {
+  let P: Ctx;
+  let regId: string;
+  const item = async (num: string, name: string, price: string, group: string, unit: string, weighed = false) => {
+    const g = (await listRecords(P, "inv.itemGroup", { filter: { code: group } }, client)).rows[0];
+    const u = (await listRecords(P, "inv.unit", { filter: { code: unit } }, client)).rows[0];
+    return saveRecord(P, "inv.item", null, { itemNum: num, name, groupId: g.id, unitId: u.id, salesPrice: price, priceInclTax: true, weighed }, undefined, client);
+  };
+  beforeAll(async () => {
+    const r = await provisionTenant(client, {
+      code: `t-pos-${run}`,
+      name: "Uzeniny",
+      adminEmail: `pos-${run}@test.local`,
+      adminPassword: "heslo-12345",
+      modules: ["pos"],
+      company: { code: "UZ", name: "Uzeniny Test", regNo: "12345678", vatId: "CZ12345678" },
+    });
+    P = r.ctx;
+    const v12 = (await listRecords(P, "tax.taxCode", { filter: { code: "V12" } }, client)).rows[0];
+    const a601 = (await listRecords(P, "gl.account", { filter: { accountNum: "601" } }, client)).rows[0];
+    await saveRecord(P, "inv.itemGroup", null, { code: "UZENINY", name: "Uzeniny", taxCodeId: v12.id, revenueAccountId: a601.id }, undefined, client);
+    regId = String((await listRecords(P, "pos.register", {}, client)).rows[0].id);
+  });
+
+  it("směna, prodej na váhu i kusů, zaokrouhlení hotovosti, uzávěrka do účetnictví a DPH", async () => {
+    const sun = await item("SUN", "Šunka od kosti", "459.90", "UZENINY", "KG", true);
+    const pas = await item("PAS", "Paštika", "49.90", "UZENINY", "KS");
+    const tas = await item("TAS", "Taška", "5", "ZBOZI", "KS");
+    const api = (fn: (a: import("@/core/module").DataApi) => Promise<unknown>) => inTenant(P, (s) => fn(s.sys().api()) as Promise<never>, client);
+
+    await expectUserError(api((a) => sell(a, { registerId: regId, payment: "cash", lines: [{ itemId: String(pas.id), qty: "1" }] })), "@POS:ShiftNotOpen");
+    const shift = await saveRecord(P, "pos.shift", null, { registerId: regId, openingCash: "2000" }, undefined, client);
+    await expectUserError(saveRecord(P, "pos.shift", null, { registerId: regId }, undefined, client), "@POS:ShiftAlreadyOpen");
+
+    // 0,253 kg × 459,90 = 116,35; 2 × 49,90 = 99,80; taška 5 → 221,15 → hotově 221
+    const r1 = (await api((a) =>
+      sell(a, {
+        registerId: regId,
+        payment: "cash",
+        cashGiven: "500",
+        lines: [
+          { itemId: String(sun.id), qty: "0.253" },
+          { itemId: String(pas.id), qty: "2" },
+          { itemId: String(tas.id), qty: "1" },
+        ],
+      }),
+    )) as Record<string, unknown>;
+    expect([r1.amountGross, r1.amountPaid, r1.rounding, r1.change]).toEqual(["221.15", "221.00", "-0.15", "279.00"]);
+    // DPH ze zpětného výpočtu po řádcích: 116,35 → 103,88 + 12,47; 99,80 → 89,11 + 10,69; 5 → 4,13 + 0,87
+    expect([r1.amountNet, r1.taxAmount]).toEqual(["197.12", "24.03"]);
+    await expectUserError(api((a) => sell(a, { registerId: regId, payment: "cash", cashGiven: "100", lines: [{ itemId: String(sun.id), qty: "1" }] })), "@POS:NotEnoughCash");
+    await expectUserError(api((a) => sell(a, { registerId: regId, payment: "card", lines: [{ itemId: String(pas.id), qty: "-1" }] })), "@POS:InvalidQty");
+    // kartou bez zaokrouhlení
+    const r2 = (await api((a) => sell(a, { registerId: regId, payment: "card", lines: [{ itemId: String(sun.id), qty: "1.5" }] }))) as Record<string, unknown>;
+    expect([r2.amountGross, r2.amountPaid, r2.rounding]).toEqual(["689.85", "689.85", "0.00"]);
+
+    const print = (await api((a) => receiptPrint(a, P.companyId, String(r1.id)))) as ReceiptPrint;
+    expect(print.company).toMatchObject({ name: "Uzeniny Test", vatId: "CZ12345678" });
+    expect(print.lines.map((l) => [l.description, l.qty, l.unit, l.rate])).toEqual([
+      ["Šunka od kosti", "0.253", "KG", "12"],
+      ["Paštika", "2", "KS", "12"],
+      ["Taška", "1", "KS", "21"],
+    ]);
+    expect(print.vat).toEqual(expect.arrayContaining([{ rate: "12", base: "192.99", tax: "23.16" }, { rate: "21", base: "4.13", tax: "0.87" }]));
+
+    // účtenky ručně založit nejde
+    await expectUserError(saveRecord(P, "pos.receipt", null, { registerId: regId }, undefined, client), "@SYS:InvalidValue");
+
+    await runAction(P, "pos.shift", String(shift.id), "close", client);
+    const closed = (await getRecord(P, "pos.shift", String(shift.id), client))!;
+    expect([closed.status, closed.receiptCount, closed.salesGross, closed.cashTotal, closed.cardTotal, closed.roundingTotal, closed.expectedCash]).toEqual([
+      "closed", 2, "911.00", "221.00", "689.85", "-0.15", "2221.00",
+    ]);
+    const lines = (await listRecords(P, "gl.trans", { filter: { voucherId: closed.voucherId as string } }, client)).rows;
+    const byAcc = async (num: string) => {
+      const acc = (await listRecords(P, "gl.account", { filter: { accountNum: num } }, client)).rows[0];
+      return lines.filter((l) => l.accountId === acc.id).map((l) => l.amount);
+    };
+    expect(await byAcc("211")).toEqual(["221.00"]);
+    expect(await byAcc("261")).toEqual(["689.85"]);
+    expect(await byAcc("548")).toEqual(["0.15"]);
+    expect((await byAcc("343")).sort()).toEqual(["-0.87", "-97.07"]);
+    const taxTrans = (await listRecords(P, "tax.trans", { filter: { sourceId: String(shift.id) } }, client)).rows;
+    expect(taxTrans.every((t) => t.simplified === true)).toBe(true);
+
+    // KH: tržba směny (911 Kč, nad limitem by byla taky) jde do A.5 bez varování
+    await saveRecord(P, "tax.parameters", null, { taxOfficeCode: "451", subjectType: "P" }, undefined, client);
+    const now = new Date();
+    const kh = await saveRecord(P, "tax.return", null, { kind: "kh", year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 }, undefined, client);
+    await runAction(P, "tax.return", String(kh.id), "calculate", client);
+    expect((await getRecord(P, "tax.return", String(kh.id), client))!.a4Count).toBe(0);
+    const xml = String((await downloadFile(P, "tax.return", String(kh.id), "xml", client)).data);
+    expect(xml).toContain('<VetaA5 zakl_dane1="4.13" dan1="0.87" zakl_dane2="808.93" dan2="97.07"/>');
+
+    await expectUserError(runAction(P, "pos.shift", String(shift.id), "close", client), "@SYS:Locked");
+    await expectUserError(api((a) => sell(a, { registerId: regId, payment: "card", lines: [{ itemId: String(pas.id), qty: "1" }] })), "@POS:ShiftNotOpen");
   });
 });
 

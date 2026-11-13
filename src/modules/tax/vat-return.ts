@@ -86,7 +86,7 @@ export async function computeVat(
   const rows = { out21: [zero, zero], out12: [zero, zero], in21: [zero, zero], in12: [zero, zero] } as VatComputation["rows"];
   const warnings = new Set<string>();
   // doklady pro KH: transakce jednoho dokladu (sourceId) dohromady
-  const docs = new Map<string, { dir: string; dic: string; num: string; date: string; slots: Slots; gross: bigint }>();
+  const docs = new Map<string, { dir: string; dic: string; num: string; date: string; slots: Slots; gross: bigint; simplified: boolean }>();
   for (const t of trans) {
     const code = codes.get(String(t.taxCodeId))!;
     const base = toCents(t.base);
@@ -106,6 +106,7 @@ export async function computeVat(
       date: String(t.taxDate),
       slots: emptySlots(),
       gross: zero,
+      simplified: !!t.simplified,
     };
     const s = slotOf(code.rate);
     d.slots[s].base += base;
@@ -126,7 +127,8 @@ export async function computeVat(
       continue;
     }
     if (d.dic && !d.dic.startsWith("CZ")) warnings.add(warn("@TAX:WarnForeign", { doc: d.num, dic: d.dic }));
-    else if (d.gross >= KH_LIMIT_CENTS) warnings.add(warn("@TAX:WarnNoDic", { doc: d.num }));
+    // tržby z pokladny (souhrn účtenek) patří do A.5 i nad limit
+    else if (d.gross >= KH_LIMIT_CENTS && !d.simplified) warnings.add(warn("@TAX:WarnNoDic", { doc: d.num }));
     const sum = out ? a5 : b3;
     for (const k of [1, 2, 3] as const) {
       sum[k].base += d.slots[k].base;

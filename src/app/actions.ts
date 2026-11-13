@@ -11,6 +11,9 @@ import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
 import { importRecords, readTable, type ImportReport } from "@/server/import";
+import { can } from "@/core/security";
+import { fromCents, toCents } from "@/core/money";
+import { openShiftOf, receiptPrint, sell, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
 import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
@@ -290,6 +293,87 @@ export async function importAction(form: FormData): Promise<ActionResult<ImportR
     const report = await importRecords(s.ctx, objectId, table, { dryRun: form.get("dryRun") === "1", lang: s.lang });
     if (report.applied) revalidatePath(objectHref(objectId));
     return { ok: true, data: report };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pokladna (terminál /kasa) — ceny i DPH počítá server z položek
+// ---------------------------------------------------------------------------
+
+function assertCan(perms: Parameters<typeof can>[0], objectId: string, level: "read" | "write") {
+  if (!can(perms, objectId, level)) throw new UserError("@SYS:NoAccess");
+}
+
+export async function posOpenShiftAction(registerId: string, openingCash: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    await saveRecord(s.ctx, "pos.shift", null, { registerId, openingCash: openingCash || "0" });
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function posSellAction(input: SaleInput): Promise<ActionResult<ReceiptPrint>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const sale: SaleInput = {
+      registerId: String(input.registerId),
+      payment: input.payment === "card" ? "card" : "cash",
+      cashGiven: input.cashGiven ? String(input.cashGiven) : null,
+      lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
+    };
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const r = await sell(api, sale);
+      return receiptPrint(api, s.ctx.companyId, String(r.id));
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function posShiftSummaryAction(registerId: string): Promise<ActionResult<Record<string, string | number> | null>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.shift", "read");
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const sh = await openShiftOf(api, String(registerId));
+      if (!sh) return null;
+      const t = await shiftTotals(api, String(sh.id));
+      return {
+        shiftNum: String(sh.shiftNum),
+        receiptCount: t.receiptCount,
+        gross: fromCents(t.gross),
+        tax: fromCents(t.tax),
+        cash: fromCents(t.cash),
+        card: fromCents(t.card),
+        rounding: fromCents(t.rounding),
+        openingCash: String(sh.openingCash ?? "0.00"),
+        expectedCash: fromCents(toCents(sh.openingCash) + t.cash),
+      };
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function posCloseShiftAction(registerId: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    await inTenant(s.ctx, async (sess) => {
+      const sh = await openShiftOf(sess.sys().api(), String(registerId));
+      if (!sh) throw new UserError("@POS:ShiftNotOpen");
+      await sess.action("pos.shift", String(sh.id), "close");
+    });
+    revalidatePath(objectHref("pos.shift"));
+    return { ok: true, data: undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

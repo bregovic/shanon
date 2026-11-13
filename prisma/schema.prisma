@@ -234,6 +234,10 @@ model SysCompany {
   bankAccount_company       BankAccount[]       @relation("BankAccount_company")
   bankStatement_company     BankStatement[]     @relation("BankStatement_company")
   bankStatementLine_company BankStatementLine[] @relation("BankStatementLine_company")
+  posRegister_company       PosRegister[]       @relation("PosRegister_company")
+  posShift_company          PosShift[]          @relation("PosShift_company")
+  posReceipt_company        PosReceipt[]        @relation("PosReceipt_company")
+  posReceiptLine_company    PosReceiptLine[]    @relation("PosReceiptLine_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -468,6 +472,11 @@ model GlAccount {
   apInvoiceLine_expenseAccount    ApInvoiceLine[]     @relation("ApInvoiceLine_expenseAccount")
   bankAccount_glAccount           BankAccount[]       @relation("BankAccount_glAccount")
   bankStatementLine_offsetAccount BankStatementLine[] @relation("BankStatementLine_offsetAccount")
+  posRegister_cashAccount         PosRegister[]       @relation("PosRegister_cashAccount")
+  posRegister_cardAccount         PosRegister[]       @relation("PosRegister_cardAccount")
+  posRegister_roundingGainAccount PosRegister[]       @relation("PosRegister_roundingGainAccount")
+  posRegister_roundingLossAccount PosRegister[]       @relation("PosRegister_roundingLossAccount")
+  posReceiptLine_revenueAccount   PosReceiptLine[]    @relation("PosReceiptLine_revenueAccount")
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
@@ -574,6 +583,7 @@ model GlVoucher {
   apInvoice_voucher     ApInvoice[]     @relation("ApInvoice_voucher")
   apTrans_voucher       ApTrans[]       @relation("ApTrans_voucher")
   bankStatement_voucher BankStatement[] @relation("BankStatement_voucher")
+  posShift_voucher      PosShift[]      @relation("PosShift_voucher")
 
   @@unique([tenantId, companyId, voucherNum])
   @@index([tenantId, companyId])
@@ -725,16 +735,17 @@ model TaxCode {
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy     String?  @map("updated_by") @db.Uuid
 
-  company                      SysCompany      @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
-  account                      GlAccount       @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
-  taxTrans_taxCode             TaxTrans[]      @relation("TaxTrans_taxCode")
-  invItemGroup_taxCode         InvItemGroup[]  @relation("InvItemGroup_taxCode")
-  invItemGroup_purchaseTaxCode InvItemGroup[]  @relation("InvItemGroup_purchaseTaxCode")
-  invItem_taxCode              InvItem[]       @relation("InvItem_taxCode")
-  arGroup_taxCode              ArGroup[]       @relation("ArGroup_taxCode")
-  arInvoiceLine_taxCode        ArInvoiceLine[] @relation("ArInvoiceLine_taxCode")
-  apGroup_taxCode              ApGroup[]       @relation("ApGroup_taxCode")
-  apInvoiceLine_taxCode        ApInvoiceLine[] @relation("ApInvoiceLine_taxCode")
+  company                      SysCompany       @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
+  account                      GlAccount        @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
+  taxTrans_taxCode             TaxTrans[]       @relation("TaxTrans_taxCode")
+  invItemGroup_taxCode         InvItemGroup[]   @relation("InvItemGroup_taxCode")
+  invItemGroup_purchaseTaxCode InvItemGroup[]   @relation("InvItemGroup_purchaseTaxCode")
+  invItem_taxCode              InvItem[]        @relation("InvItem_taxCode")
+  arGroup_taxCode              ArGroup[]        @relation("ArGroup_taxCode")
+  arInvoiceLine_taxCode        ArInvoiceLine[]  @relation("ArInvoiceLine_taxCode")
+  apGroup_taxCode              ApGroup[]        @relation("ApGroup_taxCode")
+  apInvoiceLine_taxCode        ApInvoiceLine[]  @relation("ApInvoiceLine_taxCode")
+  posReceiptLine_taxCode       PosReceiptLine[] @relation("PosReceiptLine_taxCode")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -761,6 +772,7 @@ model TaxTrans {
   voucherId    String?  @map("voucher_id") @db.Uuid
   sourceObject String?  @map("source_object") @db.VarChar(255)
   sourceId     String?  @map("source_id") @db.VarChar(255)
+  simplified   Boolean  @default(false)
   ext          Json     @default("{}")
   version      Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at")
@@ -871,10 +883,11 @@ model InvUnit {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy String?  @map("updated_by") @db.Uuid
 
-  company            SysCompany      @relation("InvUnit_company", fields: [companyId], references: [id], onDelete: Restrict)
-  invItem_unit       InvItem[]       @relation("InvItem_unit")
-  arInvoiceLine_unit ArInvoiceLine[] @relation("ArInvoiceLine_unit")
-  apInvoiceLine_unit ApInvoiceLine[] @relation("ApInvoiceLine_unit")
+  company             SysCompany       @relation("InvUnit_company", fields: [companyId], references: [id], onDelete: Restrict)
+  invItem_unit        InvItem[]        @relation("InvItem_unit")
+  arInvoiceLine_unit  ArInvoiceLine[]  @relation("ArInvoiceLine_unit")
+  apInvoiceLine_unit  ApInvoiceLine[]  @relation("ApInvoiceLine_unit")
+  posReceiptLine_unit PosReceiptLine[] @relation("PosReceiptLine_unit")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -942,12 +955,13 @@ model InvItem {
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy     String?  @map("updated_by") @db.Uuid
 
-  company            SysCompany      @relation("InvItem_company", fields: [companyId], references: [id], onDelete: Restrict)
-  group              InvItemGroup    @relation("InvItem_group", fields: [groupId], references: [id], onDelete: Restrict)
-  unit               InvUnit         @relation("InvItem_unit", fields: [unitId], references: [id], onDelete: Restrict)
-  taxCode            TaxCode?        @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  arInvoiceLine_item ArInvoiceLine[] @relation("ArInvoiceLine_item")
-  apInvoiceLine_item ApInvoiceLine[] @relation("ApInvoiceLine_item")
+  company             SysCompany       @relation("InvItem_company", fields: [companyId], references: [id], onDelete: Restrict)
+  group               InvItemGroup     @relation("InvItem_group", fields: [groupId], references: [id], onDelete: Restrict)
+  unit                InvUnit          @relation("InvItem_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  taxCode             TaxCode?         @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  arInvoiceLine_item  ArInvoiceLine[]  @relation("ArInvoiceLine_item")
+  apInvoiceLine_item  ApInvoiceLine[]  @relation("ApInvoiceLine_item")
+  posReceiptLine_item PosReceiptLine[] @relation("PosReceiptLine_item")
 
   @@unique([tenantId, companyId, itemNum])
   @@index([tenantId, companyId])
@@ -1431,4 +1445,153 @@ model BankStatementLine {
   @@index([vendorTransId])
   @@index([offsetAccountId])
   @@map("bank_statement_line")
+}
+
+/// pos.register — generováno z definice objektu
+model PosRegister {
+  id                    String   @id @default(uuid(7)) @db.Uuid
+  tenantId              String   @map("tenant_id") @db.Uuid
+  companyId             String   @map("company_id") @db.Uuid
+  code                  String   @db.VarChar(20)
+  name                  String   @db.VarChar(120)
+  template              String   @default("counter") @db.VarChar(40)
+  cashAccountId         String   @map("cash_account_id") @db.Uuid
+  cardAccountId         String   @map("card_account_id") @db.Uuid
+  roundingGainAccountId String   @map("rounding_gain_account_id") @db.Uuid
+  roundingLossAccountId String   @map("rounding_loss_account_id") @db.Uuid
+  roundCash             Boolean  @default(true) @map("round_cash")
+  receiptFooter         String?  @map("receipt_footer") @db.VarChar(255)
+  blocked               Boolean  @default(false)
+  ext                   Json     @default("{}")
+  version               Int      @default(1)
+  createdAt             DateTime @default(now()) @map("created_at")
+  createdBy             String?  @map("created_by") @db.Uuid
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy             String?  @map("updated_by") @db.Uuid
+
+  company             SysCompany   @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
+  cashAccount         GlAccount    @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
+  cardAccount         GlAccount    @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
+  roundingGainAccount GlAccount    @relation("PosRegister_roundingGainAccount", fields: [roundingGainAccountId], references: [id], onDelete: Restrict)
+  roundingLossAccount GlAccount    @relation("PosRegister_roundingLossAccount", fields: [roundingLossAccountId], references: [id], onDelete: Restrict)
+  posShift_register   PosShift[]   @relation("PosShift_register")
+  posReceipt_register PosReceipt[] @relation("PosReceipt_register")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([cashAccountId])
+  @@index([cardAccountId])
+  @@index([roundingGainAccountId])
+  @@index([roundingLossAccountId])
+  @@map("pos_register")
+}
+
+/// pos.shift — generováno z definice objektu
+model PosShift {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  shiftNum      String   @map("shift_num") @db.VarChar(20)
+  registerId    String   @map("register_id") @db.Uuid
+  openDate      DateTime @default(now()) @map("open_date") @db.Date
+  status        String   @default("open") @db.VarChar(40)
+  openingCash   Decimal? @map("opening_cash") @db.Decimal(18, 2)
+  receiptCount  Int?     @map("receipt_count")
+  salesGross    Decimal? @map("sales_gross") @db.Decimal(18, 2)
+  taxAmount     Decimal? @map("tax_amount") @db.Decimal(18, 2)
+  cashTotal     Decimal? @map("cash_total") @db.Decimal(18, 2)
+  cardTotal     Decimal? @map("card_total") @db.Decimal(18, 2)
+  roundingTotal Decimal? @map("rounding_total") @db.Decimal(18, 2)
+  expectedCash  Decimal? @map("expected_cash") @db.Decimal(18, 2)
+  voucherId     String?  @map("voucher_id") @db.Uuid
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  company          SysCompany   @relation("PosShift_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register         PosRegister  @relation("PosShift_register", fields: [registerId], references: [id], onDelete: Restrict)
+  voucher          GlVoucher?   @relation("PosShift_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  posReceipt_shift PosReceipt[] @relation("PosReceipt_shift")
+
+  @@index([tenantId, companyId])
+  @@index([registerId])
+  @@index([voucherId])
+  @@map("pos_shift")
+}
+
+/// pos.receipt — generováno z definice objektu
+model PosReceipt {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  receiptNum    String   @map("receipt_num") @db.VarChar(20)
+  registerId    String   @map("register_id") @db.Uuid
+  shiftId       String   @map("shift_id") @db.Uuid
+  date          DateTime @default(now()) @db.Date
+  paymentMethod String   @map("payment_method") @db.VarChar(40)
+  amountNet     Decimal? @map("amount_net") @db.Decimal(18, 2)
+  taxAmount     Decimal? @map("tax_amount") @db.Decimal(18, 2)
+  amountGross   Decimal? @map("amount_gross") @db.Decimal(18, 2)
+  rounding      Decimal? @db.Decimal(18, 2)
+  amountPaid    Decimal? @map("amount_paid") @db.Decimal(18, 2)
+  cashGiven     Decimal? @map("cash_given") @db.Decimal(18, 2)
+  change        Decimal? @db.Decimal(18, 2)
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  company                SysCompany       @relation("PosReceipt_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register               PosRegister      @relation("PosReceipt_register", fields: [registerId], references: [id], onDelete: Restrict)
+  shift                  PosShift         @relation("PosReceipt_shift", fields: [shiftId], references: [id], onDelete: Restrict)
+  posReceiptLine_receipt PosReceiptLine[] @relation("PosReceiptLine_receipt")
+
+  @@index([tenantId, companyId])
+  @@index([registerId])
+  @@index([shiftId])
+  @@map("pos_receipt")
+}
+
+/// pos.receiptLine — generováno z definice objektu
+model PosReceiptLine {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  receiptId        String   @map("receipt_id") @db.Uuid
+  itemId           String   @map("item_id") @db.Uuid
+  description      String   @db.VarChar(255)
+  qty              Decimal  @db.Decimal(18, 4)
+  unitId           String?  @map("unit_id") @db.Uuid
+  unitPrice        Decimal  @map("unit_price") @db.Decimal(18, 2)
+  taxCodeId        String?  @map("tax_code_id") @db.Uuid
+  revenueAccountId String?  @map("revenue_account_id") @db.Uuid
+  amountGross      Decimal? @map("amount_gross") @db.Decimal(18, 2)
+  amountNet        Decimal? @map("amount_net") @db.Decimal(18, 2)
+  taxAmount        Decimal? @map("tax_amount") @db.Decimal(18, 2)
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  company        SysCompany @relation("PosReceiptLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  receipt        PosReceipt @relation("PosReceiptLine_receipt", fields: [receiptId], references: [id], onDelete: Restrict)
+  item           InvItem    @relation("PosReceiptLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit           InvUnit?   @relation("PosReceiptLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?   @relation("PosReceiptLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  revenueAccount GlAccount? @relation("PosReceiptLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([receiptId])
+  @@index([itemId])
+  @@index([unitId])
+  @@index([taxCodeId])
+  @@index([revenueAccountId])
+  @@map("pos_receipt_line")
 }
