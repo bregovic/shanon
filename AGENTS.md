@@ -27,6 +27,14 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   (`noManualEntry`: saldokonto, banka, pokladna, DPH) odmítne účetní deník,
   doklady modulů na ně účtují. Výchozí nastavení modulů bere účet přes
   `postingAccount(data, "311")` (xxx000, jinak první účet syntetiky).
+- Deníky (`src/modules/gl/journal.ts`): řádek = druh účtu (hlavní kniha, odběratel,
+  dodavatel, banka, pokladna) + účet, MD/D, volitelně druh a protiúčet; název deníku určuje
+  druh a číslování dokladů (po vyrovnání / jeden za deník / řádek / ručně). Ověřit =
+  `runJournal(…, dryRun)` (postVoucher `dryRun`), Zaúčtovat po dokladech; odběratel /
+  dodavatel → saldokontní účet skupiny + zápis do salda, úhrada s VS spáruje fakturu.
+  Ruční zápis na saldokonto jen přes druh účtu (`PostingLine.viaSubledger`).
+- Řádky upravované v mřížce: `lines[].inline` (`InlineLines`), sdílený sloupec polí
+  `FieldDef.gridColumn`; kompaktní hlavička dokladu `ObjectDef.compactHeader`.
 - Doklady s řádky a DPH (faktury) nepsat znovu: `src/modules/tax/document.ts`
   (výpočet, součty, zaúčtování, saldo, daňové transakce). Pomocná kniha partnerů
   (AR, AP) vzniká továrnou `partner-ledger.ts` — nový podobný modul = parametry

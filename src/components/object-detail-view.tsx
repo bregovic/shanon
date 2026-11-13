@@ -28,6 +28,7 @@ import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
 import { HistoryButton } from "./history-panel";
 import { ImportButton } from "./import-dialog";
+import { InlineLines } from "./inline-lines";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
@@ -48,6 +49,9 @@ export interface LineSpec {
   editable: boolean;
   /** řádky jsou samostatné doklady — dvojklik otevře jejich stránku */
   overview: boolean;
+  /** úprava přímo v mřížce (deník) */
+  inline?: boolean;
+  sortField?: string;
   initial: { rows: Row[]; total: number; totals?: Record<string, string> };
 }
 
@@ -68,6 +72,8 @@ export interface ObjectDetailProps {
   canDuplicate?: boolean;
   /** tisk podle šablony (Tiskové sestavy) */
   printHref?: string;
+  /** hlavička jako kompaktní pruh (deník), řádky přes celou stránku */
+  compactHeader?: boolean;
   actions: { id: string; label: string; upload?: string; download?: boolean }[];
   lines: LineSpec[];
   lang: string;
@@ -109,7 +115,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           aria-label={labels.export}
           onClick={() => (window.location.href = `/api/export/${spec.objectId}?filter=${encodeURIComponent(JSON.stringify({ [spec.field]: parentId }))}`)}
         />
-        {spec.editable && (
+        {spec.editable && !spec.inline && (
           <>
             <Button icon={<Add24Regular />} onClick={() => open(null)}>
               {labels.actions.new}
@@ -140,6 +146,21 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}
+      {spec.inline ? (
+        <InlineLines
+          objectId={spec.objectId}
+          parentField={spec.field}
+          parentId={parentId}
+          columns={spec.columns}
+          defaults={spec.defaults}
+          initial={spec.initial.rows}
+          sortField={spec.sortField}
+          readOnly={!spec.editable}
+          lang={lang}
+          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "" }}
+          onChanged={() => router.refresh()}
+        />
+      ) : (
       <SmartGrid
         objectId={spec.objectId}
         columns={spec.columns}
@@ -153,7 +174,8 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
         onOpen={spec.overview ? (row) => router.push(objectHref(spec.objectId, String(row.id))) : spec.editable ? open : undefined}
         onSelectionChange={setSelected}
       />
-      {spec.editable && (
+      )}
+      {spec.editable && !spec.inline && (
         <RecordDrawer
           objectId={spec.objectId}
           id={drawer.id}
@@ -341,7 +363,9 @@ export function ObjectDetailView(p: ObjectDetailProps) {
         )}
         <div className={s.card}>
           <RecordForm
-            groups={p.groups}
+            // kompaktní hlavička: všechna pole v jednom bloku, víc sloupců
+            groups={p.compactHeader ? [{ label: "", fields: p.groups.flatMap((g) => g.fields) }] : p.groups}
+            columns={p.compactHeader ? 4 : undefined}
             values={values}
             titles={titles}
             errors={errors}

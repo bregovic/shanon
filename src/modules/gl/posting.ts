@@ -3,8 +3,9 @@
  * Volají ho deníky, a později i pomocné knihy (odběratelé, dodavatelé,
  * pokladna, majetek) — každá transakce má tak obraz v hlavní knize.
  */
+import { runJournal } from "./journal";
 import { fromCents, sumCents, toCents } from "@/core/money";
-import { UserError, type ValidationErrors, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { UserError, type ValidationErrors, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents, rateFor } from "@/modules/sys/currency";
 import { activeDimensions, dimsOf, requirementsFor, resolveDims, type Dims } from "./dimensions";
 
@@ -18,6 +19,8 @@ export interface PostingLine {
   /** cizí měna řádku (null = účetní měna) a částka v ní */
   currencyId?: string | null;
   amountCur?: string | null;
+  /** účet přes pomocnou knihu (odběratel, dodavatel, banka, pokladna) — smí i na účet se zákazem ručního zápisu */
+  viaSubledger?: boolean;
 }
 
 export interface PostingRequest {
@@ -32,6 +35,10 @@ export interface PostingRequest {
   partner?: string | null;
   /** výchozí dimenze partnera (dodavatel / odběratel) */
   partnerDims?: Record<string, unknown>;
+  /** číslo dokladu zadané ručně (deník s ručním číslováním) */
+  voucherNum?: string | null;
+  /** jen kontroly (Ověřit deník) — nic se nezapíše */
+  dryRun?: boolean;
 }
 
 /** Kontrola bez přístupu k datům — vyrovnanost a neprázdnost. */
@@ -151,7 +158,12 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
   // ruční zápis = účetní deník; doklady modulů (faktury, banka, pokladna) smí i na saldokonto
   const manual = req.sourceObject === "gl.journal";
   const accounts = new Map<string, RecordData>();
-  for (const l of req.lines) if (!accounts.has(l.accountId)) accounts.set(l.accountId, await assertPostable(data, l.accountId, manual));
+  for (const l of req.lines) {
+    // ruční řádek na saldokonto/banku/pokladnu jen přes pomocnou knihu (druh účtu odběratel, banka…)
+    const strict = manual && !l.viaSubledger;
+    const acc = await assertPostable(data, l.accountId, strict);
+    if (!accounts.has(l.accountId)) accounts.set(l.accountId, acc);
+  }
   // dimenze podle nastavení účtu (partner z dokladu se doplní sám)
   const defs = await activeDimensions(data);
   // výchozí hodnoty: řádek → partner → účet (jen kde účet dimenzi nezakazuje)
@@ -167,9 +179,10 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
     return out;
   };
   const dims = await Promise.all(req.lines.map((l) => resolveDims(data, accounts.get(l.accountId)!, withDefaults(l), { manual, partner: req.partner, defs })));
+  if (req.dryRun) return {} as RecordData;
   const voucher = await data.create("gl.voucher", {
-    // bez řady z deníku doplní číslo datová služba podle Použití (gl.voucher)
-    voucherNum: req.voucherSeqId ? await data.nextNumber({ id: req.voucherSeqId }, new Date(req.date)) : null,
+    // ruční číslo, jinak řada deníku, jinak datová služba podle Použití (gl.voucher)
+    voucherNum: req.voucherNum || (req.voucherSeqId ? await data.nextNumber({ id: req.voucherSeqId }, new Date(req.date)) : null),
     date: req.date,
     description: req.description ?? null,
     sourceObject: req.sourceObject ?? null,
@@ -208,6 +221,20 @@ async function assertJournalOpen(data: DataApi, journalId: unknown) {
   if (j?.status === "posted") throw new UserError("@GL:Locked");
 }
 
+/** Výsledek Ověřit / Zaúčtovat pro hlavičku deníku. */
+function checkText(ctx: EventContext, r: { vouchers: number; debit: string; credit: string; errors: string[] }) {
+  return (r.errors.length ? ctx.t("@GL:CheckErrors", { n: String(r.errors.length), list: r.errors.slice(0, 5).join(" | ") }) : ctx.t("@GL:CheckOk", { n: String(r.vouchers), debit: r.debit, credit: r.credit })).slice(0, 255);
+}
+
+/** pole odkazu účtu a protiúčtu podle druhu */
+const LINE_REFS: Record<string, { main: string; offset: string }> = {
+  ledger: { main: "accountId", offset: "offsetAccountId" },
+  customer: { main: "customerId", offset: "offsetCustomerId" },
+  vendor: { main: "vendorId", offset: "offsetVendorId" },
+  bank: { main: "bankAccountId", offset: "offsetBankAccountId" },
+  cash: { main: "cashDeskId", offset: "offsetCashDeskId" },
+};
+
 export const glHandlers: Record<string, ObjectHandlers> = {
   "gl.fiscalYear": {
     beforeSave(_ctx, data) {
@@ -226,30 +253,17 @@ export const glHandlers: Record<string, ObjectHandlers> = {
       data.journalNameId = jn.id;
     },
     actions: {
+      /** Ověřit: rozdělení na doklady, vyrovnanost, účty, období, dimenze — bez účtování */
+      async validate(ctx, journal) {
+        const r = await runJournal(ctx, journal, true);
+        await ctx.data.update("gl.journal", String(journal.id), { checkResult: checkText(ctx, r) });
+      },
       async post(ctx, journal) {
         if (journal.status !== "draft") throw new UserError("@GL:Locked");
         const jn = await resolveJournalName(ctx.data, journal.journalNameId);
         if (jn.blocked) throw new UserError("@GL:JournalNameBlocked", { name: String(jn.code) });
-        const lines = await convertLines(
-          ctx.data,
-          ctx.companyId,
-          String(journal.date),
-          journalLinesToPosting(await ctx.data.find("gl.journalLine", { journalId: journal.id })),
-        );
-        // protiúčet z nastavení deníku vyrovná rozdíl MD a D
-        const diff = sumCents(lines.map((l) => toCents(l.amount)));
-        if (diff !== BigInt(0) && jn.offsetAccountId) {
-          lines.push({ accountId: String(jn.offsetAccountId), amount: fromCents(-diff), text: (journal.description as string) ?? null });
-        }
-        const voucher = await postVoucher(ctx.data, {
-          date: String(journal.date),
-          description: (journal.description as string) ?? null,
-          sourceObject: "gl.journal",
-          sourceId: String(journal.id),
-          voucherSeqId: (jn.voucherSeqId as string) ?? null,
-          lines,
-        });
-        await ctx.data.update("gl.journal", String(journal.id), { status: "posted", voucherId: voucher.id });
+        const r = await runJournal(ctx, journal, false);
+        await ctx.data.update("gl.journal", String(journal.id), { checkResult: checkText(ctx, r) });
       },
     },
   },
@@ -291,16 +305,34 @@ export const glHandlers: Record<string, ObjectHandlers> = {
     },
   },
   "gl.journalLine": {
-    async beforeSave(ctx, data) {
-      await assertJournalOpen(ctx.data, data.journalId);
-      // ruční zápis: hned při zadání řádku, ne až při zaúčtování
-      if (data.accountId) {
+    async beforeSave(ctx, data, isNew) {
+      const journal = data.journalId ? await ctx.data.get("gl.journal", String(data.journalId)) : null;
+      if (journal?.status === "posted") throw new UserError("@GL:Locked");
+      if (isNew) {
+        // pořadí řádku, výchozí protiúčet z názvu deníku
+        const last = await ctx.data.find("gl.journalLine", { journalId: data.journalId }, { take: 1, orderBy: { lineNum: "desc" } });
+        data.lineNum ??= Number(last[0]?.lineNum ?? 0) + 1;
+        const jn = journal?.journalNameId ? await ctx.data.get("gl.journalName", String(journal.journalNameId)) : null;
+        const defType = (jn?.offsetType as string) || (jn?.offsetAccountId ? "ledger" : null);
+        if (!data.offsetType && defType) {
+          data.offsetType = defType;
+          data.offsetAccountId ??= jn?.offsetAccountId ?? null;
+          data.offsetBankAccountId ??= jn?.offsetBankAccountId ?? null;
+          data.offsetCashDeskId ??= jn?.offsetCashDeskId ?? null;
+        }
+      }
+      data.accountType ||= "ledger";
+      // jen odkaz odpovídající druhu (ostatní vyčistit)
+      for (const [kind, f] of Object.entries(LINE_REFS)) if (data.accountType !== kind) data[f.main] = null;
+      for (const [kind, f] of Object.entries(LINE_REFS)) if (data.offsetType !== kind) data[f.offset] = null;
+      // účet hlavní knihy: kontrola ručního zápisu a dimenzí hned při zadání
+      if (data.accountType === "ledger" && data.accountId) {
         const acc = await assertPostable(ctx.data, String(data.accountId), true);
-        // prázdné dimenze doplní výchozí hodnoty účtu (kde je účet nezakazuje)
         const dims = dimsOf(data);
         for (const n of [1, 2, 3, 4, 5, 6]) if (!dims[`dim${n}`] && acc[`dim${n}`] && acc[`dim${n}Req`] !== "notAllowed") dims[`dim${n}`] = String(acc[`dim${n}`]);
         Object.assign(data, await resolveDims(ctx.data, acc, dims, { manual: true }));
       }
+      if (data.offsetType === "ledger" && data.offsetAccountId) await assertPostable(ctx.data, String(data.offsetAccountId), true);
     },
     beforeDelete: (ctx, data) => assertJournalOpen(ctx.data, data.journalId),
   },

@@ -34,6 +34,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
     secret: f.secret,
     image: f.image,
     visibleWhen: f.visibleWhen,
+    gridColumn: f.gridColumn,
   };
 }
 

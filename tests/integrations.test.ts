@@ -827,3 +827,70 @@ describe("založení firmy z rejstříku", () => {
     await expect(createCompanyFromRegistry(T, "27079864", client)).rejects.toMatchObject({ label: "@ORG:CompanyExists" });
   });
 });
+
+describe("deníky jako v AX (CR-045)", () => {
+  it("číslování dokladů, druhy účtů, protiúčet, platba odběratele podle VS, Ověřit", async () => {
+    const D = (await provisionTenant(client, { code: `t-jr-${run}`, name: "JR", adminEmail: `jr-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "bank", "cash"], company: { code: "J", name: "J" } })).ctx;
+    const acc = async (n: string) => String((await listRecords(D, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
+    const jn = async (code: string, va: string, extra: Record<string, unknown> = {}) =>
+      String((await saveRecord(D, "gl.journalName", null, { code, name: code, voucherAllocation: va, ...extra }, undefined, client)).id);
+    const journal = async (nameId: string) => saveRecord(D, "gl.journal", null, { journalNameId: nameId, date: "2026-11-13", description: "Test" }, undefined, client);
+    const line = (j: unknown, v: Record<string, unknown>) => saveRecord(D, "gl.journalLine", null, { journalId: (j as { id: string }).id, ...v }, undefined, client);
+    const vouchers = async (j: Record<string, unknown>) => new Set((await listRecords(D, "gl.journalLine", { filter: { journalId: String(j.id) } }, client)).rows.map((r) => r.voucherNum)).size;
+
+    // nový doklad po vyrovnání: 2 doklady
+    const j1 = await journal(await jn("BAL", "balance"));
+    await line(j1, { accountId: await acc("518000"), debit: "100" });
+    await line(j1, { accountId: await acc("395000"), credit: "100" });
+    await line(j1, { accountId: await acc("518000"), debit: "50" });
+    await line(j1, { accountId: await acc("395000"), credit: "50" });
+    await runAction(D, "gl.journal", String(j1.id), "validate", client);
+    expect((await getRecord(D, "gl.journal", String(j1.id), client))!.checkResult).toMatch(/^V pořádku: 2 dokladů/);
+    await runAction(D, "gl.journal", String(j1.id), "post", client);
+    expect(await vouchers(j1)).toBe(2);
+
+    // jeden doklad za deník
+    const j2 = await journal(await jn("ONE", "journal"));
+    for (const v of [{ debit: "100" }, { credit: "100" }, { debit: "50" }, { credit: "50" }]) await line(j2, { accountId: await acc(v.debit ? "518000" : "395000"), ...v });
+    await runAction(D, "gl.journal", String(j2.id), "post", client);
+    expect(await vouchers(j2)).toBe(1);
+
+    // každý řádek vlastní doklad: bez protiúčtu chyba v Ověřit, s protiúčtem z názvu deníku OK
+    const lineJn = await jn("LIN", "line", { offsetType: "ledger", offsetAccountId: await acc("395000") });
+    const j3 = await journal(lineJn);
+    await line(j3, { accountId: await acc("518000"), debit: "10" });
+    const l3 = await line(j3, { accountId: await acc("518000"), debit: "20" });
+    expect([l3.offsetType, l3.lineNum]).toEqual(["ledger", 2]);
+    await runAction(D, "gl.journal", String(j3.id), "post", client);
+    expect(await vouchers(j3)).toBe(2);
+
+    // ručně: chybí číslo → Ověřit hlásí, s čísly → doklady podle čísel
+    const j4 = await journal(await jn("MAN", "manual"));
+    const m1 = await line(j4, { accountId: await acc("518000"), debit: "5", offsetType: "ledger", offsetAccountId: await acc("395000") });
+    await runAction(D, "gl.journal", String(j4.id), "validate", client);
+    expect((await getRecord(D, "gl.journal", String(j4.id), client))!.checkResult).toMatch(/^Chyby \(1\): Řádek 1: deník číslujete ručně/);
+    await saveRecord(D, "gl.journalLine", String(m1.id), { voucherNum: "RUC-1" }, undefined, client);
+    await runAction(D, "gl.journal", String(j4.id), "post", client);
+    expect((await listRecords(D, "gl.voucher", { filter: { voucherNum: "RUC-1" } }, client)).total).toBe(1);
+
+    // platba odběratele: druh Odběratel (D) s VS faktury, protiúčet Banka → saldo uhrazeno
+    const grp = (await listRecords(D, "ar.group", {}, client)).rows[0];
+    const subj = await saveRecord(D, "gab.subject", null, { name: "Bistro" }, undefined, client);
+    const cust = await saveRecord(D, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const inv = await saveRecord(D, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-12", vs: "777" }, undefined, client);
+    await saveRecord(D, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Uzeniny", qty: "1", unitPrice: "1000" }, undefined, client);
+    await runAction(D, "ar.invoice", String(inv.id), "post", client);
+    const gross = String((await getRecord(D, "ar.invoice", String(inv.id), client))!.amountGross);
+    const bankAcc = await saveRecord(D, "bank.account", null, { code: "KB", name: "KB", glAccountId: await acc("221000") }, undefined, client);
+    const j5 = await journal(await jn("PAY", "line", { journalType: "customerPayment" }));
+    await line(j5, { accountType: "customer", customerId: cust.id, credit: gross, vs: "777", offsetType: "bank", offsetBankAccountId: bankAcc.id });
+    await runAction(D, "gl.journal", String(j5.id), "post", client);
+    const inv2 = (await getRecord(D, "ar.invoice", String(inv.id), client))!;
+    expect(inv2.paidAmount).toBe(gross);
+    const payments = (await listRecords(D, "ar.trans", { filter: { customerId: String(cust.id), kind: "payment" } }, client)).rows;
+    expect([payments.length, payments[0].amount]).toEqual([1, `-${gross}`]);
+    // ruční řádek přímo na saldokonto 311 nejde, přes druh Odběratel ano (výše)
+    const j6 = await journal(await jn("BAD", "balance"));
+    await expect(line(j6, { accountId: await acc("311000"), debit: "1" })).rejects.toMatchObject({ label: "@GL:ManualEntryDenied" });
+  });
+});

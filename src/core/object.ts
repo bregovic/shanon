@@ -53,6 +53,8 @@ export interface FieldDef {
   visibleWhen?: VisibleWhen;
   /** další názvy sloupce při importu (CSV/XML), např. ["cena", "price"] */
   aliases?: string[];
+  /** mřížka řádků: pole se stejným sloupcem (vzájemně se vylučující přes visibleWhen) sdílí jeden sloupec */
+  gridColumn?: string;
 }
 
 export interface VisibleWhen {
@@ -97,7 +99,10 @@ export interface ObjectDef {
    * (faktury odběratele) — se záznamem se nemažou, smazání pak zastaví vazba.
    */
   /** `copy: false` = řádky se při Duplikovat nekopírují (diskuze, historie) */
-  lines?: { object: string; field: string; label: LabelRef; owned?: boolean; copy?: boolean }[];
+  /** `inline` = řádky se upravují přímo v mřížce (deník, řádky dokladu) */
+  lines?: { object: string; field: string; label: LabelRef; owned?: boolean; copy?: boolean; inline?: boolean }[];
+  /** stránka dokladu: hlavička jako jeden řádek nahoře, řádky přes celou stránku */
+  compactHeader?: boolean;
   /** tlačítka ve formuláři; logika v ObjectHandlers.actions */
   /**
    * `upload` = akce si vyžádá soubor (přípony pro výběr, např. ".gpc,.txt");

@@ -68,7 +68,7 @@ export function RecordForm({
   readOnly: boolean;
   onChange: (name: string, value: unknown, title?: string) => void;
   /** 1 = šuplík (jeden sloupec), 2 = celá stránka */
-  columns?: 1 | 2;
+  columns?: 1 | 2 | 4;
   /** popisek tlačítka pro proskok na odkazovaný záznam */
   openLabel: string;
   /** záznam (pro pole s obrázkem: nahrání k uloženému záznamu) */
@@ -80,7 +80,7 @@ export function RecordForm({
       {groups.filter((g) => shown(g.visibleWhen, values) && g.fields.some((f) => shown(f.visibleWhen, values))).map((g) => (
         <section key={g.label} className={s.group}>
           <div className={s.groupTitle}>{g.label}</div>
-          <div className={s.grid} style={columns === 1 ? { gridTemplateColumns: "1fr" } : undefined}>
+          <div className={s.grid} style={columns === 1 ? { gridTemplateColumns: "1fr" } : columns === 4 ? { gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "4px 16px" } : undefined}>
             {g.fields.filter((f) => shown(f.visibleWhen, values)).map((f) => (
               <div key={f.name} className={f.kind === "text" || f.image ? s.wide : undefined}>
                 {f.image ? (
@@ -213,13 +213,14 @@ function OpenRef({ href, label }: { href: string; label: string }) {
 }
 
 /** Výběr odkazovaného záznamu s hledáním na serveru. */
-function RefCombobox({
+export function RefCombobox({
   f,
   value,
   title,
   disabled,
   onChange,
   openLabel,
+  compact = false,
 }: {
   f: FieldMeta;
   value: string;
@@ -227,6 +228,8 @@ function RefCombobox({
   disabled: boolean;
   onChange: (name: string, value: unknown, title?: string) => void;
   openLabel: string;
+  /** mřížka řádků: malá velikost, bez tlačítka Otevřít */
+  compact?: boolean;
 }) {
   const [query, setQuery] = useState(title);
   const [open, setOpen] = useState(false);
@@ -254,6 +257,7 @@ function RefCombobox({
       <Combobox
         // obal se má zúžit (primární slot Comboboxu je input, proto root)
         root={{ style: { flex: 1, minWidth: 0 } }}
+        size={compact ? "small" : undefined}
         value={query}
         selectedOptions={value ? [value] : []}
         disabled={disabled}
@@ -283,7 +287,7 @@ function RefCombobox({
         ))}
       </Combobox>
       {/* proskok na odkazovaný záznam (číselník, nastavení, subjekt…) */}
-      {value && <OpenRef href={refLink(f, value)} label={openLabel} />}
+      {value && !compact && <OpenRef href={refLink(f, value)} label={openLabel} />}
     </div>
   );
 }

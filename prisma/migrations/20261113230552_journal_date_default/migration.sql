@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "gl_journal" ALTER COLUMN "date" SET DEFAULT CURRENT_TIMESTAMP;

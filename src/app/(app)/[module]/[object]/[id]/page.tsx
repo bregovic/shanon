@@ -70,6 +70,8 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               defaults: defaults(ld),
               // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít
               overview: l.owned === false || !!ld.systemOnly,
+              inline: !!l.inline,
+              sortField: ld.defaultSort?.field,
               editable: l.owned !== false && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               initial: { rows: initial.rows, total: initial.total, totals: initial.totals },
             };
@@ -94,6 +96,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       canAttach={mayWrite}
       canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
       canDuplicate={!isNew && !def.systemOnly && mayWrite}
+      compactHeader={!!def.compactHeader}
       printHref={!isNew && s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/${id}` : undefined}
       actions={
         isNew || !mayWrite

@@ -27,6 +27,8 @@ export interface FieldMeta {
   /** obrázek (hodnota = id souboru, /api/files/<id>) */
   image?: boolean;
   visibleWhen?: { field: string; in: unknown[] };
+  /** mřížka řádků: sdílený sloupec vzájemně se vylučujících polí */
+  gridColumn?: string;
 }
 
 export const objectHref = (objectId: string, id?: string) =>

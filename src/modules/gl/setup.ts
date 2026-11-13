@@ -176,8 +176,15 @@ export async function glSetup(data: DataApi): Promise<void> {
     const taken = await data.find("gl.dimension", { position }, { take: 1 });
     if (!taken.length && !(await data.find("gl.dimension", { code }, { take: 1 })).length) await data.create("gl.dimension", { code, name, position, source, active: true });
   }
-  if (!(await data.find("gl.journalName", { code: "GEN" }, { take: 1 })).length) {
-    await data.create("gl.journalName", { code: "GEN", name: "Obecný deník" });
+  // názvy deníků podle druhu (jen chybějící kód; tenant si je pak upraví)
+  for (const [code, name, journalType, voucherAllocation] of [
+    ["GEN", "Obecný deník", "daily", "balance"],
+    ["PLDOD", "Platby dodavatelům", "vendorPayment", "line"],
+    ["PLODB", "Platby odběratelů", "customerPayment", "line"],
+    ["POKL", "Pokladní deník", "cash", "line"],
+    ["BANKA", "Bankovní deník", "bank", "line"],
+  ] as const) {
+    if (!(await data.find("gl.journalName", { code }, { take: 1 })).length) await data.create("gl.journalName", { code, name, journalType, voucherAllocation });
   }
 }
 

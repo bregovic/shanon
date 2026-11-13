@@ -364,6 +364,46 @@ export const voucher = defineObject({
 });
 
 /** Nastavení deníku (obdoba Journal names v AX): řada dokladů, protiúčet. */
+/** Druh deníku (obdoba Journal type v AX). */
+export const JournalType = defineEnum({
+  id: "GlJournalType",
+  label: "@GL:JournalType",
+  values: [
+    { value: "daily", label: "@GL:JtDaily" },
+    { value: "vendorPayment", label: "@GL:JtVendorPayment" },
+    { value: "customerPayment", label: "@GL:JtCustomerPayment" },
+    { value: "cash", label: "@GL:JtCash" },
+    { value: "bank", label: "@GL:JtBank" },
+  ],
+});
+
+/** Číslování dokladů v deníku. */
+export const VoucherAllocation = defineEnum({
+  id: "GlVoucherAllocation",
+  label: "@GL:VoucherAllocation",
+  values: [
+    { value: "balance", label: "@GL:VaBalance" },
+    { value: "journal", label: "@GL:VaJournal" },
+    { value: "line", label: "@GL:VaLine" },
+    { value: "manual", label: "@GL:VaManual" },
+  ],
+});
+
+/** Druh účtu na řádku deníku (účet i protiúčet). */
+export const LedgerAccountType = defineEnum({
+  id: "GlLedgerAccountType",
+  label: "@GL:AccountKind",
+  values: [
+    { value: "ledger", label: "@GL:AkLedger" },
+    { value: "customer", label: "@GL:AkCustomer" },
+    { value: "vendor", label: "@GL:AkVendor" },
+    { value: "bank", label: "@GL:AkBank" },
+    { value: "cash", label: "@GL:AkCash" },
+  ],
+});
+
+const when = (field: string, v: string) => ({ field, in: [v] });
+
 export const journalName = defineObject({
   id: "gl.journalName",
   table: "gl_journal_name",
@@ -373,15 +413,21 @@ export const journalName = defineObject({
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
+    journalType: { edt: enumEdt(JournalType), mandatory: true, default: "daily" },
+    voucherAllocation: { edt: enumEdt(VoucherAllocation), mandatory: true, default: "balance" },
     voucherSeqId: { edt: NumberSeqRef, label: "@GL:VoucherSeq" },
-    offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount" },
+    // výchozí protiúčet řádků (druh a účet)
+    offsetType: { edt: enumEdt(LedgerAccountType, "@GL:OffsetKind") },
+    offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount", visibleWhen: when("offsetType", "ledger") },
+    offsetBankAccountId: { edt: refEdt("bank.account", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "bank") },
+    offsetCashDeskId: { edt: refEdt("cash.desk", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "cash") },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "code",
-  list: ["code", "name", "voucherSeqId", "offsetAccountId", "blocked"],
+  list: ["code", "name", "journalType", "voucherAllocation", "voucherSeqId", "offsetType", "blocked"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "blocked"] },
-    { label: "@GL:Posting", fields: ["voucherSeqId", "offsetAccountId"] },
+    { label: "@SYS:General", fields: ["code", "name", "journalType", "blocked"] },
+    { label: "@GL:Posting", fields: ["voucherAllocation", "voucherSeqId", "offsetType", "offsetAccountId", "offsetBankAccountId", "offsetCashDeskId"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -425,21 +471,28 @@ export const journal = defineObject({
     journalNum: { edt: VoucherNum, label: "@GL:JournalNum", mandatory: true, readOnly: true },
     /** prázdné = výchozí název deníku (GEN, jinak první) — doplní se při uložení */
     journalNameId: { edt: JournalNameRef },
-    date: { edt: Edts.TransDate, mandatory: true },
+    date: { edt: Edts.TransDate, mandatory: true, default: "$today" },
     description: { edt: Edts.Description, mandatory: true },
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
     voucherId: { edt: VoucherRef, readOnly: true },
+    // výsledek Ověřit (počet dokladů, chyby)
+    checkResult: { edt: Edts.Description, label: "@GL:CheckResult", readOnly: true },
   },
   titleField: "journalNum",
-  list: ["journalNum", "journalNameId", "date", "description", "status", "voucherId"],
+  list: ["journalNum", "journalNameId", "date", "description", "status", "checkResult"],
+  // hlavička jako řádek nahoře, řádky v upravitelné mřížce přes celou stránku
+  compactHeader: true,
   form: [
     { label: "@SYS:General", fields: ["journalNum", "journalNameId", "date", "description"] },
-    { label: "@GL:Status", fields: ["status", "voucherId"] },
+    { label: "@GL:Status", fields: ["status", "voucherId", "checkResult"] },
   ],
   numberSeq: { field: "journalNum", seq: "GLJOURNAL" },
   defaultSort: { field: "date", dir: "desc" },
-  lines: [{ object: "gl.journalLine", field: "journalId", label: "@SYS:Lines" }],
-  actions: [{ id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } }],
+  lines: [{ object: "gl.journalLine", field: "journalId", label: "@SYS:Lines", inline: true }],
+  actions: [
+    { id: "validate", label: "@GL:Validate", when: { field: "status", equals: "draft" } },
+    { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
+  ],
   lockedWhen: { field: "status", equals: "posted" },
 });
 
@@ -451,18 +504,60 @@ export const journalLine = defineObject({
   scope: "company",
   fields: {
     journalId: { edt: JournalRef, mandatory: true },
-    accountId: { edt: AccountRef, mandatory: true },
+    lineNum: { edt: Edts.Int, label: "@SYS:Number", readOnly: true },
+    /** prázdné = datum deníku */
+    date: { edt: Edts.TransDate },
+    /** číslo dokladu: ručně (deník s ručním číslováním), jinak se doplní při zaúčtování */
+    voucherNum: { edt: Edts.Code, label: "@GL:Voucher" },
+    // účet: druh + jeden z odkazů (mřížka je ukazuje v jednom sloupci)
+    accountType: { edt: enumEdt(LedgerAccountType), mandatory: true, default: "ledger" },
+    accountId: { edt: AccountRef, visibleWhen: when("accountType", "ledger"), gridColumn: "account" },
+    customerId: { edt: refEdt("ar.customer", "@GL:Account"), optionalRef: true, visibleWhen: when("accountType", "customer"), gridColumn: "account" },
+    vendorId: { edt: refEdt("ap.vendor", "@GL:Account"), optionalRef: true, visibleWhen: when("accountType", "vendor"), gridColumn: "account" },
+    bankAccountId: { edt: refEdt("bank.account", "@GL:Account"), optionalRef: true, visibleWhen: when("accountType", "bank"), gridColumn: "account" },
+    cashDeskId: { edt: refEdt("cash.desk", "@GL:Account"), optionalRef: true, visibleWhen: when("accountType", "cash"), gridColumn: "account" },
+    text: { edt: Edts.Description, label: "@GL:Text" },
+    debit: { edt: Edts.Amount, label: "@GL:Debit", aliases: ["má dáti", "ma dati", "debet", "debit"] },
+    credit: { edt: Edts.Amount, label: "@GL:Credit", aliases: ["dal", "kredit", "credit"] },
+    offsetType: { edt: enumEdt(LedgerAccountType, "@GL:OffsetKind") },
+    offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount", visibleWhen: when("offsetType", "ledger"), gridColumn: "offset" },
+    offsetCustomerId: { edt: refEdt("ar.customer", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "customer"), gridColumn: "offset" },
+    offsetVendorId: { edt: refEdt("ap.vendor", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "vendor"), gridColumn: "offset" },
+    offsetBankAccountId: { edt: refEdt("bank.account", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "bank"), gridColumn: "offset" },
+    offsetCashDeskId: { edt: refEdt("cash.desk", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "cash"), gridColumn: "offset" },
+    /** variabilní symbol: platba odběratele / dodavateli se spáruje s fakturou */
+    vs: { edt: defineEdt({ id: "GlLineVs", kind: "string", label: "@GL:Vs", maxLength: 10, pattern: /^\d{0,10}$/ }) },
     ...dimFields(),
     /** prázdné = účetní měna firmy */
     currencyId: { edt: CurrencyRef },
-    debit: { edt: Edts.Amount, label: "@GL:Debit", aliases: ["má dáti", "ma dati", "debet", "debit"] },
-    credit: { edt: Edts.Amount, label: "@GL:Credit", aliases: ["dal", "kredit", "credit"] },
-    text: { edt: Edts.Description, label: "@GL:Text" },
   },
   titleField: "text",
-  list: ["accountId", ...DIM_NAMES, "currencyId", "debit", "credit", "text"],
+  defaultSort: { field: "lineNum", dir: "asc" },
+  list: [
+    "date",
+    "voucherNum",
+    "accountType",
+    "accountId",
+    "customerId",
+    "vendorId",
+    "bankAccountId",
+    "cashDeskId",
+    "text",
+    "debit",
+    "credit",
+    "offsetType",
+    "offsetAccountId",
+    "offsetCustomerId",
+    "offsetVendorId",
+    "offsetBankAccountId",
+    "offsetCashDeskId",
+    "vs",
+    ...DIM_NAMES,
+    "currencyId",
+  ],
   form: [
-    { label: "@SYS:General", fields: ["journalId", "accountId", "currencyId", "debit", "credit", "text"] },
+    { label: "@SYS:General", fields: ["journalId", "date", "voucherNum", "accountType", "accountId", "customerId", "vendorId", "bankAccountId", "cashDeskId", "text", "debit", "credit", "currencyId", "vs"] },
+    { label: "@GL:Offset", fields: ["offsetType", "offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
     { label: "@GL:Dimensions", fields: DIM_NAMES },
   ],
 });
@@ -473,7 +568,7 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus, SystemPosting],
+  enums: [DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus, SystemPosting, JournalType, VoucherAllocation, LedgerAccountType],
   objects: [parameters, systemAccount, dimension, dimensionValue, dimensionRule, account, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
   reports: glReports,
   menu: [
@@ -510,6 +605,35 @@ export default defineModule({
   setup: glSetup,
   labels: {
     cs: {
+      JournalType: "Druh deníku",
+      JtDaily: "Obecný",
+      JtVendorPayment: "Platby dodavatelům",
+      JtCustomerPayment: "Platby odběratelů",
+      JtCash: "Pokladní",
+      JtBank: "Bankovní",
+      VoucherAllocation: "Číslování dokladů",
+      VaBalance: "Nový doklad po vyrovnání",
+      VaJournal: "Jeden doklad za deník",
+      VaLine: "Každý řádek vlastní doklad",
+      VaManual: "Ručně",
+      AccountKind: "Druh účtu",
+      OffsetKind: "Druh protiúčtu",
+      AkLedger: "Hlavní kniha",
+      AkCustomer: "Odběratel",
+      AkVendor: "Dodavatel",
+      AkBank: "Banka",
+      AkCash: "Pokladna",
+      Offset: "Protiúčet",
+      Vs: "VS",
+      CheckResult: "Ověření",
+      Validate: "Ověřit",
+      CheckOk: "V pořádku: {n} dokladů, MD {debit} = D {credit}.",
+      CheckErrors: "Chyby ({n}): {list}",
+      LineAccountMissing: "Řádek {line}: vyplňte účet.",
+      VoucherDates: "Doklad {voucher}: řádky mají různé datum.",
+      VoucherNumMissing: "Řádek {line}: deník číslujete ručně — vyplňte číslo dokladu.",
+      LineNotBalanced: "Řádek {line}: deník má „každý řádek vlastní doklad“ — vyplňte protiúčet.",
+      JournalEmpty: "Deník nemá žádné řádky.",
       DimSubject: "Adresář – hodnoty se zakládají samy",
       DimValuePrefix: "Předpona hodnoty",
       DimValueDigits: "Počet číslic",
@@ -673,6 +797,35 @@ export default defineModule({
       AmountCur: "Částka v měně",
     },
     en: {
+      JournalType: "Journal type",
+      JtDaily: "Daily",
+      JtVendorPayment: "Vendor payments",
+      JtCustomerPayment: "Customer payments",
+      JtCash: "Cash",
+      JtBank: "Bank",
+      VoucherAllocation: "Voucher allocation",
+      VaBalance: "New voucher when balanced",
+      VaJournal: "One voucher per journal",
+      VaLine: "Each line its own voucher",
+      VaManual: "Manual",
+      AccountKind: "Account type",
+      OffsetKind: "Offset account type",
+      AkLedger: "Ledger",
+      AkCustomer: "Customer",
+      AkVendor: "Vendor",
+      AkBank: "Bank",
+      AkCash: "Cash",
+      Offset: "Offset account",
+      Vs: "Var. symbol",
+      CheckResult: "Validation",
+      Validate: "Validate",
+      CheckOk: "OK: {n} vouchers, debit {debit} = credit {credit}.",
+      CheckErrors: "Errors ({n}): {list}",
+      LineAccountMissing: "Line {line}: fill in the account.",
+      VoucherDates: "Voucher {voucher}: lines have different dates.",
+      VoucherNumMissing: "Line {line}: the journal uses manual numbering — fill in the voucher number.",
+      LineNotBalanced: "Line {line}: the journal has “each line its own voucher” — fill in the offset account.",
+      JournalEmpty: "The journal has no lines.",
       DimSubject: "Address book – values created automatically",
       DimValuePrefix: "Value prefix",
       DimValueDigits: "Digits",
