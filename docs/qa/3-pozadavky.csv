@@ -47,3 +47,4 @@ CR-045;change;"Deníky jako v AX: hlavička + maximalizovaná mřížka řádků
 CR-046;change;Zpracování dokumentů (OCR přes ChatGPT): hromadné nahrání PDF, rozpoznání druhu, zápis do agendy;INT-EET;high;analysis;46;"Napojení OpenAI druhu OCR v Integraci; přehled stavů; přijatá faktura, pokladní doklad…"
 CR-047;bug;Kasa na dotyk: krátké ťuknutí nepřidalo položku, dialog po podržení se hned zavřel;POS-SALE;critical;uat;47;"Ťuknutí = běžné kliknutí, stav stisku drží dlaždice; po podržení se zahodí kliknutí na pozadí dialogu. Ověřeno na telefonu i tabletu."
 CR-048;change;Nedávné: posledních 5 otevřených funkcí vedle oblíbených;SYS-UI;low;uat;48;
+CR-049;change;Kasa na dotyku: bez automatické klávesnice, začíná se v přehledu zboží;POS-SALE;medium;uat;49;"Hledání se otevře až ťuknutím; čtečka EAN píše do hledání i bez fokusu; dialog množství používá vlastní klávesnici."

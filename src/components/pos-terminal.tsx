@@ -528,9 +528,10 @@ export function PosTerminal(p: {
     return () => window.removeEventListener("keydown", onKey);
   }, [weigh, payDlg, receipt, summary, card]);
 
-  // po zavření dialogů vrátit fokus do hledání (čtečka EAN píše tam)
+  // po zavření dialogů vrátit fokus do hledání (čtečka EAN píše tam) — jen s klávesnicí/myší;
+  // na dotykovém zařízení by vyskočila klávesnice přes zboží (čtečka funguje i bez fokusu)
   useEffect(() => {
-    if (!weigh && !payDlg && !receipt && !summary) search.current?.focus();
+    if (!weigh && !payDlg && !receipt && !summary && !touchOnly()) search.current?.focus();
   }, [weigh, payDlg, receipt, summary]);
 
   const add = (item: PosItem, qty = 1) => {
@@ -900,7 +901,8 @@ export function PosTerminal(p: {
                 onKeyDown={(e) => e.key === "Enter" && confirmQty()}
                 inputMode="decimal"
                 size="large"
-                autoFocus
+                // dotyk: zadává se klávesnicí v dialogu, ne systémovou
+                autoFocus={!touchOnly()}
                 aria-label={weigh?.item.weighed ? L.Weight : L.Quantity}
                 placeholder={weigh?.item.weighed ? L.Weight : L.Quantity}
                 contentAfter={isKg(weigh?.item) ? wUnit : weigh?.item.unit.toLowerCase()}
@@ -1140,6 +1142,12 @@ const SWIPE_REMOVE_PX = 90;
  * i při překreslení kasy, funguje i z klávesnice); podržení spustí časovač a
  * následné kliknutí se pak ignoruje. Stav drží prvek, ne render.
  */
+/** Zařízení jen na dotyk (telefon, tablet bez klávesnice a myši). */
+function touchOnly(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches;
+}
+
 /** Po podržení zahodit jedno následné kliknutí (trefilo by pozadí otevřeného dialogu). */
 function swallowNextClick() {
   const swallow = (ev: Event) => {
