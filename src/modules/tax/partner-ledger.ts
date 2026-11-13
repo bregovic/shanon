@@ -82,6 +82,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     fields: {
       accountNum: { edt: Edts.Code, label: L("AccountNum"), mandatory: true, readOnly: true },
       subjectId: { edt: refEdt("gab.subject", "@GAB:Subject"), mandatory: true },
+      // výchozí dimenze dokladů partnera (z adresáře se doplní samy)
+      ...dimFields(),
       groupId: { edt: refEdt(id("group"), L("Group")), mandatory: true },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
       paymentDays: { edt: Edts.Int, label: "@TAX:PaymentDays" },
@@ -92,6 +94,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     form: [
       { label: "@SYS:General", fields: ["accountNum", "subjectId", "groupId", "blocked"] },
       { label: L("Terms"), fields: ["currencyId", "paymentDays"] },
+      { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
     unique: [["accountNum"], ["subjectId"]],
     numberSeq: { field: "accountNum", seq: sp.partnerSeq },

@@ -34,3 +34,4 @@ CR-032;change;Kasa: rozpracované nákupy podle boxu s QR kódem;POS-SALE;high;u
 CR-033;change;Duplikovat záznam (šablona);SYS-UI;medium;uat;33;"Číselník: nový formulář bez klíče; doklad s číselnou řadou: kopie i s řádky, nové číslo."
 CR-034;change;Testování: stav Vráceno do vývoje;QA;medium;uat;34;"Po neúspěšném testu; přiřadí se vývojáři."
 CR-035;change;Číselné řady v Nastavení každého modulu;SYS-UI;medium;uat;35;Odkaz vede na číselné řady filtrované na modul (filter.usedFor=modul.*).
+CR-036;change;Konfigurace testovacího prostředí (testovací napojení a data jedním krokem);INT-EET;high;analysis;36;EET Playground, simulátor platebního terminálu, tisk do prohlížeče, testovací data.

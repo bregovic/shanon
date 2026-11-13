@@ -140,6 +140,7 @@ export const DimSource = defineEnum({
   values: [
     { value: "custom", label: "@GL:DimCustom" },
     { value: "partner", label: "@GL:DimPartner" },
+    { value: "subject", label: "@GL:DimSubject" },
   ],
 });
 
@@ -171,10 +172,18 @@ export const dimension = defineObject({
     position: { edt: Edts.Int, label: "@GL:DimPositionLabel", mandatory: true },
     source: { edt: enumEdt(DimSource), mandatory: true, default: "custom" },
     active: { edt: Edts.NoYes, label: "@GL:DimActive", default: true },
+    // automatické hodnoty z adresáře: předpona + pořadové číslo (P00001…)
+    valuePrefix: { edt: defineEdt({ id: "DimValuePrefix", kind: "string", label: "@GL:DimValuePrefix", maxLength: 10, transform: "upper" }), visibleWhen: { field: "source", in: ["subject"] } },
+    valueDigits: { edt: Edts.Int, label: "@GL:DimValueDigits", default: 5, visibleWhen: { field: "source", in: ["subject"] } },
+    nextValue: { edt: Edts.Int, label: "@GL:DimNextValue", default: 1, visibleWhen: { field: "source", in: ["subject"] } },
   },
   titleField: "code",
   list: ["position", "code", "name", "source", "active"],
-  form: [{ label: "@SYS:General", fields: ["code", "name", "position", "source", "active"] }],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "position", "source", "active"] },
+    { label: "@GL:DimAutoValues", fields: ["valuePrefix", "valueDigits", "nextValue"], visibleWhen: { field: "source", in: ["subject"] } },
+  ],
+  actions: [{ id: "createSubjectValues", label: "@GL:DimCreateSubjectValues", when: { field: "source", equals: "subject" } }],
   unique: [["code"], ["position"]],
   defaultSort: { field: "position", dir: "asc" },
   lines: [
@@ -194,10 +203,12 @@ export const dimensionValue = defineObject({
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+    // hodnota založená z adresáře (jedna na subjekt)
+    subjectId: { edt: refEdt("gab.subject", "@GAB:Subject"), optionalRef: true, readOnly: true },
   },
   titleField: "code",
-  list: ["dimensionId", "code", "name", "blocked"],
-  form: [{ label: "@SYS:General", fields: ["dimensionId", "code", "name", "blocked"] }],
+  list: ["dimensionId", "code", "name", "subjectId", "blocked"],
+  form: [{ label: "@SYS:General", fields: ["dimensionId", "code", "name", "subjectId", "blocked"] }],
   unique: [["dimensionId", "code"]],
   defaultSort: { field: "code", dir: "asc" },
 });
@@ -313,6 +324,8 @@ export const account = defineObject({
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
     // nastavení dimenzí — propisuje se z pravidel (gl.dimensionRule)
     ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`dim${n}Req`, { edt: enumEdt(DimRequirement), readOnly: true, dimSlot: n }])),
+    // výchozí hodnoty dimenzí při účtování na účet (když je nedá řádek ani partner)
+    ...dimFields(),
   },
   titleField: "accountNum",
   list: ["accountNum", "name", "type", "postingType", "noManualEntry", "blocked"],
@@ -320,6 +333,7 @@ export const account = defineObject({
     { label: "@SYS:General", fields: ["accountNum", "name", "type", "synthetic", "accountClass", "blocked"] },
     { label: "@GL:Control", fields: ["postingType", "noManualEntry"] },
     { label: "@GL:Dimensions", fields: ["dim1Req", "dim2Req", "dim3Req", "dim4Req", "dim5Req", "dim6Req"] },
+    { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
   ],
   unique: [["accountNum"]],
   defaultSort: { field: "accountNum", dir: "asc" },
@@ -484,6 +498,7 @@ export default defineModule({
         { object: "sys.exchangeRate" },
         { object: "gl.account" },
         { object: "gl.dimension" },
+        { object: "gl.dimensionValue" },
         { object: "gl.dimensionRule" },
         { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
     },
@@ -495,6 +510,13 @@ export default defineModule({
   setup: glSetup,
   labels: {
     cs: {
+      DimSubject: "Adresář – hodnoty se zakládají samy",
+      DimValuePrefix: "Předpona hodnoty",
+      DimValueDigits: "Počet číslic",
+      DimNextValue: "Další číslo",
+      DimAutoValues: "Automatické hodnoty z adresáře",
+      DimCreateSubjectValues: "Založit hodnoty pro celý adresář",
+      DefaultDims: "Výchozí dimenze",
       SystemPosting: "Druh",
       SystemAccount: "Systémový účet",
       SystemAccounts: "Systémové účty",
@@ -651,6 +673,13 @@ export default defineModule({
       AmountCur: "Částka v měně",
     },
     en: {
+      DimSubject: "Address book – values created automatically",
+      DimValuePrefix: "Value prefix",
+      DimValueDigits: "Digits",
+      DimNextValue: "Next number",
+      DimAutoValues: "Automatic values from address book",
+      DimCreateSubjectValues: "Create values for the whole address book",
+      DefaultDims: "Default dimensions",
       SystemPosting: "Type",
       SystemAccount: "System account",
       SystemAccounts: "System accounts",

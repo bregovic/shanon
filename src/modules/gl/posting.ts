@@ -30,6 +30,8 @@ export interface PostingRequest {
   lines: PostingLine[];
   /** partner dokladu (číslo odběratele / dodavatele) pro dimenzi Partner */
   partner?: string | null;
+  /** výchozí dimenze partnera (dodavatel / odběratel) */
+  partnerDims?: Record<string, unknown>;
 }
 
 /** Kontrola bez přístupu k datům — vyrovnanost a neprázdnost. */
@@ -152,7 +154,19 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
   for (const l of req.lines) if (!accounts.has(l.accountId)) accounts.set(l.accountId, await assertPostable(data, l.accountId, manual));
   // dimenze podle nastavení účtu (partner z dokladu se doplní sám)
   const defs = await activeDimensions(data);
-  const dims = await Promise.all(req.lines.map((l) => resolveDims(data, accounts.get(l.accountId)!, l.dims ?? {}, { manual, partner: req.partner, defs })));
+  // výchozí hodnoty: řádek → partner → účet (jen kde účet dimenzi nezakazuje)
+  const withDefaults = (l: PostingLine) => {
+    const acc = accounts.get(l.accountId)!;
+    const out: Record<string, string | null> = { ...((l.dims ?? {}) as Record<string, string | null>) };
+    for (const n of [1, 2, 3, 4, 5, 6]) {
+      const f = `dim${n}`;
+      if (out[f] || acc[`dim${n}Req`] === "notAllowed") continue;
+      const v = req.partnerDims?.[f] || acc[f];
+      if (v) out[f] = String(v);
+    }
+    return out;
+  };
+  const dims = await Promise.all(req.lines.map((l) => resolveDims(data, accounts.get(l.accountId)!, withDefaults(l), { manual, partner: req.partner, defs })));
   const voucher = await data.create("gl.voucher", {
     // bez řady z deníku doplní číslo datová služba podle Použití (gl.voucher)
     voucherNum: req.voucherSeqId ? await data.nextNumber({ id: req.voucherSeqId }, new Date(req.date)) : null,
@@ -282,7 +296,10 @@ export const glHandlers: Record<string, ObjectHandlers> = {
       // ruční zápis: hned při zadání řádku, ne až při zaúčtování
       if (data.accountId) {
         const acc = await assertPostable(ctx.data, String(data.accountId), true);
-        Object.assign(data, await resolveDims(ctx.data, acc, dimsOf(data), { manual: true }));
+        // prázdné dimenze doplní výchozí hodnoty účtu (kde je účet nezakazuje)
+        const dims = dimsOf(data);
+        for (const n of [1, 2, 3, 4, 5, 6]) if (!dims[`dim${n}`] && acc[`dim${n}`] && acc[`dim${n}Req`] !== "notAllowed") dims[`dim${n}`] = String(acc[`dim${n}`]);
+        Object.assign(data, await resolveDims(ctx.data, acc, dims, { manual: true }));
       }
     },
     beforeDelete: (ctx, data) => assertJournalOpen(ctx.data, data.journalId),

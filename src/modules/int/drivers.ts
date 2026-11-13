@@ -248,7 +248,10 @@ export const intHandlers: Record<string, ObjectHandlers> = {
   "int.connection": {
     beforeSave(_ctx, d) {
       const e: Record<string, string> = {};
-      if (!DRIVERS[String(d.kind)]?.includes(String(d.driver))) e.driver = "@INT:WrongDriver";
+      // druh s jediným ovladačem (EET, API) ho dostane sám
+      const allowed = DRIVERS[String(d.kind)] ?? [];
+      if (!allowed.includes(String(d.driver)) && allowed.length === 1) d.driver = allowed[0];
+      if (!allowed.includes(String(d.driver))) e.driver = "@INT:WrongDriver";
       if (d.kind === "eet" && !d.unitId) e.unitId = "@SYS:Required";
       if (d.kind === "eet" && !d.posId) e.posId = "@SYS:Required";
       if (d.kind === "api") {

@@ -97,6 +97,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   popisek = název dimenze, nepoužité se skryjí. Pravidla firmy podle začátku čísla
   účtu → `dimNReq` na účtu; kontroluje `postVoucher` (ruční zápis přísně, doklady
   modulů nepovolené vynechají). Partner se doplní z `PostingRequest.partner`.
+  Výchozí dimenze: řádek → partner (`PostingRequest.partnerDims`, pole dim1…6 na
+  dodavateli/odběrateli) → účet (dim1…6 na účtu). Zdroj „subject“: nový subjekt
+  adresáře založí hodnotu (předpona + číslo) a partneři subjektu ji dostanou.
 - Reporty: `ModuleDef.reports` (`defineReport`, `src/core/report.ts`) — parametry,
   výpočet přes DataApi, `requires` = objekty ke čtení; obecná stránka
   `/report/<modul>/<id>` s exportem do Excelu, v menu sekce `kind: "reports"`.

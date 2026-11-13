@@ -533,11 +533,12 @@ model GabSubject {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy String?  @map("updated_by") @db.Uuid
 
-  gabAddress_subject GabAddress[] @relation("GabAddress_subject")
-  gabContact_subject GabContact[] @relation("GabContact_subject")
-  taxTrans_subject   TaxTrans[]   @relation("TaxTrans_subject")
-  arCustomer_subject ArCustomer[] @relation("ArCustomer_subject")
-  apVendor_subject   ApVendor[]   @relation("ApVendor_subject")
+  gabAddress_subject       GabAddress[]       @relation("GabAddress_subject")
+  gabContact_subject       GabContact[]       @relation("GabContact_subject")
+  glDimensionValue_subject GlDimensionValue[] @relation("GlDimensionValue_subject")
+  taxTrans_subject         TaxTrans[]         @relation("TaxTrans_subject")
+  arCustomer_subject       ArCustomer[]       @relation("ArCustomer_subject")
+  apVendor_subject         ApVendor[]         @relation("ApVendor_subject")
 
   @@index([tenantId])
   @@map("gab_subject")
@@ -640,19 +641,22 @@ model GlSystemAccount {
 
 /// gl.dimension — generováno z definice objektu
 model GlDimension {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  code      String   @db.VarChar(20)
-  name      String   @db.VarChar(120)
-  position  Int
-  source    String   @default("custom") @db.VarChar(40)
-  active    Boolean  @default(true)
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  position    Int
+  source      String   @default("custom") @db.VarChar(40)
+  active      Boolean  @default(true)
+  valuePrefix String?  @map("value_prefix") @db.VarChar(10)
+  valueDigits Int?     @default(5) @map("value_digits")
+  nextValue   Int?     @default(1) @map("next_value")
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
 
   glDimensionValue_dimension GlDimensionValue[] @relation("GlDimensionValue_dimension")
   glDimensionRule_dimension  GlDimensionRule[]  @relation("GlDimensionRule_dimension")
@@ -671,6 +675,7 @@ model GlDimensionValue {
   code        String   @db.VarChar(20)
   name        String   @db.VarChar(120)
   blocked     Boolean  @default(false)
+  subjectId   String?  @map("subject_id") @db.Uuid
   ext         Json     @default("{}")
   version     Int      @default(1)
   createdAt   DateTime @default(now()) @map("created_at")
@@ -679,10 +684,12 @@ model GlDimensionValue {
   updatedBy   String?  @map("updated_by") @db.Uuid
 
   dimension GlDimension @relation("GlDimensionValue_dimension", fields: [dimensionId], references: [id], onDelete: Restrict)
+  subject   GabSubject? @relation("GlDimensionValue_subject", fields: [subjectId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, dimensionId, code])
   @@index([tenantId])
   @@index([dimensionId])
+  @@index([subjectId])
   @@map("gl_dimension_value")
 }
 
@@ -729,6 +736,12 @@ model GlAccount {
   dim4Req       String?  @map("dim4_req") @db.VarChar(40)
   dim5Req       String?  @map("dim5_req") @db.VarChar(40)
   dim6Req       String?  @map("dim6_req") @db.VarChar(40)
+  dim1          String?  @db.VarChar(20)
+  dim2          String?  @db.VarChar(20)
+  dim3          String?  @db.VarChar(20)
+  dim4          String?  @db.VarChar(20)
+  dim5          String?  @db.VarChar(20)
+  dim6          String?  @db.VarChar(20)
   ext           Json     @default("{}")
   version       Int      @default(1)
   createdAt     DateTime @default(now()) @map("created_at")
@@ -1343,6 +1356,12 @@ model ArCustomer {
   companyId   String   @map("company_id") @db.Uuid
   accountNum  String   @map("account_num") @db.VarChar(20)
   subjectId   String   @map("subject_id") @db.Uuid
+  dim1        String?  @db.VarChar(20)
+  dim2        String?  @db.VarChar(20)
+  dim3        String?  @db.VarChar(20)
+  dim4        String?  @db.VarChar(20)
+  dim5        String?  @db.VarChar(20)
+  dim6        String?  @db.VarChar(20)
   groupId     String   @map("group_id") @db.Uuid
   currencyId  String?  @map("currency_id") @db.Uuid
   paymentDays Int?     @map("payment_days")
@@ -1533,6 +1552,12 @@ model ApVendor {
   companyId   String   @map("company_id") @db.Uuid
   accountNum  String   @map("account_num") @db.VarChar(20)
   subjectId   String   @map("subject_id") @db.Uuid
+  dim1        String?  @db.VarChar(20)
+  dim2        String?  @db.VarChar(20)
+  dim3        String?  @db.VarChar(20)
+  dim4        String?  @db.VarChar(20)
+  dim5        String?  @db.VarChar(20)
+  dim6        String?  @db.VarChar(20)
   groupId     String   @map("group_id") @db.Uuid
   currencyId  String?  @map("currency_id") @db.Uuid
   paymentDays Int?     @map("payment_days")

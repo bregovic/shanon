@@ -22,7 +22,7 @@ export interface DimDef {
   slot: number;
   code: string;
   name: string;
-  source: "custom" | "partner";
+  source: "custom" | "partner" | "subject";
 }
 
 /** Aktivní dimenze tenanta podle pořadí. */
@@ -33,7 +33,7 @@ export async function activeDimensions(data: DataApi): Promise<DimDef[]> {
   } catch {
     return [];
   }
-  return rows.map((r) => ({ id: String(r.id), slot: Number(r.position), code: String(r.code), name: String(r.name), source: r.source === "partner" ? "partner" : "custom" }));
+  return rows.map((r) => ({ id: String(r.id), slot: Number(r.position), code: String(r.code), name: String(r.name), source: r.source === "partner" ? "partner" : r.source === "subject" ? "subject" : "custom" }));
 }
 
 /** Dimenze řádku (dim1…dim6) jako prosté hodnoty. */
@@ -107,7 +107,7 @@ export async function resolveDims(
 }
 
 async function dimValueExists(data: DataApi, d: DimDef, v: string): Promise<boolean> {
-  if (d.source === "custom") return (await data.find("gl.dimensionValue", { dimensionId: d.id, code: v, blocked: false }, { take: 1 })).length > 0;
+  if (d.source !== "partner") return (await data.find("gl.dimensionValue", { dimensionId: d.id, code: v, blocked: false }, { take: 1 })).length > 0;
   for (const obj of ["ar.customer", "ap.vendor"]) {
     try {
       if ((await data.find(obj, { accountNum: v }, { take: 1 })).length) return true;
@@ -118,12 +118,43 @@ async function dimValueExists(data: DataApi, d: DimDef, v: string): Promise<bool
   return false;
 }
 
+/** Hodnota dimenze pro subjekt adresáře (založí, pokud chybí) a výchozí na jeho partnerech. */
+async function subjectValue(data: DataApi, dim: RecordData, subject: RecordData): Promise<string> {
+  const [have] = await data.find("gl.dimensionValue", { dimensionId: dim.id, subjectId: subject.id }, { take: 1 });
+  let code = have ? String(have.code) : "";
+  if (!have) {
+    // další volné číslo (přeskočí ručně založené kódy)
+    let n = Number(dim.nextValue ?? 1) || 1;
+    const fmt = (x: number) => `${String(dim.valuePrefix ?? "")}${String(x).padStart(Number(dim.valueDigits ?? 5) || 1, "0")}`;
+    while ((await data.find("gl.dimensionValue", { dimensionId: dim.id, code: fmt(n) }, { take: 1 })).length) n++;
+    code = fmt(n);
+    await data.create("gl.dimensionValue", { dimensionId: dim.id, code, name: String(subject.name).slice(0, 120), subjectId: subject.id });
+    await data.update("gl.dimension", String(dim.id), { nextValue: n + 1 });
+  }
+  // dodavatel a odběratel subjektu bez hodnoty ji dostanou jako výchozí
+  const f = dimField(Number(dim.position));
+  for (const obj of ["ap.vendor", "ar.customer"]) {
+    try {
+      for (const p of await data.find(obj, { subjectId: subject.id }, { take: 5 })) if (!p[f]) await data.update(obj, String(p.id), { [f]: code });
+    } catch {
+      /* modul není zapnutý */
+    }
+  }
+  return code;
+}
+
+/** Nový dodavatel / odběratel: výchozí dimenze z hodnoty jeho subjektu. */
+async function partnerDefaults(data: DataApi, d: RecordData, isNew: boolean) {
+  if (!isNew || !d.subjectId) return;
+  for (const dim of await data.find("gl.dimension", { source: "subject", active: true }, { take: 6 })) {
+    const f = dimField(Number(dim.position));
+    if (d[f]) continue;
+    const [v] = await data.find("gl.dimensionValue", { dimensionId: dim.id, subjectId: d.subjectId }, { take: 1 });
+    if (v) d[f] = v.code;
+  }
+}
+
 export const dimensionHandlers: Record<string, ObjectHandlers> = {
-  "gl.dimension": {
-    beforeSave(_ctx, d) {
-      if (!(Number(d.position) >= 1 && Number(d.position) <= 6)) return { position: "@GL:DimPosition" };
-    },
-  },
   "gl.dimensionRule": {
     beforeSave(_ctx, d) {
       if (!/^\d{1,6}$/.test(String(d.accountMask ?? ""))) return { accountMask: "@GL:DimMaskHelp" };
@@ -136,6 +167,30 @@ export const dimensionHandlers: Record<string, ObjectHandlers> = {
       await applyDimensionRules(ctx.data);
     },
   },
+  "gl.dimension": {
+    beforeSave(_ctx, d) {
+      if (!(Number(d.position) >= 1 && Number(d.position) <= 6)) return { position: "@GL:DimPosition" };
+    },
+    actions: {
+      /** hodnoty pro subjekty adresáře, které ještě žádnou nemají, a výchozí na jejich partnerech */
+      async createSubjectValues(ctx, dim) {
+        for (const s of await ctx.data.find("gab.subject", {}, { take: 100000, orderBy: { name: "asc" } })) await subjectValue(ctx.data, dim, s);
+      },
+    },
+  },
+  "gab.subject": {
+    // nový subjekt → hodnota v každé dimenzi „z adresáře“; přejmenování → název hodnoty
+    async afterSave(ctx, d, isNew) {
+      for (const dim of await ctx.data.find("gl.dimension", { source: "subject", active: true }, { take: 6 })) {
+        if (isNew) await subjectValue(ctx.data, dim, d);
+        else
+          for (const v of await ctx.data.find("gl.dimensionValue", { dimensionId: dim.id, subjectId: d.id }, { take: 1 }))
+            if (v.name !== d.name) await ctx.data.update("gl.dimensionValue", String(v.id), { name: d.name });
+      }
+    },
+  },
+  "ap.vendor": { beforeSave: (ctx, d, isNew) => partnerDefaults(ctx.data, d, isNew) },
+  "ar.customer": { beforeSave: (ctx, d, isNew) => partnerDefaults(ctx.data, d, isNew) },
   "gl.dimensionValue": {
     beforeSave(_ctx, d) {
       if (d.code) d.code = String(d.code).trim().toUpperCase();

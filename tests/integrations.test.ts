@@ -491,7 +491,7 @@ describe("diskuze u požadavků", () => {
 
 describe("REST API", () => {
   it("klíč s rozsahem qa: čte a zakládá požadavky, jinam ne, bez klíče 401", async () => {
-    const { GET, POST, PATCH } = await import("@/app/api/v1/[...path]/route");
+    const { GET, POST, PATCH } = await import("@/app/api/v1/[[...path]]/route");
     const A = (await provisionTenant(client, { code: `t-api-${run}`, name: "API", adminEmail: `api-${run}@test.local`, adminPassword: "heslo-12345", modules: ["qa", "int", "inv"], company: { code: "A", name: "A" } })).ctx;
     await expect(saveRecord(A, "int.connection", null, { code: "BAD", name: "x", kind: "api", driver: "rest", scopes: "sys" }, undefined, client)).rejects.toMatchObject({ fields: { scopes: "@INT:ScopeUnknown" } });
     const conn = await saveRecord(A, "int.connection", null, { code: "CLAUDE", name: "Claude", kind: "api", driver: "rest", scopes: "qa" }, undefined, client);
@@ -613,5 +613,37 @@ describe("odložené nákupy (boxy)", () => {
       expect((await openBaskets(api)).map((b) => b.label)).toEqual(["Novák"]);
       expect((await basketForBox(api, box, reg)).id).not.toBe(b1.id);
     }, client);
+  });
+});
+
+describe("výchozí dimenze a hodnoty z adresáře (CR-001)", () => {
+  it("dimenze z adresáře: nový subjekt → hodnota, dodavatel ji dostane, účtování doplní řádek → partner → účet", async () => {
+    const E = (await provisionTenant(client, { code: `t-dd-${run}`, name: "DD", adminEmail: `dd-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap", "ar"], company: { code: "D", name: "D" } })).ctx;
+    const dims = (await listRecords(E, "gl.dimension", {}, client)).rows;
+    const par = dims.find((d) => d.code === "PAR")!;
+    // existující subjekt před přepnutím — doplní se akcí
+    const old = await saveRecord(E, "gab.subject", null, { name: "Starý dodavatel" }, undefined, client);
+    await saveRecord(E, "gl.dimension", String(par.id), { source: "subject", valuePrefix: "P", valueDigits: 4, nextValue: 1 }, undefined, client);
+    const s1 = await saveRecord(E, "gab.subject", null, { name: "Masna Novák" }, undefined, client);
+    const vals = async () => (await listRecords(E, "gl.dimensionValue", { filter: { dimensionId: String(par.id) } }, client)).rows;
+    expect((await vals()).map((v) => [v.code, v.name])).toEqual([["P0001", "Masna Novák"]]);
+    await runAction(E, "gl.dimension", String(par.id), "createSubjectValues", client);
+    expect((await vals()).map((v) => v.code).sort()).toEqual(["P0001", "P0002"]);
+    expect((await vals()).find((v) => v.subjectId === old.id)!.code).toBe("P0002");
+    // přejmenování subjektu → název hodnoty
+    await saveRecord(E, "gab.subject", String(s1.id), { name: "Masna Novák s.r.o." }, undefined, client);
+    expect((await vals()).find((v) => v.code === "P0001")!.name).toBe("Masna Novák s.r.o.");
+    // dodavatel subjektu dostane výchozí dimenzi
+    const grp = (await listRecords(E, "ap.group", {}, client)).rows[0];
+    const v = await saveRecord(E, "ap.vendor", null, { subjectId: s1.id, groupId: grp.id }, undefined, client);
+    expect(v.dim3).toBe("P0001");
+    // výchozí hodnota na účtu se doplní do řádku deníku
+    const str = dims.find((d) => d.code === "STR")!;
+    await saveRecord(E, "gl.dimensionValue", null, { dimensionId: str.id, code: "KRAM", name: "Krám" }, undefined, client);
+    const [a518] = (await listRecords(E, "gl.account", { filter: { accountNum: "518000" } }, client)).rows;
+    await saveRecord(E, "gl.account", String(a518.id), { dim1: "KRAM" }, undefined, client);
+    const j = await saveRecord(E, "gl.journal", null, { date: "2026-11-13", description: "Výchozí" }, undefined, client);
+    const line = await saveRecord(E, "gl.journalLine", null, { journalId: j.id, accountId: a518.id, debit: "10" }, undefined, client);
+    expect(line.dim1).toBe("KRAM");
   });
 });

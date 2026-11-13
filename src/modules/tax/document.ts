@@ -214,6 +214,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     sourceObject: cfg.header,
     sourceId: String(header.id),
     partner: String(partner.accountNum ?? "") || null,
+    partnerDims: Object.fromEntries(["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"].map((f) => [f, partner[f] ?? null])),
     lines: posting,
   });
 
