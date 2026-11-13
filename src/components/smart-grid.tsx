@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Badge,
   Button,
   Input,
   makeStyles,
@@ -41,6 +42,8 @@ import NextLink from "next/link";
 import { listAction } from "@/app/actions";
 import { displayValue, type FieldMeta } from "@/lib/meta";
 
+type BadgeColor = "danger" | "warning" | "success" | "informative" | "brand" | "important" | "subtle";
+
 type Row = Record<string, unknown>;
 
 export interface GridLabels {
@@ -70,6 +73,8 @@ interface Props {
   pageSize?: number;
   selectable?: boolean;
   onOpen?: (row: Row) => void;
+  /** sloupec s číslem / kódem záznamu — zobrazí se jako odkaz na detail (onOpen) */
+  titleField?: string;
   onSelectionChange?: (rows: Row[]) => void;
   /** změna čísla vynutí nové načtení (po uložení/smazání) */
   reloadKey?: number;
@@ -87,6 +92,20 @@ interface View {
 }
 
 const useStyles = makeStyles({
+  titleLink: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    font: "inherit",
+    color: tokens.colorBrandForegroundLink,
+    cursor: "pointer",
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    textAlign: "inherit",
+    ":hover": { textDecoration: "underline", color: tokens.colorBrandForegroundLinkHover },
+  },
   wrap: {
     display: "flex",
     flexDirection: "column",
@@ -297,6 +316,7 @@ export function SmartGrid({
   pageSize = 100,
   selectable = true,
   onOpen,
+  titleField,
   onSelectionChange,
   reloadKey = 0,
   storageKey,
@@ -379,16 +399,35 @@ export function SmartGrid({
       else n.add(id);
       return n;
     });
-  // minimální šířky sloupců — na úzkém displeji se grid posouvá do strany, nemačká
-  const colWidth = (c: FieldMeta) => (c.kind === "string" || c.kind === "text" || c.kind === "ref" ? 160 : c.kind === "bool" ? 90 : 120);
-  const minTableWidth = columns.reduce((a, c) => a + colWidth(c), selectable ? 44 : 0);
+  // šířka sloupců podle obsahu: nejdelší hodnota (a nadpis) v načtených řádcích, s minimem a maximem;
+  // nejširší textový sloupec (název) dostane zbytek místa
+  const widths = useMemo(() => {
+    const sample = rows.slice(0, 200);
+    const w: Record<string, number> = {};
+    for (const c of columns) {
+      if (c.image) {
+        w[c.name] = 56;
+        continue;
+      }
+      let chars = Math.min(c.label.length, 18);
+      for (const r of sample) chars = Math.max(chars, displayValue(c, r, lang).length);
+      const min = c.kind === "bool" ? 72 : 64;
+      w[c.name] = Math.min(Math.max(Math.round(chars * 7.6 + 44), min), c.kind === "text" ? 420 : 340);
+    }
+    return w;
+  }, [rows, columns, lang]);
+  const flexCol = useMemo(() => {
+    const texts = columns.filter((c) => (c.kind === "string" || c.kind === "text") && c.name !== titleField);
+    return texts.sort((a, b) => (widths[b.name] ?? 0) - (widths[a.name] ?? 0))[0]?.name;
+  }, [columns, widths, titleField]);
+  const minTableWidth = columns.reduce((a, c) => a + (widths[c.name] ?? 120), selectable ? 44 : 0);
   const allSelected = rows.length > 0 && selected.size === rows.length;
   const filterCount = Object.keys(view.filters).length;
 
   return (
     <div className={s.wrap}>
       <div className={s.scroll} style={{ maxHeight }}>
-        <Table size="small" aria-label={objectId} style={{ minWidth: `max(100%, ${minTableWidth}px)` }}>
+        <Table size="small" aria-label={objectId} style={{ tableLayout: "fixed", width: `max(100%, ${minTableWidth}px)` }}>
           <TableHeader className={s.head}>
             <TableRow>
               {selectable && (
@@ -399,7 +438,7 @@ export function SmartGrid({
                 />
               )}
               {columns.map((c) => (
-                <TableHeaderCell key={c.name} className={s.headCell}>
+                <TableHeaderCell key={c.name} className={s.headCell} style={c.name === flexCol ? undefined : { width: widths[c.name] }}>
                   <ColumnMenu
                     col={c}
                     view={view}
@@ -448,11 +487,28 @@ export function SmartGrid({
                     const neg = c.kind === "decimal" && String(r[c.name] ?? "").startsWith("-");
                     return (
                       <TableCell key={c.name} className={`${s.cell} ${neg ? s.neg : ""}`} style={{ textAlign: c.align }}>
-                        {c.image ? (
+                        {c.kind === "enum" && c.options?.find((o) => o.value === r[c.name])?.color ? (
+                          <Badge appearance="tint" color={c.options.find((o) => o.value === r[c.name])!.color as BadgeColor} shape="rounded">
+                            {text}
+                          </Badge>
+                        ) : c.image ? (
                           r[c.name] ? (
                             // eslint-disable-next-line @next/next/no-img-element -- soubor za přihlášením
                             <img src={`/api/files/${r[c.name]}`} alt="" width={32} height={32} loading="lazy" style={{ objectFit: "contain", display: "block" }} />
                           ) : null
+                        ) : c.name === titleField && onOpen && text ? (
+                          // číslo / kód záznamu = odkaz na detail
+                          <button
+                            type="button"
+                            className={s.titleLink}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpen(r);
+                            }}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                          >
+                            {text}
+                          </button>
                         ) : c.kind === "ref" && r[c.name] && text ? (
                           // proskok na odkazovaný záznam; klik neoznačí řádek
                           <NextLink

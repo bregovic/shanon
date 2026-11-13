@@ -11,11 +11,11 @@ export const FeatureStatus = defineEnum({
   id: "QaFeatureStatus",
   label: "@QA:FeatureStatus",
   values: [
-    { value: "planned", label: "@QA:Planned" },
-    { value: "development", label: "@QA:Development" },
-    { value: "fat", label: "@QA:Fat" },
-    { value: "uat", label: "@QA:Uat" },
-    { value: "live", label: "@QA:Live" },
+    { value: "planned", label: "@QA:Planned", color: "subtle" },
+    { value: "development", label: "@QA:Development", color: "warning" },
+    { value: "fat", label: "@QA:Fat", color: "brand" },
+    { value: "uat", label: "@QA:Uat", color: "important" },
+    { value: "live", label: "@QA:Live", color: "success" },
   ],
 });
 
@@ -23,8 +23,8 @@ export const TestStage = defineEnum({
   id: "QaStage",
   label: "@QA:Stage",
   values: [
-    { value: "fat", label: "@QA:Fat" },
-    { value: "uat", label: "@QA:Uat" },
+    { value: "fat", label: "@QA:Fat", color: "brand" },
+    { value: "uat", label: "@QA:Uat", color: "important" },
   ],
 });
 
@@ -32,10 +32,10 @@ export const TestResult = defineEnum({
   id: "QaResult",
   label: "@QA:Result",
   values: [
-    { value: "notRun", label: "@QA:NotRun" },
-    { value: "passed", label: "@QA:Passed" },
-    { value: "failed", label: "@QA:Failed" },
-    { value: "blocked", label: "@QA:Blocked" },
+    { value: "notRun", label: "@QA:NotRun", color: "subtle" },
+    { value: "passed", label: "@QA:Passed", color: "success" },
+    { value: "failed", label: "@QA:Failed", color: "danger" },
+    { value: "blocked", label: "@QA:Blocked", color: "warning" },
   ],
 });
 
@@ -43,8 +43,8 @@ export const IssueType = defineEnum({
   id: "QaIssueType",
   label: "@QA:IssueType",
   values: [
-    { value: "change", label: "@QA:Change" },
-    { value: "bug", label: "@QA:Bug" },
+    { value: "change", label: "@QA:Change", color: "brand" },
+    { value: "bug", label: "@QA:Bug", color: "danger" },
     { value: "task", label: "@QA:Task" },
   ],
 });
@@ -53,10 +53,10 @@ export const Priority = defineEnum({
   id: "QaPriority",
   label: "@QA:Priority",
   values: [
-    { value: "low", label: "@QA:Low" },
-    { value: "medium", label: "@QA:Medium" },
-    { value: "high", label: "@QA:High" },
-    { value: "critical", label: "@QA:Critical" },
+    { value: "low", label: "@QA:Low", color: "subtle" },
+    { value: "medium", label: "@QA:Medium", color: "informative" },
+    { value: "high", label: "@QA:High", color: "warning" },
+    { value: "critical", label: "@QA:Critical", color: "danger" },
   ],
 });
 
@@ -64,13 +64,13 @@ export const IssueStatus = defineEnum({
   id: "QaIssueStatus",
   label: "@QA:IssueStatus",
   values: [
-    { value: "new", label: "@QA:New" },
+    { value: "new", label: "@QA:New", color: "informative" },
     { value: "analysis", label: "@QA:Analysis" },
-    { value: "development", label: "@QA:Development" },
-    { value: "fat", label: "@QA:Fat" },
-    { value: "uat", label: "@QA:Uat" },
-    { value: "done", label: "@QA:Done" },
-    { value: "rejected", label: "@QA:Rejected" },
+    { value: "development", label: "@QA:Development", color: "warning" },
+    { value: "fat", label: "@QA:Fat", color: "brand" },
+    { value: "uat", label: "@QA:Uat", color: "important" },
+    { value: "done", label: "@QA:Done", color: "success" },
+    { value: "rejected", label: "@QA:Rejected", color: "subtle" },
   ],
 });
 
@@ -148,6 +148,8 @@ export const issue = defineObject({
     priority: { edt: enumEdt(Priority), mandatory: true, default: "medium" },
     status: { edt: enumEdt(IssueStatus), mandatory: true, default: "new" },
     order: { edt: Edts.Int, label: "@QA:Order" },
+    /** 1 kritická … 4 nízká — pro řazení podle priority */
+    priorityRank: { edt: Edts.Int, label: "@QA:Priority", readOnly: true },
     reportedBy: { edt: Text("QaReporter", "@QA:ReportedBy", 120) },
     assignedTo: { edt: Text("QaAssignee", "@QA:AssignedTo", 120) },
     dueDate: { edt: Edts.TransDate, label: "@QA:DueDate" },
@@ -163,11 +165,18 @@ export const issue = defineObject({
   ],
   unique: [["issueNum"]],
   numberSeq: { field: "issueNum", seq: "QAISSUE" },
-  defaultSort: { field: "order", dir: "asc" },
+  defaultSort: { field: "priorityRank", dir: "asc" },
 });
 
 /** Testovaný scénář dostane datum, pokud ho tester nevyplnil. */
+const RANK: Record<string, number> = { critical: 1, high: 2, medium: 3, low: 4 };
+
 export const qaHandlers: Record<string, ObjectHandlers> = {
+  "qa.issue": {
+    beforeSave(_ctx, d) {
+      d.priorityRank = RANK[String(d.priority)] ?? 3;
+    },
+  },
   "qa.scenario": {
     beforeSave(_ctx, d) {
       if (d.result && d.result !== "notRun" && !d.testedAt) d.testedAt = new Date().toISOString().slice(0, 10);

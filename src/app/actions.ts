@@ -11,6 +11,7 @@ import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
 import { importRecords, imagesFromUploads, readTable, type ImportReport } from "@/server/import";
+import { runReport } from "@/server/report";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
 import { openShiftOf, quote, receiptPrint, sell, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
@@ -487,6 +488,16 @@ export async function uploadImageAction(form: FormData): Promise<ActionResult<st
     const res = await setImage(s.ctx, objectId, id, field, data);
     revalidatePath(objectHref(objectId));
     return { ok: true, data: res };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Report: parametry → výsledek (sloupce s popisky a řádky). */
+export async function runReportAction(module: string, id: string, params: RecordData) {
+  const s = await requireSession();
+  try {
+    return { ok: true as const, data: await runReport(s, String(module), String(id), params ?? {}) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

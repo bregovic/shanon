@@ -10,6 +10,7 @@
  */
 import type { EnumDef } from "./edt";
 import type { LabelFile, LabelRef } from "./labels";
+import type { ReportDef } from "./report";
 import type { FieldDef, ObjectDef } from "./object";
 import { moduleOf } from "./object";
 
@@ -53,6 +54,8 @@ export interface ModuleDef {
    * idempotentní — zakládá jen to, co chybí, nic nepřepisuje.
    */
   setup?: (data: DataApi) => Promise<void>;
+  /** reporty modulu (/report/<modul>/<id>) — v menu jako sekce druhu „reports“ */
+  reports?: ReportDef[];
 }
 
 export function defineModule(def: ModuleDef): ModuleDef {

@@ -24,7 +24,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
     // standard: text vlevo, čísla vpravo, data na střed
     align: e.align ?? (e.kind === "int" || e.kind === "decimal" ? "right" : e.kind === "date" || e.kind === "datetime" || e.kind === "bool" ? "center" : "left"),
     options: e.enumId
-      ? registry.enums.get(e.enumId)!.values.map((v) => ({ value: v.value, label: t(v.label) }))
+      ? registry.enums.get(e.enumId)!.values.map((v) => ({ value: v.value, label: t(v.label), color: v.color }))
       : undefined,
     refObject: e.refObject,
     noTotal: e.noTotal,

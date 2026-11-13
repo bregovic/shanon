@@ -73,6 +73,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   popisek = název dimenze, nepoužité se skryjí. Pravidla firmy podle začátku čísla
   účtu → `dimNReq` na účtu; kontroluje `postVoucher` (ruční zápis přísně, doklady
   modulů nepovolené vynechají). Partner se doplní z `PostingRequest.partner`.
+- Reporty: `ModuleDef.reports` (`defineReport`, `src/core/report.ts`) — parametry,
+  výpočet přes DataApi, `requires` = objekty ke čtení; obecná stránka
+  `/report/<modul>/<id>` s exportem do Excelu, v menu sekce `kind: "reports"`.
+- Barevný štítek výčtu v gridu: `color` u hodnoty `defineEnum` (stav, priorita).
+- Grid: titleField je odkaz na detail; šířky sloupců podle obsahu (min/max),
+  nejširší textový sloupec bere zbytek.
 - Pole/skupina formuláře podle hodnoty jiného pole: `visibleWhen: { field, in: [...] }`.
 - ARES (`src/modules/gab/ares.ts`): veřejná služba bez klíče; akce „Doplnit z ARES“
   na subjektu i partnerovi (podle IČO, jinak jednoznačně podle názvu) doplní jméno,

@@ -419,3 +419,40 @@ describe("finanční dimenze", () => {
     expect(lines.every((l) => l.dim3 === cust.accountNum)).toBe(true);
   });
 });
+
+describe("výkazy hlavní knihy", () => {
+  it("předvaha, výsledovka a rozvaha ze zápisů; filtr dimenze; po syntetice", async () => {
+    const { trialBalance, incomeStatement, balanceSheet } = await import("@/modules/gl/reports");
+    const R = (await provisionTenant(client, { code: `t-rep-${run}`, name: "Rep", adminEmail: `rep-${run}@test.local`, adminPassword: "heslo-12345", modules: ["gl"], company: { code: "R", name: "R" } })).ctx;
+    const acc = async (n: string) => (await listRecords(R, "gl.account", { filter: { accountNum: n } }, client)).rows[0];
+    const str = (await listRecords(R, "gl.dimension", { filter: { code: "STR" } }, client)).rows[0];
+    await saveRecord(R, "gl.dimensionValue", null, { dimensionId: str.id, code: "A", name: "A" }, undefined, client);
+    const post = async (date: string, lines: [string, string, string?][]) => {
+      const j = await saveRecord(R, "gl.journal", null, { date, description: "x" }, undefined, client);
+      for (const [num, amount, dim] of lines) {
+        const a = await acc(num);
+        const v = Number(amount);
+        await saveRecord(R, "gl.journalLine", null, { journalId: j.id, accountId: a.id, ...(v > 0 ? { debit: amount } : { credit: String(-v) }), ...(dim ? { dim1: dim } : {}) }, undefined, client);
+      }
+      await runAction(R, "gl.journal", String(j.id), "post", client);
+    };
+    await post("2026-01-05", [["395000", "1000"], ["411000", "-1000"]]); // počáteční vklad
+    await post("2026-03-10", [["518000", "300", "A"], ["395000", "-300"]]);
+    await post("2026-03-11", [["518100", "200"], ["395000", "-200"]]);
+    await post("2026-03-12", [["395000", "900"], ["602000", "-900"]]);
+    const run2 = (def: typeof trialBalance, p: Record<string, unknown>) =>
+      inTenant(R, (s) => def.run(s.sys().api(), p, { companyId: R.companyId, t: (x) => x }), client);
+    const tb = await run2(trialBalance, { dateFrom: "2026-03-01", dateTo: "2026-03-31" });
+    const row = (n: string) => tb.rows.find((r) => r.account === n)!;
+    expect([row("395000").opening, row("395000").debit, row("395000").credit, row("395000").closing]).toEqual(["1000.00", "900.00", "500.00", "1400.00"]);
+    const syn = await run2(trialBalance, { dateFrom: "2026-03-01", dateTo: "2026-03-31", bySynthetic: true });
+    expect(syn.rows.find((r) => r.account === "518")!.debit).toBe("500.00");
+    const dimA = await run2(trialBalance, { dateFrom: "2026-03-01", dateTo: "2026-03-31", dim1: "a" });
+    expect(dimA.rows.map((r) => r.account)).toEqual(["518000"]);
+    const is = await run2(incomeStatement, { dateFrom: "2026-01-01", dateTo: "2026-12-31" });
+    expect(is.rows.at(-1)!.amount).toBe("400.00"); // 900 − 500
+    const bs = await run2(balanceSheet, { dateTo: "2026-12-31" });
+    expect(bs.rows.find((r) => r.name === "@GL:Assets")!.amount).toBe("1400.00");
+    expect(bs.rows.find((r) => r.name === "@GL:LiabilitiesEquity")!.amount).toBe("1400.00"); // 1000 kapitál + 400 výsledek
+  });
+});

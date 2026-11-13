@@ -1990,27 +1990,28 @@ model QaScenario {
 
 /// qa.issue — generováno z definice objektu
 model QaIssue {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  tenantId    String    @map("tenant_id") @db.Uuid
-  issueNum    String    @map("issue_num") @db.VarChar(20)
-  type        String    @default("change") @db.VarChar(40)
-  title       String    @db.VarChar(255)
-  featureId   String?   @map("feature_id") @db.Uuid
-  scenarioId  String?   @map("scenario_id") @db.Uuid
-  priority    String    @default("medium") @db.VarChar(40)
-  status      String    @default("new") @db.VarChar(40)
-  order       Int?
-  reportedBy  String?   @map("reported_by") @db.VarChar(120)
-  assignedTo  String?   @map("assigned_to") @db.VarChar(120)
-  dueDate     DateTime? @map("due_date") @db.Date
-  description String?
-  resolution  String?
-  ext         Json      @default("{}")
-  version     Int       @default(1)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  createdBy   String?   @map("created_by") @db.Uuid
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?   @map("updated_by") @db.Uuid
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  issueNum     String    @map("issue_num") @db.VarChar(20)
+  type         String    @default("change") @db.VarChar(40)
+  title        String    @db.VarChar(255)
+  featureId    String?   @map("feature_id") @db.Uuid
+  scenarioId   String?   @map("scenario_id") @db.Uuid
+  priority     String    @default("medium") @db.VarChar(40)
+  status       String    @default("new") @db.VarChar(40)
+  order        Int?
+  priorityRank Int?      @map("priority_rank")
+  reportedBy   String?   @map("reported_by") @db.VarChar(120)
+  assignedTo   String?   @map("assigned_to") @db.VarChar(120)
+  dueDate      DateTime? @map("due_date") @db.Date
+  description  String?
+  resolution   String?
+  ext          Json      @default("{}")
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by") @db.Uuid
 
   feature  QaFeature?  @relation("QaIssue_feature", fields: [featureId], references: [id], onDelete: Restrict)
   scenario QaScenario? @relation("QaIssue_scenario", fields: [scenarioId], references: [id], onDelete: Restrict)

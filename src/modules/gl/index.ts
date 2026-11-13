@@ -7,6 +7,7 @@ import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { glSetup } from "./setup";
+import { glReports } from "./reports";
 
 export const AccountType = defineEnum({
   id: "AccountType",
@@ -56,8 +57,8 @@ export const JournalStatus = defineEnum({
   id: "JournalStatus",
   label: "@GL:Status",
   values: [
-    { value: "draft", label: "@GL:Draft" },
-    { value: "posted", label: "@GL:Posted" },
+    { value: "draft", label: "@GL:Draft", color: "warning" },
+    { value: "posted", label: "@GL:Posted", color: "success" },
   ],
 });
 
@@ -415,7 +416,17 @@ export default defineModule({
   dependsOn: ["sys"],
   enums: [DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus],
   objects: [parameters, dimension, dimensionValue, dimensionRule, account, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
+  reports: glReports,
   menu: [
+    {
+      label: "@GL:Reports",
+      kind: "reports",
+      items: [
+        { href: "/report/gl/trialBalance", label: "@GL:TrialBalance" },
+        { href: "/report/gl/balanceSheet", label: "@GL:BalanceSheet" },
+        { href: "/report/gl/incomeStatement", label: "@GL:IncomeStatement" },
+      ],
+    },
     {
       label: "@GL:Module",
       items: [{ object: "gl.journal" }, { object: "gl.voucher" }, { object: "gl.trans" }],
@@ -447,6 +458,26 @@ export default defineModule({
       AccountNumHelp: "Číslo účtu má 3–10 číslic.",
       SyntheticAccount: "Syntetický účet",
       Parameters: "Parametry hlavní knihy",
+      Reports: "Výkazy",
+      TrialBalance: "Obratová předvaha",
+      TrialBalanceDesc: "Počáteční stav, obraty MD a D a konečný stav účtů za období.",
+      BalanceSheet: "Rozvaha",
+      BalanceSheetDesc: "Aktiva a pasiva k datu včetně výsledku hospodaření běžného období.",
+      IncomeStatement: "Výsledovka",
+      IncomeStatementDesc: "Výnosy a náklady za období a výsledek hospodaření.",
+      DateFrom: "Od",
+      DateTo: "Do",
+      BySynthetic: "Po syntetických účtech",
+      Opening: "Počáteční stav",
+      TurnoverDebit: "Obrat MD",
+      TurnoverCredit: "Obrat D",
+      Closing: "Konečný stav",
+      Assets: "Aktiva",
+      LiabilitiesEquity: "Pasiva",
+      ProfitCurrent: "Výsledek hospodaření běžného období",
+      BalanceAmount: "Stav",
+      Revenues: "Výnosy",
+      Expenses: "Náklady",
       Dimension: "Finanční dimenze",
       Dimensions: "Finanční dimenze",
       DimSource: "Hodnoty",
@@ -564,6 +595,26 @@ export default defineModule({
       AccountNumHelp: "Account number has 3–10 digits.",
       SyntheticAccount: "Synthetic account",
       Parameters: "General ledger parameters",
+      Reports: "Statements",
+      TrialBalance: "Trial balance",
+      TrialBalanceDesc: "Opening balance, debit and credit turnover and closing balance for the period.",
+      BalanceSheet: "Balance sheet",
+      BalanceSheetDesc: "Assets and liabilities at the date including the current period result.",
+      IncomeStatement: "Income statement",
+      IncomeStatementDesc: "Revenues and expenses for the period and the result.",
+      DateFrom: "From",
+      DateTo: "To",
+      BySynthetic: "By synthetic accounts",
+      Opening: "Opening balance",
+      TurnoverDebit: "Debit turnover",
+      TurnoverCredit: "Credit turnover",
+      Closing: "Closing balance",
+      Assets: "Assets",
+      LiabilitiesEquity: "Liabilities and equity",
+      ProfitCurrent: "Current period result",
+      BalanceAmount: "Balance",
+      Revenues: "Revenues",
+      Expenses: "Expenses",
       Dimension: "Financial dimension",
       Dimensions: "Financial dimensions",
       DimSource: "Values",

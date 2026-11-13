@@ -13,7 +13,7 @@ export interface FieldMeta {
   readOnly: boolean;
   maxLength?: number;
   align: "left" | "right" | "center";
-  options?: { value: string; label: string }[];
+  options?: { value: string; label: string; color?: string }[];
   refObject?: string;
   refHref?: string;
   /** číslo se nesčítá v řádku Celkem */

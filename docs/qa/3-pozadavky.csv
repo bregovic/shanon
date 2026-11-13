@@ -3,7 +3,7 @@ CR-001;change;Finanční dimenze místo střediska;GL-ACCOUNTS;high;uat;1;Dimenz
 CR-002;change;Kurzy ČNB a ECB jako napojení s plánovaným stahováním;GL-PARAMS;medium;new;2;Napojení v Integraci, denní stažení dávkovou úlohou.
 CR-003;change;Dávkové úlohy s opakováním a jejich přehled;;high;new;3;Jako batch v AX: třídy úloh, plán s rekurencí, historie běhů, přehled v Organizaci.
 CR-004;change;Pokladní deník;POS-SHIFT;high;new;4;Příjmové a výdajové pokladní doklady, zůstatek, uzávěrka směny do deníku.
-CR-005;change;Seznamy: kód jako odkaz na detail, šířka sloupců podle obsahu;SYS-UI;medium;new;5;"Číslo záznamu jako hypertext; automatická šířka s maximem."
+CR-005;change;Seznamy: kód jako odkaz na detail, šířka sloupců podle obsahu;SYS-UI;medium;uat;5;"Číslo záznamu jako hypertext; automatická šířka s maximem."
 CR-006;change;Kasa na tablet: nejčastější položky;POS-SALE;medium;new;6;Úvodní okno s nejprodávanějšími, pohodlné kategorie.
 CR-007;change;Odložené košíky s kódem (váha → pokladna);POS-SALE;medium;new;7;Košík s kódem, plnění z váhy nebo pultu, načtení v kase a vyúčtování.
 CR-008;change;Platební metody v modulu Banka;BANK-GPC;medium;new;8;Číselník platebních metod pro faktury, pokladnu a e-shop.
@@ -12,7 +12,7 @@ CR-010;change;Poštovní server (SMTP) v Integraci;;medium;new;10;Odesílání e
 CR-011;change;Vytěžování dokladů přes OpenAI API;;medium;new;11;Napojení s API klíčem, přijaté faktury z PDF a fotek.
 CR-012;change;Návrhář tiskových sestav;;medium;new;12;"Plátno pro úpravu faktur, účtenek…; předvytvořené sestavy per firma."
 CR-013;change;Tisk faktur do PDF s QR platbou;AR-INVOICE;high;new;13;
-CR-014;change;Výkazy: předvaha, rozvaha, výsledovka;GL-ACCOUNTS;high;new;14;
+CR-014;change;Výkazy: předvaha, rozvaha, výsledovka;GL-REPORTS;high;uat;14;"Hlavní kniha → Reporty; po syntetice, filtr dimenzí, export do Excelu."
 CR-015;change;Příkazy k úhradě a výpisy camt.053;BANK-GPC;medium;new;15;
 CR-016;change;Souhrnné hlášení a přenesená daňová povinnost;TAX-VAT;medium;new;16;
 CR-017;change;Storno a vratky v pokladně;POS-SALE;medium;new;17;
@@ -22,3 +22,4 @@ CR-020;task;Ověřit platební terminál SumUp se skutečným účtem;INT-PAY;me
 CR-021;task;Ověřit tiskárnu ESC/POS a pokladní zásuvku;INT-PRINT;medium;new;21;
 CR-022;change;Kasa: výrazné množství, ťuk = 1 ks, +/−, podržení = zadat množství, přejetí doleva = odebrat;POS-SALE;medium;uat;22;"Podržení dlaždice zadá množství rovnou; změněný řádek krátce zabliká."
 CR-023;change;Měny a kurzy přesunout do Hlavní knihy;GL-PARAMS;low;uat;23;Hlavní kniha → Nastavení: Parametry, Měny, Kurzy měn.
+CR-024;change;Požadavky: barevné štítky priority a stavu, řazení podle priority;QA;medium;uat;24;Štítky výčtů obecně (stavy dokladů, EET…).

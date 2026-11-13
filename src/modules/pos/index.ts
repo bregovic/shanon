@@ -31,9 +31,9 @@ export const EetStatus = defineEnum({
   id: "PosEetStatus",
   label: "@POS:EetStatus",
   values: [
-    { value: "sent", label: "@POS:EetSent" },
-    { value: "pending", label: "@POS:EetPending" },
-    { value: "error", label: "@POS:EetError" },
+    { value: "sent", label: "@POS:EetSent", color: "success" },
+    { value: "pending", label: "@POS:EetPending", color: "warning" },
+    { value: "error", label: "@POS:EetError", color: "danger" },
   ],
 });
 

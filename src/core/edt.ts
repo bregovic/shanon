@@ -51,10 +51,13 @@ export function extendEdt(base: Edt, patch: Partial<Edt> & { id: string }): Edt 
   return { ...base, ...patch };
 }
 
+export type EnumColor = "danger" | "warning" | "success" | "informative" | "brand" | "important" | "subtle";
+
 export interface EnumDef {
   id: string;
   label: LabelRef;
-  values: { value: string; label: LabelRef }[];
+  /** `color` = barevný štítek v gridu (stav, priorita) */
+  values: { value: string; label: LabelRef; color?: EnumColor }[];
 }
 
 export function defineEnum(def: EnumDef): EnumDef {

@@ -153,6 +153,7 @@ export function ObjectListView(p: ObjectListProps) {
           reloadKey={reload}
           storageKey={p.objectId}
           onOpen={open}
+          titleField={p.titleField}
           onSelectionChange={setSelected}
           onViewChange={setView}
         />
