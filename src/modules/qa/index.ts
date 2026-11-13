@@ -166,15 +166,48 @@ export const issue = defineObject({
   unique: [["issueNum"]],
   numberSeq: { field: "issueNum", seq: "QAISSUE" },
   defaultSort: { field: "priorityRank", dir: "asc" },
+  // detail požadavku s diskuzí (příspěvky patří požadavku)
+  lines: [{ object: "qa.comment", field: "issueId", label: "@QA:Discussion" }],
+});
+
+/** Příspěvek diskuze pod požadavkem (autor a čas doplní systém). */
+export const comment = defineObject({
+  id: "qa.comment",
+  table: "qa_comment",
+  label: "@QA:Comment",
+  labelPlural: "@QA:Discussion",
+  scope: "tenant",
+  fields: {
+    issueId: { edt: refEdt("qa.issue", "@QA:Issue"), mandatory: true },
+    text: { edt: Edts.Notes, label: "@QA:CommentText", mandatory: true },
+    author: { edt: Text("QaAuthor", "@QA:Author", 120), readOnly: true },
+    postedAt: { edt: Edts.TransDate, label: "@QA:PostedAt", readOnly: true },
+  },
+  titleField: "author",
+  list: ["postedAt", "author", "text"],
+  form: [{ label: "@QA:Comment", fields: ["issueId", "text", "author", "postedAt"] }],
+  defaultSort: { field: "postedAt", dir: "asc" },
 });
 
 /** Testovaný scénář dostane datum, pokud ho tester nevyplnil. */
 const RANK: Record<string, number> = { critical: 1, high: 2, medium: 3, low: 4 };
+/** řešitel požadavků ve vývoji */
+export const DEVELOPER = "Claude (vývoj)";
 
 export const qaHandlers: Record<string, ObjectHandlers> = {
   "qa.issue": {
     beforeSave(_ctx, d) {
       d.priorityRank = RANK[String(d.priority)] ?? 3;
+      // vývoj bez řešitele = vývojář (Claude)
+      if (d.status === "development" && !d.assignedTo) d.assignedTo = DEVELOPER;
+    },
+  },
+  "qa.comment": {
+    beforeSave(ctx, d, isNew) {
+      if (isNew) {
+        d.author = ctx.userName ?? null;
+        d.postedAt = new Date().toISOString().slice(0, 10);
+      }
     },
   },
   "qa.scenario": {
@@ -191,7 +224,7 @@ export default defineModule({
   icon: "Beaker",
   dependsOn: ["sys"],
   enums: [FeatureStatus, TestStage, TestResult, IssueType, Priority, IssueStatus],
-  objects: [feature, scenario, issue],
+  objects: [feature, scenario, issue, comment],
   menu: [
     { label: "@QA:Module", items: [{ object: "qa.issue" }, { object: "qa.scenario" }] },
     { label: "@SYS:Setup", items: [{ object: "qa.feature" }] },
@@ -250,6 +283,11 @@ export default defineModule({
       Resolution: "Řešení",
       Responsibility: "Odpovědnost",
       DescriptionGroup: "Popis",
+      Comment: "Příspěvek",
+      Discussion: "Diskuze",
+      CommentText: "Text",
+      Author: "Autor",
+      PostedAt: "Datum",
     },
     en: {
       Module: "Testing and development",
@@ -302,6 +340,11 @@ export default defineModule({
       Resolution: "Resolution",
       Responsibility: "Responsibility",
       DescriptionGroup: "Description",
+      Comment: "Comment",
+      Discussion: "Discussion",
+      CommentText: "Text",
+      Author: "Author",
+      PostedAt: "Date",
     },
   },
 });

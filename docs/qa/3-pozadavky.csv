@@ -4,7 +4,7 @@ CR-002;change;Kurzy ČNB a ECB jako napojení s plánovaným stahováním;GL-PAR
 CR-003;change;Dávkové úlohy s opakováním a jejich přehled;;high;new;3;Jako batch v AX: třídy úloh, plán s rekurencí, historie běhů, přehled v Organizaci.
 CR-004;change;Pokladní deník;POS-SHIFT;high;new;4;Příjmové a výdajové pokladní doklady, zůstatek, uzávěrka směny do deníku.
 CR-005;change;Seznamy: kód jako odkaz na detail, šířka sloupců podle obsahu;SYS-UI;medium;uat;5;"Číslo záznamu jako hypertext; automatická šířka s maximem."
-CR-006;change;Kasa na tablet: nejčastější položky;POS-SALE;medium;new;6;Úvodní okno s nejprodávanějšími, pohodlné kategorie.
+CR-006;change;Kasa na tablet: nejčastější položky a kategorie;POS-SALE;medium;uat;6;Záložka Nejčastější (30 dní), strom kategorií prodeje s podkategoriemi, rychlé hledání bez diakritiky.
 CR-007;change;Odložené košíky s kódem (váha → pokladna);POS-SALE;medium;new;7;Košík s kódem, plnění z váhy nebo pultu, načtení v kase a vyúčtování.
 CR-008;change;Platební metody v modulu Banka;BANK-GPC;medium;new;8;Číselník platebních metod pro faktury, pokladnu a e-shop.
 CR-009;change;Zvoneček interních upozornění;SYS-UI;medium;new;9;Chyby integrací, čekající EET, workflow.
@@ -23,3 +23,5 @@ CR-021;task;Ověřit tiskárnu ESC/POS a pokladní zásuvku;INT-PRINT;medium;new
 CR-022;change;Kasa: výrazné množství, ťuk = 1 ks, +/−, podržení = zadat množství, přejetí doleva = odebrat;POS-SALE;medium;uat;22;"Podržení dlaždice zadá množství rovnou; změněný řádek krátce zabliká."
 CR-023;change;Měny a kurzy přesunout do Hlavní knihy;GL-PARAMS;low;uat;23;Hlavní kniha → Nastavení: Parametry, Měny, Kurzy měn.
 CR-024;change;Požadavky: barevné štítky priority a stavu, řazení podle priority;QA;medium;uat;24;Štítky výčtů obecně (stavy dokladů, EET…).
+CR-025;change;Testování: diskuze pod požadavkem, printscreeny ze schránky, přiřazení vývoje;QA;medium;uat;25;"Příspěvky s autorem a datem; v Přílohách Ctrl+V vloží obrázek; stav Vývoj → řeší Claude."
+CR-026;change;API napojení pro správu požadavků zvenku;QA;medium;analysis;26;"Klíč omezený na modul Testování; zakládání a posun požadavků, čtení výsledků testů."

@@ -23,6 +23,7 @@ import {
   Spinner,
   Tab,
   TabList,
+  Text,
   makeStyles,
   mergeClasses,
   tokens,
@@ -30,6 +31,7 @@ import {
 import {
   ArrowLeft24Regular,
   Backspace24Regular,
+  Dismiss24Regular,
   CloudArrowUp24Regular,
   Delete24Regular,
   LockClosed24Regular,
@@ -48,6 +50,8 @@ export interface PosItem {
   num: string;
   name: string;
   groupId: string;
+  /** kategorie prodeje (strom); bez kategorií se kasa člení podle skupin položek */
+  categoryId?: string | null;
   unit: string;
   price: string;
   /** běžná cena, když platí akce */
@@ -86,6 +90,8 @@ const useStyles = makeStyles({
   },
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
+  chips: { display: "flex", gap: "8px", overflowX: "auto", flexShrink: 0, paddingBottom: "4px" },
+  searchInfo: { color: tokens.colorNeutralForeground3 },
   tiles: {
     flex: 1,
     overflowY: "auto",
@@ -212,6 +218,9 @@ export function PosTerminal(p: {
   shift: { id: string; num: string } | null;
   items: PosItem[];
   groups: { id: string; name: string }[];
+  categories: { id: string; name: string; parentId: string | null }[];
+  /** nejčastěji prodávané položky (id) */
+  top: string[];
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
@@ -227,7 +236,9 @@ export function PosTerminal(p: {
   const fmt = (v: string | number) => money.format(Number(v));
 
   const [shift, setShift] = useState(p.shift);
-  const [group, setGroup] = useState("all");
+  // záložka: "top" nejčastější, "all" vše, jinak id hlavní kategorie / skupiny; sub = podkategorie
+  const [group, setGroup] = useState(p.top.length ? "top" : "all");
+  const [sub, setSub] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   // zadání množství / hmotnosti: nový řádek (idx = null) nebo úprava řádku nákupu
@@ -288,12 +299,57 @@ export function PosTerminal(p: {
   const toPay = due;
   const givenNum = Number(given.replace(",", ".")) || 0;
 
+  // strom kategorií: bez kategorií záložky podle skupin položek
+  const useCats = p.categories.length > 0 && p.items.some((i) => i.categoryId);
+  const roots = useCats ? p.categories.filter((c) => !c.parentId) : p.groups.map((g) => ({ ...g, parentId: null }));
+  const children = (id: string) => p.categories.filter((c) => c.parentId === id);
+  const catName = useMemo(() => new Map(p.categories.map((c) => [c.id, c.name])), [p.categories]);
+  /** kategorie a všichni její potomci */
+  const subtree = (id: string): Set<string> => {
+    const out = new Set([id]);
+    for (const c of children(id)) for (const x of subtree(c.id)) out.add(x);
+    return out;
+  };
+
   const visible = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    return p.items.filter(
-      (i) => (group === "all" || i.groupId === group) && (!n || i.name.toLowerCase().includes(n) || i.num.toLowerCase().includes(n) || i.ean === n),
-    );
-  }, [p.items, group, q]);
+    const words = foldText(q).split(/\s+/).filter(Boolean);
+    if (words.length) {
+      // hledání napříč kategoriemi: všechna slova jako začátky slov názvu, nebo kód / EAN / kategorie
+      const scored = p.items
+        .map((i) => {
+          const name = foldText(i.name);
+          const hay = `${name} ${foldText(i.num)} ${i.ean ?? ""} ${foldText(catName.get(i.categoryId ?? "") ?? "")}`;
+          const nameWords = name.split(/[^a-z0-9]+/);
+          if (!words.every((w) => hay.includes(w))) return null;
+          const score = words.reduce((a, w) => a + (nameWords.some((x) => x.startsWith(w)) ? 2 : 0) + (foldText(i.num) === w || i.ean === w ? 5 : 0), 0);
+          return { i, score };
+        })
+        .filter((x): x is { i: PosItem; score: number } => !!x)
+        .sort((a, b) => b.score - a.score || a.i.name.localeCompare(b.i.name, "cs"));
+      return scored.map((x) => x.i);
+    }
+    if (group === "top") {
+      const order = new Map(p.top.map((id, k) => [id, k]));
+      return p.items.filter((i) => order.has(i.id)).sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+    }
+    if (group === "all") return p.items;
+    if (!useCats) return p.items.filter((i) => i.groupId === group);
+    const ids = subtree(sub ?? group);
+    return p.items.filter((i) => i.categoryId && ids.has(i.categoryId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.items, p.top, group, sub, q, useCats, catName]);
+
+  // psaní kdekoli na stránce jde do hledání (pokud není otevřený dialog ani jiné pole)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (weigh || payDlg || receipt || summary || card) return;
+      if (["INPUT", "TEXTAREA"].includes(el.tagName) || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+      search.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [weigh, payDlg, receipt, summary, card]);
 
   // po zavření dialogů vrátit fokus do hledání (čtečka EAN píše tam)
   useEffect(() => {
@@ -493,18 +549,45 @@ export function PosTerminal(p: {
               onChange={(_, d) => setQ(d.value)}
               onKeyDown={onSearchKey}
               contentBefore={<Search24Regular />}
+              contentAfter={
+                q ? (
+                  <Button appearance="transparent" size="small" icon={<Dismiss24Regular />} aria-label={L.Clear} onClick={() => (setQ(""), search.current?.focus())} />
+                ) : undefined
+              }
               placeholder={L.Search}
               aria-label={L.Search}
               size="large"
             />
-            <TabList className={st.tabs} selectedValue={group} onTabSelect={(_, d) => setGroup(String(d.value))}>
+            <TabList
+              className={st.tabs}
+              selectedValue={q.trim() ? "" : group}
+              onTabSelect={(_, d) => {
+                setGroup(String(d.value));
+                setSub(null);
+                setQ("");
+              }}
+            >
+              {p.top.length > 0 && <Tab value="top">{L.Top}</Tab>}
               <Tab value="all">{L.All}</Tab>
-              {p.groups.map((g) => (
+              {roots.map((g) => (
                 <Tab key={g.id} value={g.id}>
                   {g.name}
                 </Tab>
               ))}
             </TabList>
+            {useCats && !q.trim() && group !== "all" && group !== "top" && children(group).length > 0 && (
+              <div className={st.chips}>
+                <Button size="large" shape="circular" appearance={sub === null ? "primary" : "secondary"} onClick={() => setSub(null)}>
+                  {L.All}
+                </Button>
+                {children(group).map((c) => (
+                  <Button key={c.id} size="large" shape="circular" appearance={sub === c.id ? "primary" : "secondary"} onClick={() => setSub(c.id)}>
+                    {c.name}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {q.trim() && <Text className={st.searchInfo}>{L.SearchResults.replace("{n}", String(visible.length))}</Text>}
             {!p.items.length && <p className={st.empty}>{L.NoItems}</p>}
             <div className={st.tiles}>
               {visible.map((i) => (
@@ -757,6 +840,13 @@ export function PosTerminal(p: {
     </div>
   );
 }
+
+/** text bez diakritiky malými písmeny (hledání) */
+const foldText = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 
 const LONG_PRESS_MS = 500;
 const SWIPE_REMOVE_PX = 90;

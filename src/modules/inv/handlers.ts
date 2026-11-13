@@ -58,6 +58,16 @@ export const invHandlers: Record<string, ObjectHandlers> = {
       data.marginPct = buy !== null && p.net > BigInt(0) ? (Number(((p.net - buy) * BigInt(1000000)) / p.net) / 10000).toFixed(2) : null;
     },
   },
+  "inv.category": {
+    async beforeSave(ctx, d): Promise<ValidationErrors | void> {
+      // zákaz cyklu ve stromu (A → B → A)
+      let p = d.parentId ? String(d.parentId) : null;
+      for (let i = 0; p && i < 20; i++) {
+        if (p === d.id) return { parentId: "@INV:CategoryLoop" };
+        p = ((await ctx.data.get("inv.category", p))?.parentId as string) ?? null;
+      }
+    },
+  },
   "inv.discount": {
     beforeSave(_ctx, d): ValidationErrors | void {
       if (d.itemId && d.groupId) return { groupId: "@INV:DiscountTarget" };

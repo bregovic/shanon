@@ -456,3 +456,26 @@ describe("výkazy hlavní knihy", () => {
     expect(bs.rows.find((r) => r.name === "@GL:LiabilitiesEquity")!.amount).toBe("1400.00"); // 1000 kapitál + 400 výsledek
   });
 });
+
+describe("kategorie prodeje", () => {
+  it("strom z jednoho souboru (nadřazená v témže importu), zákaz cyklu", async () => {
+    const { importRecords, parseCsv } = await import("@/server/import");
+    const K = (await provisionTenant(client, { code: `t-cat-${run}`, name: "Cat", adminEmail: `cat-${run}@test.local`, adminPassword: "heslo-12345", modules: ["inv"], company: { code: "K", name: "K" } })).ctx;
+    const r = await importRecords(K, "inv.category", parseCsv("Kód;Název;Nadřazená kategorie;Pořadí\nUZENINY;Uzeniny;;10\nSALAMY;Salámy;UZENINY;11"), { dryRun: false, lang: "cs" }, client);
+    expect([r.created, r.errors.length]).toEqual([2, 0]);
+    const [root] = (await listRecords(K, "inv.category", { filter: { code: "UZENINY" } }, client)).rows;
+    const [child] = (await listRecords(K, "inv.category", { filter: { code: "SALAMY" } }, client)).rows;
+    expect(child.parentId).toBe(root.id);
+    await expect(saveRecord(K, "inv.category", String(root.id), { parentId: child.id }, undefined, client)).rejects.toMatchObject({ fields: { parentId: "@INV:CategoryLoop" } });
+  });
+});
+
+describe("diskuze u požadavků", () => {
+  it("příspěvek s autorem a datem, vývoj se přiřadí vývojáři", async () => {
+    const Q = (await provisionTenant(client, { code: `t-qad-${run}`, name: "QA", adminEmail: `qad-${run}@test.local`, adminPassword: "heslo-12345", modules: ["qa"], company: { code: "Q", name: "Q" } })).ctx;
+    const iss = await saveRecord(Q, "qa.issue", null, { title: "Kasa: kategorie", status: "development" }, undefined, client);
+    expect(iss.assignedTo).toBe("Claude (vývoj)");
+    const c = await saveRecord({ ...Q, userName: "Václav" }, "qa.comment", null, { issueId: iss.id, text: "Na tabletu je tlačítko moc malé." }, undefined, client);
+    expect([c.author, c.postedAt]).toEqual(["Václav", new Date().toISOString().slice(0, 10)]);
+  });
+});

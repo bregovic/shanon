@@ -227,6 +227,7 @@ model SysCompany {
   taxReturn_company         TaxReturn[]         @relation("TaxReturn_company")
   invUnit_company           InvUnit[]           @relation("InvUnit_company")
   invItemGroup_company      InvItemGroup[]      @relation("InvItemGroup_company")
+  invCategory_company       InvCategory[]       @relation("InvCategory_company")
   invItem_company           InvItem[]           @relation("InvItem_company")
   invDiscount_company       InvDiscount[]       @relation("InvDiscount_company")
   arGroup_company           ArGroup[]           @relation("ArGroup_company")
@@ -1133,6 +1134,34 @@ model InvItemGroup {
   @@map("inv_item_group")
 }
 
+/// inv.category — generováno z definice objektu
+model InvCategory {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  parentId  String?  @map("parent_id") @db.Uuid
+  sortOrder Int?     @default(100) @map("sort_order")
+  blocked   Boolean  @default(false)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company            SysCompany    @relation("InvCategory_company", fields: [companyId], references: [id], onDelete: Restrict)
+  parent             InvCategory?  @relation("InvCategory_parent", fields: [parentId], references: [id], onDelete: Restrict)
+  invCategory_parent InvCategory[] @relation("InvCategory_parent")
+  invItem_category   InvItem[]     @relation("InvItem_category")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([parentId])
+  @@map("inv_category")
+}
+
 /// inv.item — generováno z definice objektu
 model InvItem {
   id             String   @id @default(uuid(7)) @db.Uuid
@@ -1142,6 +1171,7 @@ model InvItem {
   name           String   @db.VarChar(120)
   itemType       String   @default("item") @map("item_type") @db.VarChar(40)
   groupId        String   @map("group_id") @db.Uuid
+  categoryId     String?  @map("category_id") @db.Uuid
   unitId         String   @map("unit_id") @db.Uuid
   ean            String?  @db.VarChar(14)
   salesPrice     Decimal? @map("sales_price") @db.Decimal(18, 2)
@@ -1166,6 +1196,7 @@ model InvItem {
 
   company             SysCompany       @relation("InvItem_company", fields: [companyId], references: [id], onDelete: Restrict)
   group               InvItemGroup     @relation("InvItem_group", fields: [groupId], references: [id], onDelete: Restrict)
+  category            InvCategory?     @relation("InvItem_category", fields: [categoryId], references: [id], onDelete: Restrict)
   unit                InvUnit          @relation("InvItem_unit", fields: [unitId], references: [id], onDelete: Restrict)
   taxCode             TaxCode?         @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   vendor              ApVendor?        @relation("InvItem_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
@@ -1177,6 +1208,7 @@ model InvItem {
   @@unique([tenantId, companyId, itemNum])
   @@index([tenantId, companyId])
   @@index([groupId])
+  @@index([categoryId])
   @@index([unitId])
   @@index([taxCodeId])
   @@index([vendorId])
@@ -2013,12 +2045,35 @@ model QaIssue {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?   @map("updated_by") @db.Uuid
 
-  feature  QaFeature?  @relation("QaIssue_feature", fields: [featureId], references: [id], onDelete: Restrict)
-  scenario QaScenario? @relation("QaIssue_scenario", fields: [scenarioId], references: [id], onDelete: Restrict)
+  feature         QaFeature?  @relation("QaIssue_feature", fields: [featureId], references: [id], onDelete: Restrict)
+  scenario        QaScenario? @relation("QaIssue_scenario", fields: [scenarioId], references: [id], onDelete: Restrict)
+  qaComment_issue QaComment[] @relation("QaComment_issue")
 
   @@unique([tenantId, issueNum])
   @@index([tenantId])
   @@index([featureId])
   @@index([scenarioId])
   @@map("qa_issue")
+}
+
+/// qa.comment — generováno z definice objektu
+model QaComment {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  issueId   String    @map("issue_id") @db.Uuid
+  text      String
+  author    String?   @db.VarChar(120)
+  postedAt  DateTime? @map("posted_at") @db.Date
+  ext       Json      @default("{}")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.Uuid
+
+  issue QaIssue @relation("QaComment_issue", fields: [issueId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([issueId])
+  @@map("qa_comment")
 }

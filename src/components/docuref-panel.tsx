@@ -203,7 +203,7 @@ function PanelBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectId, recordId]);
 
-  const upload = async (files: FileList | null) => {
+  const upload = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     setBusy(true);
     setError(undefined);
@@ -220,6 +220,22 @@ function PanelBody({
     await load();
     setBusy(false);
   };
+
+  // Ctrl+V v otevřených přílohách: obrázek ze schránky (printscreen) se nahraje jako soubor
+  useEffect(() => {
+    if (!canWrite) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const imgs = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+      if (!imgs.length) return;
+      e.preventDefault();
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+      void upload(imgs.map((f, i) => new File([f], `printscreen-${stamp}${i ? `-${i}` : ""}.${f.type.split("/")[1] || "png"}`, { type: f.type })));
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+    // upload je stabilní v rámci otevřeného panelu
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canWrite, objectId, recordId]);
 
   const saveNote = async () => {
     setBusy(true);

@@ -95,6 +95,8 @@ export interface EventContext {
   tenantId: string;
   companyId: string | null;
   userId: string;
+  /** jméno přihlášeného uživatele (autor příspěvků, poznámek) */
+  userName?: string;
   objectId: string;
   data: DataApi;
   /** překlad labelu do jazyka uživatele (texty do souborů, varování) */

@@ -75,6 +75,35 @@ export const itemGroup = defineObject({
   lines: [{ object: "inv.item", field: "groupId", label: "@INV:Items", owned: false }],
 });
 
+/**
+ * Kategorie prodeje (obdoba Retail category hierarchy v D365): strom pro
+ * členění v pokladně a e-shopu — nezávislý na skupinách položek (ty řídí
+ * DPH a účty). Hlavní kategorie = záložky kasy, podřízené = druhá řada.
+ */
+export const category = defineObject({
+  id: "inv.category",
+  table: "inv_category",
+  label: "@INV:Category",
+  labelPlural: "@INV:Categories",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    parentId: { edt: refEdt("inv.category", "@INV:ParentCategory"), aliases: ["nadřazená", "nadrazena", "parent"] },
+    sortOrder: { edt: Edts.Int, label: "@INV:SortOrder", default: 100, aliases: ["pořadí", "poradi"] },
+    blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+  },
+  titleField: "code",
+  list: ["code", "name", "parentId", "sortOrder", "blocked"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "parentId", "sortOrder", "blocked"] }],
+  unique: [["code"]],
+  defaultSort: { field: "sortOrder", dir: "asc" },
+  lines: [
+    { object: "inv.category", field: "parentId", label: "@INV:SubCategories", owned: false },
+    { object: "inv.item", field: "categoryId", label: "@INV:Items", owned: false },
+  ],
+});
+
 export const item = defineObject({
   id: "inv.item",
   table: "inv_item",
@@ -85,7 +114,8 @@ export const item = defineObject({
     itemNum: { edt: Edts.Code, label: "@INV:ItemNum", mandatory: true, aliases: ["kod", "kód", "cislo", "číslo", "sku", "code", "id", "plu"] },
     name: { edt: Edts.Name, mandatory: true, aliases: ["nazev", "název", "polozka", "položka", "zbozi", "zboží", "product"] },
     itemType: { edt: enumEdt(ItemType), mandatory: true, default: "item", aliases: ["typ", "druh"] },
-    groupId: { edt: refEdt("inv.itemGroup", "@INV:Group"), mandatory: true, aliases: ["skupina", "kategorie", "group", "category"] },
+    groupId: { edt: refEdt("inv.itemGroup", "@INV:Group"), mandatory: true, aliases: ["skupina", "group"] },
+    categoryId: { edt: refEdt("inv.category", "@INV:Category"), aliases: ["kategorie", "kategorie pokladny", "category"] },
     unitId: { edt: refEdt("inv.unit", "@INV:Unit"), mandatory: true, aliases: ["mj", "měrná jednotka", "unit", "uom"] },
     ean: { edt: Ean, aliases: ["carovy kod", "čárový kód", "barcode", "gtin"] },
     salesPrice: { edt: Edts.Price, label: "@INV:SalesPrice", aliases: ["cena", "prodejni cena", "price"] },
@@ -104,9 +134,9 @@ export const item = defineObject({
     image: { edt: defineEdt({ id: "ImageRef", kind: "string", label: "@SYS:Image", maxLength: 36 }), image: true, readOnly: true, aliases: ["obrazek", "obrázek", "foto", "fotka", "image", "picture"] },
   },
   titleField: "itemNum",
-  list: ["image", "itemNum", "name", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "vendorId", "weighed", "blocked"],
+  list: ["image", "itemNum", "name", "categoryId", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "vendorId", "weighed", "blocked"],
   form: [
-    { label: "@SYS:General", fields: ["itemNum", "name", "itemType", "groupId", "unitId", "ean", "weighed", "blocked"] },
+    { label: "@SYS:General", fields: ["itemNum", "name", "itemType", "categoryId", "groupId", "unitId", "ean", "weighed", "blocked"] },
     { label: "@INV:Prices", fields: ["salesPrice", "priceInclTax", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
     { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName"] },
     { label: "@SYS:Image", fields: ["image"] },
@@ -194,10 +224,10 @@ export default defineModule({
   icon: "Box",
   dependsOn: ["gl", "tax"],
   enums: [ItemType, DiscountKind],
-  objects: [unit, itemGroup, item, discount],
+  objects: [unit, itemGroup, category, item, discount],
   menu: [
     { label: "@INV:Module", items: [{ object: "inv.item" }, { object: "inv.discount" }] },
-    { label: "@SYS:Setup", items: [{ object: "inv.itemGroup" }, { object: "inv.unit" }] },
+    { label: "@SYS:Setup", items: [{ object: "inv.category" }, { object: "inv.itemGroup" }, { object: "inv.unit" }] },
   ],
   numberSeqs: [{ code: "INVITEM", name: "@INV:Items", format: "P{#####}", usedFor: "inv.item" }],
   setup: invSetup,
@@ -233,6 +263,12 @@ export default defineModule({
       Description: "Popis",
       Prices: "Ceny",
       Margin: "Marže %",
+      Category: "Kategorie",
+      Categories: "Kategorie prodeje",
+      ParentCategory: "Nadřazená kategorie",
+      SubCategories: "Podkategorie",
+      SortOrder: "Pořadí",
+      CategoryLoop: "Kategorie nemůže být sama sobě nadřazená.",
       Vendor: "Hlavní dodavatel",
       VendorItemName: "Název u dodavatele",
       Discount: "Sleva",
@@ -280,6 +316,12 @@ export default defineModule({
       Description: "Description",
       Prices: "Prices",
       Margin: "Margin %",
+      Category: "Category",
+      Categories: "Sales categories",
+      ParentCategory: "Parent category",
+      SubCategories: "Subcategories",
+      SortOrder: "Order",
+      CategoryLoop: "A category cannot be its own parent.",
       Vendor: "Main vendor",
       VendorItemName: "Vendor item name",
       Discount: "Discount",

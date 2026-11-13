@@ -129,7 +129,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
     : [];
 
   return {
-    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions, lang: (user.lang as Lang) ?? DEFAULT_LANG, dims },
+    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions, lang: (user.lang as Lang) ?? DEFAULT_LANG, dims, userName: user.name },
     lang: (user.lang as Lang) ?? DEFAULT_LANG,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     tenant: { id: tenant.id, name: tenant.name },

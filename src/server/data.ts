@@ -46,6 +46,8 @@ export interface Ctx {
   extensions: Set<string>;
   /** jazyk uživatele (výchozí čeština) */
   lang?: Lang;
+  /** jméno uživatele (autor příspěvků) */
+  userName?: string;
   /** aktivní finanční dimenze (pořadí → název) — popisky a viditelnost polí dim1…dim6 */
   dims?: { slot: number; name: string }[];
 }
@@ -217,6 +219,7 @@ export class Session {
       tenantId: this.ctx.tenantId,
       companyId: this.ctx.companyId,
       userId: this.ctx.userId,
+      userName: this.ctx.userName,
       objectId,
       data: this.api(),
       t: (ref, params) => fillLabel(resolveLabel(labelTable, ref, this.ctx.lang ?? "cs"), params),

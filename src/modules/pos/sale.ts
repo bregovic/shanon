@@ -326,3 +326,13 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
     eet: r.eetStatus ? { status: String(r.eetStatus), pok: (r.eetPok as string) ?? null } : null,
   };
 }
+
+/** Nejčastěji prodávané položky pokladny za posledních `days` dní (počet řádků účtenek). */
+export async function topItems(data: DataApi, registerId: string, days = 30, limit = 24): Promise<string[]> {
+  const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const counts = new Map<string, number>();
+  for (const r of await data.find("pos.receipt", { registerId, date: { gte: since } }, { take: 2000 })) {
+    for (const l of await data.find("pos.receiptLine", { receiptId: r.id }, { take: 200 })) counts.set(String(l.itemId), (counts.get(String(l.itemId)) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+}

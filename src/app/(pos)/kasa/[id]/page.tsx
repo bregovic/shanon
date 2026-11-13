@@ -5,7 +5,7 @@ import { can } from "@/core/security";
 import { requireSession } from "@/server/auth";
 import { getRecord, inTenant } from "@/server/data";
 import { getT } from "@/server/i18n";
-import { openShiftOf } from "@/modules/pos/sale";
+import { openShiftOf, topItems } from "@/modules/pos/sale";
 import { connectionsFor } from "@/modules/int/drivers";
 import { bestDiscount } from "@/modules/inv/handlers";
 import { fromCents, toCents } from "@/core/money";
@@ -25,6 +25,11 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
   const data = await inTenant(s.ctx, async (sess) => {
     const items = await sess.find("inv.item", { blocked: false }, 5000, { name: "asc" });
     const groups = await sess.find("inv.itemGroup", {}, 500, { code: "asc" });
+    const categories = (await sess.find("inv.category", { blocked: false }, 1000, { sortOrder: "asc" })).map((c) => ({
+      id: String(c.id),
+      name: String(c.name),
+      parentId: (c.parentId as string) ?? null,
+    }));
     const units = new Map((await sess.find("inv.unit", {}, 500)).map((u) => [String(u.id), String(u.code)]));
     const api = sess.sys().api();
     const shift = await openShiftOf(api, id);
@@ -38,7 +43,8 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       const d = await bestDiscount(api, i, toCents(i.priceGross), today);
       if (d) promo.set(String(i.id), fromCents(d.price));
     }
-    return { items, groups, units, shift, conns, eetPending, promo };
+    const top = await topItems(api, id);
+    return { items, groups, units, shift, conns, eetPending, promo, categories, top };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -55,6 +61,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           num: String(i.itemNum),
           name: String(i.name),
           groupId: String(i.groupId),
+          categoryId: (i.categoryId as string) ?? null,
           unit: data.units.get(String(i.unitId)) ?? "",
           price: data.promo.get(String(i.id)) ?? String(i.priceGross),
           regular: data.promo.has(String(i.id)) ? String(i.priceGross) : null,
@@ -63,6 +70,8 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           image: (i.image as string) ?? null,
         }))}
       groups={data.groups.filter((g) => used.has(String(g.id))).map((g) => ({ id: String(g.id), name: String(g.name) }))}
+      categories={data.categories}
+      top={data.top}
       printer={
         data.conns.printer
           ? {

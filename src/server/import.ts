@@ -369,6 +369,14 @@ export async function importRecords(
           await s.tx.$executeRawUnsafe("SAVEPOINT shanon_import_row");
           try {
             const saved = await s.save(objectId, existingId, values);
+            // odkaz na záznam téhož souboru (strom kategorií): přidat do vyhledávání
+            const self = lookups.get(objectId);
+            if (self) {
+              for (const k of [saved[def.titleField], "name" in def.fields ? saved.name : null]) {
+                const n = norm(String(k ?? ""));
+                if (n) self.set(n, String(saved.id));
+              }
+            }
             for (const im of images) await storeImage(s, objectId, String(saved.id), im.field, saved[im.field] as string | null, im.file);
             await s.tx.$executeRawUnsafe("RELEASE SAVEPOINT shanon_import_row");
             if (existingId) report.updated++;
