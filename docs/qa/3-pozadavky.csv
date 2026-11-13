@@ -36,3 +36,4 @@ CR-034;change;Testování: stav Vráceno do vývoje;QA;medium;uat;34;"Po neúsp�
 CR-035;change;Číselné řady v Nastavení každého modulu;SYS-UI;medium;uat;35;Odkaz vede na číselné řady filtrované na modul (filter.usedFor=modul.*).
 CR-036;change;Konfigurace testovacího prostředí (testovací napojení a data jedním krokem);INT-EET;high;uat;36;"Integrace → Funkce → Testovací prostředí: EET simulátor, simulátor terminálu, tisk z prohlížeče, boxy; ostrá napojení se pozastaví. Datové služby ARES, ČNB, ECB jako napojení s testem a logem."
 CR-037;change;Produkční prostředí a instalace u klienta (Docker obraz bez zdrojových kódů);SYS-MODULES;high;analysis;37;"Tento Railway projekt = test; produkce zvlášť z vydání; repo neveřejné; licence."
+CR-038;change;Adresář: založit podle IČO / DIČ (ARES, VIES), vytvořit dodavatele a odběratele;GAB-ARES;high;uat;38;"Adresář → Funkce → Založit podle IČO / DIČ; na subjektu Vytvořit dodavatele / odběratele; VIES jako datová služba v Integraci."

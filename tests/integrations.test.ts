@@ -663,7 +663,7 @@ describe("testovací prostředí a datové služby (CR-036)", () => {
     await saveRecord(T, "pos.shift", null, { registerId: reg }, undefined, client);
     // výchozí datové služby
     const svc = (await listRecords(T, "int.connection", { filter: { kind: "service" } }, client)).rows.map((c) => c.driver).sort();
-    expect(svc).toEqual(["ares", "cnb", "ecb"]);
+    expect(svc).toEqual(["ares", "cnb", "ecb", "vies"]);
     // ostré platební napojení se pozastaví
     const real = await saveRecord(T, "int.connection", null, { code: "SUMUP", name: "SumUp", kind: "payment", driver: "manual" }, undefined, client);
     await inTenant(T, async (s) => {
@@ -725,5 +725,43 @@ describe("pokladní kniha", () => {
       const bal = r.rows.map((x) => x.balance);
       expect([bal[0], bal[bal.length - 1]]).toEqual(["0.00", "879.00"]);
     }
+  });
+});
+
+describe("adresář: založení z registru, dodavatel a odběratel", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("ARES podle IČO, VIES podle zahraničního DIČ, duplicita, vytvoření partnerů", async () => {
+    const { lookupRegistry, createFromRegistry } = await import("@/modules/gab/registry-lookup");
+    const { inTenant } = await import("@/server/data");
+    const A = (await provisionTenant(client, { code: `t-reg-${run}`, name: "Reg", adminEmail: `reg-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap", "ar", "int"], company: { code: "R", name: "R" } })).ctx;
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (String(url).includes("ares.gov.cz"))
+        return new Response(JSON.stringify({ ico: "27079864", obchodniJmeno: "Uzenářství s.r.o.", dic: "CZ27079864", pravniForma: "112", sidlo: { kodStatu: "CZ", nazevObce: "Davle", nazevUlice: "Na náměstí", cisloDomovni: 97, psc: 25206 } }), { status: 200 });
+      if (String(url).includes("/ms/DE/vat/123456789"))
+        return new Response(JSON.stringify({ isValid: true, userError: "VALID", name: "Wurst GmbH", address: "Hauptstr. 1\n80331 München\nDeutschland" }), { status: 200 });
+      return new Response(JSON.stringify({ isValid: false, userError: "INVALID" }), { status: 200 });
+    });
+    await inTenant(A, async (s) => {
+      const api = s.sys().api();
+      const a = await lookupRegistry(api, "CZ 2707 9864");
+      expect([a?.source, a?.regNo, a?.name, a?.city, a?.existingId]).toEqual(["ares", "27079864", "Uzenářství s.r.o.", "Davle", null]);
+      const id = await createFromRegistry(api, "27079864", { vendor: true, customer: true });
+      expect((await api.find("ap.vendor", { subjectId: id }, { take: 2 })).length).toBe(1);
+      expect((await api.find("ar.customer", { subjectId: id }, { take: 2 })).length).toBe(1);
+      expect((await lookupRegistry(api, "27079864"))?.existingId).toBe(id);
+      await expect(createFromRegistry(api, "27079864", {})).rejects.toMatchObject({ label: "@GAB:SubjectExists" });
+      const v = await lookupRegistry(api, "DE123456789");
+      expect([v?.source, v?.name, v?.vatId, v?.zipCode, v?.city, v?.country]).toEqual(["vies", "Wurst GmbH", "DE123456789", "80331", "München", "DE"]);
+      expect(await lookupRegistry(api, "DE999")).toBeNull();
+      await expect(lookupRegistry(api, "nesmysl!")).rejects.toMatchObject({ label: "@GAB:LookupFormat" });
+      // ARES i VIES jdou do protokolu napojení
+      const conns = await api.find("int.connection", { kind: "service" }, { take: 10 });
+      const logs = await api.find("int.log", {}, { take: 50 });
+      expect(new Set(logs.map((l) => conns.find((c) => c.id === l.connectionId)?.driver))).toEqual(new Set(["ares", "vies"]));
+    }, client);
+    // akce na záznamu adresáře
+    const sub = await saveRecord(A, "gab.subject", null, { name: "Bez partnera" }, undefined, client);
+    await runAction(A, "gab.subject", String(sub.id), "createVendor", client);
+    await expect(runAction(A, "gab.subject", String(sub.id), "createVendor", client)).rejects.toMatchObject({ label: "@GAB:PartnerExists" });
   });
 });

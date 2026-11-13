@@ -102,9 +102,10 @@ export interface ObjectDef {
   /**
    * `upload` = akce si vyžádá soubor (přípony pro výběr, např. ".gpc,.txt");
    * `download` = akce vrátí soubor ke stažení (ObjectHandlers.downloads);
-   * stačí právo číst, `downloadNeedsWrite` = stažení mění záznam (nový klíč)
+   * stačí právo číst, `downloadNeedsWrite` = stažení mění záznam (nový klíč);
+   * `module` = akce jen se zapnutým modulem (Vytvořit dodavatele → ap)
    */
-  actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown }; upload?: string; download?: boolean; downloadNeedsWrite?: boolean }[];
+  actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown }; upload?: string; download?: boolean; downloadNeedsWrite?: boolean; module?: string }[];
   /** záznam (i jeho řádky) nelze měnit ani mazat, když pole má danou hodnotu */
   lockedWhen?: { field: string; equals: unknown };
 }

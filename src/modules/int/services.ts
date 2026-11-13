@@ -8,7 +8,7 @@
  */
 import { UserError, type DataApi, type RecordData } from "@/core/module";
 
-export type ServiceDriver = "ares" | "cnb" | "ecb";
+export type ServiceDriver = "ares" | "cnb" | "ecb" | "vies";
 
 export async function withService<T>(data: DataApi, driver: ServiceDriver, operation: string, fn: () => Promise<T>, describe?: (r: T) => string): Promise<T> {
   let conns: RecordData[] = [];

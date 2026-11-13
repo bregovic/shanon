@@ -5,6 +5,7 @@
  */
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { withService } from "@/modules/int/services";
+import { createPartner } from "./registry-lookup";
 
 const API = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty";
 
@@ -108,12 +109,19 @@ export async function fillFromAres(data: DataApi, subjectId: string) {
   return a;
 }
 
+/** Vytvořit dodavatele / odběratele ze záznamu adresáře. */
+const partnerActions: ObjectHandlers["actions"] = {
+  createVendor: async (ctx, s) => void (await createPartner(ctx.data, String(s.id), "ap.vendor")),
+  createCustomer: async (ctx, s) => void (await createPartner(ctx.data, String(s.id), "ar.customer")),
+};
+
 export const aresHandlers: Record<string, ObjectHandlers> = {
   "gab.subject": {
     actions: {
       async ares(ctx, subj) {
         await fillFromAres(ctx.data, String(subj.id));
       },
+      ...partnerActions,
     },
   },
 };

@@ -38,6 +38,7 @@ export const Driver = defineEnum({
     { value: "ares", label: "@INT:DrvAres" },
     { value: "cnb", label: "@INT:DrvCnb" },
     { value: "ecb", label: "@INT:DrvEcb" },
+    { value: "vies", label: "@INT:DrvVies" },
   ],
 });
 
@@ -185,6 +186,7 @@ async function intSetup(data: DataApi) {
     ["ARES", "ares", "ARES – registr subjektů"],
     ["CNB", "cnb", "Kurzy ČNB"],
     ["ECB", "ecb", "Kurzy ECB"],
+    ["VIES", "vies", "VIES – plátci DPH v EU"],
   ]) {
     if (!(await data.find("int.connection", { kind: "service", driver }, { take: 1 })).length) {
       await data.create("int.connection", { code, name, kind: "service", driver, active: true });
@@ -212,6 +214,7 @@ export default defineModule({
       DrvAres: "ARES",
       DrvCnb: "ČNB – kurzy",
       DrvEcb: "ECB – kurzy",
+      DrvVies: "VIES – plátci DPH v EU",
       PausedByTest: "Pozastaveno testem",
       Testing: "Testování",
       TestEnv: "Testovací prostředí",
@@ -329,6 +332,7 @@ export default defineModule({
       DrvAres: "ARES",
       DrvCnb: "CNB – rates",
       DrvEcb: "ECB – rates",
+      DrvVies: "VIES – EU VAT register",
       PausedByTest: "Paused by test",
       Testing: "Testing",
       TestEnv: "Test environment",

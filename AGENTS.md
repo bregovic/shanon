@@ -117,6 +117,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Grid: titleField je odkaz na detail; šířky sloupců podle obsahu (min/max),
   nejširší textový sloupec bere zbytek.
 - Pole/skupina formuláře podle hodnoty jiného pole: `visibleWhen: { field, in: [...] }`.
+- Založení z registru (`src/modules/gab/registry-lookup.ts`): IČO / DIČ CZ → ARES,
+  zahraniční DIČ → VIES (datová služba `vies`). Akce s `module: "ap"` se ukáže jen se
+  zapnutým modulem (Vytvořit dodavatele / odběratele na subjektu).
 - ARES (`src/modules/gab/ares.ts`): veřejná služba bez klíče; akce „Doplnit z ARES“
   na subjektu i partnerovi (podle IČO, jinak jednoznačně podle názvu) doplní jméno,
   DIČ, právní formu a sídlo.

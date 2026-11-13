@@ -481,6 +481,7 @@ export class Session {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system);
     const a = def.actions?.find((x) => x.id === actionId);
+    if (a?.module && !this.ctx.modules.has(a.module)) throw new UserError("@SYS:NoAccess");
     if (!a) throw new UserError("@SYS:InvalidValue");
     const record = await this.sys().get(objectId, id);
     if (!record) throw new UserError("@SYS:NotFound");

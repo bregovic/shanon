@@ -1,5 +1,6 @@
 "use server";
 
+import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
 import { basketForBox, boxByCode, closeBasket, openBaskets, saveBasket, type BasketView } from "@/modules/pos/basket";
 import { duplicateRecord, type DuplicateResult } from "@/server/duplicate";
@@ -811,6 +812,30 @@ export async function intTestEnvAction(on: boolean): Promise<ActionResult<TestEn
       return testEnvState(api);
     });
     return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Adresář → Založit podle IČO / DIČ: náhled nálezu (ARES / VIES). */
+export async function gabLookupAction(query: string): Promise<ActionResult<RegistryHit | null>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "gab.subject", "read");
+    return { ok: true, data: await inTenant(s.ctx, (sess) => lookupRegistry(sess.sys().api(), String(query).slice(0, 20))) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function gabCreateFromRegistryAction(query: string, opts: { vendor?: boolean; customer?: boolean }): Promise<ActionResult<string>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "gab.subject", "write");
+    const o = { vendor: !!opts.vendor && s.ctx.modules.has("ap"), customer: !!opts.customer && s.ctx.modules.has("ar") };
+    if (o.vendor) assertCan(s.ctx.perms, "ap.vendor", "write");
+    if (o.customer) assertCan(s.ctx.perms, "ar.customer", "write");
+    return { ok: true, data: await inTenant(s.ctx, (sess) => createFromRegistry(sess.sys().api(), String(query).slice(0, 20), o)) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

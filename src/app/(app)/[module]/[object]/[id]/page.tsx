@@ -96,7 +96,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       actions={
         isNew || !mayWrite
           ? []
-          : (def.actions ?? []).filter((a) => !a.when || record[a.when.field] === a.when.equals).map((a) => ({ id: a.id, label: t(a.label), upload: a.upload, download: a.download }))
+          : (def.actions ?? []).filter((a) => (!a.when || record[a.when.field] === a.when.equals) && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), upload: a.upload, download: a.download }))
       }
       lines={lines}
       lang={s.lang}

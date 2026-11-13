@@ -17,6 +17,7 @@ import {
 import { revealSecret } from "@/server/secrets";
 import { newToken } from "@/server/api-token";
 import { aresByIco } from "@/modules/gab/ares";
+import { viesLookup } from "@/modules/gab/registry-lookup";
 import { fetchCnb, fetchEcb } from "@/modules/sys/currency";
 import { registry } from "@/registry";
 import {
@@ -34,7 +35,7 @@ export const DRIVERS: Record<string, string[]> = {
   printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator"],
   api: ["rest"],
-  service: ["ares", "cnb", "ecb"],
+  service: ["ares", "cnb", "ecb", "vies"],
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -551,7 +552,9 @@ export const intHandlers: Record<string, ObjectHandlers> = {
           const call =
             conn.driver === "ares"
               ? () => aresByIco("00006947")
-              : conn.driver === "cnb"
+              : conn.driver === "vies"
+                ? () => viesLookup("CZ", "00006947")
+                : conn.driver === "cnb"
                 ? () => fetchCnb(today)
                 : () => fetchEcb(today, "CZK");
           try {
