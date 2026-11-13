@@ -133,6 +133,46 @@ const useStyles = makeStyles({
   lines: { flex: 1, overflowY: "auto", padding: "0 8px" },
   line: { display: "grid", gridTemplateColumns: "1fr auto", gap: "2px 8px", padding: "8px", borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
   lineName: { fontWeight: tokens.fontWeightSemibold },
+  lineWrap: { position: "relative", overflow: "hidden", borderBottom: `1px solid ${tokens.colorNeutralStroke3}` },
+  lineBehind: {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingRight: "16px",
+    backgroundColor: tokens.colorPaletteRedBackground3,
+    color: tokens.colorNeutralForegroundOnBrand,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  lineCard: {
+    position: "relative",
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    alignItems: "center",
+    gap: "4px 12px",
+    padding: "10px 8px",
+    backgroundColor: tokens.colorNeutralBackground1,
+    touchAction: "pan-y",
+    userSelect: "none",
+    transition: "transform 0.15s ease-out, background-color 0.6s",
+  },
+  lineFlash: { backgroundColor: tokens.colorBrandBackground2, transition: "none" },
+  qtyBadge: {
+    minWidth: "52px",
+    padding: "6px 8px",
+    borderRadius: tokens.borderRadiusLarge,
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+    fontSize: tokens.fontSizeBase400,
+    fontWeight: tokens.fontWeightBold,
+    textAlign: "center",
+    cursor: "pointer",
+    border: "none",
+    fontFamily: "inherit",
+  },
+  stepper: { gridColumn: "2 / 4", display: "flex", gap: "8px", justifyContent: "flex-end" },
+  stepBtn: { minWidth: "48px", minHeight: "40px", fontSize: tokens.fontSizeBase500 },
   lineSub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, display: "flex", alignItems: "center", gap: "6px" },
   lineAmt: { textAlign: "right", fontWeight: tokens.fontWeightSemibold, alignSelf: "center" },
   empty: { color: tokens.colorNeutralForeground3, padding: "24px 8px", textAlign: "center" },
@@ -190,7 +230,10 @@ export function PosTerminal(p: {
   const [group, setGroup] = useState("all");
   const [q, setQ] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
-  const [weigh, setWeigh] = useState<{ item: PosItem; value: string } | null>(null);
+  // zadání množství / hmotnosti: nový řádek (idx = null) nebo úprava řádku nákupu
+  const [weigh, setWeigh] = useState<{ item: PosItem; value: string; idx?: number | null } | null>(null);
+  // naposledy změněný řádek — krátce zvýrazněný
+  const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
   const [payDlg, setPayDlg] = useState<"cash" | "card" | null>(null);
   // způsob a částka zůstanou i během zavírací animace dialogu
   const [method, setMethod] = useState<"cash" | "card">("cash");
@@ -257,17 +300,40 @@ export function PosTerminal(p: {
     if (!weigh && !payDlg && !receipt && !summary) search.current?.focus();
   }, [weigh, payDlg, receipt, summary]);
 
-  const add = (item: PosItem, qty = 1) =>
+  const add = (item: PosItem, qty = 1) => {
+    setFlash((f) => ({ id: item.id, n: (f?.n ?? 0) + 1 }));
     setLines((ls) => {
       const i = ls.findIndex((l) => l.item.id === item.id && !item.weighed);
       if (i >= 0) return ls.map((l, j) => (j === i ? { ...l, qty: l.qty + qty } : l));
       return [...ls, { item, qty }];
     });
+  };
+  const setQty = (idx: number, qty: number) => {
+    if (qty <= 0) return setLines((ls) => ls.filter((_, j) => j !== idx));
+    setLines((ls) => ls.map((x, j) => (j === idx ? { ...x, qty } : x)));
+    const id = lines[idx]?.item.id;
+    if (id) setFlash((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+  };
+  const remove = (idx: number) => setLines((ls) => ls.filter((_, j) => j !== idx));
+  /** potvrzení dialogu množství */
+  const confirmQty = () => {
+    if (!weigh) return;
+    const v = Number(weigh.value.replace(",", "."));
+    if (!(v >= 0)) return;
+    if (weigh.idx !== undefined && weigh.idx !== null) setQty(weigh.idx, v);
+    else if (v > 0) add(weigh.item, v);
+    setWeigh(null);
+  };
 
   const pick = (item: PosItem) => {
     setError(undefined);
     if (item.weighed) setWeigh({ item, value: "" });
     else add(item);
+  };
+  /** podržení dlaždice: zadat množství rovnou */
+  const pickQty = (item: PosItem) => {
+    setError(undefined);
+    setWeigh({ item, value: "", idx: null });
   };
 
   const onSearchKey = (e: React.KeyboardEvent) => {
@@ -442,7 +508,7 @@ export function PosTerminal(p: {
             {!p.items.length && <p className={st.empty}>{L.NoItems}</p>}
             <div className={st.tiles}>
               {visible.map((i) => (
-                <button key={i.id} type="button" className={st.tile} onClick={() => pick(i)}>
+                <button key={i.id} type="button" className={st.tile} {...pressHandlers(() => pick(i), () => pickQty(i))} onContextMenu={(e) => e.preventDefault()}>
                   {i.image && (
                     // eslint-disable-next-line @next/next/no-img-element -- soubor za přihlášením, prohlížeč ho cachuje
                     <img src={`/api/files/${i.image}`} alt="" loading="lazy" className={st.tileImg} />
@@ -472,30 +538,21 @@ export function PosTerminal(p: {
             <div className={st.lines}>
               {!lines.length && <p className={st.empty}>{L.EmptyCart}</p>}
               {lines.map((l, idx) => (
-                <div key={idx} className={st.line}>
-                  <span className={st.lineName}>{l.item.name}</span>
-                  <span className={st.lineAmt}>{fmt(Math.round(Number(l.item.price) * l.qty * 100) / 100)}</span>
-                  <span className={st.lineSub}>
-                    {l.item.weighed ? `${num.format(l.qty)} ${l.item.unit.toLowerCase()} ×` : `${l.qty} ×`} {fmt(l.item.price)}
-                    {!l.item.weighed && (
-                      <>
-                        <Button size="small" onClick={() => setLines((ls) => ls.map((x, j) => (j === idx ? { ...x, qty: Math.max(1, x.qty - 1) } : x)))} aria-label="−">
-                          −
-                        </Button>
-                        <Button size="small" onClick={() => setLines((ls) => ls.map((x, j) => (j === idx ? { ...x, qty: x.qty + 1 } : x)))} aria-label="+">
-                          +
-                        </Button>
-                      </>
-                    )}
-                  </span>
-                  <Button
-                    size="small"
-                    appearance="subtle"
-                    icon={<Delete24Regular />}
-                    aria-label={L.Cancel}
-                    onClick={() => setLines((ls) => ls.filter((_, j) => j !== idx))}
-                  />
-                </div>
+                <CartLine
+                  key={`${l.item.id}-${idx}`}
+                  st={st}
+                  flash={flash?.id === l.item.id ? flash.n : 0}
+                  qtyText={l.item.weighed ? `${num.format(l.qty)} ${l.item.unit.toLowerCase()}` : `${l.qty}×`}
+                  name={l.item.name}
+                  unitPrice={`${fmt(l.item.price)}${l.item.unit && l.item.unit !== "KS" ? ` / ${l.item.unit.toLowerCase()}` : ""}`}
+                  amount={fmt(Math.round(Number(l.item.price) * l.qty * 100) / 100)}
+                  stepper={!l.item.weighed}
+                  labels={{ minus: L.Less, plus: L.More, remove: L.Remove, qty: L.Quantity }}
+                  onMinus={() => setQty(idx, l.qty - 1)}
+                  onPlus={() => setQty(idx, l.qty + 1)}
+                  onEdit={() => setWeigh({ item: l.item, value: num.format(l.qty).replace(/\s/g, ""), idx })}
+                  onRemove={() => remove(idx)}
+                />
               ))}
             </div>
             <div className={st.total}>
@@ -525,12 +582,12 @@ export function PosTerminal(p: {
               <Input
                 value={weigh?.value ?? ""}
                 onChange={(_, d) => setWeigh((w) => (w ? { ...w, value: d.value } : w))}
-                onKeyDown={(e) => e.key === "Enter" && Number(weigh?.value.replace(",", ".")) > 0 && (add(weigh!.item, Number(weigh!.value.replace(",", "."))), setWeigh(null))}
+                onKeyDown={(e) => e.key === "Enter" && confirmQty()}
                 inputMode="decimal"
                 size="large"
                 autoFocus
-                aria-label={L.Weight}
-                placeholder={L.Weight}
+                aria-label={weigh?.item.weighed ? L.Weight : L.Quantity}
+                placeholder={weigh?.item.weighed ? L.Weight : L.Quantity}
                 contentAfter={weigh?.item.unit.toLowerCase()}
               />
               <div className={st.big}>{fmt((Number(weigh?.value.replace(",", ".")) || 0) * Number(weigh?.item.price ?? 0))}</div>
@@ -540,13 +597,11 @@ export function PosTerminal(p: {
               <Button onClick={() => setWeigh(null)}>{L.Cancel}</Button>
               <Button
                 appearance="primary"
-                disabled={!(Number(weigh?.value.replace(",", ".")) > 0)}
-                onClick={() => {
-                  add(weigh!.item, Number(weigh!.value.replace(",", ".")));
-                  setWeigh(null);
-                }}
+                // úprava řádku smí i 0 (= odebrat), nový řádek jen kladné množství
+                disabled={!(Number(weigh?.value.replace(",", ".")) > 0 || (weigh?.idx != null && weigh?.value.trim() === "0"))}
+                onClick={confirmQty}
               >
-                {L.Add}
+                {weigh?.idx != null ? L.Save : L.Add}
               </Button>
             </DialogActions>
           </DialogBody>
@@ -699,6 +754,145 @@ export function PosTerminal(p: {
           </DialogBody>
         </DialogSurface>
       </Dialog>
+    </div>
+  );
+}
+
+const LONG_PRESS_MS = 500;
+const SWIPE_REMOVE_PX = 90;
+
+/** Ťuknutí vs. podržení prstu (myš i dotyk). */
+function pressHandlers(onTap: () => void, onLong: () => void) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let long = false;
+  let start = { x: 0, y: 0 };
+  const clear = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      long = false;
+      start = { x: e.clientX, y: e.clientY };
+      clear();
+      timer = setTimeout(() => {
+        long = true;
+        onLong();
+      }, LONG_PRESS_MS);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (Math.abs(e.clientX - start.x) > 10 || Math.abs(e.clientY - start.y) > 10) clear();
+    },
+    onPointerUp: () => {
+      const wasTimer = !!timer;
+      clear();
+      if (!long && wasTimer) onTap();
+    },
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+  };
+}
+
+/**
+ * Řádek nákupu: výrazné množství, − / + pro kusy, podržení = zadat množství,
+ * přejetí doleva = odebrat (myší i prstem). Změněný řádek krátce zabliká.
+ */
+function CartLine(p: {
+  st: ReturnType<typeof useStyles>;
+  flash: number;
+  qtyText: string;
+  name: string;
+  unitPrice: string;
+  amount: string;
+  stepper: boolean;
+  labels: { minus: string; plus: string; remove: string; qty: string };
+  onMinus: () => void;
+  onPlus: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const { st } = p;
+  const [dx, setDx] = useState(0);
+  const [lit, setLit] = useState(false);
+  // zvýraznění po přidání / změně: nová hodnota flash rozsvítí řádek (vzor „předchozí hodnota ve stavu“)
+  const [seen, setSeen] = useState(p.flash);
+  if (p.flash !== seen) {
+    setSeen(p.flash);
+    if (p.flash) setLit(true);
+  }
+  const drag = useRef<{ x: number; y: number; active: boolean; timer: ReturnType<typeof setTimeout> | null; long: boolean } | null>(null);
+  useEffect(() => {
+    if (!lit) return;
+    const t = setTimeout(() => setLit(false), 450);
+    return () => clearTimeout(t);
+  }, [lit]);
+
+  const end = () => {
+    const d = drag.current;
+    if (d?.timer) clearTimeout(d.timer);
+    drag.current = null;
+    if (dx <= -SWIPE_REMOVE_PX) p.onRemove();
+    setDx(0);
+  };
+
+  return (
+    <div className={st.lineWrap}>
+      <div className={st.lineBehind} aria-hidden>
+        {p.labels.remove}
+      </div>
+      <div
+        className={mergeClasses(st.lineCard, lit && st.lineFlash)}
+        style={{ transform: dx ? `translateX(${dx}px)` : undefined }}
+        onContextMenu={(e) => e.preventDefault()}
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest("button")) return;
+          const d = { x: e.clientX, y: e.clientY, active: false, long: false, timer: null as ReturnType<typeof setTimeout> | null };
+          d.timer = setTimeout(() => {
+            d.long = true;
+            p.onEdit();
+          }, LONG_PRESS_MS);
+          drag.current = d;
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const mx = e.clientX - d.x;
+          if (Math.abs(mx) > 10 || Math.abs(e.clientY - d.y) > 10) {
+            if (d.timer) clearTimeout(d.timer);
+            d.timer = null;
+          }
+          if (!d.long && mx < -10 && Math.abs(mx) > Math.abs(e.clientY - d.y)) {
+            d.active = true;
+            setDx(Math.max(mx, -160));
+          }
+        }}
+        onPointerUp={end}
+        onPointerLeave={() => drag.current && end()}
+        onPointerCancel={end}
+      >
+        <button type="button" className={st.qtyBadge} onClick={p.onEdit} aria-label={p.labels.qty}>
+          {p.qtyText}
+        </button>
+        <span>
+          <span className={st.lineName}>{p.name}</span>
+          <br />
+          <span className={st.lineSub}>{p.unitPrice}</span>
+        </span>
+        <span className={st.lineAmt}>{p.amount}</span>
+        <div className={st.stepper}>
+          {p.stepper && (
+            <>
+              <Button className={st.stepBtn} onClick={p.onMinus} aria-label={p.labels.minus}>
+                −
+              </Button>
+              <Button className={st.stepBtn} onClick={p.onPlus} aria-label={p.labels.plus}>
+                +
+              </Button>
+            </>
+          )}
+          <Button className={st.stepBtn} appearance="subtle" icon={<Delete24Regular />} onClick={p.onRemove} aria-label={p.labels.remove} />
+        </div>
+      </div>
     </div>
   );
 }

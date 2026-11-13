@@ -201,7 +201,7 @@ export default defineModule({
   menu: [
     {
       label: "@SYS:Setup",
-      items: [{ object: "sys.company" }, { object: "sys.numberSeq" }, { object: "sys.currency" }, { object: "sys.exchangeRate" }],
+      items: [{ object: "sys.company" }, { object: "sys.numberSeq" }],
     },
     { label: "@SYS:ModulesAndSetup", kind: "setup", items: [{ href: "/system/modules", label: "@SYS:Modules" }] },
     { label: "@SYS:Maintenance", kind: "functions", items: [{ href: "/system/setup", label: "@SYS:DefaultSetup" }] },

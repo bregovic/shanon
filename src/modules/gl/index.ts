@@ -422,7 +422,14 @@ export default defineModule({
     },
     {
       label: "@SYS:Setup",
-      items: [{ object: "gl.parameters" }, { object: "gl.account" }, { object: "gl.dimension" }, { object: "gl.dimensionRule" }, { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
+      items: [
+        { object: "gl.parameters" },
+        { object: "sys.currency" },
+        { object: "sys.exchangeRate" },
+        { object: "gl.account" },
+        { object: "gl.dimension" },
+        { object: "gl.dimensionRule" },
+        { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
     },
   ],
   numberSeqs: [

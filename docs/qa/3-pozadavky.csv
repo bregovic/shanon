@@ -20,3 +20,5 @@ CR-018;change;E-shop jako šablona napojení;;low;new;18;
 CR-019;task;Ověřit EET na ostrém prostředí s pokladním certifikátem;INT-EET;high;new;19;Certifikát z portálu MOJE daně.
 CR-020;task;Ověřit platební terminál SumUp se skutečným účtem;INT-PAY;medium;new;20;
 CR-021;task;Ověřit tiskárnu ESC/POS a pokladní zásuvku;INT-PRINT;medium;new;21;
+CR-022;change;Kasa: výrazné množství, ťuk = 1 ks, +/−, podržení = zadat množství, přejetí doleva = odebrat;POS-SALE;medium;uat;22;"Podržení dlaždice zadá množství rovnou; změněný řádek krátce zabliká."
+CR-023;change;Měny a kurzy přesunout do Hlavní knihy;GL-PARAMS;low;uat;23;Hlavní kniha → Nastavení: Parametry, Měny, Kurzy měn.
