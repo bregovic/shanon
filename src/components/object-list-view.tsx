@@ -50,6 +50,8 @@ export interface ObjectListProps {
   initial: { rows: Row[]; total: number; totals?: Record<string, string> };
   /** záznam vybraný při otevření (proklik z odkazu) */
   focusId?: string;
+  /** filtry z odkazu (?filter.pole=výraz) */
+  initialFilters?: Record<string, string>;
   lang: string;
   labels: UiLabels;
 }
@@ -157,6 +159,7 @@ export function ObjectListView(p: ObjectListProps) {
           onOpen={open}
           titleField={p.titleField}
           focusId={p.focusId}
+          initialFilters={p.initialFilters}
           onSelectionChange={setSelected}
           onViewChange={setView}
         />

@@ -250,6 +250,9 @@ model SysCompany {
   posShift_company          PosShift[]          @relation("PosShift_company")
   posReceipt_company        PosReceipt[]        @relation("PosReceipt_company")
   posReceiptLine_company    PosReceiptLine[]    @relation("PosReceiptLine_company")
+  posBox_company            PosBox[]            @relation("PosBox_company")
+  posBasket_company         PosBasket[]         @relation("PosBasket_company")
+  posBasketLine_company     PosBasketLine[]     @relation("PosBasketLine_company")
   intConnection_company     IntConnection[]     @relation("IntConnection_company")
   intLog_company            IntLog[]            @relation("IntLog_company")
 
@@ -1255,6 +1258,7 @@ model InvItem {
   arInvoiceLine_item  ArInvoiceLine[]  @relation("ArInvoiceLine_item")
   apInvoiceLine_item  ApInvoiceLine[]  @relation("ApInvoiceLine_item")
   posReceiptLine_item PosReceiptLine[] @relation("PosReceiptLine_item")
+  posBasketLine_item  PosBasketLine[]  @relation("PosBasketLine_item")
 
   @@unique([tenantId, companyId, itemNum])
   @@index([tenantId, companyId])
@@ -1807,6 +1811,7 @@ model PosRegister {
   cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
   posShift_register      PosShift[]      @relation("PosShift_register")
   posReceipt_register    PosReceipt[]    @relation("PosReceipt_register")
+  posBasket_register     PosBasket[]     @relation("PosBasket_register")
   intConnection_register IntConnection[] @relation("IntConnection_register")
 
   @@unique([tenantId, companyId, code])
@@ -1884,6 +1889,7 @@ model PosReceipt {
   register               PosRegister      @relation("PosReceipt_register", fields: [registerId], references: [id], onDelete: Restrict)
   shift                  PosShift         @relation("PosReceipt_shift", fields: [shiftId], references: [id], onDelete: Restrict)
   posReceiptLine_receipt PosReceiptLine[] @relation("PosReceiptLine_receipt")
+  posBasket_receipt      PosBasket[]      @relation("PosBasket_receipt")
 
   @@index([tenantId, companyId])
   @@index([registerId])
@@ -1932,6 +1938,85 @@ model PosReceiptLine {
   @@index([taxCodeId])
   @@index([revenueAccountId])
   @@map("pos_receipt_line")
+}
+
+/// pos.box — generováno z definice objektu
+model PosBox {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String?  @db.VarChar(120)
+  active    Boolean  @default(true)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company       SysCompany  @relation("PosBox_company", fields: [companyId], references: [id], onDelete: Restrict)
+  posBasket_box PosBasket[] @relation("PosBasket_box")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("pos_box")
+}
+
+/// pos.basket — generováno z definice objektu
+model PosBasket {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  label      String   @db.VarChar(120)
+  boxId      String?  @map("box_id") @db.Uuid
+  registerId String?  @map("register_id") @db.Uuid
+  status     String   @default("open") @db.VarChar(40)
+  receiptId  String?  @map("receipt_id") @db.Uuid
+  ext        Json     @default("{}")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String?  @map("created_by") @db.Uuid
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.Uuid
+
+  company              SysCompany      @relation("PosBasket_company", fields: [companyId], references: [id], onDelete: Restrict)
+  box                  PosBox?         @relation("PosBasket_box", fields: [boxId], references: [id], onDelete: Restrict)
+  register             PosRegister?    @relation("PosBasket_register", fields: [registerId], references: [id], onDelete: Restrict)
+  receipt              PosReceipt?     @relation("PosBasket_receipt", fields: [receiptId], references: [id], onDelete: Restrict)
+  posBasketLine_basket PosBasketLine[] @relation("PosBasketLine_basket")
+
+  @@index([tenantId, companyId])
+  @@index([boxId])
+  @@index([registerId])
+  @@index([receiptId])
+  @@map("pos_basket")
+}
+
+/// pos.basketLine — generováno z definice objektu
+model PosBasketLine {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  basketId  String   @map("basket_id") @db.Uuid
+  lineNum   Int?     @map("line_num")
+  itemId    String   @map("item_id") @db.Uuid
+  qty       Decimal  @db.Decimal(18, 4)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("PosBasketLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  basket  PosBasket  @relation("PosBasketLine_basket", fields: [basketId], references: [id], onDelete: Restrict)
+  item    InvItem    @relation("PosBasketLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([basketId])
+  @@index([itemId])
+  @@map("pos_basket_line")
 }
 
 /// int.connection — generováno z definice objektu

@@ -577,3 +577,41 @@ describe("zaokrouhlení podle měny", () => {
     expect([roundCents(c(1232), "0.05"), roundCents(c(1233), "0.05"), roundCents(c(-12350), "1"), roundCents(c(12345), "0.01")]).toEqual([c(1230), c(1235), c(-12400), c(12345)]);
   });
 });
+
+describe("odložené nákupy (boxy)", () => {
+  it("box s QR: otevře/založí nákup, souběh hlídá verze, zaplacení uvolní box", async () => {
+    const { boxByCode, basketForBox, saveBasket, openBaskets } = await import("@/modules/pos/basket");
+    const { sell } = await import("@/modules/pos/sale");
+    const { inTenant } = await import("@/server/data");
+    const P = (await provisionTenant(client, { code: `t-box-${run}`, name: "Box", adminEmail: `box-${run}@test.local`, adminPassword: "heslo-12345", modules: ["pos"], company: { code: "B", name: "B" } })).ctx;
+    const reg = String((await listRecords(P, "pos.register", {}, client)).rows[0].id);
+    const g = (await listRecords(P, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(P, "inv.unit", { filter: { code: "KS" } }, client)).rows[0];
+    const item = String((await saveRecord(P, "inv.item", null, { itemNum: "SAL", name: "Salám", groupId: g.id, unitId: u.id, salesPrice: "100", priceInclTax: true }, undefined, client)).id);
+    await saveRecord(P, "pos.shift", null, { registerId: reg }, undefined, client);
+    await expect(saveRecord(P, "pos.box", null, { code: "B 7" }, undefined, client)).rejects.toBeTruthy();
+    await saveRecord(P, "pos.box", null, { code: "B07" }, undefined, client);
+    await inTenant(P, async (s) => {
+      const api = s.sys().api();
+      expect(await boxByCode(api, "nic")).toBeNull();
+      const box = (await boxByCode(api, " b07 "))!;
+      const b1 = await basketForBox(api, box, reg);
+      expect([b1.label, b1.boxCode, b1.lines.length]).toEqual(["B07", "B07", 0]);
+      // váha přidá položku, druhé načtení boxu vrátí stejný nákup
+      const b2 = await saveBasket(api, { id: b1.id, registerId: reg, version: b1.version, lines: [{ itemId: item, qty: "2" }] });
+      expect((await basketForBox(api, box, reg)).id).toBe(b1.id);
+      // kasa se starou verzí → konflikt
+      await expect(saveBasket(api, { id: b1.id, registerId: reg, version: b1.version, lines: [] })).rejects.toMatchObject({ label: "@POS:BasketChanged" });
+      // box obsazený, nový nákup pod stejný box nejde; pod jméno ano
+      await expect(saveBasket(api, { boxCode: "B07", registerId: reg, lines: [] })).rejects.toMatchObject({ label: "@POS:BoxBusy" });
+      const named = await saveBasket(api, { label: "Novák", boxCode: "Novák", registerId: reg, lines: [{ itemId: item, qty: "1" }] });
+      expect([named.label, named.boxCode]).toEqual(["Novák", null]);
+      expect((await openBaskets(api)).map((b) => b.label)).toEqual(["B07", "Novák"]);
+      // zaplacení nákupu boxu → box volný
+      const r = await sell(api, { registerId: reg, payment: "cash", lines: b2.lines, basketId: b2.id });
+      expect((await api.get("pos.basket", b2.id))!.receiptId).toBe(r.id);
+      expect((await openBaskets(api)).map((b) => b.label)).toEqual(["Novák"]);
+      expect((await basketForBox(api, box, reg)).id).not.toBe(b1.id);
+    }, client);
+  });
+});

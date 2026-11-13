@@ -67,6 +67,7 @@ export const IssueStatus = defineEnum({
     { value: "new", label: "@QA:New", color: "informative" },
     { value: "analysis", label: "@QA:Analysis" },
     { value: "development", label: "@QA:Development", color: "warning" },
+    { value: "returned", label: "@QA:Returned", color: "danger" },
     { value: "fat", label: "@QA:Fat", color: "brand" },
     { value: "uat", label: "@QA:Uat", color: "important" },
     { value: "done", label: "@QA:Done", color: "success" },
@@ -199,7 +200,8 @@ export const qaHandlers: Record<string, ObjectHandlers> = {
     beforeSave(_ctx, d) {
       d.priorityRank = RANK[String(d.priority)] ?? 3;
       // vývoj bez řešitele = vývojář (Claude)
-      if (d.status === "development" && !d.assignedTo) d.assignedTo = DEVELOPER;
+      // vývoj / vráceno z testu: řeší vývojář (Claude), pokud řešitel není jiný
+      if ((d.status === "development" || d.status === "returned") && !d.assignedTo) d.assignedTo = DEVELOPER;
     },
   },
   "qa.comment": {
@@ -233,6 +235,7 @@ export default defineModule({
   numberSeqs: [{ code: "QAISSUE", name: "@QA:Issues", format: "CR{YY}-{####}", usedFor: "qa.issue" }],
   labels: {
     cs: {
+      Returned: "Vráceno do vývoje",
       Module: "Testování a vývoj",
       ModuleDesc: "Klíčové funkce a jejich stav, testovací scénáře FAT/UAT, požadavky na změny a chyby.",
       Feature: "Funkce",
@@ -290,6 +293,7 @@ export default defineModule({
       PostedAt: "Datum",
     },
     en: {
+      Returned: "Returned to development",
       Module: "Testing and development",
       ModuleDesc: "Key features and their status, FAT/UAT test scenarios, change requests and bugs.",
       Feature: "Feature",

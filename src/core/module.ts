@@ -98,6 +98,8 @@ export interface DataApi {
   find(objectId: string, where: RecordData, opts?: { take?: number; orderBy?: Record<string, "asc" | "desc"> }): Promise<RecordData[]>;
   create(objectId: string, data: RecordData): Promise<RecordData>;
   update(objectId: string, id: string, data: RecordData): Promise<RecordData>;
+  /** smazání (s událostmi a historií změn) — jen pro data, která logika modulu sama vlastní */
+  remove(objectId: string, id: string): Promise<void>;
   /**
    * Další číslo z číselné řady firmy: podle kódu řady, id řady, nebo podle
    * objektu, pro který je řada určená (pole Použití).

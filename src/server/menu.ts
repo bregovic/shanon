@@ -50,6 +50,20 @@ export function moduleMenu(s: Session, t: T, mod: ModuleDef): (MenuEntry & { sec
       });
     }
   });
+  // číselné řady modulu do jeho Nastavení (filtr podle Použití)
+  if (mod.numberSeqs?.length && mod.id !== "sys" && can(s.ctx.perms, "sys.numberSeq", "read")) {
+    const setupIdx = mod.menu.findIndex((g) => kindOf(g) === "setup");
+    out.push({
+      module: mod.id,
+      moduleLabel: t(mod.label),
+      icon: mod.icon,
+      section: setupIdx >= 0 ? t(mod.menu[setupIdx].label) : t("@SYS:Settings"),
+      kind: "setup",
+      label: t("@SYS:NumberSeqs"),
+      href: `${objectHref("sys.numberSeq")}?filter.usedFor=${encodeURIComponent(`${mod.id}.*`)}`,
+      sectionIndex: setupIdx >= 0 ? setupIdx : mod.menu.length,
+    });
+  }
   return out;
 }
 

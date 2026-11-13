@@ -8,7 +8,7 @@
  * k tisku (80 mm), otevření směny a uzávěrka. Ceny a DPH počítá server;
  * terminál ukazuje jen orientační součet z cen s DPH.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Dialog,
@@ -31,6 +31,7 @@ import {
 import {
   ArrowLeft24Regular,
   Backspace24Regular,
+  Box20Regular,
   Dismiss24Regular,
   CloudArrowUp24Regular,
   Delete24Regular,
@@ -41,7 +42,20 @@ import {
   Scales24Regular,
   Search24Regular,
 } from "@fluentui/react-icons";
-import { posCardStartAction, posCardStatusAction, posCloseShiftAction, posEetResendAction, posOpenShiftAction, posSellAction, posShiftSummaryAction } from "@/app/actions";
+import {
+  posBasketCancelAction,
+  posBasketOpenAction,
+  posBasketSaveAction,
+  posBasketsAction,
+  posCardStartAction,
+  posCardStatusAction,
+  posCloseShiftAction,
+  posEetResendAction,
+  posOpenShiftAction,
+  posSellAction,
+  posShiftSummaryAction,
+} from "@/app/actions";
+import type { BasketView } from "@/modules/pos/basket";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
 
@@ -90,6 +104,7 @@ const useStyles = makeStyles({
   },
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
+  baskets: { display: "flex", gap: "6px", flexWrap: "wrap", padding: "8px 12px 0" },
   wUnits: { display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px", alignItems: "center" },
   wSep: { width: "8px" },
   chips: { display: "flex", gap: "8px", overflowX: "auto", flexShrink: 0, paddingBottom: "4px" },
@@ -223,6 +238,8 @@ export function PosTerminal(p: {
   categories: { id: string; name: string; parentId: string | null }[];
   /** nejčastěji prodávané položky (id) */
   top: string[];
+  /** odložené nákupy (boxy) sdílené pokladnami firmy */
+  baskets: BasketView[];
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
@@ -243,6 +260,7 @@ export function PosTerminal(p: {
   const [sub, setSub] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
+
   // zadání množství / hmotnosti: nový řádek (idx = null) nebo úprava řádku nákupu
   const [weigh, setWeigh] = useState<{ item: PosItem; value: string; idx?: number | null } | null>(null);
   // jednotka zadání hmotnosti u položek na kg (30 dkg = 0,3 kg); poslední volba se pamatuje
@@ -283,6 +301,131 @@ export function PosTerminal(p: {
   const search = useRef<HTMLInputElement>(null);
   // platební terminál: stav čekání na kartu
   const [card, setCard] = useState<{ ref: string; state: "waiting" | "declined"; message?: string } | null>(null);
+  // --- odložené nákupy: aktivní nákup se průběžně ukládá, volný prodej čeká stranou
+  const [baskets, setBaskets] = useState<BasketView[]>(p.baskets);
+  const [active, setActive] = useState<{ id: string; label: string; version: number } | null>(null);
+  const [parkDlg, setParkDlg] = useState<string | null>(null);
+  const freeStash = useRef<Line[]>([]);
+  const skipSave = useRef(false);
+  const dirty = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const itemById = useMemo(() => new Map(p.items.map((i) => [i.id, i])), [p.items]);
+  const toLines = useCallback(
+    (b: BasketView): Line[] => b.lines.flatMap((l) => (itemById.has(l.itemId) ? [{ item: itemById.get(l.itemId)!, qty: Number(l.qty) }] : [])),
+    [itemById],
+  );
+  /** nastavit řádky ze serveru (bez zpětného uložení) */
+  const loadLines = (ls: Line[]) => {
+    skipSave.current = true;
+    setLines(ls);
+  };
+  /** načíst seznam; změnil-li aktivní nákup jiný terminál, převzít jeho stav */
+  const refreshBaskets = useCallback(
+    async (force = false) => {
+      const r = await posBasketsAction();
+      if (!r.ok) return;
+      setBaskets(r.data);
+      setActive((a) => {
+        if (!a || (dirty.current && !force)) return a;
+        const b = r.data.find((x) => x.id === a.id);
+        if (!b) {
+          // zaplaceno nebo zrušeno jinde → zpět na volný prodej
+          loadLines(freeStash.current);
+          freeStash.current = [];
+          return null;
+        }
+        if (b.version !== a.version || force) {
+          loadLines(toLines(b));
+          return { ...a, version: b.version };
+        }
+        return a;
+      });
+    },
+    [toLines],
+  );
+  const saveActive = async (ls: Line[], a: { id: string; version: number }) => {
+    const r = await posBasketSaveAction({
+      id: a.id,
+      registerId: p.register.id,
+      version: a.version,
+      lines: ls.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) })),
+    });
+    dirty.current = false;
+    if (r.ok) {
+      setActive((x) => (x && x.id === r.data.id ? { ...x, version: r.data.version } : x));
+      setBaskets((bs) => bs.map((b) => (b.id === r.data.id ? r.data : b)));
+    } else {
+      setError(r.message);
+      await refreshBaskets(true);
+    }
+  };
+  // změna řádků aktivního nákupu → uložit (s odstupem, ať se neukládá každé ťuknutí)
+  useEffect(() => {
+    if (skipSave.current) {
+      skipSave.current = false;
+      return;
+    }
+    if (!active) return;
+    dirty.current = true;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const a = active;
+    saveTimer.current = setTimeout(() => void saveActive(lines, a), 600);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines]);
+  /** dokončit čekající uložení (před přepnutím nákupu) */
+  const flush = async () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    if (active && dirty.current) await saveActive(lines, active);
+  };
+  useEffect(() => {
+    const t = setInterval(() => void refreshBaskets(), 10_000);
+    const onFocus = () => void refreshBaskets();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refreshBaskets]);
+  const openBasket = async (b: BasketView) => {
+    if (active?.id === b.id) return;
+    await flush();
+    if (!active) freeStash.current = lines;
+    loadLines(toLines(b));
+    setActive({ id: b.id, label: b.label, version: b.version });
+    setBaskets((bs) => (bs.some((x) => x.id === b.id) ? bs.map((x) => (x.id === b.id ? b : x)) : [...bs, b]));
+  };
+  const openFree = async () => {
+    if (!active) return;
+    await flush();
+    loadLines(freeStash.current);
+    freeStash.current = [];
+    setActive(null);
+  };
+  /** odložit volný prodej pod box (kód / QR) nebo jméno */
+  const park = async (value: string) => {
+    const v = value.trim();
+    if (!v) return;
+    setBusy(true);
+    const r = await posBasketSaveAction({ label: v, boxCode: v, registerId: p.register.id, lines: lines.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) })) });
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    setParkDlg(null);
+    setError(undefined);
+    setLines([]);
+    setBaskets((bs) => [...bs, r.data]);
+  };
+  /** uvolnit prázdný box (nákup zrušen) */
+  const release = async () => {
+    if (!active || lines.length) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const r = await posBasketCancelAction(active.id);
+    if (!r.ok) return setError(r.message);
+    setBaskets((bs) => bs.filter((b) => b.id !== active.id));
+    loadLines(freeStash.current);
+    freeStash.current = [];
+    setActive(null);
+  };
   const cardLoop = useRef(0);
   const [eetPending, setEetPending] = useState(p.eet?.pending ?? 0);
   const serialPrinter = p.printer?.driver === "escposSerial";
@@ -424,7 +567,17 @@ export function PosTerminal(p: {
     if (hit) {
       pick(hit);
       setQ("");
+      return;
     }
+    // není to zboží: kód boxu (QR nebo ručně) otevře jeho nákup
+    const code = q.trim();
+    if (!code) return;
+    void posBasketOpenAction(p.register.id, code).then((r) => {
+      if (r.ok && r.data) {
+        setQ("");
+        void openBasket(r.data);
+      } else if (!r.ok) setError(r.message);
+    });
   };
 
   const saleLines = () => lines.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) }));
@@ -437,6 +590,7 @@ export function PosTerminal(p: {
       payment,
       cashGiven: payment === "cash" && given ? given.replace(",", ".") : null,
       paymentRef,
+      basketId: active?.id ?? null,
       lines: saleLines(),
     });
     setBusy(false);
@@ -447,7 +601,15 @@ export function PosTerminal(p: {
     setPayDlg(null);
     setCard(null);
     setGiven("");
-    setLines([]);
+    if (active) {
+      // zaplacený nákup boxu: box volný, zpět na volný prodej
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      dirty.current = false;
+      setBaskets((bs) => bs.filter((b) => b.id !== active.id));
+      setActive(null);
+      loadLines(freeStash.current);
+      freeStash.current = [];
+    } else setLines([]);
     setReceipt(res.data);
     if (typeof res.data.eetQueue === "number") setEetPending(res.data.eetQueue);
     if (p.printer?.autoPrint) {
@@ -634,12 +796,33 @@ export function PosTerminal(p: {
           </section>
 
           <aside className={st.cart} aria-label={L.Cart}>
+            <div className={st.baskets}>
+              <Button size="small" shape="circular" appearance={active ? "secondary" : "primary"} onClick={() => void openFree()}>
+                {L.FreeSale}
+                {!active && lines.length ? ` · ${lines.length}` : ""}
+              </Button>
+              {baskets.map((b) => (
+                <Button key={b.id} size="small" shape="circular" appearance={active?.id === b.id ? "primary" : "secondary"} onClick={() => void openBasket(b)}>
+                  {b.label} · {active?.id === b.id ? lines.length : b.lines.length}
+                </Button>
+              ))}
+              {!active && lines.length > 0 && (
+                <Button size="small" shape="circular" appearance="outline" icon={<Box20Regular />} onClick={() => setParkDlg("")}>
+                  {L.Park}
+                </Button>
+              )}
+            </div>
             <div className={st.cartHead}>
-              {L.Cart}
+              {active ? active.label : L.Cart}
               <span className={st.spacer} />
               {lines.length > 0 && (
                 <Button appearance="subtle" size="small" onClick={() => setLines([])}>
                   {L.Clear}
+                </Button>
+              )}
+              {active && !lines.length && (
+                <Button appearance="subtle" size="small" onClick={() => void release()}>
+                  {L.ReleaseBox}
                 </Button>
               )}
             </div>
@@ -725,6 +908,34 @@ export function PosTerminal(p: {
                 onClick={confirmQty}
               >
                 {weigh?.idx != null ? L.Save : L.Add}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      {/* odložit nákup do boxu / pod jméno */}
+      <Dialog open={parkDlg !== null} onOpenChange={(_, d) => !d.open && setParkDlg(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{L.ParkTitle}</DialogTitle>
+            <DialogContent>
+              <Text block style={{ marginBottom: 8 }}>
+                {L.ParkHint}
+              </Text>
+              <Input
+                size="large"
+                autoFocus
+                value={parkDlg ?? ""}
+                onChange={(_, d) => setParkDlg(d.value)}
+                onKeyDown={(e) => e.key === "Enter" && void park(parkDlg ?? "")}
+                aria-label={L.BasketLabel}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setParkDlg(null)}>{L.Cancel}</Button>
+              <Button appearance="primary" disabled={busy || !(parkDlg ?? "").trim()} onClick={() => void park(parkDlg ?? "")}>
+                {L.Park}
               </Button>
             </DialogActions>
           </DialogBody>

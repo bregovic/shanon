@@ -23,7 +23,8 @@ export default async function ModulePage({ params }: { params: Promise<{ module:
   // sloupce: Formuláře, Funkce, Reporty, Nastavení — prázdné se nezobrazí
   const columns: WorkspaceColumn[] = COLUMNS.map(([kind, label]) => ({
     title: t(label),
-    sections: mod.menu
+    // poslední oddíl „Nastavení“ pro automatické položky (číselné řady), když modul žádný nemá
+    sections: [...mod.menu, { label: "@SYS:Settings", items: [] }]
       .map((g, i) => ({ id: String(i), title: t(g.label), items: entries.filter((e) => e.sectionIndex === i && e.kind === kind).map((e) => ({ label: e.label, href: e.href })) }))
       .filter((x) => x.items.length),
   })).filter((c) => c.sections.length);

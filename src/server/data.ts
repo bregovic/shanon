@@ -234,6 +234,7 @@ export class Session {
       find: (o, where, opts) => s.find(o, where, opts?.take, opts?.orderBy),
       create: (o, data) => s.save(o, null, data, { system: true }),
       update: (o, id, data) => s.save(o, id, data, { system: true }),
+      remove: (o, id) => s.remove(o, id),
       nextNumber: (seq, date) => s.nextNumber(seq, date),
     };
   }

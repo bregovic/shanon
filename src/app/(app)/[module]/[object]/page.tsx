@@ -16,9 +16,16 @@ export async function generateMetadata({ params }: { params: Promise<Params> }) 
   return { title: def ? (await getT("cs"))(def.labelPlural) : undefined };
 }
 
-export default async function ObjectListPage({ params, searchParams }: { params: Promise<Params>; searchParams: Promise<{ focus?: string }> }) {
+export default async function ObjectListPage({ params, searchParams }: { params: Promise<Params>; searchParams: Promise<Record<string, string | undefined>> }) {
   const { module, object } = await params;
-  const { focus } = await searchParams;
+  const sp = await searchParams;
+  const focus = sp.focus;
+  // ?filter.<pole>=<výraz> → filtr sloupce (např. číselné řady modulu: filter.usedFor=qa.*)
+  const initialFilters = Object.fromEntries(
+    Object.entries(sp)
+      .filter(([k, v]) => k.startsWith("filter.") && typeof v === "string")
+      .map(([k, v]) => [k.slice(7), String(v)]),
+  );
   const s = await requireSession();
   const def = registry.objects.get(`${module}.${object}`);
   if (!def || !s.ctx.modules.has(module)) notFound();
@@ -59,6 +66,7 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       openInPage={openInPage || !!def.systemOnly}
       initial={{ rows: initial.rows, total: initial.total, totals: initial.totals }}
       focusId={focus}
+      initialFilters={initialFilters}
       lang={s.lang}
       labels={uiLabels(t)}
     />

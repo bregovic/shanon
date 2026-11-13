@@ -14,6 +14,7 @@ import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@
 import { accountingCurrencyId, currencyRounding, postVoucher, systemAccount, type PostingLine } from "@/modules/gl/posting";
 import { bestDiscount, netFromGross } from "@/modules/inv/handlers";
 import { addressLine, orgOf } from "@/modules/org";
+import { closeBasket } from "./basket";
 
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -26,6 +27,8 @@ export interface SaleInput {
   cashGiven?: string | null;
   /** platba kartou přes terminál: id transakce (ověřené volajícím) */
   paymentRef?: string | null;
+  /** odložený nákup, který se tímto platí (uzavře se) */
+  basketId?: string | null;
 }
 
 
@@ -125,6 +128,8 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
       taxAmount: fromCents(l.tax),
     });
   }
+  // zaplacený odložený nákup se uzavře (box je volný)
+  if (input.basketId) await closeBasket(data, input.basketId, "paid", String(receipt.id));
   return receipt;
 }
 

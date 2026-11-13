@@ -1,4 +1,5 @@
 /** Prodejní terminál pokladny (šablona „Pult s váhou“). */
+import { openBaskets } from "@/modules/pos/basket";
 import { accountingCurrencyId, currencyRounding } from "@/modules/gl/posting";
 import { notFound } from "next/navigation";
 import { PosTerminal } from "@/components/pos-terminal";
@@ -47,7 +48,8 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     const top = await topItems(api, id);
     // zaokrouhlení hotovosti podle účetní měny (terminál jen ukazuje, počítá server)
     const rounding = await currencyRounding(api, await accountingCurrencyId(api, s.ctx.companyId));
-    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding };
+    const baskets = await openBaskets(api);
+    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding, baskets };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -75,6 +77,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       groups={data.groups.filter((g) => used.has(String(g.id))).map((g) => ({ id: String(g.id), name: String(g.name) }))}
       categories={data.categories}
       top={data.top}
+      baskets={data.baskets}
       printer={
         data.conns.printer
           ? {

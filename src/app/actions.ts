@@ -1,5 +1,6 @@
 "use server";
 
+import { basketForBox, boxByCode, closeBasket, openBaskets, saveBasket, type BasketView } from "@/modules/pos/basket";
 import { duplicateRecord, type DuplicateResult } from "@/server/duplicate";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
@@ -382,6 +383,7 @@ function saleInput(input: SaleInput): SaleInput {
     payment: input.payment === "card" ? "card" : "cash",
     cashGiven: input.cashGiven ? String(input.cashGiven) : null,
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,
+    basketId: input.basketId ? String(input.basketId) : null,
     lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
   };
 }
@@ -722,6 +724,74 @@ export async function duplicateRecordAction(objectId: string, id: string): Promi
   const s = await requireSession();
   try {
     return { ok: true, data: await duplicateRecord(s.ctx, objectId, id) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Odložené nákupy (boxy) — sdílené všemi pokladnami firmy
+// ---------------------------------------------------------------------------
+
+export async function posBasketsAction(): Promise<ActionResult<BasketView[]>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    return { ok: true, data: await inTenant(s.ctx, (sess) => openBaskets(sess.sys().api())) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Kód boxu (QR / ručně) → jeho otevřený nákup, případně nový prázdný; null = není kód boxu. */
+export async function posBasketOpenAction(registerId: string, code: string): Promise<ActionResult<BasketView | null>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    return {
+      ok: true,
+      data: await inTenant(s.ctx, async (sess) => {
+        const api = sess.sys().api();
+        const box = await boxByCode(api, String(code));
+        return box ? basketForBox(api, box, String(registerId)) : null;
+      }),
+    };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function posBasketSaveAction(input: {
+  id?: string | null;
+  label?: string | null;
+  boxCode?: string | null;
+  registerId: string;
+  version?: number;
+  lines: { itemId: string; qty: string }[];
+}): Promise<ActionResult<BasketView>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const clean = {
+      id: input.id ? String(input.id) : null,
+      label: input.label ? String(input.label).slice(0, 120) : null,
+      boxCode: input.boxCode ? String(input.boxCode) : null,
+      registerId: String(input.registerId),
+      version: typeof input.version === "number" ? input.version : undefined,
+      lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
+    };
+    return { ok: true, data: await inTenant(s.ctx, (sess) => saveBasket(sess.sys().api(), clean)) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+export async function posBasketCancelAction(id: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    await inTenant(s.ctx, (sess) => closeBasket(sess.sys().api(), String(id), "cancelled"));
+    return { ok: true, data: undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

@@ -55,6 +55,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   zaokrouhluje podle účetní měny (`sys.currency.cashRoundingUnit`, CZK = 1 Kč,
   `roundCents`) mimo základ DPH. Do účetnictví jde až uzávěrka směny
   (jeden doklad za směnu, `tax.trans` se `simplified` → KH oddíl A.5).
+  Odložené nákupy (`basket.ts`): box (`pos.box`, kód = obsah QR, jen písmena
+  a číslice) nebo jméno; sdílené pokladnami firmy, souběh hlídá verze, prodej
+  s `basketId` nákup uzavře. Kód boxu v hledání kasy + Enter otevře jeho nákup.
 - Integrace (`src/modules/int`): napojení = druh + ovladač (`drivers.ts`), každá
   komunikace do `int.log`. Síť nikdy uvnitř transakce prodeje — EET se posílá po
   uložení účtenky, nevyjde-li do 2 s, účtenka „čeká“ a odešle se dodatečně (48 h).
@@ -70,6 +73,8 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   zprávu), `default` = výchozí nastavení úlohu ve firmě založí. Plánovač
   `src/server/batch.ts` (z `src/instrumentation.ts`, každou minutu, `BATCH_SCHEDULER=off`
   vypne), plán v pražském čase, zmeškané běhy se nedohánějí, historie `sys.batchRun`.
+- Číselné řady modulu se v jeho Nastavení ukážou samy (z `numberSeqs`, odkaz
+  `?filter.usedFor=<modul>.*`). Seznam objektu umí filtr z odkazu `?filter.<pole>=<výraz>`.
 - Odkaz na číselník (cíl bez řádků/akcí) vede do seznamu `?focus=<id>` s vybraným
   řádkem (`refLink`), doklad na svou stránku.
 - Duplikovat (`src/server/duplicate.ts`, obecně): bez polí unikátního klíče (kromě

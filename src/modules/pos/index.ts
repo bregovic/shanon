@@ -109,6 +109,74 @@ export const shift = defineObject({
   lockedWhen: { field: "status", equals: "closed" },
 });
 
+/** Box (přepravka, tác) s QR štítkem — pod ním se skládá odložený nákup. */
+export const box = defineObject({
+  id: "pos.box",
+  table: "pos_box",
+  label: "@POS:Box",
+  labelPlural: "@POS:Boxes",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name },
+    active: { edt: Edts.NoYes, default: true },
+  },
+  titleField: "code",
+  list: ["code", "name", "active"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "active"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+});
+
+export const BasketStatus = defineEnum({
+  id: "PosBasketStatus",
+  label: "@SYS:Status",
+  values: [
+    { value: "open", label: "@POS:BasketOpen", color: "informative" },
+    { value: "paid", label: "@POS:BasketPaid", color: "success" },
+    { value: "cancelled", label: "@POS:BasketCancelled", color: "subtle" },
+  ],
+});
+
+/** Odložený (rozpracovaný) nákup — sdílený všemi pokladnami firmy. */
+export const basket = defineObject({
+  id: "pos.basket",
+  table: "pos_basket",
+  label: "@POS:Basket",
+  labelPlural: "@POS:Baskets",
+  scope: "company",
+  fields: {
+    label: { edt: Edts.Name, label: "@POS:BasketLabel", mandatory: true },
+    boxId: { edt: refEdt("pos.box", "@POS:Box") },
+    registerId: { edt: refEdt("pos.register", "@POS:Register") },
+    status: { edt: enumEdt(BasketStatus), mandatory: true, default: "open", readOnly: true },
+    receiptId: { edt: refEdt("pos.receipt", "@POS:Receipt"), readOnly: true },
+  },
+  titleField: "label",
+  list: ["label", "boxId", "registerId", "status", "receiptId"],
+  form: [{ label: "@SYS:General", fields: ["label", "boxId", "registerId", "status", "receiptId"] }],
+  defaultSort: { field: "label", dir: "asc" },
+  lines: [{ object: "pos.basketLine", field: "basketId", label: "@POS:Items" }],
+});
+
+export const basketLine = defineObject({
+  id: "pos.basketLine",
+  table: "pos_basket_line",
+  label: "@POS:BasketLine",
+  labelPlural: "@POS:Items",
+  scope: "company",
+  fields: {
+    basketId: { edt: refEdt("pos.basket", "@POS:Basket"), mandatory: true },
+    lineNum: { edt: Edts.Int, label: "@SYS:Number" },
+    itemId: { edt: refEdt("inv.item", "@INV:Item"), mandatory: true },
+    qty: { edt: Edts.Qty, mandatory: true },
+  },
+  titleField: "itemId",
+  list: ["lineNum", "itemId", "qty"],
+  form: [{ label: "@SYS:General", fields: ["itemId", "qty"] }],
+  defaultSort: { field: "lineNum", dir: "asc" },
+});
+
 export const receipt = defineObject({
   id: "pos.receipt",
   table: "pos_receipt",
@@ -212,11 +280,11 @@ export default defineModule({
   description: "@POS:ModuleDesc",
   icon: "Cart",
   dependsOn: ["inv", "gl", "tax"],
-  enums: [PosTemplate, PaymentMethod, ShiftStatus, EetStatus],
-  objects: [register, shift, receipt, receiptLine],
+  enums: [PosTemplate, PaymentMethod, ShiftStatus, EetStatus, BasketStatus],
+  objects: [register, shift, receipt, receiptLine, box, basket, basketLine],
   menu: [
-    { label: "@POS:Module", items: [{ href: "/kasa", label: "@POS:Terminal" }, { object: "pos.receipt" }, { object: "pos.shift" }] },
-    { label: "@SYS:Setup", items: [{ object: "pos.register" }] },
+    { label: "@POS:Module", items: [{ href: "/kasa", label: "@POS:Terminal" }, { object: "pos.receipt" }, { object: "pos.shift" }, { object: "pos.basket" }] },
+    { label: "@SYS:Setup", items: [{ object: "pos.register" }, { object: "pos.box" }, { href: "/kasa/boxy", label: "@POS:BoxLabels" }] },
   ],
   numberSeqs: [
     { code: "POSSHIFT", name: "@POS:Shifts", format: "SM{YY}{#####}", usedFor: "pos.shift" },
@@ -225,6 +293,28 @@ export default defineModule({
   setup: posSetup,
   labels: {
     cs: {
+      Box: "Box",
+      Boxes: "Boxy",
+      BoxLabels: "Štítky boxů",
+      Print: "Tisk",
+      BoxLabelsHint: "Vytiskněte a nalepte na boxy. QR obsahuje kód boxu — v kase stačí načíst čtečkou nebo napsat kód a Enter.",
+      Basket: "Odložený nákup",
+      Baskets: "Odložené nákupy",
+      BasketLine: "Položka nákupu",
+      BasketLabel: "Označení",
+      BasketOpen: "Rozpracovaný",
+      BasketPaid: "Zaplacený",
+      BasketCancelled: "Zrušený",
+      BasketClosed: "Nákup už je uzavřený.",
+      BasketChanged: "Nákup mezitím upravila jiná pokladna — načteno znovu.",
+      BoxBusy: "„{box}“ už má rozpracovaný nákup.",
+      BoxCodeFormat: "Kód boxu jen z písmen a číslic (např. B07).",
+      FreeSale: "Volný prodej",
+      Park: "Odložit",
+      ParkTitle: "Odložit nákup",
+      ParkHint: "Načtěte QR boxu, napište kód boxu nebo jméno zákazníka.",
+      ReleaseBox: "Uvolnit",
+      NoActiveBoxes: "Žádné aktivní boxy — založte je v Pokladna → Boxy.",
       Module: "Pokladna",
       ModuleDesc: "Prodej na pultu: dotykový terminál, zboží na váhu, hotovost i karta, uzávěrka se zaúčtováním.",
       Terminal: "Prodej",
@@ -337,6 +427,28 @@ export default defineModule({
       OpenDrawer: "Otevřít zásuvku",
     },
     en: {
+      Box: "Box",
+      Boxes: "Boxes",
+      BoxLabels: "Box labels",
+      Print: "Print",
+      BoxLabelsHint: "Print and stick on boxes. The QR holds the box code — scan it at the register or type the code and Enter.",
+      Basket: "Parked sale",
+      Baskets: "Parked sales",
+      BasketLine: "Sale item",
+      BasketLabel: "Label",
+      BasketOpen: "In progress",
+      BasketPaid: "Paid",
+      BasketCancelled: "Cancelled",
+      BasketClosed: "The sale is already closed.",
+      BasketChanged: "Another register changed the sale — reloaded.",
+      BoxBusy: "“{box}” already has a sale in progress.",
+      BoxCodeFormat: "Box code may contain letters and digits only (e.g. B07).",
+      FreeSale: "Free sale",
+      Park: "Park",
+      ParkTitle: "Park sale",
+      ParkHint: "Scan the box QR, type the box code or the customer's name.",
+      ReleaseBox: "Release",
+      NoActiveBoxes: "No active boxes — create them in Point of sale → Boxes.",
       Module: "Point of sale",
       ModuleDesc: "Counter sales: touch terminal, items by weight, cash and card, shift closing with posting.",
       Terminal: "Sell",

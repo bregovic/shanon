@@ -78,6 +78,8 @@ interface Props {
   onSelectionChange?: (rows: Row[]) => void;
   /** řádek vybraný a posunutý do pohledu při otevření */
   focusId?: string;
+  /** filtry sloupců z odkazu (?filter.pole=výraz) — mají přednost před uloženými */
+  initialFilters?: Record<string, string>;
   /** změna čísla vynutí nové načtení (po uložení/smazání) */
   reloadKey?: number;
   /** klíč pro zapamatování filtrů v rámci relace prohlížeče */
@@ -328,6 +330,7 @@ export function SmartGrid({
   titleField,
   onSelectionChange,
   focusId,
+  initialFilters,
   reloadKey = 0,
   storageKey,
   maxHeight = "calc(100vh - 190px)",
@@ -381,7 +384,7 @@ export function SmartGrid({
     if (!restored.current) {
       // první běh: obnovit filtry z relace prohlížeče, jinak použít data ze serveru
       restored.current = true;
-      const v = loadView(storageKey);
+      const v = initialFilters && Object.keys(initialFilters).length ? { ...loadView(storageKey), filters: initialFilters } : loadView(storageKey);
       if (Object.keys(v.filters).length || v.sort) {
         // synchronizace s úložištěm prohlížeče až po hydrataci (server ho nezná)
         // eslint-disable-next-line react-hooks/set-state-in-effect

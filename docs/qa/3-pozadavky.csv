@@ -30,5 +30,7 @@ CR-028;change;Kasa: zadání hmotnosti v kg / dkg / g a rychlé volby;POS-SALE;h
 CR-029;change;"Seznamy: šířky sloupců; Otevřít u číselníku vede do přehledu s vybraným záznamem";SYS-UI;medium;uat;29;"Např. účet na pokladně → účtový rozvrh, kde jde založit nový účet; Esc zpět."
 CR-030;change;Organizace: Doplnit z ARES (přejmenování firmy Demo);ORG;medium;uat;30;
 CR-031;change;Systémové účty hlavní knihy a zaokrouhlení podle měny;GL-PARAMS;high;uat;31;"Zaokrouhlení zisk/ztráta, kurzové rozdíly realizované/nerealizované, haléřové rozdíly, technický účet chyb; pravidlo zaokrouhlení u měny (CZK hotovost na koruny)."
-CR-032;change;Kasa: rozpracované nákupy podle boxu s QR kódem;POS-SALE;high;analysis;32;"Volný prodej zůstane; v Nákupu přepínání mezi nákupy, box s QR = nákup."
+CR-032;change;Kasa: rozpracované nákupy podle boxu s QR kódem;POS-SALE;high;uat;32;"Volný prodej zůstane; v Nákupu přepínání mezi nákupy, box s QR = nákup."
 CR-033;change;Duplikovat záznam (šablona);SYS-UI;medium;uat;33;"Číselník: nový formulář bez klíče; doklad s číselnou řadou: kopie i s řádky, nové číslo."
+CR-034;change;Testování: stav Vráceno do vývoje;QA;medium;uat;34;"Po neúspěšném testu; přiřadí se vývojáři."
+CR-035;change;Číselné řady v Nastavení každého modulu;SYS-UI;medium;uat;35;Odkaz vede na číselné řady filtrované na modul (filter.usedFor=modul.*).
