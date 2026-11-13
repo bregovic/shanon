@@ -5,11 +5,12 @@
  * účtování. Modul dodá parametry a labely, objekty a logika jsou společné.
  */
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
-import type { DataApi } from "@/core/module";
+import type { DataApi, EventContext, ObjectHandlers, RecordData } from "@/core/module";
 import { defineObject, type ObjectDef } from "@/core/object";
 import { JournalStatus } from "@/modules/gl";
 import { invoiceHandlers, type InvoiceConfig } from "./document";
 import { postingAccount } from "@/modules/gl/setup";
+import { fillFromAres } from "@/modules/gab/ares";
 
 /** Variabilní symbol — jen číslice, do 10 znaků (jako v příkazu k úhradě). */
 export const Vs = defineEdt({ id: "Vs", kind: "string", label: "@TAX:Vs", maxLength: 10, pattern: /^\d{1,10}$/, patternMessage: "@TAX:VsHelp" });
@@ -95,6 +96,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     unique: [["accountNum"], ["subjectId"]],
     numberSeq: { field: "accountNum", seq: sp.partnerSeq },
     defaultSort: { field: "accountNum", dir: "asc" },
+    actions: [{ id: "ares", label: "@GAB:FromAres" }],
     lines: [
       { object: id("trans"), field: partnerId, label: L("TransPlural"), owned: false },
       { object: id("invoice"), field: partnerId, label: L("Invoices"), owned: false },
@@ -224,7 +226,11 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   return {
     enums: [TransKind],
     objects: [group, partner, invoice, invoiceLine, trans],
-    handlers: invoiceHandlers(cfg),
+    handlers: {
+      ...invoiceHandlers(cfg),
+      // údaje partnera = údaje jeho subjektu v adresáři
+      [partner.id]: { actions: { ares: async (ctx: EventContext, p: RecordData) => void (await fillFromAres(ctx.data, String(p.subjectId))) } } as ObjectHandlers,
+    },
     menu: [
       { label: L("Module"), items: [{ object: partner.id }, { object: invoice.id }, { object: trans.id }] },
       { label: "@SYS:Setup", items: [{ object: group.id }] },

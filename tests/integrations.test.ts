@@ -248,3 +248,63 @@ describe("organizace", () => {
     expect(print.company).toEqual({ name: "Hynek Cibulka", tradeName: "Uzeniny Hynek Cibulka", regNo: "41832744", vatId: "CZ12345678", address: "Uhelný trh 413/8, 110 00 Praha 1" });
   });
 });
+
+describe("položky: marže, slevy, ARES", () => {
+  let D: Ctx;
+  beforeAll(async () => {
+    D = (
+      await provisionTenant(client, {
+        code: `t-disc-${run}`,
+        name: "Slevy",
+        adminEmail: `disc-${run}@test.local`,
+        adminPassword: "heslo-12345",
+        modules: ["pos", "ap"],
+        company: { code: "UZ", name: "Uzeniny" },
+      })
+    ).ctx;
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("marže z prodejní ceny bez DPH, nejvýhodnější sleva v pokladně", async () => {
+    const g = (await listRecords(D, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(D, "inv.unit", { filter: { code: "KG" } }, client)).rows[0];
+    // 229 Kč s DPH 21 % (skupina ZBOZI) = 189,26 bez DPH; nákup 139 → marže 26,56 %
+    const it = await saveRecord(D, "inv.item", null, { itemNum: "SPEK", name: "Iberijský špek", groupId: g.id, unitId: u.id, salesPrice: "229", priceInclTax: true, purchasePrice: "139", weighed: true }, undefined, client);
+    expect([it.priceNet, it.marginPct]).toEqual(["189.26", "26.5600"]);
+    await saveRecord(D, "inv.discount", null, { code: "SKUP10", name: "Skupina −10 %", kind: "percent", percent: "10", groupId: g.id }, undefined, client);
+    await saveRecord(D, "inv.discount", null, { code: "AKCE", name: "Akce týdne", kind: "price", price: "199", itemId: it.id, validFrom: "2020-01-01", validTo: "2099-12-31" }, undefined, client);
+    await saveRecord(D, "inv.discount", null, { code: "STARA", name: "Stará akce", kind: "price", price: "99", itemId: it.id, validTo: "2020-01-01" }, undefined, client);
+    await expect(saveRecord(D, "inv.discount", null, { code: "X", name: "X", kind: "percent", percent: "0" }, undefined, client)).rejects.toBeInstanceOf(UserError);
+
+    const regId = String((await listRecords(D, "pos.register", {}, client)).rows[0].id);
+    await saveRecord(D, "pos.shift", null, { registerId: regId }, undefined, client);
+    const r = await inTenant(D, (s) => sell(s.sys().api(), { registerId: regId, payment: "card", lines: [{ itemId: String(it.id), qty: "0.5" }] }), client);
+    const [line] = (await listRecords(D, "pos.receiptLine", { filter: { receiptId: String(r.id) } }, client)).rows;
+    // −10 % = 206,10 vs. akční 199 → 199; propadlá akce 99 se nepoužije
+    expect([line.unitPrice, line.originalPrice, line.amountGross]).toEqual(["199.00", "229.00", "99.50"]);
+  });
+
+  it("ARES: doplní subjekt a sídlo podle IČO, partner přes svůj subjekt", async () => {
+    vi.stubGlobal("fetch", async (url: string) => {
+      expect(String(url)).toContain("/ekonomicke-subjekty/27079864");
+      return new Response(
+        JSON.stringify({
+          ico: "27079864",
+          obchodniJmeno: "Řeznictví a uzenářství U DOLEJŠÍCH s.r.o.",
+          dic: "CZ27079864",
+          pravniForma: "112",
+          sidlo: { kodStatu: "CZ", nazevObce: "Davle", nazevUlice: "Na náměstí", cisloDomovni: 97, psc: 25206 },
+        }),
+        { status: 200 },
+      );
+    });
+    const subj = await saveRecord(D, "gab.subject", null, { name: "U Dolejších", regNo: "27079864" }, undefined, client);
+    const grp = (await listRecords(D, "ap.group", {}, client)).rows[0];
+    const vendor = await saveRecord(D, "ap.vendor", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    await runAction(D, "ap.vendor", String(vendor.id), "ares", client);
+    const s2 = (await getRecord(D, "gab.subject", String(subj.id), client))!;
+    expect([s2.name, s2.vatId, s2.type]).toEqual(["Řeznictví a uzenářství U DOLEJŠÍCH s.r.o.", "CZ27079864", "organization"]);
+    const [addr] = (await listRecords(D, "gab.address", { filter: { subjectId: String(subj.id) } }, client)).rows;
+    expect([addr.street, addr.city, addr.zipCode, addr.kind]).toEqual(["Na náměstí 97", "Davle", "252 06", "registered"]);
+  });
+});

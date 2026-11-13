@@ -65,6 +65,14 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   v prostředí — bez něj produkce tajné údaje neuloží; ztráta klíče = údaje znovu
   zadat), ven jen maska. Čte je jen logika modulu přes `revealSecret()`.
 - Pole/skupina formuláře podle hodnoty jiného pole: `visibleWhen: { field, in: [...] }`.
+- ARES (`src/modules/gab/ares.ts`): veřejná služba bez klíče; akce „Doplnit z ARES“
+  na subjektu i partnerovi (podle IČO, jinak jednoznačně podle názvu) doplní jméno,
+  DIČ, právní formu a sídlo.
+- Slevy (`inv.discount`): procento nebo akční cena, na položku / skupinu / vše,
+  od–do; pokladna bere nejvýhodnější (`bestDiscount`), na řádku účtenky zůstane
+  běžná cena a sleva.
+- Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
+  <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Peníze přes `src/core/money.ts` (haléře, BigInt), nikdy sčítání `Number`.
 
 ## Obecné metody — žádný kód pro běžné operace

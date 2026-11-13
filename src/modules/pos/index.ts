@@ -165,6 +165,9 @@ export const receiptLine = defineObject({
     qty: { edt: Edts.Qty, mandatory: true },
     unitId: { edt: refEdt("inv.unit", "@INV:Unit") },
     unitPrice: { edt: Edts.Price, label: "@POS:UnitPriceGross", mandatory: true },
+    /** běžná cena před slevou (jen když se sleva použila) */
+    originalPrice: { edt: Edts.Price, label: "@POS:OriginalPrice" },
+    discountId: { edt: refEdt("inv.discount", "@INV:Discount") },
     taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode") },
     revenueAccountId: { edt: refEdt("gl.account", "@INV:RevenueAccount") },
     amountGross: { edt: Edts.Amount, label: "@TAX:AmountGross" },
@@ -172,8 +175,13 @@ export const receiptLine = defineObject({
     taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount" },
   },
   titleField: "description",
-  list: ["itemId", "description", "qty", "unitId", "unitPrice", "taxCodeId", "amountNet", "taxAmount", "amountGross"],
-  form: [{ label: "@SYS:General", fields: ["receiptId", "itemId", "description", "qty", "unitId", "unitPrice", "taxCodeId", "revenueAccountId", "amountNet", "taxAmount", "amountGross"] }],
+  list: ["itemId", "description", "qty", "unitId", "unitPrice", "originalPrice", "discountId", "taxCodeId", "amountNet", "taxAmount", "amountGross"],
+  form: [
+    {
+      label: "@SYS:General",
+      fields: ["receiptId", "itemId", "description", "qty", "unitId", "unitPrice", "originalPrice", "discountId", "taxCodeId", "revenueAccountId", "amountNet", "taxAmount", "amountGross"],
+    },
+  ],
 });
 
 /** Účty pokladny, které ve výchozí osnově nejsou. */
@@ -305,6 +313,8 @@ export default defineModule({
       EmptySale: "Nákup je prázdný.",
       UnitsKg: "kg",
       PaymentRef: "Transakce terminálu",
+      OriginalPrice: "Běžná cena",
+      Discount: "Sleva",
       Eet: "Evidence tržeb",
       EetStatus: "EET",
       EetSent: "Zaevidováno",
@@ -408,6 +418,8 @@ export default defineModule({
       EmptySale: "The basket is empty.",
       UnitsKg: "kg",
       PaymentRef: "Terminal transaction",
+      OriginalPrice: "Regular price",
+      Discount: "Discount",
       Eet: "Sales registration",
       EetStatus: "EET",
       EetSent: "Registered",

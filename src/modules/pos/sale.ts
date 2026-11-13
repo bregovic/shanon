@@ -12,7 +12,7 @@
 import { fromCents, mulCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { postVoucher, type PostingLine } from "@/modules/gl/posting";
-import { netFromGross } from "@/modules/inv/handlers";
+import { bestDiscount, netFromGross } from "@/modules/inv/handlers";
 import { addressLine, orgOf } from "@/modules/org";
 
 const zero = BigInt(0);
@@ -50,14 +50,20 @@ async function saleLine(data: DataApi, itemId: string, qtyRaw: string) {
   if (!/^\d+(\.\d{1,4})?$/.test(qty) || Number(qty) <= 0 || Number(qty) > 100000) throw new UserError("@POS:InvalidQty");
   const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
   const group = await data.get("inv.itemGroup", String(item.groupId));
-  const gross = mulCents(qty, 4, item.priceGross, 2);
+  // akční cena / sleva platná dnes (nejvýhodnější)
+  const regular = toCents(item.priceGross);
+  const disc = await bestDiscount(data, item, regular, today());
+  const unitPrice = disc ? fromCents(disc.price) : String(item.priceGross);
+  const gross = mulCents(qty, 4, unitPrice, 2);
   const net = netFromGross(gross, code?.rate ?? 0);
   return {
     itemId,
     description: String(item.name),
     qty,
     unitId: (item.unitId as string) ?? null,
-    unitPrice: String(item.priceGross),
+    unitPrice,
+    originalPrice: disc ? String(item.priceGross) : null,
+    discountId: disc ? String(disc.discount.id) : null,
     taxCodeId: (item.taxCodeId as string) ?? null,
     revenueAccountId: (group?.revenueAccountId as string) ?? null,
     gross,
@@ -115,6 +121,8 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
       qty: l.qty,
       unitId: l.unitId,
       unitPrice: l.unitPrice,
+      originalPrice: l.originalPrice,
+      discountId: l.discountId,
       taxCodeId: l.taxCodeId,
       revenueAccountId: l.revenueAccountId,
       amountGross: fromCents(l.gross),
@@ -247,7 +255,7 @@ export interface ReceiptPrint {
   register: string;
   /** tradeName = název provozovny/značka nad obchodním jménem (jen když se liší) */
   company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null };
-  lines: { description: string; qty: string; unit: string; unitPrice: string; amount: string; rate: string }[];
+  lines: { description: string; qty: string; unit: string; unitPrice: string; amount: string; rate: string; originalPrice?: string | null }[];
   vat: { rate: string; base: string; tax: string }[];
   gross: string;
   rounding: string;
@@ -292,6 +300,7 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
       unitPrice: String(l.unitPrice),
       amount: String(l.amountGross),
       rate,
+      originalPrice: (l.originalPrice as string) ?? null,
     });
   }
   return {

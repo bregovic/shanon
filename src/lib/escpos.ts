@@ -101,6 +101,7 @@ export function receiptEscPos(
   for (const l of r.lines) {
     p.line(l.description.slice(0, opts.width));
     p.pair(`  ${n(l.qty)} ${l.unit.toLowerCase()} x ${fmt(l.unitPrice)} ${l.rate}%`, fmt(l.amount));
+    if (l.originalPrice) p.line(`  ${L.Discount} z ${fmt(l.originalPrice)}`);
   }
   p.sep();
   if (Number(r.rounding) !== 0) p.pair(L.Rounding, fmt(r.rounding));

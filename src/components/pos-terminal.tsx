@@ -50,6 +50,8 @@ export interface PosItem {
   groupId: string;
   unit: string;
   price: string;
+  /** běžná cena, když platí akce */
+  regular?: string | null;
   weighed: boolean;
   ean: string | null;
 }
@@ -110,6 +112,7 @@ const useStyles = makeStyles({
     ":hover": { backgroundColor: tokens.colorNeutralBackground1Hover },
     ":active": { backgroundColor: tokens.colorBrandBackground2 },
   },
+  regular: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
   tileName: { fontWeight: tokens.fontWeightSemibold, lineHeight: tokens.lineHeightBase400 },
   tilePrice: { display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   cart: {
@@ -437,6 +440,7 @@ export function PosTerminal(p: {
                   <span className={st.tileName}>{i.name}</span>
                   <span className={st.tilePrice}>
                     {i.weighed && <Scales24Regular fontSize={16} />}
+                    {i.regular && <s className={st.regular}>{fmt(i.regular)}</s>}
                     {fmt(i.price)}
                     {i.unit && i.unit !== "KS" ? ` / ${i.unit.toLowerCase()}` : ""}
                   </span>
@@ -743,6 +747,7 @@ function Receipt({
           <div className={st.rRow}>
             <span>
               {n(l.qty)} {l.unit.toLowerCase()} × {fmt(l.unitPrice)} ({l.rate} %)
+              {l.originalPrice ? ` · ${L.Discount} z ${fmt(l.originalPrice)}` : ""}
             </span>
             <span>{fmt(l.amount)}</span>
           </div>

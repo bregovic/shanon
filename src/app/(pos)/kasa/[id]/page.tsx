@@ -7,6 +7,8 @@ import { getRecord, inTenant } from "@/server/data";
 import { getT } from "@/server/i18n";
 import { openShiftOf } from "@/modules/pos/sale";
 import { connectionsFor } from "@/modules/int/drivers";
+import { bestDiscount } from "@/modules/inv/handlers";
+import { fromCents, toCents } from "@/core/money";
 import pos from "@/modules/pos";
 
 export const metadata = { title: "Pokladna" };
@@ -28,7 +30,15 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     const shift = await openShiftOf(api, id);
     const conns = s.ctx.modules.has("int") ? await connectionsFor(api, id) : {};
     const eetPending = conns.eet ? (await api.find("pos.receipt", { registerId: id, eetStatus: "pending" }, { take: 1000 })).length : 0;
-    return { items, groups, units, shift, conns, eetPending };
+    // dnešní akční ceny (stejná pravidla jako při prodeji na serveru)
+    const promo = new Map<string, string>();
+    const today = new Date().toISOString().slice(0, 10);
+    for (const i of items) {
+      if (i.priceGross === null) continue;
+      const d = await bestDiscount(api, i, toCents(i.priceGross), today);
+      if (d) promo.set(String(i.id), fromCents(d.price));
+    }
+    return { items, groups, units, shift, conns, eetPending, promo };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -46,7 +56,8 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           name: String(i.name),
           groupId: String(i.groupId),
           unit: data.units.get(String(i.unitId)) ?? "",
-          price: String(i.priceGross),
+          price: data.promo.get(String(i.id)) ?? String(i.priceGross),
+          regular: data.promo.has(String(i.id)) ? String(i.priceGross) : null,
           weighed: !!i.weighed,
           ean: (i.ean as string) ?? null,
         }))}

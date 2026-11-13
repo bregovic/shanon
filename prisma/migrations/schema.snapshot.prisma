@@ -223,6 +223,7 @@ model SysCompany {
   invUnit_company           InvUnit[]           @relation("InvUnit_company")
   invItemGroup_company      InvItemGroup[]      @relation("InvItemGroup_company")
   invItem_company           InvItem[]           @relation("InvItem_company")
+  invDiscount_company       InvDiscount[]       @relation("InvDiscount_company")
   arGroup_company           ArGroup[]           @relation("ArGroup_company")
   arCustomer_company        ArCustomer[]        @relation("ArCustomer_company")
   arInvoice_company         ArInvoice[]         @relation("ArInvoice_company")
@@ -993,12 +994,13 @@ model InvItemGroup {
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy         String?  @map("updated_by") @db.Uuid
 
-  company         SysCompany @relation("InvItemGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
-  taxCode         TaxCode?   @relation("InvItemGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  revenueAccount  GlAccount? @relation("InvItemGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
-  purchaseTaxCode TaxCode?   @relation("InvItemGroup_purchaseTaxCode", fields: [purchaseTaxCodeId], references: [id], onDelete: Restrict)
-  costAccount     GlAccount? @relation("InvItemGroup_costAccount", fields: [costAccountId], references: [id], onDelete: Restrict)
-  invItem_group   InvItem[]  @relation("InvItem_group")
+  company           SysCompany    @relation("InvItemGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  taxCode           TaxCode?      @relation("InvItemGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  revenueAccount    GlAccount?    @relation("InvItemGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  purchaseTaxCode   TaxCode?      @relation("InvItemGroup_purchaseTaxCode", fields: [purchaseTaxCodeId], references: [id], onDelete: Restrict)
+  costAccount       GlAccount?    @relation("InvItemGroup_costAccount", fields: [costAccountId], references: [id], onDelete: Restrict)
+  invItem_group     InvItem[]     @relation("InvItem_group")
+  invDiscount_group InvDiscount[] @relation("InvDiscount_group")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -1011,35 +1013,40 @@ model InvItemGroup {
 
 /// inv.item — generováno z definice objektu
 model InvItem {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  tenantId      String   @map("tenant_id") @db.Uuid
-  companyId     String   @map("company_id") @db.Uuid
-  itemNum       String   @map("item_num") @db.VarChar(20)
-  name          String   @db.VarChar(120)
-  itemType      String   @default("item") @map("item_type") @db.VarChar(40)
-  groupId       String   @map("group_id") @db.Uuid
-  unitId        String   @map("unit_id") @db.Uuid
-  ean           String?  @db.VarChar(14)
-  salesPrice    Decimal? @map("sales_price") @db.Decimal(18, 2)
-  priceInclTax  Boolean  @default(false) @map("price_incl_tax")
-  taxCodeId     String?  @map("tax_code_id") @db.Uuid
-  priceNet      Decimal? @map("price_net") @db.Decimal(18, 2)
-  priceGross    Decimal? @map("price_gross") @db.Decimal(18, 2)
-  purchasePrice Decimal? @map("purchase_price") @db.Decimal(18, 2)
-  weighed       Boolean  @default(false)
-  description   String?
-  blocked       Boolean  @default(false)
-  ext           Json     @default("{}")
-  version       Int      @default(1)
-  createdAt     DateTime @default(now()) @map("created_at")
-  createdBy     String?  @map("created_by") @db.Uuid
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy     String?  @map("updated_by") @db.Uuid
+  id             String   @id @default(uuid(7)) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  itemNum        String   @map("item_num") @db.VarChar(20)
+  name           String   @db.VarChar(120)
+  itemType       String   @default("item") @map("item_type") @db.VarChar(40)
+  groupId        String   @map("group_id") @db.Uuid
+  unitId         String   @map("unit_id") @db.Uuid
+  ean            String?  @db.VarChar(14)
+  salesPrice     Decimal? @map("sales_price") @db.Decimal(18, 2)
+  priceInclTax   Boolean  @default(false) @map("price_incl_tax")
+  taxCodeId      String?  @map("tax_code_id") @db.Uuid
+  priceNet       Decimal? @map("price_net") @db.Decimal(18, 2)
+  priceGross     Decimal? @map("price_gross") @db.Decimal(18, 2)
+  purchasePrice  Decimal? @map("purchase_price") @db.Decimal(18, 2)
+  marginPct      Decimal? @map("margin_pct") @db.Decimal(7, 4)
+  vendorId       String?  @map("vendor_id") @db.Uuid
+  vendorItemName String?  @map("vendor_item_name") @db.VarChar(255)
+  weighed        Boolean  @default(false)
+  description    String?
+  blocked        Boolean  @default(false)
+  ext            Json     @default("{}")
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?  @map("updated_by") @db.Uuid
 
   company             SysCompany       @relation("InvItem_company", fields: [companyId], references: [id], onDelete: Restrict)
   group               InvItemGroup     @relation("InvItem_group", fields: [groupId], references: [id], onDelete: Restrict)
   unit                InvUnit          @relation("InvItem_unit", fields: [unitId], references: [id], onDelete: Restrict)
   taxCode             TaxCode?         @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  vendor              ApVendor?        @relation("InvItem_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  invDiscount_item    InvDiscount[]    @relation("InvDiscount_item")
   arInvoiceLine_item  ArInvoiceLine[]  @relation("ArInvoiceLine_item")
   apInvoiceLine_item  ApInvoiceLine[]  @relation("ApInvoiceLine_item")
   posReceiptLine_item PosReceiptLine[] @relation("PosReceiptLine_item")
@@ -1049,7 +1056,42 @@ model InvItem {
   @@index([groupId])
   @@index([unitId])
   @@index([taxCodeId])
+  @@index([vendorId])
   @@map("inv_item")
+}
+
+/// inv.discount — generováno z definice objektu
+model InvDiscount {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  code      String    @db.VarChar(20)
+  name      String    @db.VarChar(120)
+  kind      String    @default("percent") @db.VarChar(40)
+  percent   Decimal?  @db.Decimal(7, 4)
+  price     Decimal?  @db.Decimal(18, 2)
+  itemId    String?   @map("item_id") @db.Uuid
+  groupId   String?   @map("group_id") @db.Uuid
+  validFrom DateTime? @map("valid_from") @db.Date
+  validTo   DateTime? @map("valid_to") @db.Date
+  active    Boolean   @default(true)
+  ext       Json      @default("{}")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.Uuid
+
+  company                 SysCompany       @relation("InvDiscount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  item                    InvItem?         @relation("InvDiscount_item", fields: [itemId], references: [id], onDelete: Restrict)
+  group                   InvItemGroup?    @relation("InvDiscount_group", fields: [groupId], references: [id], onDelete: Restrict)
+  posReceiptLine_discount PosReceiptLine[] @relation("PosReceiptLine_discount")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([itemId])
+  @@index([groupId])
+  @@map("inv_discount")
 }
 
 /// ar.group — generováno z definice objektu
@@ -1293,6 +1335,7 @@ model ApVendor {
   subject          GabSubject   @relation("ApVendor_subject", fields: [subjectId], references: [id], onDelete: Restrict)
   group            ApGroup      @relation("ApVendor_group", fields: [groupId], references: [id], onDelete: Restrict)
   currency         SysCurrency? @relation("ApVendor_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  invItem_vendor   InvItem[]    @relation("InvItem_vendor")
   apInvoice_vendor ApInvoice[]  @relation("ApInvoice_vendor")
   apTrans_vendor   ApTrans[]    @relation("ApTrans_vendor")
 
@@ -1654,6 +1697,8 @@ model PosReceiptLine {
   qty              Decimal  @db.Decimal(18, 4)
   unitId           String?  @map("unit_id") @db.Uuid
   unitPrice        Decimal  @map("unit_price") @db.Decimal(18, 2)
+  originalPrice    Decimal? @map("original_price") @db.Decimal(18, 2)
+  discountId       String?  @map("discount_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   revenueAccountId String?  @map("revenue_account_id") @db.Uuid
   amountGross      Decimal? @map("amount_gross") @db.Decimal(18, 2)
@@ -1666,17 +1711,19 @@ model PosReceiptLine {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company        SysCompany @relation("PosReceiptLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  receipt        PosReceipt @relation("PosReceiptLine_receipt", fields: [receiptId], references: [id], onDelete: Restrict)
-  item           InvItem    @relation("PosReceiptLine_item", fields: [itemId], references: [id], onDelete: Restrict)
-  unit           InvUnit?   @relation("PosReceiptLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
-  taxCode        TaxCode?   @relation("PosReceiptLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  revenueAccount GlAccount? @relation("PosReceiptLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  company        SysCompany   @relation("PosReceiptLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  receipt        PosReceipt   @relation("PosReceiptLine_receipt", fields: [receiptId], references: [id], onDelete: Restrict)
+  item           InvItem      @relation("PosReceiptLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit           InvUnit?     @relation("PosReceiptLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  discount       InvDiscount? @relation("PosReceiptLine_discount", fields: [discountId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?     @relation("PosReceiptLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  revenueAccount GlAccount?   @relation("PosReceiptLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([receiptId])
   @@index([itemId])
   @@index([unitId])
+  @@index([discountId])
   @@index([taxCodeId])
   @@index([revenueAccountId])
   @@map("pos_receipt_line")

@@ -284,9 +284,14 @@ export async function importRecords(
             if (!n) return;
             m.set(n, m.has(n) && m.get(n) !== id ? null : id); // null = nejednoznačné
           };
-          for (const r of await s.sys().find(target, {}, 20000)) {
+          const rows = await s.sys().find(target, {}, 20000);
+          // záznam bez vlastního názvu (dodavatel, odběratel) i podle názvu odkazu (subjektu)
+          const refField = tdef.list.find((f) => tdef.fields[f]?.edt.kind === "ref");
+          if (refField && !("name" in tdef.fields)) await s.attachRefTitles(tdef, rows);
+          for (const r of rows) {
             put(r[tdef.titleField], String(r.id));
             if ("name" in tdef.fields && tdef.titleField !== "name") put(r.name, String(r.id));
+            else if (refField) put((r._titles as Record<string, string> | undefined)?.[refField], String(r.id));
           }
           lookups.set(target, m);
           return m;

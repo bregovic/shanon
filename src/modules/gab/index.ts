@@ -65,6 +65,7 @@ export const subject = defineObject({
     { object: "gab.address", field: "subjectId", label: "@GAB:Addresses" },
     { object: "gab.contact", field: "subjectId", label: "@GAB:Contacts" },
   ],
+  actions: [{ id: "ares", label: "@GAB:FromAres" }],
 });
 
 export const address = defineObject({
@@ -137,6 +138,10 @@ export default defineModule({
       ContactKind: "Druh kontaktu",
       ContactValue: "Hodnota",
       Web: "Web",
+      FromAres: "Doplnit z ARES",
+      AresNotFound: "V ARES nic nenalezeno pro „{query}“.",
+      AresAmbiguous: "„{query}“ odpovídá v ARES {n} subjektům — vyplňte IČO.",
+      AresUnavailable: "ARES neodpovídá ({status}). Zkuste to později.",
     },
     en: {
       Module: "Address book",
@@ -160,6 +165,10 @@ export default defineModule({
       ContactKind: "Contact type",
       ContactValue: "Value",
       Web: "Web",
+      FromAres: "Fill in from ARES",
+      AresNotFound: "Nothing found in ARES for “{query}”.",
+      AresAmbiguous: "“{query}” matches {n} parties in ARES — fill in the registration number.",
+      AresUnavailable: "ARES is not responding ({status}). Try again later.",
     },
   },
 });

@@ -8,6 +8,15 @@ import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { postingAccount } from "@/modules/gl/setup";
 
+export const DiscountKind = defineEnum({
+  id: "InvDiscountKind",
+  label: "@INV:DiscountKind",
+  values: [
+    { value: "percent", label: "@INV:DiscountPercent" },
+    { value: "price", label: "@INV:DiscountPrice" },
+  ],
+});
+
 export const ItemType = defineEnum({
   id: "ItemType",
   label: "@INV:ItemType",
@@ -84,21 +93,60 @@ export const item = defineObject({
     taxCodeId: { edt: TaxRef(), aliases: ["dph", "sazba dph", "vat"] },
     priceNet: { edt: Edts.Price, label: "@INV:PriceNet", readOnly: true },
     priceGross: { edt: Edts.Price, label: "@INV:PriceGross", readOnly: true },
-    purchasePrice: { edt: Edts.Price, label: "@INV:PurchasePrice", aliases: ["nakupni cena", "nákupní cena"] },
+    purchasePrice: { edt: Edts.Price, label: "@INV:PurchasePrice", aliases: ["nakupni cena", "nákupní cena", "cena bez dph nakup"] },
+    /** marže z prodejní ceny bez DPH: (prodej − nákup) / prodej */
+    marginPct: { edt: Edts.Percent, label: "@INV:Margin", readOnly: true },
+    vendorId: { edt: refEdt("ap.vendor", "@INV:Vendor"), optionalRef: true, aliases: ["dodavatel", "firma", "vendor", "supplier"] },
+    vendorItemName: { edt: Edts.Description, label: "@INV:VendorItemName" },
     weighed: { edt: Edts.NoYes, label: "@INV:Weighed", aliases: ["vazene", "vážené", "na vahu", "na váhu"] },
     description: { edt: Edts.Notes, label: "@INV:Description", aliases: ["popis", "description"] },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "itemNum",
-  list: ["itemNum", "name", "groupId", "unitId", "priceNet", "priceGross", "taxCodeId", "ean", "weighed", "blocked"],
+  list: ["itemNum", "name", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "vendorId", "weighed", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["itemNum", "name", "itemType", "groupId", "unitId", "ean", "weighed", "blocked"] },
-    { label: "@INV:Prices", fields: ["salesPrice", "priceInclTax", "taxCodeId", "priceNet", "priceGross", "purchasePrice"] },
+    { label: "@INV:Prices", fields: ["salesPrice", "priceInclTax", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
+    { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName"] },
     { label: "@INV:Description", fields: ["description"] },
   ],
   unique: [["itemNum"]],
   numberSeq: { field: "itemNum", seq: "INVITEM" },
   defaultSort: { field: "itemNum", dir: "asc" },
+});
+
+/**
+ * Sleva (obdoba Retail discounts / prodejních akcí v D365): procento nebo
+ * akční cena s DPH, na položku, skupinu nebo celý sortiment, v rozmezí dat.
+ * Pokladna použije nejvýhodnější platnou slevu; ruční změny ceny na účtence
+ * se zatím nepovolují.
+ */
+export const discount = defineObject({
+  id: "inv.discount",
+  table: "inv_discount",
+  label: "@INV:Discount",
+  labelPlural: "@INV:Discounts",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    kind: { edt: enumEdt(DiscountKind), mandatory: true, default: "percent" },
+    percent: { edt: Edts.Percent, label: "@INV:DiscountPercentValue", visibleWhen: { field: "kind", in: ["percent"] } },
+    price: { edt: Edts.Price, label: "@INV:DiscountPriceValue", visibleWhen: { field: "kind", in: ["price"] } },
+    itemId: { edt: refEdt("inv.item", "@INV:Item") },
+    groupId: { edt: refEdt("inv.itemGroup", "@INV:Group") },
+    validFrom: { edt: Edts.TransDate, label: "@INV:ValidFrom" },
+    validTo: { edt: Edts.TransDate, label: "@INV:ValidTo" },
+    active: { edt: Edts.NoYes, label: "@INV:Active", default: true },
+  },
+  titleField: "code",
+  list: ["code", "name", "kind", "percent", "price", "itemId", "groupId", "validFrom", "validTo", "active"],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "kind", "percent", "price", "active"] },
+    { label: "@INV:DiscountScope", fields: ["itemId", "groupId", "validFrom", "validTo"] },
+  ],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
 });
 
 const UNITS: [string, string, number][] = [
@@ -143,10 +191,10 @@ export default defineModule({
   description: "@INV:ModuleDesc",
   icon: "Box",
   dependsOn: ["gl", "tax"],
-  enums: [ItemType],
-  objects: [unit, itemGroup, item],
+  enums: [ItemType, DiscountKind],
+  objects: [unit, itemGroup, item, discount],
   menu: [
-    { label: "@INV:Module", items: [{ object: "inv.item" }] },
+    { label: "@INV:Module", items: [{ object: "inv.item" }, { object: "inv.discount" }] },
     { label: "@SYS:Setup", items: [{ object: "inv.itemGroup" }, { object: "inv.unit" }] },
   ],
   numberSeqs: [{ code: "INVITEM", name: "@INV:Items", format: "P{#####}", usedFor: "inv.item" }],
@@ -182,6 +230,22 @@ export default defineModule({
       Weighed: "Prodej na váhu",
       Description: "Popis",
       Prices: "Ceny",
+      Margin: "Marže %",
+      Vendor: "Hlavní dodavatel",
+      VendorItemName: "Název u dodavatele",
+      Discount: "Sleva",
+      Discounts: "Slevy a akce",
+      DiscountKind: "Druh slevy",
+      DiscountPercent: "Procento z ceny",
+      DiscountPrice: "Akční cena",
+      DiscountPercentValue: "Sleva %",
+      DiscountPriceValue: "Akční cena s DPH",
+      DiscountScope: "Platnost",
+      ValidFrom: "Platí od",
+      ValidTo: "Platí do",
+      Active: "Aktivní",
+      DiscountTarget: "Vyplňte buď položku, nebo skupinu (prázdné = celý sortiment).",
+      DiscountValue: "Vyplňte výši slevy.",
     },
     en: {
       Module: "Products",
@@ -213,6 +277,22 @@ export default defineModule({
       Weighed: "Sold by weight",
       Description: "Description",
       Prices: "Prices",
+      Margin: "Margin %",
+      Vendor: "Main vendor",
+      VendorItemName: "Vendor item name",
+      Discount: "Discount",
+      Discounts: "Discounts and promotions",
+      DiscountKind: "Discount type",
+      DiscountPercent: "Percentage off",
+      DiscountPrice: "Promotional price",
+      DiscountPercentValue: "Discount %",
+      DiscountPriceValue: "Promotional price incl. VAT",
+      DiscountScope: "Validity",
+      ValidFrom: "Valid from",
+      ValidTo: "Valid to",
+      Active: "Active",
+      DiscountTarget: "Fill in either an item or a group (empty = whole assortment).",
+      DiscountValue: "Fill in the discount amount.",
     },
   },
 });
