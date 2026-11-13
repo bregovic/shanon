@@ -164,6 +164,16 @@ export async function glSetup(data: DataApi): Promise<void> {
       });
     }
   }
+  // finanční dimenze (sdílené v tenantovi): středisko, zakázka, partner
+  for (const [code, name, position, source] of [
+    ["STR", "Středisko", 1, "custom"],
+    ["ZAK", "Zakázka", 2, "custom"],
+    ["PAR", "Partner", 3, "partner"],
+  ] as const) {
+    // jen chybějící kód na volném pořadí (tenant si mohl dimenze upravit)
+    const taken = await data.find("gl.dimension", { position }, { take: 1 });
+    if (!taken.length && !(await data.find("gl.dimension", { code }, { take: 1 })).length) await data.create("gl.dimension", { code, name, position, source, active: true });
+  }
   if (!(await data.find("gl.journalName", { code: "GEN" }, { take: 1 })).length) {
     await data.create("gl.journalName", { code: "GEN", name: "Obecný deník" });
   }

@@ -9,6 +9,7 @@ import { fromCents, mulCents, percentOf, sumCents, toCents } from "@/core/money"
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents } from "@/modules/sys/currency";
 import { accountingCurrencyId, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { dimsOf } from "@/modules/gl/dimensions";
 
 export interface InvoiceConfig {
   /** hlavička a řádky, např. ar.invoice / ar.invoiceLine */
@@ -180,7 +181,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
       amount: fromCents(-s * net),
       amountCur: fromCents(-s * netCur),
       currencyId: curId,
-      costCenterId: (l.costCenterId as string) ?? null,
+      dims: dimsOf(l),
       text: (l.description as string) ?? null,
     });
     if (l.taxCodeId) {
@@ -212,6 +213,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     description: `${docNum}${subject ? ` · ${subject.name}` : ""}`,
     sourceObject: cfg.header,
     sourceId: String(header.id),
+    partner: String(partner.accountNum ?? "") || null,
     lines: posting,
   });
 

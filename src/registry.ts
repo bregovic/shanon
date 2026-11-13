@@ -7,6 +7,7 @@ import { ADMIN_ONLY } from "@/core/security";
 import gab from "@/modules/gab";
 import gl from "@/modules/gl";
 import { glHandlers } from "@/modules/gl/posting";
+import { dimensionHandlers } from "@/modules/gl/dimensions";
 import { sysHandlers } from "@/modules/sys/currency";
 import sys, { NumberedObject, SecurityTarget } from "@/modules/sys";
 import tax from "@/modules/tax";
@@ -40,7 +41,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

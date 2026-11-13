@@ -6,12 +6,14 @@
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type ValidationErrors, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents, rateFor } from "@/modules/sys/currency";
+import { activeDimensions, dimsOf, requirementsFor, resolveDims, type Dims } from "./dimensions";
 
 export interface PostingLine {
   accountId: string;
   /** kladná = MD, záporná = D */
   amount: string;
-  costCenterId?: string | null;
+  /** finanční dimenze dim1…dim6 (kontroluje je postVoucher podle účtu) */
+  dims?: Dims;
   text?: string | null;
   /** cizí měna řádku (null = účetní měna) a částka v ní */
   currencyId?: string | null;
@@ -26,6 +28,8 @@ export interface PostingRequest {
   /** konkrétní řada dokladů (z názvu deníku); jinak řada s Použitím „Účetní doklady“ */
   voucherSeqId?: string | null;
   lines: PostingLine[];
+  /** partner dokladu (číslo odběratele / dodavatele) pro dimenzi Partner */
+  partner?: string | null;
 }
 
 /** Kontrola bez přístupu k datům — vyrovnanost a neprázdnost. */
@@ -46,7 +50,7 @@ export function journalLinesToPosting(lines: RecordData[]): PostingLine[] {
     return {
       accountId: String(l.accountId),
       amount: fromCents(debit - credit),
-      costCenterId: (l.costCenterId as string) ?? null,
+      dims: dimsOf(l),
       text: (l.text as string) ?? null,
       currencyId: (l.currencyId as string) ?? null,
     };
@@ -144,12 +148,11 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
   await assertOpenPeriod(data, req.date);
   // ruční zápis = účetní deník; doklady modulů (faktury, banka, pokladna) smí i na saldokonto
   const manual = req.sourceObject === "gl.journal";
-  const seen = new Set<string>();
-  for (const l of req.lines) {
-    if (seen.has(l.accountId)) continue;
-    seen.add(l.accountId);
-    await assertPostable(data, l.accountId, manual);
-  }
+  const accounts = new Map<string, RecordData>();
+  for (const l of req.lines) if (!accounts.has(l.accountId)) accounts.set(l.accountId, await assertPostable(data, l.accountId, manual));
+  // dimenze podle nastavení účtu (partner z dokladu se doplní sám)
+  const defs = await activeDimensions(data);
+  const dims = await Promise.all(req.lines.map((l) => resolveDims(data, accounts.get(l.accountId)!, l.dims ?? {}, { manual, partner: req.partner, defs })));
   const voucher = await data.create("gl.voucher", {
     // bez řady z deníku doplní číslo datová služba podle Použití (gl.voucher)
     voucherNum: req.voucherSeqId ? await data.nextNumber({ id: req.voucherSeqId }, new Date(req.date)) : null,
@@ -158,13 +161,13 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
     sourceObject: req.sourceObject ?? null,
     sourceId: req.sourceId ?? null,
   });
-  for (const l of req.lines) {
+  for (const [i, l] of req.lines.entries()) {
     if (toCents(l.amount) === BigInt(0)) continue;
     await data.create("gl.trans", {
+      ...dims[i],
       voucherId: voucher.id,
       date: req.date,
       accountId: l.accountId,
-      costCenterId: l.costCenterId ?? null,
       amount: l.amount,
       currencyId: l.currencyId ?? null,
       amountCur: l.amountCur ?? null,
@@ -259,6 +262,7 @@ export const glHandlers: Record<string, ObjectHandlers> = {
       if (!/^\d{6}$/.test(num)) return;
       data.synthetic = num.slice(0, 3);
       data.accountClass = Number(num[0]);
+      Object.assign(data, await requirementsFor(ctx.data, num));
       // nový účet stejné syntetiky převezme typ a druh od existujícího
       if (!data.type || !data.postingType) {
         const [sib] = (await ctx.data.find("gl.account", { synthetic: data.synthetic }, { take: 5, orderBy: { accountNum: "asc" } })).filter((a) => a.id !== data.id);
@@ -276,7 +280,10 @@ export const glHandlers: Record<string, ObjectHandlers> = {
     async beforeSave(ctx, data) {
       await assertJournalOpen(ctx.data, data.journalId);
       // ruční zápis: hned při zadání řádku, ne až při zaúčtování
-      if (data.accountId) await assertPostable(ctx.data, String(data.accountId), true);
+      if (data.accountId) {
+        const acc = await assertPostable(ctx.data, String(data.accountId), true);
+        Object.assign(data, await resolveDims(ctx.data, acc, dimsOf(data), { manual: true }));
+      }
     },
     beforeDelete: (ctx, data) => assertJournalOpen(ctx.data, data.journalId),
   },

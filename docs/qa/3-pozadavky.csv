@@ -1,5 +1,5 @@
 ﻿Číslo;Typ;Název;Funkce;Priorita;Stav;Pořadí;Popis
-CR-001;change;Finanční dimenze místo střediska;GL-ACCOUNTS;high;development;1;Dimenze (středisko, partner, projekt…), povolené a povinné podle účtu / syntetiky, periodické přiřazení.
+CR-001;change;Finanční dimenze místo střediska;GL-ACCOUNTS;high;uat;1;Dimenze (středisko, partner, projekt…), povolené a povinné podle účtu / syntetiky, periodické přiřazení.
 CR-002;change;Kurzy ČNB a ECB jako napojení s plánovaným stahováním;GL-PARAMS;medium;new;2;Napojení v Integraci, denní stažení dávkovou úlohou.
 CR-003;change;Dávkové úlohy s opakováním a jejich přehled;;high;new;3;Jako batch v AX: třídy úloh, plán s rekurencí, historie běhů, přehled v Organizaci.
 CR-004;change;Pokladní deník;POS-SHIFT;high;new;4;Příjmové a výdajové pokladní doklady, zůstatek, uzávěrka směny do deníku.

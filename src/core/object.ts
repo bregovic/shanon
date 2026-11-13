@@ -44,6 +44,11 @@ export interface FieldDef {
    * tlačítkem i přetažením, grid miniaturu, import bere cestu k souboru
    */
   image?: boolean;
+  /**
+   * finanční dimenze č. 1–6: popisek = název dimenze tenanta, bez aktivní
+   * dimenze se pole nezobrazuje (src/server/ui.ts)
+   */
+  dimSlot?: number;
   /** pole se ve formuláři ukáže jen při dané hodnotě jiného pole */
   visibleWhen?: VisibleWhen;
   /** další názvy sloupce při importu (CSV/XML), např. ["cena", "price"] */

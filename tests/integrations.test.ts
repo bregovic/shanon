@@ -379,3 +379,43 @@ describe("testování a vývoj", () => {
     expect(iss.status).toBe("new");
   });
 });
+
+describe("finanční dimenze", () => {
+  it("pravidla podle začátku účtu, povinná / nepovolená v deníku, partner z faktury, popisky", async () => {
+    const D = (await provisionTenant(client, { code: `t-dim-${run}`, name: "Dim", adminEmail: `dim-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar"], company: { code: "D", name: "D" } })).ctx;
+    const dims = (await listRecords(D, "gl.dimension", {}, client)).rows;
+    expect(dims.map((d) => [d.position, d.code, d.source])).toEqual([[1, "STR", "custom"], [2, "ZAK", "custom"], [3, "PAR", "partner"]]);
+    const str = dims[0];
+    await saveRecord(D, "gl.dimensionValue", null, { dimensionId: str.id, code: "prodejna", name: "Prodejna" }, undefined, client);
+    // náklady (5) vyžadují středisko, účet 518100 ho naopak nepovoluje (nejdelší shoda)
+    await saveRecord(D, "gl.dimensionRule", null, { dimensionId: str.id, accountMask: "5", requirement: "mandatory" }, undefined, client);
+    await saveRecord(D, "gl.dimensionRule", null, { dimensionId: str.id, accountMask: "5181", requirement: "notAllowed" }, undefined, client);
+    const acc = async (n: string) => (await listRecords(D, "gl.account", { filter: { accountNum: n } }, client)).rows[0];
+    expect([(await acc("518000")).dim1Req, (await acc("518100")).dim1Req, (await acc("604000")).dim1Req]).toEqual(["mandatory", "notAllowed", "optional"]);
+    // nový účet převezme nastavení z pravidel
+    expect((await saveRecord(D, "gl.account", null, { accountNum: "512100", name: "Cestovné tuzemsko" }, undefined, client)).dim1Req).toBe("mandatory");
+
+    const j = await saveRecord(D, "gl.journal", null, { date: "2026-11-12", description: "Dimenze" }, undefined, client);
+    const a518 = await acc("518000");
+    await expect(saveRecord(D, "gl.journalLine", null, { journalId: j.id, accountId: a518.id, debit: "100" }, undefined, client)).rejects.toMatchObject({ label: "@GL:DimMandatory" });
+    await expect(saveRecord(D, "gl.journalLine", null, { journalId: j.id, accountId: a518.id, debit: "100", dim1: "SKLAD" }, undefined, client)).rejects.toMatchObject({ label: "@GL:DimValueUnknown" });
+    await expect(saveRecord(D, "gl.journalLine", null, { journalId: j.id, accountId: (await acc("518100")).id, debit: "100", dim1: "PRODEJNA" }, undefined, client)).rejects.toMatchObject({ label: "@GL:DimNotAllowed" });
+    await saveRecord(D, "gl.journalLine", null, { journalId: j.id, accountId: a518.id, debit: "100", dim1: "prodejna" }, undefined, client);
+    await saveRecord(D, "gl.journalLine", null, { journalId: j.id, accountId: (await acc("395000")).id, credit: "100" }, undefined, client);
+    await runAction(D, "gl.journal", String(j.id), "post", client);
+    const posted = (await getRecord(D, "gl.journal", String(j.id), client))!;
+    const tr = (await listRecords(D, "gl.trans", { filter: { voucherId: String(posted.voucherId) } }, client)).rows;
+    expect(tr.find((t) => t.accountId === a518.id)!.dim1).toBe("PRODEJNA");
+
+    // vydaná faktura: partner = číslo odběratele, doplní se sám na všech řádcích zápisu
+    const grp = (await listRecords(D, "ar.group", {}, client)).rows[0];
+    const subj = await saveRecord(D, "gab.subject", null, { name: "Restaurace" }, undefined, client);
+    const cust = await saveRecord(D, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const inv = await saveRecord(D, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-12" }, undefined, client);
+    await saveRecord(D, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Catering", qty: "1", unitPrice: "1000" }, undefined, client);
+    await runAction(D, "ar.invoice", String(inv.id), "post", client);
+    const v = (await getRecord(D, "ar.invoice", String(inv.id), client))!.voucherId;
+    const lines = (await listRecords(D, "gl.trans", { filter: { voucherId: String(v) } }, client)).rows;
+    expect(lines.every((l) => l.dim3 === cust.accountNum)).toBe(true);
+  });
+});

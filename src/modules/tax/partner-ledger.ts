@@ -7,7 +7,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import type { DataApi, EventContext, ObjectHandlers, RecordData } from "@/core/module";
 import { defineObject, type ObjectDef } from "@/core/object";
-import { JournalStatus } from "@/modules/gl";
+import { DIM_NAMES, JournalStatus, dimFields } from "@/modules/gl";
 import { invoiceHandlers, type InvoiceConfig } from "./document";
 import { postingAccount } from "@/modules/gl/setup";
 import { fillFromAres } from "@/modules/gab/ares";
@@ -160,15 +160,16 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       unitPrice: { edt: Edts.Price, label: "@TAX:UnitPrice" },
       [sp.lineAccountField]: { edt: AccountRef(L("LineAccount")) },
       taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode") },
-      costCenterId: { edt: refEdt("gl.costCenter", "@GL:CostCenter") },
+      ...dimFields(),
       amountNet: { edt: Edts.Amount, label: "@TAX:AmountNet", readOnly: true },
       taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
     },
     titleField: "description",
-    list: ["itemId", "description", "qty", "unitId", "unitPrice", sp.lineAccountField, "taxCodeId", "costCenterId", "amountNet", "taxAmount"],
+    list: ["itemId", "description", "qty", "unitId", "unitPrice", sp.lineAccountField, "taxCodeId", ...DIM_NAMES, "amountNet", "taxAmount"],
     form: [
       { label: "@SYS:General", fields: ["invoiceId", "itemId", "description", "qty", "unitId", "unitPrice"] },
-      { label: "@GL:Posting", fields: [sp.lineAccountField, "taxCodeId", "costCenterId", "amountNet", "taxAmount"] },
+      { label: "@GL:Posting", fields: [sp.lineAccountField, "taxCodeId", "amountNet", "taxAmount"] },
+      { label: "@GL:Dimensions", fields: DIM_NAMES },
     ],
   });
 

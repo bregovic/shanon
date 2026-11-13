@@ -39,12 +39,22 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
 /** Pole odkazující do vypnutého modulu se v UI nezobrazují. */
 export const hiddenFields = (ctx: Ctx, def: ObjectDef) =>
   Object.entries(def.fields)
-    .filter(([, f]) => f.edt.refObject && !ctx.modules.has(f.edt.refObject.split(".")[0]))
+    .filter(
+      ([, f]) =>
+        (f.edt.refObject && !f.dimSlot && !ctx.modules.has(f.edt.refObject.split(".")[0])) ||
+        // dimenze bez aktivní dimenze na daném pořadí se nezobrazuje
+        (f.dimSlot && !ctx.dims?.some((d) => d.slot === f.dimSlot)),
+    )
     .map(([n]) => n);
 
 export function fieldsMeta(ctx: Ctx, def: ObjectDef, t: T): Record<string, FieldMeta> {
   const out: Record<string, FieldMeta> = {};
-  for (const [n, f] of Object.entries(def.fields)) out[n] = meta(n, f, t);
+  for (const [n, f] of Object.entries(def.fields)) {
+    out[n] = meta(n, f, t);
+    // popisek dimenze = její název v tenantovi (Středisko, Zakázka…)
+    const dim = f.dimSlot ? ctx.dims?.find((d) => d.slot === f.dimSlot) : undefined;
+    if (dim) out[n] = { ...out[n], label: dim.name };
+  }
   for (const [n, f] of Object.entries(extFields(ctx, def.id))) out[n] = meta(n, f, t, true);
   return out;
 }

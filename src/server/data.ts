@@ -46,6 +46,8 @@ export interface Ctx {
   extensions: Set<string>;
   /** jazyk uživatele (výchozí čeština) */
   lang?: Lang;
+  /** aktivní finanční dimenze (pořadí → název) — popisky a viditelnost polí dim1…dim6 */
+  dims?: { slot: number; name: string }[];
 }
 
 export interface ListParams {

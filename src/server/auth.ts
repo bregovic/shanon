@@ -119,8 +119,17 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   /** firmy, kde smí spravovat uživatele (superuživatel všechny) */
   const adminCompanyIds = superUser ? allCompanies.map((c) => c.id) : [...assigned.values()].filter((a) => a.admin).map((a) => a.companyId);
 
+  // finanční dimenze tenanta (popisky polí dim1…dim6)
+  const dims = modules.has("gl")
+    ? (
+        await withTenant(tenant.id, (tx) =>
+          tx.glDimension.findMany({ where: { tenantId: tenant.id, active: true }, select: { position: true, name: true }, orderBy: { position: "asc" } }),
+        )
+      ).map((d) => ({ slot: d.position, name: d.name }))
+    : [];
+
   return {
-    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions, lang: (user.lang as Lang) ?? DEFAULT_LANG },
+    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions, lang: (user.lang as Lang) ?? DEFAULT_LANG, dims },
     lang: (user.lang as Lang) ?? DEFAULT_LANG,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     tenant: { id: tenant.id, name: tenant.name },

@@ -82,7 +82,6 @@ export const AccountNum = defineEdt({
 });
 export const VoucherNum = defineEdt({ id: "VoucherNum", kind: "string", label: "@GL:Voucher", maxLength: 30 });
 const AccountRef = refEdt("gl.account", "@GL:Account");
-const CostCenterRef = refEdt("gl.costCenter", "@GL:CostCenter");
 const VoucherRef = refEdt("gl.voucher", "@GL:Voucher");
 const JournalRef = refEdt("gl.journal", "@GL:Journal");
 const JournalNameRef = refEdt("gl.journalName", "@GL:JournalName");
@@ -134,6 +133,92 @@ export const period = defineObject({
 
 const AccRef = (label: string) => refEdt("gl.account", label);
 
+export const DimSource = defineEnum({
+  id: "DimSource",
+  label: "@GL:DimSource",
+  values: [
+    { value: "custom", label: "@GL:DimCustom" },
+    { value: "partner", label: "@GL:DimPartner" },
+  ],
+});
+
+export const DimRequirement = defineEnum({
+  id: "DimRequirement",
+  label: "@GL:DimRequirement",
+  values: [
+    { value: "optional", label: "@GL:DimOptional" },
+    { value: "mandatory", label: "@GL:DimMandatoryValue" },
+    { value: "notAllowed", label: "@GL:DimNotAllowedValue" },
+  ],
+});
+
+const DimValue = defineEdt({ id: "DimValue", kind: "string", label: "@GL:Dimension", maxLength: 20, transform: "upper" });
+/** pole dim1…dim6 (finanční dimenze) — stejná na zápisech, deníku i řádcích dokladů */
+export const dimFields = () =>
+  Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`dim${n}`, { edt: DimValue, dimSlot: n }])) as Record<string, { edt: typeof DimValue; dimSlot: number }>;
+export const DIM_NAMES = ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"];
+
+export const dimension = defineObject({
+  id: "gl.dimension",
+  table: "gl_dimension",
+  label: "@GL:Dimension",
+  labelPlural: "@GL:Dimensions",
+  scope: "tenant",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    position: { edt: Edts.Int, label: "@GL:DimPositionLabel", mandatory: true },
+    source: { edt: enumEdt(DimSource), mandatory: true, default: "custom" },
+    active: { edt: Edts.NoYes, label: "@GL:DimActive", default: true },
+  },
+  titleField: "code",
+  list: ["position", "code", "name", "source", "active"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "position", "source", "active"] }],
+  unique: [["code"], ["position"]],
+  defaultSort: { field: "position", dir: "asc" },
+  lines: [
+    { object: "gl.dimensionValue", field: "dimensionId", label: "@GL:DimValues" },
+    { object: "gl.dimensionRule", field: "dimensionId", label: "@GL:DimRules", owned: false },
+  ],
+});
+
+export const dimensionValue = defineObject({
+  id: "gl.dimensionValue",
+  table: "gl_dimension_value",
+  label: "@GL:DimValue",
+  labelPlural: "@GL:DimValues",
+  scope: "tenant",
+  fields: {
+    dimensionId: { edt: refEdt("gl.dimension", "@GL:Dimension"), mandatory: true },
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+  },
+  titleField: "code",
+  list: ["dimensionId", "code", "name", "blocked"],
+  form: [{ label: "@SYS:General", fields: ["dimensionId", "code", "name", "blocked"] }],
+  unique: [["dimensionId", "code"]],
+  defaultSort: { field: "code", dir: "asc" },
+});
+
+export const dimensionRule = defineObject({
+  id: "gl.dimensionRule",
+  table: "gl_dimension_rule",
+  label: "@GL:DimRule",
+  labelPlural: "@GL:DimRules",
+  scope: "company",
+  fields: {
+    dimensionId: { edt: refEdt("gl.dimension", "@GL:Dimension"), mandatory: true },
+    accountMask: { edt: defineEdt({ id: "DimMask", kind: "string", label: "@GL:DimMask", maxLength: 6, pattern: /^\d{1,6}$/, patternMessage: "@GL:DimMaskHelp" }), mandatory: true },
+    requirement: { edt: enumEdt(DimRequirement), mandatory: true, default: "mandatory" },
+  },
+  titleField: "accountMask",
+  list: ["dimensionId", "accountMask", "requirement"],
+  form: [{ label: "@SYS:General", fields: ["dimensionId", "accountMask", "requirement"] }],
+  unique: [["dimensionId", "accountMask"]],
+  defaultSort: { field: "accountMask", dir: "asc" },
+});
+
 export const parameters = defineObject({
   id: "gl.parameters",
   table: "gl_parameters",
@@ -180,33 +265,20 @@ export const account = defineObject({
     postingType: { edt: enumEdt(PostingType) },
     noManualEntry: { edt: Edts.NoYes, label: "@GL:NoManualEntry" },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+    // nastavení dimenzí — propisuje se z pravidel (gl.dimensionRule)
+    ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`dim${n}Req`, { edt: enumEdt(DimRequirement), readOnly: true, dimSlot: n }])),
   },
   titleField: "accountNum",
   list: ["accountNum", "name", "type", "postingType", "noManualEntry", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["accountNum", "name", "type", "synthetic", "accountClass", "blocked"] },
     { label: "@GL:Control", fields: ["postingType", "noManualEntry"] },
+    { label: "@GL:Dimensions", fields: ["dim1Req", "dim2Req", "dim3Req", "dim4Req", "dim5Req", "dim6Req"] },
   ],
   unique: [["accountNum"]],
   defaultSort: { field: "accountNum", dir: "asc" },
 });
 
-export const costCenter = defineObject({
-  id: "gl.costCenter",
-  table: "gl_cost_center",
-  label: "@GL:CostCenter",
-  labelPlural: "@GL:CostCenters",
-  scope: "company",
-  fields: {
-    code: { edt: Edts.Code, mandatory: true },
-    name: { edt: Edts.Name, mandatory: true },
-  },
-  titleField: "code",
-  list: ["code", "name"],
-  form: [{ label: "@SYS:General", fields: ["code", "name"] }],
-  unique: [["code"]],
-  defaultSort: { field: "code", dir: "asc" },
-});
 
 export const voucher = defineObject({
   id: "gl.voucher",
@@ -266,7 +338,7 @@ export const trans = defineObject({
     voucherId: { edt: VoucherRef, mandatory: true },
     date: { edt: Edts.TransDate, mandatory: true },
     accountId: { edt: AccountRef, mandatory: true },
-    costCenterId: { edt: CostCenterRef },
+    ...dimFields(),
     /** kladná = MD (debet), záporná = D (kredit) */
     amount: { edt: Edts.Amount, mandatory: true, label: "@GL:AmountSigned" },
     currencyId: { edt: CurrencyRef },
@@ -274,9 +346,10 @@ export const trans = defineObject({
     text: { edt: Edts.Description, label: "@GL:Text" },
   },
   titleField: "text",
-  list: ["date", "voucherId", "accountId", "costCenterId", "amount", "currencyId", "amountCur", "text"],
+  list: ["date", "voucherId", "accountId", ...DIM_NAMES, "amount", "currencyId", "amountCur", "text"],
   form: [
-    { label: "@SYS:General", fields: ["voucherId", "date", "accountId", "costCenterId", "amount", "text"] },
+    { label: "@SYS:General", fields: ["voucherId", "date", "accountId", "amount", "text"] },
+    { label: "@GL:Dimensions", fields: DIM_NAMES },
     { label: "@SYS:Currency", fields: ["currencyId", "amountCur"] },
   ],
   defaultSort: { field: "date", dir: "desc" },
@@ -319,7 +392,7 @@ export const journalLine = defineObject({
   fields: {
     journalId: { edt: JournalRef, mandatory: true },
     accountId: { edt: AccountRef, mandatory: true },
-    costCenterId: { edt: CostCenterRef },
+    ...dimFields(),
     /** prázdné = účetní měna firmy */
     currencyId: { edt: CurrencyRef },
     debit: { edt: Edts.Amount, label: "@GL:Debit" },
@@ -327,8 +400,11 @@ export const journalLine = defineObject({
     text: { edt: Edts.Description, label: "@GL:Text" },
   },
   titleField: "text",
-  list: ["accountId", "costCenterId", "currencyId", "debit", "credit", "text"],
-  form: [{ label: "@SYS:General", fields: ["journalId", "accountId", "costCenterId", "currencyId", "debit", "credit", "text"] }],
+  list: ["accountId", ...DIM_NAMES, "currencyId", "debit", "credit", "text"],
+  form: [
+    { label: "@SYS:General", fields: ["journalId", "accountId", "currencyId", "debit", "credit", "text"] },
+    { label: "@GL:Dimensions", fields: DIM_NAMES },
+  ],
 });
 
 export default defineModule({
@@ -337,8 +413,8 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus],
-  objects: [parameters, account, costCenter, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
+  enums: [DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus],
+  objects: [parameters, dimension, dimensionValue, dimensionRule, account, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
   menu: [
     {
       label: "@GL:Module",
@@ -346,7 +422,7 @@ export default defineModule({
     },
     {
       label: "@SYS:Setup",
-      items: [{ object: "gl.parameters" }, { object: "gl.account" }, { object: "gl.costCenter" }, { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
+      items: [{ object: "gl.parameters" }, { object: "gl.account" }, { object: "gl.dimension" }, { object: "gl.dimensionRule" }, { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
     },
   ],
   numberSeqs: [
@@ -364,6 +440,27 @@ export default defineModule({
       AccountNumHelp: "Číslo účtu má 3–10 číslic.",
       SyntheticAccount: "Syntetický účet",
       Parameters: "Parametry hlavní knihy",
+      Dimension: "Finanční dimenze",
+      Dimensions: "Finanční dimenze",
+      DimSource: "Hodnoty",
+      DimCustom: "Vlastní seznam",
+      DimPartner: "Partner (odběratel / dodavatel)",
+      DimPositionLabel: "Pořadí (1–6)",
+      DimPosition: "Pořadí je 1 až 6.",
+      DimActive: "Aktivní",
+      DimValue: "Hodnota dimenze",
+      DimValues: "Hodnoty dimenze",
+      DimRule: "Pravidlo dimenze",
+      DimRules: "Pravidla dimenzí podle účtů",
+      DimMask: "Účty začínající",
+      DimMaskHelp: "Začátek čísla účtu: 1–6 číslic, např. 5 nebo 518.",
+      DimRequirement: "Na účtu",
+      DimOptional: "Volitelná",
+      DimMandatoryValue: "Povinná",
+      DimNotAllowedValue: "Nepovolená",
+      DimMandatory: "Účet {account} vyžaduje dimenzi {dim}.",
+      DimNotAllowed: "Na účtu {account} se dimenze {dim} nepoužívá.",
+      DimValueUnknown: "{dim}: hodnota {value} neexistuje nebo je zablokovaná.",
       AccountingCurrency: "Účetní měna",
       ReportingCurrency: "Vykazovací měna",
       RateMaxAge: "Nejstarší použitelný kurz (dní)",
@@ -460,6 +557,27 @@ export default defineModule({
       AccountNumHelp: "Account number has 3–10 digits.",
       SyntheticAccount: "Synthetic account",
       Parameters: "General ledger parameters",
+      Dimension: "Financial dimension",
+      Dimensions: "Financial dimensions",
+      DimSource: "Values",
+      DimCustom: "Custom list",
+      DimPartner: "Partner (customer / vendor)",
+      DimPositionLabel: "Order (1–6)",
+      DimPosition: "The order is 1 to 6.",
+      DimActive: "Active",
+      DimValue: "Dimension value",
+      DimValues: "Dimension values",
+      DimRule: "Dimension rule",
+      DimRules: "Dimension rules by account",
+      DimMask: "Accounts starting with",
+      DimMaskHelp: "Start of the account number: 1–6 digits, e.g. 5 or 518.",
+      DimRequirement: "On the account",
+      DimOptional: "Optional",
+      DimMandatoryValue: "Mandatory",
+      DimNotAllowedValue: "Not allowed",
+      DimMandatory: "Account {account} requires dimension {dim}.",
+      DimNotAllowed: "Dimension {dim} is not used on account {account}.",
+      DimValueUnknown: "{dim}: value {value} does not exist or is blocked.",
       AccountingCurrency: "Accounting currency",
       ReportingCurrency: "Reporting currency",
       RateMaxAge: "Oldest usable rate (days)",

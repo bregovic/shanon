@@ -68,6 +68,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   nahrání tlačítkem i přetažením (`setImage`, bez zvýšení verze záznamu), grid
   miniaturu, import ho nastaví ze sloupce s cestou + složky obrázků
   (`imagesFromUploads`, párování podle konce cesty / názvu souboru).
+- Finanční dimenze (`src/modules/gl/dimensions.ts`): max. 6, pole `dim1…dim6`
+  (`dimFields()`, `FieldDef.dimSlot`) na zápisech, deníku a řádcích dokladů;
+  popisek = název dimenze, nepoužité se skryjí. Pravidla firmy podle začátku čísla
+  účtu → `dimNReq` na účtu; kontroluje `postVoucher` (ruční zápis přísně, doklady
+  modulů nepovolené vynechají). Partner se doplní z `PostingRequest.partner`.
 - Pole/skupina formuláře podle hodnoty jiného pole: `visibleWhen: { field, in: [...] }`.
 - ARES (`src/modules/gab/ares.ts`): veřejná služba bez klíče; akce „Doplnit z ARES“
   na subjektu i partnerovi (podle IČO, jinak jednoznačně podle názvu) doplní jméno,
