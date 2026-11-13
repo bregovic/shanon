@@ -88,7 +88,9 @@ export function receiptEscPos(
 ): Uint8Array {
   const p = new EscPos(opts.width, opts.codePage);
   if (opts.drawer) p.drawer();
-  p.align("center").bold(true).line(r.company.name).bold(false);
+  p.align("center");
+  if (r.company.tradeName) p.bold(true).line(r.company.tradeName).bold(false).line(r.company.name);
+  else p.bold(true).line(r.company.name).bold(false);
   if (r.company.address) p.line(r.company.address);
   p.line([r.company.regNo && `IČO ${r.company.regNo}`, r.company.vatId && `DIČ ${r.company.vatId}`].filter(Boolean).join("  "));
   p.align("left").sep();

@@ -200,3 +200,51 @@ describe("napojení pokladny", () => {
     await expect(api((a) => assertPaid(a, c, ok.ref, BigInt(10026)))).rejects.toBeInstanceOf(UserError);
   }, 15000);
 });
+
+describe("organizace", () => {
+  it("výchozí údaje z firmy a daňových parametrů, propis do firmy, adresa na účtence", async () => {
+    const r = await provisionTenant(client, {
+      code: `t-org-${run}`,
+      name: "Org",
+      adminEmail: `org-${run}@test.local`,
+      adminPassword: "heslo-12345",
+      modules: ["org", "pos"],
+      company: { code: "UZ", name: "Demo s.r.o.", regNo: "12345678", vatId: "CZ12345678" },
+    });
+    const O = r.ctx;
+    const [e] = (await listRecords(O, "org.entity", {}, client)).rows;
+    expect([e.legalName, e.regNo, e.vatId, e.legalForm]).toEqual(["Demo s.r.o.", "12345678", "CZ12345678", "legal"]);
+    await expect(saveRecord(O, "org.entity", null, { legalName: "Druhá" }, undefined, client)).rejects.toMatchObject({ label: "@ORG:OneEntity" });
+    await expect(saveRecord(O, "org.entity", String(e.id), { bankAccount: "123" }, undefined, client)).rejects.toBeInstanceOf(UserError);
+
+    await saveRecord(O, "org.entity", String(e.id), {
+      legalName: "Hynek Cibulka",
+      tradeName: "Uzeniny Hynek Cibulka",
+      legalForm: "natural",
+      firstName: "Hynek",
+      lastName: "Cibulka",
+      regNo: "41832744",
+      street: "Uhelný trh",
+      houseNo: "413",
+      orientNo: "8",
+      city: "Praha 1",
+      zipCode: "110 00",
+      bankAccount: "19-2000145399/0800",
+    }, undefined, client);
+    const company = (await getRecord(O, "sys.company", O.companyId!, client))!;
+    expect([company.name, company.regNo]).toEqual(["Uzeniny Hynek Cibulka", "41832744"]);
+
+    const regId = String((await listRecords(O, "pos.register", {}, client)).rows[0].id);
+    const g = (await listRecords(O, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(O, "inv.unit", { filter: { code: "KS" } }, client)).rows[0];
+    const it = await saveRecord(O, "inv.item", null, { itemNum: "X", name: "X", groupId: g.id, unitId: u.id, salesPrice: "10", priceInclTax: true }, undefined, client);
+    await saveRecord(O, "pos.shift", null, { registerId: regId }, undefined, client);
+    const print = await inTenant(O, async (s) => {
+      const a = s.sys().api();
+      const rec = await sell(a, { registerId: regId, payment: "card", lines: [{ itemId: String(it.id), qty: "1" }] });
+      const { receiptPrint } = await import("@/modules/pos/sale");
+      return receiptPrint(a, O.companyId, String(rec.id));
+    }, client);
+    expect(print.company).toEqual({ name: "Hynek Cibulka", tradeName: "Uzeniny Hynek Cibulka", regNo: "41832744", vatId: "CZ12345678", address: "Uhelný trh 413/8, 110 00 Praha 1" });
+  });
+});

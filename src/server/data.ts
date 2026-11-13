@@ -224,6 +224,7 @@ class Session {
   api(): DataApi {
     const s = this.sys();
     return {
+      companyId: this.ctx.companyId,
       get: (o, id) => s.get(o, id),
       find: (o, where, opts) => s.find(o, where, opts?.take, opts?.orderBy),
       create: (o, data) => s.save(o, null, data, { system: true }),
@@ -519,6 +520,10 @@ class Session {
 export function inTenant<T>(ctx: Ctx, fn: (s: Session) => Promise<T>, client?: PrismaClient): Promise<T> {
   return withTenant(ctx.tenantId, (tx) => fn(new Session(tx, ctx)), client ?? prisma);
 }
+
+/** Počet záznamů objektu v celém tenantovi (všechny firmy) — pro správu modulů. */
+export const countAllRecords = (tenantId: string, objectId: string, client?: PrismaClient) =>
+  withTenant(tenantId, (tx) => delegate(tx, getObject(objectId)).count({ where: { tenantId } }), client ?? prisma);
 
 export const listRecords = (ctx: Ctx, objectId: string, p: ListParams, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.list(objectId, p), client);

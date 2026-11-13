@@ -68,6 +68,8 @@ export type RecordData = Record<string, unknown>;
  * a v transakci aktuální operace.
  */
 export interface DataApi {
+  /** aktuální firma (null u objektů tenanta) */
+  companyId?: string | null;
   get(objectId: string, id: string): Promise<RecordData | null>;
   /** přesná shoda, nebo rozsah { gte, lte, gt, lt } (data, čísla) */
   find(objectId: string, where: RecordData, opts?: { take?: number; orderBy?: Record<string, "asc" | "desc"> }): Promise<RecordData[]>;

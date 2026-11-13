@@ -21,7 +21,7 @@ export default async function ModulesPage() {
       label: t(m.label),
       description: t(m.description),
       enabled,
-      canToggle: !m.core && (!enabled || neededBy.length === 0),
+      canToggle: !m.core,
       notes: [
         ...(m.dependsOn.length ? [`${t("@SYS:Requires")}: ${m.dependsOn.map(name).join(", ")}`] : []),
         ...(enabled && neededBy.length ? [`${t("@SYS:RequiredBy")}: ${neededBy.map(name).join(", ")}`] : []),
@@ -51,7 +51,16 @@ export default async function ModulesPage() {
         { title: t("@SYS:Modules"), rows: modules },
         { title: t("@SYS:Extensions"), rows: extensions },
       ]}
-      labels={{ enable: t("@SYS:Enable"), disable: t("@SYS:Disable"), enabled: t("@SYS:Enabled") }}
+      labels={{
+        enable: t("@SYS:Enable"),
+        disable: t("@SYS:Disable"),
+        enabled: t("@SYS:Enabled"),
+        disableTitle: t("@SYS:DisableTitle"),
+        disableAlso: t("@SYS:DisableAlso"),
+        dataKept: t("@SYS:DataKept"),
+        records: t("@SYS:Records"),
+        cancel: t("@SYS:Cancel"),
+      }}
     />
   );
 }

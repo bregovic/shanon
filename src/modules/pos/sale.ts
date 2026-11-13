@@ -13,6 +13,7 @@ import { fromCents, mulCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { netFromGross } from "@/modules/inv/handlers";
+import { addressLine, orgOf } from "@/modules/org";
 
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -244,7 +245,8 @@ export interface ReceiptPrint {
   receiptNum: string;
   issuedAt: string;
   register: string;
-  company: { name: string; regNo: string | null; vatId: string | null; address: string | null };
+  /** tradeName = název provozovny/značka nad obchodním jménem (jen když se liší) */
+  company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null };
   lines: { description: string; qty: string; unit: string; unitPrice: string; amount: string; rate: string }[];
   vat: { rate: string; base: string; tax: string }[];
   gross: string;
@@ -265,8 +267,9 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
   if (!r) throw new UserError("@SYS:NotFound");
   const reg = await data.get("pos.register", String(r.registerId));
   const company = companyId ? await data.get("sys.company", companyId) : null;
-  const [tp] = await data.find("tax.parameters", {}, { take: 1 }).catch(() => [] as RecordData[]);
-  const addr = tp ? [`${tp.street ?? ""} ${[tp.houseNo, tp.orientNo].filter(Boolean).join("/")}`.trim(), `${tp.zipCode ?? ""} ${tp.city ?? ""}`.trim()].filter(Boolean).join(", ") : null;
+  const org = await orgOf(data);
+  const [tp] = org ? [] : await data.find("tax.parameters", {}, { take: 1 }).catch(() => [] as RecordData[]);
+  const addr = addressLine(org ?? tp);
   const lines = await data.find("pos.receiptLine", { receiptId }, { take: 10000 });
   const rates = new Map<string, string>();
   const units = new Map<string, string>();
@@ -295,7 +298,13 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
     receiptNum: String(r.receiptNum),
     issuedAt: String(r.createdAt ?? r.date),
     register: String(reg?.name ?? ""),
-    company: { name: String(company?.name ?? ""), regNo: (company?.regNo as string) ?? null, vatId: (company?.vatId as string) ?? null, address: addr },
+    company: {
+      name: String(org?.legalName ?? company?.name ?? ""),
+      tradeName: org?.tradeName && org.tradeName !== org.legalName ? String(org.tradeName) : null,
+      regNo: ((org?.regNo ?? company?.regNo) as string) ?? null,
+      vatId: ((org?.vatId ?? company?.vatId) as string) ?? null,
+      address: addr,
+    },
     lines: out,
     vat: [...vat].map(([rate, v]) => ({ rate, base: fromCents(v.base), tax: fromCents(v.tax) })),
     gross: String(r.amountGross),

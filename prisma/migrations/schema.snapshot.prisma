@@ -205,6 +205,8 @@ model SysCompany {
   updatedBy String?  @map("updated_by") @db.Uuid
 
   sysNumberSeq_company      SysNumberSeq[]      @relation("SysNumberSeq_company")
+  orgEntity_company         OrgEntity[]         @relation("OrgEntity_company")
+  orgSite_company           OrgSite[]           @relation("OrgSite_company")
   glAccount_company         GlAccount[]         @relation("GlAccount_company")
   glCostCenter_company      GlCostCenter[]      @relation("GlCostCenter_company")
   glFiscalYear_company      GlFiscalYear[]      @relation("GlFiscalYear_company")
@@ -366,6 +368,75 @@ model SysRolePermission {
   @@index([tenantId])
   @@index([roleId])
   @@map("sys_role_permission")
+}
+
+/// org.entity — generováno z definice objektu
+model OrgEntity {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  legalName    String   @map("legal_name") @db.VarChar(120)
+  tradeName    String?  @map("trade_name") @db.VarChar(120)
+  legalForm    String   @default("legal") @map("legal_form") @db.VarChar(40)
+  firstName    String?  @map("first_name") @db.VarChar(60)
+  lastName     String?  @map("last_name") @db.VarChar(60)
+  regNo        String?  @map("reg_no") @db.VarChar(12)
+  vatId        String?  @map("vat_id") @db.VarChar(16)
+  vatPayer     Boolean  @default(true) @map("vat_payer")
+  registration String?  @db.VarChar(255)
+  street       String?  @db.VarChar(120)
+  houseNo      String?  @map("house_no") @db.VarChar(10)
+  orientNo     String?  @map("orient_no") @db.VarChar(10)
+  city         String?  @db.VarChar(80)
+  zipCode      String?  @map("zip_code") @db.VarChar(10)
+  country      String   @default("CZ") @db.VarChar(2)
+  email        String?  @db.VarChar(254)
+  phone        String?  @db.VarChar(30)
+  web          String?  @db.VarChar(200)
+  dataBoxId    String?  @map("data_box_id") @db.VarChar(7)
+  bankAccount  String?  @map("bank_account") @db.VarChar(30)
+  iban         String?  @db.VarChar(34)
+  bic          String?  @db.VarChar(11)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("OrgEntity_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@map("org_entity")
+}
+
+/// org.site — generováno z definice objektu
+model OrgSite {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  code         String   @db.VarChar(20)
+  name         String   @db.VarChar(120)
+  street       String?  @db.VarChar(120)
+  houseNo      String?  @map("house_no") @db.VarChar(10)
+  orientNo     String?  @map("orient_no") @db.VarChar(10)
+  city         String?  @db.VarChar(80)
+  zipCode      String?  @map("zip_code") @db.VarChar(10)
+  phone        String?  @db.VarChar(30)
+  openingHours String?  @map("opening_hours") @db.VarChar(255)
+  blocked      Boolean  @default(false)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("OrgSite_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("org_site")
 }
 
 /// gab.subject — generováno z definice objektu

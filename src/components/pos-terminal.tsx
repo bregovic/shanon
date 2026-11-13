@@ -721,7 +721,8 @@ function Receipt({
   const n = (v: string) => new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(Number(v));
   return (
     <div className={mergeClasses("pos-receipt", st.receipt)}>
-      <div className={mergeClasses(st.rCenter, st.rBold)}>{r.company.name}</div>
+      {r.company.tradeName && <div className={mergeClasses(st.rCenter, st.rBold)}>{r.company.tradeName}</div>}
+      <div className={mergeClasses(st.rCenter, r.company.tradeName ? undefined : st.rBold)}>{r.company.name}</div>
       {r.company.address && <div className={st.rCenter}>{r.company.address}</div>}
       <div className={st.rCenter}>
         {r.company.regNo && `IČO ${r.company.regNo}`} {r.company.vatId && `DIČ ${r.company.vatId}`}

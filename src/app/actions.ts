@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
 import { isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
-import { deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, runAction, saveRecord } from "@/server/data";
+import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
@@ -148,11 +148,28 @@ export async function toggleModuleAction(form: FormData) {
       );
     }
   } else {
-    // vypnout jen pokud na něm nezávisí jiný zapnutý modul (data zůstávají)
-    if (dependents(registry, id).some((d) => s.ctx.modules.has(d))) return;
-    await prisma.sysTenantModule.deleteMany({ where: { tenantId, moduleId: id } });
+    // vypnout i zapnuté moduly, které na něm stojí (uživatel je potvrdil v náhledu);
+    // data zůstávají a po opětovném zapnutí se vrátí
+    const off = [id, ...dependents(registry, id).filter((d) => s.ctx.modules.has(d))].filter((m) => !registry.modules.get(m)?.core);
+    await prisma.sysTenantModule.deleteMany({ where: { tenantId, moduleId: { in: off } } });
   }
   revalidatePath("/", "layout");
+}
+
+/** Náhled vypnutí modulu: co se vypne s ním a kolik má záznamů. */
+export async function moduleDisablePreviewAction(id: string): Promise<{ id: string; label: string; records: number }[]> {
+  const s = await requireAdmin();
+  const t = await getT(s.lang, s.ctx.tenantId);
+  const ids = [String(id), ...dependents(registry, String(id)).filter((d) => s.ctx.modules.has(d))];
+  const out = [];
+  for (const m of ids) {
+    const mod = registry.modules.get(m);
+    if (!mod || mod.core) continue;
+    let records = 0;
+    for (const o of mod.objects) records += await countAllRecords(s.ctx.tenantId, o.id);
+    out.push({ id: m, label: t(mod.label), records });
+  }
+  return out;
 }
 
 export async function toggleExtensionAction(form: FormData) {

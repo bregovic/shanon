@@ -6,6 +6,7 @@ import {
   PeopleMoney24Regular,
   BookNumber24Regular,
   Box24Regular,
+  Building24Regular,
   Cart24Regular,
   PlugConnected24Regular,
   BuildingBank24Regular,
@@ -22,6 +23,7 @@ const MODULE_ICONS: Record<string, React.ComponentType> = {
   PeopleMoney: PeopleMoney24Regular,
   BuildingShop: BuildingShop24Regular,
   Box: Box24Regular,
+  Building: Building24Regular,
   Cart: Cart24Regular,
   PlugConnected: PlugConnected24Regular,
 };

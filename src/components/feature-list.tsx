@@ -1,10 +1,23 @@
 "use client";
 
 /** Zapínání modulů a rozšíření (obdoba konfiguračních klíčů v AX). */
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, makeStyles, Switch, Text, tokens } from "@fluentui/react-components";
-import { toggleExtensionAction, toggleModuleAction } from "@/app/actions";
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  makeStyles,
+  Switch,
+  Text,
+  tokens,
+} from "@fluentui/react-components";
+import { moduleDisablePreviewAction, toggleExtensionAction, toggleModuleAction } from "@/app/actions";
 import { ModuleIcon } from "./icons";
 import { ActionBar, Crumbs, PageContent } from "./page";
 
@@ -56,20 +69,28 @@ export function FeatureList({
 }: {
   crumbs: { label: string; href?: string }[];
   sections: { title: string; rows: FeatureRow[] }[];
-  labels: { enable: string; disable: string; enabled: string };
+  labels: { enable: string; disable: string; enabled: string; disableTitle: string; disableAlso: string; dataKept: string; records: string; cancel: string };
 }) {
   const s = useStyles();
   const router = useRouter();
   const [busy, start] = useTransition();
+  const [confirm, setConfirm] = useState<{ row: FeatureRow; modules: { id: string; label: string; records: number }[] } | null>(null);
 
-  const toggle = (r: FeatureRow) =>
+  const apply = (r: FeatureRow) =>
     start(async () => {
       const fd = new FormData();
       fd.set(r.kind, r.id);
       fd.set("enable", r.enabled ? "0" : "1");
       await (r.kind === "module" ? toggleModuleAction(fd) : toggleExtensionAction(fd));
+      setConfirm(null);
       router.refresh();
     });
+
+  // vypnutí modulu vždy s náhledem: co se vypne s ním a kolik má dat
+  const toggle = (r: FeatureRow) => {
+    if (r.kind !== "module" || !r.enabled) return apply(r);
+    start(async () => setConfirm({ row: r, modules: await moduleDisablePreviewAction(r.id) }));
+  };
 
   return (
     <>
@@ -122,6 +143,31 @@ export function FeatureList({
           </div>
         ))}
       </PageContent>
+
+      <Dialog open={!!confirm} onOpenChange={(_, d) => !d.open && setConfirm(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>
+              {labels.disableTitle} {confirm?.row.label}
+            </DialogTitle>
+            <DialogContent style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {confirm && confirm.modules.length > 1 && <Text>{labels.disableAlso}</Text>}
+              {confirm?.modules.map((m) => (
+                <Text key={m.id}>
+                  <strong>{m.label}</strong> — {labels.records} {m.records.toLocaleString("cs-CZ")}
+                </Text>
+              ))}
+              <Text className={s.note}>{labels.dataKept}</Text>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirm(null)}>{labels.cancel}</Button>
+              <Button appearance="primary" disabled={busy} onClick={() => confirm && apply(confirm.row)}>
+                {labels.disable}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </>
   );
 }
