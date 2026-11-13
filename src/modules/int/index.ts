@@ -185,6 +185,8 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      JobEetResend: "Dodatečné odeslání EET",
+      EetResent: "Odesláno {sent}, čeká {pending}.",
       Module: "Integrace",
       ModuleDesc: "Napojení na evidenci tržeb (EET 2.0), tiskárny účtenek, platební terminály a další služby.",
       Connection: "Napojení",
@@ -275,6 +277,8 @@ export default defineModule({
       TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
+      JobEetResend: "EET resend",
+      EetResent: "Sent {sent}, pending {pending}.",
       Module: "Integrations",
       ModuleDesc: "Connections to sales registration (EET 2.0), receipt printers, payment terminals and other services.",
       Connection: "Connection",

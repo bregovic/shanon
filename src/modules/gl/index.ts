@@ -450,6 +450,8 @@ export default defineModule({
   setup: glSetup,
   labels: {
     cs: {
+      JobDimensionRules: "Pravidla dimenzí do účtů",
+      DimRulesApplied: "Upraveno účtů: {n}.",
       Module: "Hlavní kniha",
       ModuleDesc: "Účtový rozvrh, střediska, účetní deníky a doklady.",
       Account: "Účet",
@@ -587,6 +589,8 @@ export default defineModule({
       AmountCur: "Částka v měně",
     },
     en: {
+      JobDimensionRules: "Apply dimension rules to accounts",
+      DimRulesApplied: "Accounts updated: {n}.",
       Module: "General ledger",
       ModuleDesc: "Chart of accounts, cost centers, journals and vouchers.",
       Account: "Main account",

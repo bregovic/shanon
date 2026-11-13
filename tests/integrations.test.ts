@@ -505,3 +505,39 @@ describe("REST API", () => {
     expect((await call(POST, ["qa.issue"], { method: "POST", body: JSON.stringify({ status: "uat" }) })).status).toBe(400);
   });
 });
+
+describe("dávkové úlohy", () => {
+  it("plán: pražský čas, přechod času, měsíce, bez dohánění", async () => {
+    const { nextPragueTime, nextRun } = await import("@/server/batch");
+    // 14:45 v Praze v zimě = 13:45 UTC, v létě 12:45 UTC
+    expect(nextPragueTime("14:45", new Date("2026-11-13T10:00:00Z")).toISOString()).toBe("2026-11-13T13:45:00.000Z");
+    expect(nextPragueTime("14:45", new Date("2026-07-01T15:00:00Z")).toISOString()).toBe("2026-07-02T12:45:00.000Z");
+    // denně přes konec letního času drží 02:00 Prahy
+    expect(nextRun(new Date("2026-10-24T00:00:00Z"), "days", 1, new Date("2026-10-25T12:00:00Z"))!.toISOString()).toBe("2026-10-26T01:00:00.000Z");
+    expect(nextRun(new Date("2026-01-31T09:00:00Z"), "months", 1, new Date("2026-02-01T00:00:00Z"))!.getUTCMonth()).toBe(2);
+    // zmeškané běhy: další termín je až po „teď“, ne hromada běhů
+    expect(nextRun(new Date("2026-11-01T10:00:00Z"), "minutes", 15, new Date("2026-11-13T10:07:00Z"))!.toISOString()).toBe("2026-11-13T10:15:00.000Z");
+    expect(nextRun(new Date(), "once", 1)).toBeNull();
+  });
+
+  it("výchozí úlohy, Spustit nyní, plánovač spustí splatnou úlohu", async () => {
+    const { runDueJobs } = await import("@/server/batch");
+    const B = (await provisionTenant(client, { code: `t-bat-${run}`, name: "Batch", adminEmail: `bat-${run}@test.local`, adminPassword: "heslo-12345", modules: ["gl", "int"], company: { code: "B", name: "B" } })).ctx;
+    const jobs = (await listRecords(B, "sys.batchJob", {}, client)).rows;
+    expect(jobs.map((j) => j.jobClass).sort()).toEqual(["gl.dimensionRules", "int.eetResend", "sys.ratesCnb", "sys.ratesEcb"]);
+    const dim = jobs.find((j) => j.jobClass === "gl.dimensionRules")!;
+    await runAction(B, "sys.batchJob", String(dim.id), "run", client);
+    const after = await getRecord(B, "sys.batchJob", String(dim.id), client);
+    expect([after!.status, String(after!.lastMessage)]).toEqual(["ok", expect.stringMatching(/^Upraveno účtů: \d+\.$/)]);
+    // splatná úloha (EET bez pokladen) — plánovač ji spustí a posune termín
+    const eet = jobs.find((j) => j.jobClass === "int.eetResend")!;
+    const past = new Date(Date.now() - 3600000).toISOString();
+    await saveRecord(B, "sys.batchJob", String(eet.id), { nextRunAt: past }, undefined, client);
+    expect(await runDueJobs(new Date(), client)).toBeGreaterThanOrEqual(1);
+    const e2 = await getRecord(B, "sys.batchJob", String(eet.id), client);
+    expect([e2!.status, e2!.lastMessage]).toEqual(["ok", "Odesláno 0, čeká 0."]);
+    expect(new Date(String(e2!.nextRunAt)).getTime()).toBeGreaterThan(Date.now());
+    const runs = (await listRecords(B, "sys.batchRun", { filter: { jobId: eet.id } }, client)).rows;
+    expect(runs.length).toBe(1);
+  });
+});

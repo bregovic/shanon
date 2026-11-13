@@ -209,6 +209,8 @@ model SysCompany {
   updatedBy String?  @map("updated_by") @db.Uuid
 
   sysNumberSeq_company      SysNumberSeq[]      @relation("SysNumberSeq_company")
+  sysBatchJob_company       SysBatchJob[]       @relation("SysBatchJob_company")
+  sysBatchRun_company       SysBatchRun[]       @relation("SysBatchRun_company")
   orgEntity_company         OrgEntity[]         @relation("OrgEntity_company")
   orgSite_company           OrgSite[]           @relation("OrgSite_company")
   glParameters_company      GlParameters[]      @relation("GlParameters_company")
@@ -379,6 +381,61 @@ model SysRolePermission {
   @@index([tenantId])
   @@index([roleId])
   @@map("sys_role_permission")
+}
+
+/// sys.batchJob — generováno z definice objektu
+model SysBatchJob {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  code        String    @db.VarChar(20)
+  name        String    @db.VarChar(120)
+  jobClass    String    @map("job_class") @db.VarChar(40)
+  recurrence  String    @default("days") @db.VarChar(40)
+  every       Int?      @default(1)
+  nextRunAt   DateTime? @map("next_run_at")
+  active      Boolean   @default(true)
+  status      String?   @default("waiting") @db.VarChar(40)
+  lastRunAt   DateTime? @map("last_run_at")
+  lastMessage String?   @map("last_message") @db.VarChar(255)
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company         SysCompany    @relation("SysBatchJob_company", fields: [companyId], references: [id], onDelete: Restrict)
+  sysBatchRun_job SysBatchRun[] @relation("SysBatchRun_job")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("sys_batch_job")
+}
+
+/// sys.batchRun — generováno z definice objektu
+model SysBatchRun {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  companyId  String    @map("company_id") @db.Uuid
+  jobId      String    @map("job_id") @db.Uuid
+  startedAt  DateTime? @map("started_at")
+  durationMs Int?      @map("duration_ms")
+  status     String?   @db.VarChar(40)
+  message    String?   @db.VarChar(255)
+  ext        Json      @default("{}")
+  version    Int       @default(1)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  createdBy  String?   @map("created_by") @db.Uuid
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?   @map("updated_by") @db.Uuid
+
+  company SysCompany  @relation("SysBatchRun_company", fields: [companyId], references: [id], onDelete: Restrict)
+  job     SysBatchJob @relation("SysBatchRun_job", fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([jobId])
+  @@map("sys_batch_run")
 }
 
 /// org.entity — generováno z definice objektu

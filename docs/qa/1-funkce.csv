@@ -3,6 +3,7 @@ GL-ACCOUNTS;Účtový rozvrh;Hlavní kniha;fat;;6místné účty (syntetika + an
 GL-JOURNAL;Účetní deník a doklady;Hlavní kniha;fat;;Deník hlavička + řádky, protiúčet, číselné řady, zaúčtování do dokladu.
 GL-PERIODS;Fiskální roky a období;Hlavní kniha;fat;;Měsíční období, uzavřené a pozastavené období nejde účtovat.
 GL-PARAMS;Parametry hlavní knihy, měny a kurzy;Hlavní kniha;fat;;Účetní a vykazovací měna, zdroj kurzů ČNB/ECB, účty kurzových rozdílů.
+SYS-BATCH;Dávkové úlohy;Správa systému;uat;;"Opakování, plán, historie běhů, Spustit nyní; kurzy ČNB/ECB, EET, dimenze."
 GL-REPORTS;Výkazy hlavní knihy;Hlavní kniha;uat;;"Obratová předvaha, rozvaha, výsledovka; po syntetice, filtr dimenzí, Excel."
 GL-DIMS;Finanční dimenze;Hlavní kniha;uat;;"Středisko, zakázka, partner; povinné a nepovolené podle začátku účtu; partner z dokladu."
 AR-INVOICE;Vydané faktury a saldo odběratelů;Odběratelé;fat;;Řádky s DPH a položkou, zaúčtování, otevřené položky.

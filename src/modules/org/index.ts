@@ -4,6 +4,7 @@
  * v rejstříku — a její provozovny. Jeden zdroj pravdy pro doklady, účtenky,
  * přiznání a e-shop. Název, IČO a DIČ se propisují do firmy (sys.company).
  */
+import { aresByIco } from "@/modules/gab/ares";
 import { Edts, defineEdt, defineEnum, enumEdt } from "@/core/edt";
 import { UserError, defineModule, type DataApi, type ObjectHandlers } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -58,6 +59,7 @@ export const entity = defineObject({
   },
   titleField: "legalName",
   list: ["legalName", "regNo", "vatId", "city", "email", "phone"],
+  actions: [{ id: "ares", label: "@ORG:FromAres" }],
   form: [
     { label: "@ORG:Identity", fields: ["legalName", "tradeName", "legalForm", "firstName", "lastName", "regNo", "vatId", "vatPayer", "registration"] },
     { label: "@ORG:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode", "country"] },
@@ -144,6 +146,30 @@ async function orgSetup(data: DataApi) {
 
 export const orgHandlers: Record<string, ObjectHandlers> = {
   "org.entity": {
+    actions: {
+      /** údaje firmy z ARES podle IČO (jméno, forma, DIČ, sídlo); kontakty a banka zůstanou */
+      async ares(ctx, rec) {
+        if (!rec.regNo) throw new UserError("@ORG:RegNoFirst");
+        const a = await aresByIco(String(rec.regNo));
+        if (!a) throw new UserError("@ORG:AresNotFound");
+        const [first, ...rest] = a.name.split(/\s+/);
+        await ctx.data.update("org.entity", String(rec.id), {
+          legalName: a.name,
+          legalForm: a.person ? "natural" : "legal",
+          firstName: a.person ? (rec.firstName ?? first) : rec.firstName,
+          lastName: a.person ? (rec.lastName ?? (rest.join(" ") || null)) : rec.lastName,
+          regNo: a.ico,
+          vatId: a.vatId ?? rec.vatId ?? null,
+          vatPayer: a.vatId ? true : rec.vatPayer,
+          street: a.streetName,
+          houseNo: a.houseNo,
+          orientNo: a.orientNo,
+          city: a.city,
+          zipCode: a.zipCode,
+          country: a.country,
+        });
+      },
+    },
     async beforeSave(ctx, d, isNew) {
       if (isNew && (await ctx.data.find("org.entity", {}, { take: 1 })).length) throw new UserError("@ORG:OneEntity");
       if (d.legalForm === "natural" && (!d.firstName || !d.lastName)) return { [d.firstName ? "lastName" : "firstName"]: "@SYS:Required" };
@@ -205,6 +231,9 @@ export default defineModule({
       Site: "Provozovna",
       Sites: "Provozovny",
       OpeningHours: "Otevírací doba",
+      FromAres: "Doplnit z ARES",
+      RegNoFirst: "Vyplňte a uložte IČO, pak doplňte z ARES.",
+      AresNotFound: "IČO v ARES nenalezeno.",
       OneEntity: "Firma už údaje organizace má — upravte stávající záznam.",
     },
     en: {
@@ -239,6 +268,9 @@ export default defineModule({
       Site: "Site",
       Sites: "Sites",
       OpeningHours: "Opening hours",
+      FromAres: "Fill from ARES",
+      RegNoFirst: "Fill in and save the company ID, then fill from ARES.",
+      AresNotFound: "Company ID not found in ARES.",
       OneEntity: "The company already has organization details — edit the existing record.",
     },
   },

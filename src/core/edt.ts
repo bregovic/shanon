@@ -84,6 +84,7 @@ export const Edts = {
   Notes: defineEdt({ id: "Notes", kind: "text", label: "@SYS:Notes" }),
   NoYes: defineEdt({ id: "NoYes", kind: "bool", label: "@SYS:Active" }),
   TransDate: defineEdt({ id: "TransDate", kind: "date", label: "@SYS:Date" }),
+  DateTime: defineEdt({ id: "DateTime", kind: "datetime", label: "@SYS:DateTime" }),
   Amount: defineEdt({ id: "Amount", kind: "decimal", label: "@SYS:Amount", precision: 18, scale: 2, align: "right" }),
   Qty: defineEdt({ id: "Qty", kind: "decimal", label: "@SYS:Qty", precision: 18, scale: 4, align: "right", noTotal: true }),
   /** cena za jednotku — nesčítá se */

@@ -3,7 +3,7 @@ import { ObjectListView } from "@/components/object-list-view";
 import { coerce } from "@/core/validate";
 import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
-import { listRecords } from "@/server/data";
+import { getRecord, listRecords } from "@/server/data";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, hiddenFields, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
@@ -16,8 +16,9 @@ export async function generateMetadata({ params }: { params: Promise<Params> }) 
   return { title: def ? (await getT("cs"))(def.labelPlural) : undefined };
 }
 
-export default async function ObjectListPage({ params }: { params: Promise<Params> }) {
+export default async function ObjectListPage({ params, searchParams }: { params: Promise<Params>; searchParams: Promise<{ focus?: string }> }) {
   const { module, object } = await params;
+  const { focus } = await searchParams;
   const s = await requireSession();
   const def = registry.objects.get(`${module}.${object}`);
   if (!def || !s.ctx.modules.has(module)) notFound();
@@ -31,6 +32,11 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
   const meta = fieldsMeta(s.ctx, def, t);
   const mod = registry.modules.get(module)!;
   const initial = await listRecords(s.ctx, def.id, { lang: s.lang, totals: true });
+  // proklik z odkazu: vybraný záznam musí být v seznamu, i když není na první stránce
+  if (focus && !initial.rows.some((r) => r.id === focus)) {
+    const rec = await getRecord(s.ctx, def.id, focus).catch(() => null);
+    if (rec) initial.rows.unshift(rec);
+  }
 
   const defaults: Record<string, unknown> = {};
   for (const [n, f] of Object.entries(def.fields)) {
@@ -52,6 +58,7 @@ export default async function ObjectListPage({ params }: { params: Promise<Param
       canDelete={!def.systemOnly && can(s.ctx.perms, def.id, "delete")}
       openInPage={openInPage || !!def.systemOnly}
       initial={{ rows: initial.rows, total: initial.total, totals: initial.totals }}
+      focusId={focus}
       lang={s.lang}
       labels={uiLabels(t)}
     />

@@ -177,6 +177,82 @@ export const rolePermission = defineObject({
 });
 
 /** Výchozí měny tenanta (jen pokud žádné nejsou). */
+/** Druhy dávkových úloh — hodnoty doplní registr z `ModuleDef.jobs`. */
+export const BatchClass = defineEnum({ id: "BatchClass", label: "@SYS:BatchClass", values: [] });
+
+export const BatchRecurrence = defineEnum({
+  id: "BatchRecurrence",
+  label: "@SYS:Recurrence",
+  values: [
+    { value: "once", label: "@SYS:RecOnce" },
+    { value: "minutes", label: "@SYS:RecMinutes" },
+    { value: "hours", label: "@SYS:RecHours" },
+    { value: "days", label: "@SYS:RecDays" },
+    { value: "weeks", label: "@SYS:RecWeeks" },
+    { value: "months", label: "@SYS:RecMonths" },
+  ],
+});
+
+export const BatchStatus = defineEnum({
+  id: "BatchStatus",
+  label: "@SYS:Status",
+  values: [
+    { value: "waiting", label: "@SYS:BatchWaiting", color: "informative" },
+    { value: "ok", label: "@SYS:BatchOk", color: "success" },
+    { value: "error", label: "@SYS:BatchError", color: "danger" },
+  ],
+});
+
+export const batchJob = defineObject({
+  id: "sys.batchJob",
+  table: "sys_batch_job",
+  label: "@SYS:BatchJob",
+  labelPlural: "@SYS:BatchJobs",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    jobClass: { edt: enumEdt(BatchClass), mandatory: true },
+    recurrence: { edt: enumEdt(BatchRecurrence), mandatory: true, default: "days" },
+    every: { edt: Edts.Int, label: "@SYS:Every", default: 1 },
+    nextRunAt: { edt: Edts.DateTime, label: "@SYS:NextRun" },
+    active: { edt: Edts.NoYes, default: true },
+    status: { edt: enumEdt(BatchStatus), readOnly: true, default: "waiting" },
+    lastRunAt: { edt: Edts.DateTime, label: "@SYS:LastRun", readOnly: true },
+    lastMessage: { edt: Edts.Description, label: "@SYS:LastResult", readOnly: true },
+  },
+  titleField: "code",
+  list: ["code", "name", "jobClass", "recurrence", "every", "nextRunAt", "active", "status", "lastRunAt", "lastMessage"],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "jobClass", "active"] },
+    { label: "@SYS:Schedule", fields: ["recurrence", "every", "nextRunAt"] },
+    { label: "@SYS:LastRun", fields: ["status", "lastRunAt", "lastMessage"] },
+  ],
+  unique: [["code"]],
+  defaultSort: { field: "nextRunAt", dir: "asc" },
+  actions: [{ id: "run", label: "@SYS:RunNow" }],
+  lines: [{ object: "sys.batchRun", field: "jobId", label: "@SYS:BatchRuns" }],
+});
+
+export const batchRun = defineObject({
+  id: "sys.batchRun",
+  table: "sys_batch_run",
+  label: "@SYS:BatchRun",
+  labelPlural: "@SYS:BatchRuns",
+  scope: "company",
+  fields: {
+    jobId: { edt: refEdt("sys.batchJob", "@SYS:BatchJob"), mandatory: true },
+    startedAt: { edt: Edts.DateTime, label: "@SYS:StartedAt", readOnly: true },
+    durationMs: { edt: Edts.Int, label: "@SYS:DurationMs", readOnly: true },
+    status: { edt: enumEdt(BatchStatus), readOnly: true },
+    message: { edt: Edts.Description, label: "@SYS:LastResult", readOnly: true },
+  },
+  titleField: "startedAt",
+  list: ["startedAt", "jobId", "status", "message", "durationMs"],
+  form: [{ label: "@SYS:General", fields: ["jobId", "startedAt", "durationMs", "status", "message"] }],
+  defaultSort: { field: "startedAt", dir: "desc" },
+});
+
 async function sysSetup(data: DataApi) {
   if ((await data.find("sys.currency", {}, { take: 1 })).length) return;
   for (const [code, name, symbol] of [
@@ -195,16 +271,16 @@ export default defineModule({
   icon: "Settings",
   core: true,
   dependsOn: [],
-  enums: [RateSource, PermLevel, SecurityTarget, NumberedObject],
+  enums: [RateSource, PermLevel, SecurityTarget, NumberedObject, BatchClass, BatchRecurrence, BatchStatus],
   setup: sysSetup,
-  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission],
+  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun],
   menu: [
     {
       label: "@SYS:Setup",
       items: [{ object: "sys.company" }, { object: "sys.numberSeq" }],
     },
     { label: "@SYS:ModulesAndSetup", kind: "setup", items: [{ href: "/system/modules", label: "@SYS:Modules" }] },
-    { label: "@SYS:Maintenance", kind: "functions", items: [{ href: "/system/setup", label: "@SYS:DefaultSetup" }] },
+    { label: "@SYS:Maintenance", kind: "functions", items: [{ href: "/system/setup", label: "@SYS:DefaultSetup" }, { object: "sys.batchJob" }, { object: "sys.batchRun" }] },
     {
       label: "@SYS:Security",
       items: [{ href: "/system/users", label: "@SYS:Users" }, { object: "sys.role" }],
@@ -212,6 +288,37 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      BatchClass: "Úloha",
+      Status: "Stav",
+      Recurrence: "Opakování",
+      RecOnce: "Jednou",
+      RecMinutes: "Po minutách",
+      RecHours: "Po hodinách",
+      RecDays: "Denně",
+      RecWeeks: "Týdně",
+      RecMonths: "Měsíčně",
+      Every: "Každých",
+      NextRun: "Další spuštění",
+      LastRun: "Poslední běh",
+      LastResult: "Výsledek",
+      Schedule: "Plán",
+      BatchJob: "Dávková úloha",
+      BatchJobs: "Dávkové úlohy",
+      BatchRun: "Běh úlohy",
+      BatchRuns: "Historie běhů",
+      BatchWaiting: "Čeká",
+      BatchOk: "OK",
+      BatchError: "Chyba",
+      RunNow: "Spustit nyní",
+      StartedAt: "Spuštěno",
+      DurationMs: "Trvání (ms)",
+      DateTime: "Datum a čas",
+      BatchDone: "Dokončeno.",
+      BatchUnknownClass: "Neznámý druh úlohy.",
+      BatchModuleOff: "Modul úlohy je vypnutý — úloha pozastavena.",
+      JobRatesCnb: "Kurzy ČNB",
+      JobRatesEcb: "Kurzy ECB",
+      RatesLoaded: "Načteno kurzů: {n}.",
       Module: "Správa systému",
       ModuleDesc: "Firmy, uživatelé a role, číselné řady, moduly a výchozí nastavení.",
       ModulesAndSetup: "Moduly a výchozí nastavení",
@@ -457,6 +564,37 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      BatchClass: "Job",
+      Status: "Status",
+      Recurrence: "Recurrence",
+      RecOnce: "Once",
+      RecMinutes: "Minutes",
+      RecHours: "Hours",
+      RecDays: "Daily",
+      RecWeeks: "Weekly",
+      RecMonths: "Monthly",
+      Every: "Every",
+      NextRun: "Next run",
+      LastRun: "Last run",
+      LastResult: "Result",
+      Schedule: "Schedule",
+      BatchJob: "Batch job",
+      BatchJobs: "Batch jobs",
+      BatchRun: "Job run",
+      BatchRuns: "Run history",
+      BatchWaiting: "Waiting",
+      BatchOk: "OK",
+      BatchError: "Error",
+      RunNow: "Run now",
+      StartedAt: "Started",
+      DurationMs: "Duration (ms)",
+      DateTime: "Date and time",
+      BatchDone: "Done.",
+      BatchUnknownClass: "Unknown job type.",
+      BatchModuleOff: "The job's module is disabled — job paused.",
+      JobRatesCnb: "CNB exchange rates",
+      JobRatesEcb: "ECB exchange rates",
+      RatesLoaded: "Rates loaded: {n}.",
       Module: "System administration",
       ModulesAndSetup: "Modules and default setup",
       UserSettings: "My settings",

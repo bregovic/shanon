@@ -16,6 +16,8 @@ export interface FieldMeta {
   options?: { value: string; label: string; color?: string }[];
   refObject?: string;
   refHref?: string;
+  /** cíl odkazu se otevírá v seznamu (číselník) — „Otevřít“ vede do přehledu s vybraným záznamem */
+  refList?: boolean;
   /** číslo se nesčítá v řádku Celkem */
   noTotal?: boolean;
   /** pole rozšíření (hodnota v record.ext) */
@@ -53,4 +55,9 @@ export function displayValue(f: FieldMeta, row: RecordData, lang: string): strin
     default:
       return String(v);
   }
+}
+
+/** Odkaz na odkazovaný záznam: číselník = seznam s vybraným řádkem, doklad = jeho stránka. */
+export function refLink(f: Pick<FieldMeta, "refHref" | "refList">, id: string): string {
+  return f.refList ? `${f.refHref}?focus=${encodeURIComponent(id)}` : `${f.refHref}/${id}`;
 }

@@ -22,7 +22,7 @@ import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { Open24Regular } from "@fluentui/react-icons";
 import { searchRefs, uploadImageAction } from "@/app/actions";
-import { displayValue, type FieldMeta } from "@/lib/meta";
+import { displayValue, type FieldMeta, refLink } from "@/lib/meta";
 
 export type Values = Record<string, unknown>;
 
@@ -156,13 +156,20 @@ function FieldInput({
     case "date":
       control = <Input type="date" value={v} disabled={disabled} onChange={(_, d) => onChange(f.name, d.value)} />;
       break;
+    case "datetime": {
+      const local = v ? new Date(new Date(v).getTime() - new Date(v).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+      control = (
+        <Input type="datetime-local" value={local} disabled={disabled} onChange={(_, d) => onChange(f.name, d.value ? new Date(d.value).toISOString() : "")} />
+      );
+      break;
+    }
     case "ref":
       if (disabled) {
         // zamčený odkaz = odkaz na záznam, ne rozbalovací pole
         control = (
           <div style={{ minHeight: 32, display: "flex", alignItems: "center" }}>
             {v ? (
-              <NextLink href={`${f.refHref}/${v}`} style={{ color: tokens.colorBrandForegroundLink, textDecoration: "none", fontWeight: 600 }}>
+              <NextLink href={refLink(f, v)} style={{ color: tokens.colorBrandForegroundLink, textDecoration: "none", fontWeight: 600 }}>
                 {title || "—"}
               </NextLink>
             ) : (
@@ -276,7 +283,7 @@ function RefCombobox({
         ))}
       </Combobox>
       {/* proskok na odkazovaný záznam (číselník, nastavení, subjekt…) */}
-      {value && <OpenRef href={`${f.refHref}/${value}`} label={openLabel} />}
+      {value && <OpenRef href={refLink(f, value)} label={openLabel} />}
     </div>
   );
 }

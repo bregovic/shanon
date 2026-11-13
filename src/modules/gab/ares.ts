@@ -14,6 +14,10 @@ export interface AresSubject {
   /** fyzická osoba (podnikatel) */
   person: boolean;
   street: string | null;
+  /** ulice (nebo část obce), číslo popisné a orientační zvlášť */
+  streetName: string | null;
+  houseNo: string | null;
+  orientNo: string | null;
   city: string | null;
   zipCode: string | null;
   country: string;
@@ -34,6 +38,9 @@ function toSubject(d: RecordData): AresSubject {
     vatId: (d.dic as string) ?? null,
     person: PERSON_FORMS.has(String(d.pravniForma ?? "")),
     street: `${streetName} ${num}`.trim() || null,
+    streetName: streetName || null,
+    houseNo: s.cisloDomovni ? String(s.cisloDomovni) : null,
+    orientNo: s.cisloOrientacni ? `${s.cisloOrientacni}${s.cisloOrientacniPismeno ?? ""}` : null,
     city: (s.nazevObce as string) ?? null,
     zipCode: psc ? `${psc.slice(0, 3)} ${psc.slice(3)}` : null,
     country: String(s.kodStatu ?? "CZ"),

@@ -6,7 +6,7 @@
  * Každá komunikace s vnější službou se zapíše do protokolu int.log.
  */
 import { randomUUID } from "node:crypto";
-import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
+import { UserError, type DataApi, type EventContext, type JobDef, type ObjectHandlers, type RecordData } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
 import { newToken } from "@/server/api-token";
 import { registry } from "@/registry";
@@ -326,3 +326,28 @@ export const intHandlers: Record<string, ObjectHandlers> = {
     },
   },
 };
+
+/** Dávka: dodatečné odeslání čekajících účtenek do EET (všechny pokladny firmy). */
+export const intJobs: JobDef[] = [
+  {
+    id: "int.eetResend",
+    label: "@INT:JobEetResend",
+    default: { recurrence: "minutes", every: 15 },
+    async run(ctx) {
+      let sent = 0;
+      let pending = 0;
+      let registers: RecordData[] = [];
+      try {
+        registers = await ctx.data.find("pos.register", {}, { take: 100 });
+      } catch {
+        registers = []; // pokladna není zapnutá
+      }
+      for (const r of registers) {
+        const x = await eetResendPending(ctx.data, ctx.companyId, String(r.id));
+        sent += x.sent;
+        pending += x.pending;
+      }
+      return ctx.t("@INT:EetResent", { sent: String(sent), pending: String(pending) });
+    },
+  },
+];

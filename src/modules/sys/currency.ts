@@ -3,7 +3,7 @@
  * lístek ČNB). Přepočet vždy přes celé haléře (src/core/money.ts).
  */
 import { toScaled } from "@/core/money";
-import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { UserError, type JobDef, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 
 const CNB_URL = "https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt";
 
@@ -174,3 +174,28 @@ export const sysHandlers: Record<string, ObjectHandlers> = {
     },
   },
 };
+
+/** Dávkové úlohy kurzů: ČNB (vůči CZK) a ECB (vůči účetní měně firmy). */
+export const rateJobs: JobDef[] = [
+  {
+    id: "sys.ratesCnb",
+    label: "@SYS:JobRatesCnb",
+    default: { recurrence: "days", every: 1, at: "14:45" },
+    async run(ctx) {
+      return ctx.t("@SYS:RatesLoaded", { n: String(await loadCnbRates(ctx.data, todayPrague())) });
+    },
+  },
+  {
+    id: "sys.ratesEcb",
+    label: "@SYS:JobRatesEcb",
+    default: { recurrence: "days", every: 1, at: "16:30", active: false },
+    async run(ctx) {
+      const company = ctx.companyId ? await ctx.data.get("sys.company", ctx.companyId) : null;
+      return ctx.t("@SYS:RatesLoaded", { n: String(await loadEcbRates(ctx.data, todayPrague(), String(company?.currency ?? "CZK"))) });
+    },
+  },
+];
+
+function todayPrague() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
+}

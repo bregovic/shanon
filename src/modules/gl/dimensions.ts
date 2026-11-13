@@ -10,7 +10,7 @@
  *   dimenze na účtu povinná, nepovolená, nebo volitelná; nejdelší shoda vyhrává.
  *   Účty si nastavení drží v polích dimNReq — pravidla se do nich propíšou samy.
  */
-import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { UserError, type DataApi, type JobDef, type ObjectHandlers, type RecordData } from "@/core/module";
 
 export const DIM_SLOTS = [1, 2, 3, 4, 5, 6] as const;
 export const dimField = (n: number) => `dim${n}`;
@@ -142,3 +142,15 @@ export const dimensionHandlers: Record<string, ObjectHandlers> = {
     },
   },
 };
+
+/** Dávka: propsat pravidla dimenzí do účtů (např. po importu účtového rozvrhu). */
+export const dimensionJobs: JobDef[] = [
+  {
+    id: "gl.dimensionRules",
+    label: "@GL:JobDimensionRules",
+    default: { recurrence: "days", every: 1, at: "02:00" },
+    async run(ctx) {
+      return ctx.t("@GL:DimRulesApplied", { n: String(await applyDimensionRules(ctx.data)) });
+    },
+  },
+];

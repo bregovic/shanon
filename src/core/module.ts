@@ -56,6 +56,20 @@ export interface ModuleDef {
   setup?: (data: DataApi) => Promise<void>;
   /** reporty modulu (/report/<modul>/<id>) — v menu jako sekce druhu „reports“ */
   reports?: ReportDef[];
+  /** dávkové úlohy modulu (Správa systému → Dávkové úlohy, src/server/batch.ts) */
+  jobs?: JobDef[];
+}
+
+/**
+ * Dávková úloha (obdoba batch class v AX). `id` = `<modul>.<název>`.
+ * `run` běží jako systémová operace firmy, vrací zprávu do historie běhů.
+ * `default` = Výchozí nastavení úlohu ve firmě založí (podle druhu, jednou).
+ */
+export interface JobDef {
+  id: string;
+  label: LabelRef;
+  run: (ctx: EventContext) => Promise<string | void>;
+  default?: { recurrence: "minutes" | "hours" | "days" | "weeks" | "months"; every: number; at?: string; active?: boolean };
 }
 
 export function defineModule(def: ModuleDef): ModuleDef {

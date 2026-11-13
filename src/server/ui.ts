@@ -29,6 +29,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
     refObject: e.refObject,
     noTotal: e.noTotal,
     refHref: e.refObject ? objectHref(e.refObject) : undefined,
+    refList: e.refObject ? !opensInPage(e.refObject) : undefined,
     ext,
     secret: f.secret,
     image: f.image,
@@ -156,3 +157,9 @@ export function uiLabels(t: T) {
 }
 
 export type UiLabels = ReturnType<typeof uiLabels>;
+
+/** Otevírá se záznam objektu na celé stránce (doklad s řádky nebo akcemi), nebo v šuplíku nad seznamem? */
+export function opensInPage(objectId: string): boolean {
+  const d = registry.objects.get(objectId);
+  return !d || !!d.lines?.length || !!d.actions?.length || !!d.systemOnly;
+}

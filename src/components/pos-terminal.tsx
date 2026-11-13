@@ -90,6 +90,8 @@ const useStyles = makeStyles({
   },
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
+  wUnits: { display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px", alignItems: "center" },
+  wSep: { width: "8px" },
   chips: { display: "flex", gap: "8px", overflowX: "auto", flexShrink: 0, paddingBottom: "4px" },
   searchInfo: { color: tokens.colorNeutralForeground3 },
   tiles: {
@@ -243,6 +245,29 @@ export function PosTerminal(p: {
   const [lines, setLines] = useState<Line[]>([]);
   // zadání množství / hmotnosti: nový řádek (idx = null) nebo úprava řádku nákupu
   const [weigh, setWeigh] = useState<{ item: PosItem; value: string; idx?: number | null } | null>(null);
+  // jednotka zadání hmotnosti u položek na kg (30 dkg = 0,3 kg); poslední volba se pamatuje
+  const [wUnit, setWUnitState] = useState<WeightUnit>(() => {
+    try {
+      const v = typeof window !== "undefined" ? localStorage.getItem("pos.weightUnit") : null;
+      return v === "kg" || v === "g" || v === "dkg" ? v : "dkg";
+    } catch {
+      return "dkg";
+    }
+  });
+  const setWUnit = (u: WeightUnit) => {
+    setWUnitState(u);
+    try {
+      localStorage.setItem("pos.weightUnit", u);
+    } catch {
+      /* bez úložiště jen pro tuto relaci */
+    }
+  };
+  const isKg = (i?: PosItem) => !!i && i.weighed && i.unit.toUpperCase() === "KG";
+  /** zadané množství přepočtené na jednotku položky */
+  const qtyOf = (w: { item: PosItem; value: string } | null) => {
+    const n = Number(w?.value.replace(",", ".")) || 0;
+    return isKg(w?.item) ? Math.round(n * W_FACTOR[wUnit] * 1000) / 1000 : n;
+  };
   // naposledy změněný řádek — krátce zvýrazněný
   const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
   const [payDlg, setPayDlg] = useState<"cash" | "card" | null>(null);
@@ -374,7 +399,7 @@ export function PosTerminal(p: {
   /** potvrzení dialogu množství */
   const confirmQty = () => {
     if (!weigh) return;
-    const v = Number(weigh.value.replace(",", "."));
+    const v = qtyOf(weigh);
     if (!(v >= 0)) return;
     if (weigh.idx !== undefined && weigh.idx !== null) setQty(weigh.idx, v);
     else if (v > 0) add(weigh.item, v);
@@ -633,7 +658,7 @@ export function PosTerminal(p: {
                   labels={{ minus: L.Less, plus: L.More, remove: L.Remove, qty: L.Quantity }}
                   onMinus={() => setQty(idx, l.qty - 1)}
                   onPlus={() => setQty(idx, l.qty + 1)}
-                  onEdit={() => setWeigh({ item: l.item, value: num.format(l.qty).replace(/\s/g, ""), idx })}
+                  onEdit={() => setWeigh({ item: l.item, value: num.format(isKg(l.item) ? l.qty / W_FACTOR[wUnit] : l.qty).replace(/\s/g, ""), idx })}
                   onRemove={() => remove(idx)}
                 />
               ))}
@@ -662,6 +687,21 @@ export function PosTerminal(p: {
           <DialogBody>
             <DialogTitle>{weigh?.item.name}</DialogTitle>
             <DialogContent>
+              {isKg(weigh?.item) && (
+                <div className={st.wUnits}>
+                  {(["kg", "dkg", "g"] as const).map((u) => (
+                    <Button key={u} size="large" shape="circular" appearance={wUnit === u ? "primary" : "secondary"} onClick={() => setWUnit(u)}>
+                      {u}
+                    </Button>
+                  ))}
+                  <span className={st.wSep} />
+                  {W_PRESETS[wUnit].map((v) => (
+                    <Button key={v} size="large" onClick={() => setWeigh((w) => (w ? { ...w, value: v } : w))}>
+                      {v}
+                    </Button>
+                  ))}
+                </div>
+              )}
               <Input
                 value={weigh?.value ?? ""}
                 onChange={(_, d) => setWeigh((w) => (w ? { ...w, value: d.value } : w))}
@@ -671,9 +711,9 @@ export function PosTerminal(p: {
                 autoFocus
                 aria-label={weigh?.item.weighed ? L.Weight : L.Quantity}
                 placeholder={weigh?.item.weighed ? L.Weight : L.Quantity}
-                contentAfter={weigh?.item.unit.toLowerCase()}
+                contentAfter={isKg(weigh?.item) ? wUnit : weigh?.item.unit.toLowerCase()}
               />
-              <div className={st.big}>{fmt((Number(weigh?.value.replace(",", ".")) || 0) * Number(weigh?.item.price ?? 0))}</div>
+              <div className={st.big}>{fmt(qtyOf(weigh) * Number(weigh?.item.price ?? 0))}</div>
               <Numpad st={st} set={(f) => setWeigh((w) => (w ? { ...w, value: f(w.value) } : w))} />
             </DialogContent>
             <DialogActions>
@@ -681,7 +721,7 @@ export function PosTerminal(p: {
               <Button
                 appearance="primary"
                 // úprava řádku smí i 0 (= odebrat), nový řádek jen kladné množství
-                disabled={!(Number(weigh?.value.replace(",", ".")) > 0 || (weigh?.idx != null && weigh?.value.trim() === "0"))}
+                disabled={!(qtyOf(weigh) > 0 || (weigh?.idx != null && weigh?.value.trim() === "0"))}
                 onClick={confirmQty}
               >
                 {weigh?.idx != null ? L.Save : L.Add}
@@ -849,6 +889,11 @@ const foldText = (s: string) =>
     .toLowerCase();
 
 const LONG_PRESS_MS = 500;
+
+type WeightUnit = "kg" | "dkg" | "g";
+const W_FACTOR: Record<WeightUnit, number> = { kg: 1, dkg: 0.01, g: 0.001 };
+/** rychlé volby hmotnosti podle jednotky zadání */
+const W_PRESETS: Record<WeightUnit, string[]> = { kg: ["0,25", "0,5", "1"], dkg: ["10", "15", "20", "30", "50"], g: ["100", "150", "200", "300", "500"] };
 const SWIPE_REMOVE_PX = 90;
 
 /** Ťuknutí vs. podržení prstu (myš i dotyk). */

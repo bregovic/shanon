@@ -76,6 +76,8 @@ interface Props {
   /** sloupec s číslem / kódem záznamu — zobrazí se jako odkaz na detail (onOpen) */
   titleField?: string;
   onSelectionChange?: (rows: Row[]) => void;
+  /** řádek vybraný a posunutý do pohledu při otevření */
+  focusId?: string;
   /** změna čísla vynutí nové načtení (po uložení/smazání) */
   reloadKey?: number;
   /** klíč pro zapamatování filtrů v rámci relace prohlížeče */
@@ -306,6 +308,13 @@ function loadView(key?: string): View {
   return { filters: {}, dir: "asc" };
 }
 
+/** Odhad šířky textu v px (Segoe UI 14 px): velká písmena a číslice širší, mezery užší. */
+function textPx(t: string): number {
+  let w = 0;
+  for (const ch of t) w += /[A-Z0-9ÁČĎÉĚÍŇÓŘŠŤÚŮÝŽMW@%]/.test(ch) ? 9.2 : /[\s.,:;|il!'1]/.test(ch) ? 4 : /[mw]/.test(ch) ? 11 : 7.3;
+  return w;
+}
+
 export function SmartGrid({
   objectId,
   columns,
@@ -318,6 +327,7 @@ export function SmartGrid({
   onOpen,
   titleField,
   onSelectionChange,
+  focusId,
   reloadKey = 0,
   storageKey,
   maxHeight = "calc(100vh - 190px)",
@@ -331,7 +341,14 @@ export function SmartGrid({
   const wantTotals = columns.some((c) => c.kind === "decimal" && !c.ext && !c.noTotal);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(focusId ? [focusId] : []));
+  // proklik: vybraný řádek posunout do pohledu a dát mu fokus
+  useEffect(() => {
+    if (!focusId) return;
+    const el = document.querySelector<HTMLElement>(`tr[data-id="${CSS.escape(focusId)}"]`);
+    el?.scrollIntoView({ block: "center" });
+    el?.focus();
+  }, [focusId]);
   const restored = useRef(false);
   const reqId = useRef(0);
   const fixedKey = JSON.stringify(fixed ?? {});
@@ -409,25 +426,29 @@ export function SmartGrid({
         w[c.name] = 56;
         continue;
       }
-      let chars = Math.min(c.label.length, 18);
-      for (const r of sample) chars = Math.max(chars, displayValue(c, r, lang).length);
+      // nadpis: text + ikona menu sloupce; hodnoty: šířka podle druhu znaků, odkaz (titleField) tučně
+      let px = textPx(c.label.slice(0, 22)) + 52;
+      const bold = c.name === titleField ? 1.08 : 1;
+      for (const r of sample) px = Math.max(px, textPx(displayValue(c, r, lang)) * bold + 32);
       const min = c.kind === "bool" ? 72 : 64;
-      w[c.name] = Math.min(Math.max(Math.round(chars * 7.6 + 44), min), c.kind === "text" ? 420 : 340);
+      w[c.name] = Math.min(Math.max(Math.round(px), min), c.kind === "text" ? 420 : 360);
     }
     return w;
-  }, [rows, columns, lang]);
+  }, [rows, columns, lang, titleField]);
   const flexCol = useMemo(() => {
     const texts = columns.filter((c) => (c.kind === "string" || c.kind === "text") && c.name !== titleField);
     return texts.sort((a, b) => (widths[b.name] ?? 0) - (widths[a.name] ?? 0))[0]?.name;
   }, [columns, widths, titleField]);
   const minTableWidth = columns.reduce((a, c) => a + (widths[c.name] ?? 120), selectable ? 44 : 0);
+  // tabulka se roztáhne nejvýš o 60 % šířky pružného sloupce (název); zbytek místa zůstane volný vpravo
+  const maxTableWidth = minTableWidth + Math.round((flexCol ? widths[flexCol] ?? 0 : 0) * 0.6);
   const allSelected = rows.length > 0 && selected.size === rows.length;
   const filterCount = Object.keys(view.filters).length;
 
   return (
     <div className={s.wrap}>
       <div className={s.scroll} style={{ maxHeight }}>
-        <Table size="small" aria-label={objectId} style={{ tableLayout: "fixed", width: `max(100%, ${minTableWidth}px)` }}>
+        <Table size="small" aria-label={objectId} style={{ tableLayout: "fixed", width: `clamp(${minTableWidth}px, 100%, ${maxTableWidth}px)` }}>
           <TableHeader className={s.head}>
             <TableRow>
               {selectable && (
@@ -464,6 +485,7 @@ export function SmartGrid({
               return (
                 <TableRow
                   key={id}
+                  data-id={id}
                   className={s.row}
                   aria-selected={isSel}
                   appearance={isSel ? "brand" : "none"}

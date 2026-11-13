@@ -65,6 +65,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   druhu API (Integrace), v DB jen SHA-256 otisk (`src/server/api-token.ts`), rozsah
   = moduly/objekty s právem Upravovat, `sys`/`int` nikdy, mazání přes API není.
   Vše přes datovou službu; autor zápisů „API · název napojení“.
+- Dávkové úlohy: `ModuleDef.jobs` (`JobDef`, id `<modul>.<název>`, `run(ctx)` vrací
+  zprávu), `default` = výchozí nastavení úlohu ve firmě založí. Plánovač
+  `src/server/batch.ts` (z `src/instrumentation.ts`, každou minutu, `BATCH_SCHEDULER=off`
+  vypne), plán v pražském čase, zmeškané běhy se nedohánějí, historie `sys.batchRun`.
+- Odkaz na číselník (cíl bez řádků/akcí) vede do seznamu `?focus=<id>` s vybraným
+  řádkem (`refLink`), doklad na svou stránku.
 - Tajné údaje = `FieldDef.secret`: šifrovaně (AES-256-GCM, `SHANON_SECRET_KEY`
   v prostředí — bez něj produkce tajné údaje neuloží; ztráta klíče = údaje znovu
   zadat), ven jen maska. Čte je jen logika modulu přes `revealSecret()`.

@@ -48,6 +48,8 @@ export interface ObjectListProps {
   canDelete: boolean;
   openInPage: boolean;
   initial: { rows: Row[]; total: number; totals?: Record<string, string> };
+  /** záznam vybraný při otevření (proklik z odkazu) */
+  focusId?: string;
   lang: string;
   labels: UiLabels;
 }
@@ -154,6 +156,7 @@ export function ObjectListView(p: ObjectListProps) {
           storageKey={p.objectId}
           onOpen={open}
           titleField={p.titleField}
+          focusId={p.focusId}
           onSelectionChange={setSelected}
           onViewChange={setView}
         />
