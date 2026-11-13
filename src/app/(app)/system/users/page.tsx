@@ -16,7 +16,7 @@ export default async function UsersPage() {
     prisma.sysUser.findMany({
       where: { tenantId: s.ctx.tenantId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, role: true, active: true, lang: true, companies: true },
+      select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, active: true, lang: true, companies: true },
     }),
     inTenant(s.ctx, (sess) => sess.sys().find("sys.role", {}, 1000)),
     inTenant(s.ctx, (sess) => sess.sys().find("sys.company", {}, 1000)),
@@ -32,6 +32,9 @@ export default async function UsersPage() {
       users={users.map((u) => ({
         id: u.id,
         name: u.name,
+        // starší účty bez rozdělení: jméno = první slovo, příjmení = zbytek
+        firstName: u.firstName,
+        lastName: u.lastName || (u.firstName ? "" : u.name),
         email: u.email,
         superUser: u.role === "admin",
         active: u.active,
@@ -47,7 +50,10 @@ export default async function UsersPage() {
         cancel: t("@SYS:Cancel"),
         close: t("@SYS:Close"),
         name: t("@SYS:Name"),
-        email: t("@SYS:Email"),
+        firstName: t("@SYS:FirstName"),
+        lastName: t("@SYS:LastName"),
+        email: t("@SYS:LoginEmail"),
+        newPassword: t("@SYS:Password"),
         superUser: t("@SYS:SuperUser"),
         active: t("@SYS:Active"),
         lang: t("@SYS:Language"),

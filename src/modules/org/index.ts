@@ -196,10 +196,19 @@ export default defineModule({
   dependsOn: ["sys"],
   enums: [LegalForm],
   objects: [entity, site],
-  menu: [{ label: "@ORG:Module", items: [{ object: "org.entity" }, { object: "org.site" }] }],
+  menu: [
+    { label: "@ORG:Module", items: [{ object: "org.entity" }, { object: "org.site" }] },
+    // zakládá firmu → jen superuživatel (stránky /system/… hlídá menu)
+    { label: "@ORG:Functions", kind: "functions", items: [{ href: "/system/company-lookup", label: "@ORG:CompanyLookup" }] },
+  ],
   setup: orgSetup,
   labels: {
     cs: {
+      CompanyExists: "Firma se stejným IČO / DIČ už existuje.",
+      CompanyLookup: "Založit firmu podle IČO / DIČ",
+      CompanyLookupDesc: "Nová účtovaná firma z ARES (české IČO) nebo VIES (zahraniční DIČ): údaje organizace se sídlem a výchozí nastavení zapnutých modulů (účty, řady, DPH…). Kód firmy = IČO.",
+      CompanyCreate: "Založit firmu",
+      Functions: "Funkce",
       Module: "Organizace",
       ModuleDesc: "Údaje o firmě (IČO, DIČ, sídlo, kontakty, banka) a provozovny — pro doklady, účtenky, přiznání i e-shop.",
       Entity: "Údaje organizace",
@@ -237,6 +246,11 @@ export default defineModule({
       OneEntity: "Firma už údaje organizace má — upravte stávající záznam.",
     },
     en: {
+      CompanyExists: "A company with the same ID / VAT ID already exists.",
+      CompanyLookup: "Create company by ID / VAT ID",
+      CompanyLookupDesc: "A new accounting company from ARES (Czech ID) or VIES (foreign VAT ID): organization details with registered address and default setup of enabled modules (accounts, sequences, VAT…). Company code = ID.",
+      CompanyCreate: "Create company",
+      Functions: "Functions",
       Module: "Organization",
       ModuleDesc: "Company details (registration and VAT numbers, address, contacts, bank) and sites — for documents, receipts, returns and e-shop.",
       Entity: "Organization details",

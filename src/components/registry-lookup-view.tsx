@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Checkbox, Field, Input, makeStyles, MessageBar, MessageBarBody, Text, tokens } from "@fluentui/react-components";
 import { Add24Regular, Search24Regular } from "@fluentui/react-icons";
-import { gabCreateFromRegistryAction, gabLookupAction } from "@/app/actions";
+import { createCompanyFromRegistryAction, gabCreateFromRegistryAction, gabLookupAction } from "@/app/actions";
 import type { RegistryHit } from "@/modules/gab/registry-lookup";
 import { ActionBar, Crumbs, PageContent } from "./page";
 
@@ -28,7 +28,20 @@ const useStyles = makeStyles({
 
 type Labels = Record<"desc" | "query" | "find" | "create" | "alsoVendor" | "alsoCustomer" | "source" | "exists" | "open" | "notFound" | "regNo" | "vatId" | "address", string>;
 
-export function RegistryLookupView({ crumbs, vendor, customer, labels: L }: { crumbs: { label: string; href?: string }[]; vendor: boolean; customer: boolean; labels: Labels }) {
+export function RegistryLookupView({
+  crumbs,
+  vendor,
+  customer,
+  labels: L,
+  mode = "subject",
+}: {
+  crumbs: { label: string; href?: string }[];
+  vendor: boolean;
+  customer: boolean;
+  labels: Labels;
+  /** subject = subjekt adresáře, company = nová účtovaná firma */
+  mode?: "subject" | "company";
+}) {
   const s = useStyles();
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -39,7 +52,7 @@ export function RegistryLookupView({ crumbs, vendor, customer, labels: L }: { cr
   const find = () =>
     start(async () => {
       setErr(undefined);
-      const r = await gabLookupAction(q);
+      const r = await gabLookupAction(q, mode);
       if (r.ok) setHit(r.data);
       else {
         setHit(undefined);
@@ -48,8 +61,8 @@ export function RegistryLookupView({ crumbs, vendor, customer, labels: L }: { cr
     });
   const create = () =>
     start(async () => {
-      const r = await gabCreateFromRegistryAction(q, opts);
-      if (r.ok) router.push(`/gab/subject/${r.data}`);
+      const r = mode === "company" ? await createCompanyFromRegistryAction(q) : await gabCreateFromRegistryAction(q, opts);
+      if (r.ok) router.push(mode === "company" ? `/sys/company?focus=${r.data}` : `/gab/subject/${r.data}`);
       else setErr(r.message);
     });
   return (
@@ -107,7 +120,7 @@ export function RegistryLookupView({ crumbs, vendor, customer, labels: L }: { cr
                 <MessageBar intent="warning">
                   <MessageBarBody>
                     {L.exists} ·{" "}
-                    <Button appearance="transparent" size="small" onClick={() => router.push(`/gab/subject/${hit.existingId}`)}>
+                    <Button appearance="transparent" size="small" onClick={() => router.push(mode === "company" ? `/sys/company?focus=${hit.existingId}` : `/gab/subject/${hit.existingId}`)}>
                       {L.open}
                     </Button>
                   </MessageBarBody>

@@ -40,6 +40,8 @@ import { useShortcuts } from "./shortcuts";
 interface User {
   id: string;
   name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   superUser: boolean;
   active: boolean;
@@ -54,6 +56,9 @@ type Labels = Record<
   | "cancel"
   | "close"
   | "name"
+  | "firstName"
+  | "lastName"
+  | "newPassword"
   | "email"
   | "superUser"
   | "active"
@@ -125,8 +130,8 @@ export function UsersView({
     setMessage(undefined);
     setEdit(
       u
-        ? { id: u.id, name: u.name, email: u.email, superUser: u.superUser, active: u.active, lang: u.lang, companies: u.companies, password: "" }
-        : { id: null, name: "", email: "", superUser: false, active: true, lang: "cs", password: "", companies: [] },
+        ? { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, superUser: u.superUser, active: u.active, lang: u.lang, companies: u.companies, password: "" }
+        : { id: null, firstName: "", lastName: "", email: "", superUser: false, active: true, lang: "cs", password: "", companies: [] },
     );
   };
   const assignment = (companyId: string) => edit?.companies.find((a) => a.companyId === companyId);
@@ -201,7 +206,7 @@ export function UsersView({
           <>
             <DrawerHeader>
               <DrawerHeaderTitle action={<Button appearance="subtle" aria-label={labels.close} icon={<Dismiss24Regular />} onClick={() => setEdit(null)} />}>
-                {edit.id ? edit.name : `${labels.new} · ${labels.user}`}
+                {edit.id ? `${edit.firstName} ${edit.lastName}`.trim() : `${labels.new} · ${labels.user}`}
               </DrawerHeaderTitle>
             </DrawerHeader>
             <DrawerBody>
@@ -212,11 +217,14 @@ export function UsersView({
                   </MessageBar>
                 )}
                 <div className={s.section}>{labels.general}</div>
-                <Field label={labels.name} required validationMessage={errors.name}>
-                  <Input value={edit.name} onChange={(_, d) => setEdit({ ...edit, name: d.value })} />
+                <Field label={labels.firstName} required validationMessage={errors.firstName}>
+                  <Input value={edit.firstName} autoComplete="given-name" onChange={(_, d) => setEdit({ ...edit, firstName: d.value })} />
+                </Field>
+                <Field label={labels.lastName} required validationMessage={errors.lastName}>
+                  <Input value={edit.lastName} autoComplete="family-name" onChange={(_, d) => setEdit({ ...edit, lastName: d.value })} />
                 </Field>
                 <Field label={labels.email} required validationMessage={errors.email}>
-                  <Input type="email" value={edit.email} onChange={(_, d) => setEdit({ ...edit, email: d.value })} />
+                  <Input type="email" autoComplete="username" value={edit.email} onChange={(_, d) => setEdit({ ...edit, email: d.value })} />
                 </Field>
                 <Field label={labels.lang}>
                   <Dropdown
@@ -229,7 +237,7 @@ export function UsersView({
                   </Dropdown>
                 </Field>
                 <Switch label={labels.active} checked={edit.active} onChange={(_, d) => setEdit({ ...edit, active: d.checked })} />
-                <Field label={labels.password} required={!edit.id} hint={labels.passwordHelp} validationMessage={errors.password}>
+                <Field label={edit.id ? labels.password : labels.newPassword} required={!edit.id} hint={labels.passwordHelp} validationMessage={errors.password}>
                   <Input type="password" autoComplete="new-password" value={edit.password ?? ""} onChange={(_, d) => setEdit({ ...edit, password: d.value })} />
                 </Field>
 

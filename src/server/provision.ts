@@ -30,6 +30,7 @@ export async function provisionTenant(client: PrismaClient, input: ProvisionInpu
         create: {
           email: input.adminEmail.toLowerCase(),
           name: "Správce",
+          lastName: "Správce",
           role: "admin",
           passwordHash: await bcrypt.hash(input.adminPassword, 12),
         },

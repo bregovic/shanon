@@ -808,3 +808,22 @@ describe("tiskové sestavy", () => {
     await expect(printJob({ ...P, perms: { admin: false, levels: {} } }, "ar.invoice", String(inv.id), null, client)).rejects.toMatchObject({ label: "@SYS:NoAccess" });
   });
 });
+
+describe("založení firmy z rejstříku", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("ARES → firma (kód = IČO), výchozí nastavení, organizace se sídlem; duplicita", async () => {
+    const { createCompanyFromRegistry } = await import("@/server/company-lookup");
+    const T = (await provisionTenant(client, { code: `t-cmp-${run}`, name: "Cmp", adminEmail: `cmp-${run}@test.local`, adminPassword: "heslo-12345", modules: ["org", "gl"], company: { code: "A", name: "A" } })).ctx;
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ ico: "27079864", obchodniJmeno: "Uzenářství s.r.o.", dic: "CZ27079864", pravniForma: "112", sidlo: { kodStatu: "CZ", nazevObce: "Davle", nazevUlice: "Na náměstí", cisloDomovni: 97, cisloOrientacni: 3, psc: 25206 } }), { status: 200 }),
+    );
+    const id = await createCompanyFromRegistry(T, "27079864", client);
+    const c = (await getRecord(T, "sys.company", id, client))!;
+    expect([c.code, c.name, c.vatId]).toEqual(["27079864", "Uzenářství s.r.o.", "CZ27079864"]);
+    const C2 = { ...T, companyId: id };
+    const [org] = (await listRecords(C2, "org.entity", {}, client)).rows;
+    expect([org.legalName, org.street, org.houseNo, org.orientNo, org.city, org.zipCode]).toEqual(["Uzenářství s.r.o.", "Na náměstí", "97", "3", "Davle", "252 06"]);
+    expect((await listRecords(C2, "gl.account", { pageSize: 1 }, client)).total).toBeGreaterThan(10);
+    await expect(createCompanyFromRegistry(T, "27079864", client)).rejects.toMatchObject({ label: "@ORG:CompanyExists" });
+  });
+});

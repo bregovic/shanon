@@ -1,6 +1,7 @@
 "use server";
 
 import { printJob, recentDocs } from "@/server/print";
+import { createCompanyFromRegistry } from "@/server/company-lookup";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
 import { basketForBox, boxByCode, closeBasket, openBaskets, saveBasket, type BasketView } from "@/modules/pos/basket";
@@ -524,13 +525,18 @@ export async function runReportAction(module: string, id: string, params: Record
 
 const NOTIFY_KEYS = ["dailySummary", "overdueInvoices", "integrationErrors"] as const;
 
-export async function saveProfileAction(input: { name: string; lang: string; notify: Record<string, boolean> }): Promise<ActionResult> {
+export async function saveProfileAction(input: { firstName: string; lastName: string; lang: string; notify: Record<string, boolean> }): Promise<ActionResult> {
   const s = await requireSession();
   const t = await getT(s.lang, s.ctx.tenantId);
-  const name = String(input.name ?? "").trim();
-  if (!name || name.length > 120) return { ok: false, message: t("@SYS:FixErrors"), errors: { name: t("@SYS:Required") } };
+  const firstName = String(input.firstName ?? "").trim().slice(0, 60);
+  const lastName = String(input.lastName ?? "").trim().slice(0, 60);
+  const name = `${firstName} ${lastName}`.trim();
+  const errs: Record<string, string> = {};
+  if (!firstName) errs.firstName = t("@SYS:Required");
+  if (!lastName) errs.lastName = t("@SYS:Required");
+  if (Object.keys(errs).length) return { ok: false, message: t("@SYS:FixErrors"), errors: errs };
   const notify = Object.fromEntries(NOTIFY_KEYS.map((k) => [k, !!input.notify?.[k]]));
-  await prisma.sysUser.update({ where: { id: s.user.id }, data: { name, lang: input.lang === "en" ? "en" : "cs", notify } });
+  await prisma.sysUser.update({ where: { id: s.user.id }, data: { name, firstName, lastName, lang: input.lang === "en" ? "en" : "cs", notify } });
   revalidatePath("/", "layout");
   return { ok: true, data: undefined };
 }
@@ -568,7 +574,8 @@ export interface UserCompanyInput {
 
 export interface UserInput {
   id: string | null;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   superUser: boolean;
   active: boolean;
@@ -585,7 +592,11 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
   const scope = new Set(s.adminCompanyIds);
   const errors: Record<string, string> = {};
   const email = input.email.trim().toLowerCase();
-  if (!input.name.trim()) errors.name = t("@SYS:Required");
+  const firstName = String(input.firstName ?? "").trim().slice(0, 60);
+  const lastName = String(input.lastName ?? "").trim().slice(0, 60);
+  const name = `${firstName} ${lastName}`.trim();
+  if (!firstName) errors.firstName = t("@SYS:Required");
+  if (!lastName) errors.lastName = t("@SYS:Required");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = t("@SYS:InvalidEmail");
   if ((!input.id || input.password) && (input.password ?? "").length < 10) errors.password = t("@SYS:PasswordTooShort");
   const other = await prisma.sysUser.findUnique({ where: { email } });
@@ -602,7 +613,7 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
   const outside = (existing?.companies ?? []).filter((a) => !scope.has(a.companyId));
   const basicChanged =
     !!existing &&
-    (existing.name !== input.name.trim() || existing.email !== email || existing.active !== input.active || existing.lang !== input.lang || !!input.password);
+    (existing.name !== name || existing.email !== email || existing.active !== input.active || existing.lang !== input.lang || !!input.password);
   if (!s.superUser && outside.length && basicChanged) return { ok: false, message: t("@SYS:OtherCompanies") };
 
   // přiřazení jen do firem v rozsahu editora a jen existující role tenanta
@@ -619,7 +630,9 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
   }
 
   const data = {
-    name: input.name.trim(),
+    name,
+    firstName,
+    lastName,
     email,
     role: input.superUser ? "admin" : "user",
     active: input.active,
@@ -826,11 +839,11 @@ export async function intTestEnvAction(on: boolean): Promise<ActionResult<TestEn
 }
 
 /** Adresář → Založit podle IČO / DIČ: náhled nálezu (ARES / VIES). */
-export async function gabLookupAction(query: string): Promise<ActionResult<RegistryHit | null>> {
+export async function gabLookupAction(query: string, target: "subject" | "company" = "subject"): Promise<ActionResult<RegistryHit | null>> {
   const s = await requireSession();
   try {
-    assertCan(s.ctx.perms, "gab.subject", "read");
-    return { ok: true, data: await inTenant(s.ctx, (sess) => lookupRegistry(sess.sys().api(), String(query).slice(0, 20))) };
+    if (target === "company" ? !s.superUser : !can(s.ctx.perms, "gab.subject", "read")) throw new UserError("@SYS:NoAccess");
+    return { ok: true, data: await inTenant(s.ctx, (sess) => lookupRegistry(sess.sys().api(), String(query).slice(0, 20), target === "company" ? "company" : "subject")) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
@@ -879,6 +892,18 @@ export async function printSaveLayoutAction(templateId: string, layout: string):
     if (layout.length > 2_000_000) throw new UserError("@PRT:ImageTooBig");
     await saveRecord(s.ctx, "prt.template", String(templateId), { layout: String(layout) });
     return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Správa systému → Založit firmu podle IČO / DIČ (jen superuživatel): firma, výchozí nastavení, údaje organizace se sídlem. */
+export async function createCompanyFromRegistryAction(query: string): Promise<ActionResult<string>> {
+  const s = await requireSession();
+  try {
+    if (!s.superUser) throw new UserError("@SYS:NoAccess");
+    const id = await createCompanyFromRegistry(s.ctx, String(query).slice(0, 20));
+    return { ok: true, data: id };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

@@ -33,7 +33,10 @@ model SysUser {
   id           String   @id @default(uuid(7)) @db.Uuid
   tenantId     String   @map("tenant_id") @db.Uuid
   email        String   @unique @db.VarChar(254)
+  /// celé jméno (Jméno Příjmení) — skládá se z firstName a lastName
   name         String   @db.VarChar(120)
+  firstName    String   @default("") @map("first_name") @db.VarChar(60)
+  lastName     String   @default("") @map("last_name") @db.VarChar(60)
   passwordHash String   @map("password_hash")
   /// admin = superuživatel tenanta (všechny firmy, moduly, role); user = podle přiřazení k firmám
   role         String   @default("user") @db.VarChar(20)

@@ -14,6 +14,10 @@ export interface RegistryHit {
   vatId: string | null;
   person: boolean;
   street: string | null;
+  /** ARES: ulice a čísla zvlášť (údaje organizace) */
+  streetName?: string | null;
+  houseNo?: string | null;
+  orientNo?: string | null;
   city: string | null;
   zipCode: string | null;
   country: string;
@@ -36,13 +40,13 @@ export async function viesLookup(cc: string, num: string, data?: DataApi): Promi
 }
 
 /** Rozpozná vstup a najde subjekt v ARES nebo VIES. */
-export async function lookupRegistry(data: DataApi, query: string): Promise<RegistryHit | null> {
+export async function lookupRegistry(data: DataApi, query: string, target: "subject" | "company" = "subject"): Promise<RegistryHit | null> {
   const q = query.replace(/\s+/g, "").toUpperCase();
   const ico = /^\d{1,8}$/.test(q) ? q : /^CZ\d{8}$/.test(q) ? q.slice(2) : null;
   let hit: Omit<RegistryHit, "existingId"> | null = null;
   if (ico) {
     const a = await aresByIco(ico, data);
-    if (a) hit = { source: "ares", name: a.name, regNo: a.ico, vatId: a.vatId, person: a.person, street: a.street, city: a.city, zipCode: a.zipCode, country: a.country };
+    if (a) hit = { source: "ares", name: a.name, regNo: a.ico, vatId: a.vatId, person: a.person, street: a.street, streetName: a.streetName, houseNo: a.houseNo, orientNo: a.orientNo, city: a.city, zipCode: a.zipCode, country: a.country };
   } else {
     const m = /^([A-Z]{2})([0-9A-Z+*.]{2,14})$/.exec(q);
     if (!m) throw new UserError("@GAB:LookupFormat");
@@ -72,8 +76,16 @@ export async function lookupRegistry(data: DataApi, query: string): Promise<Regi
     }
   }
   if (!hit) return null;
-  const [byReg] = hit.regNo ? await data.find("gab.subject", { regNo: hit.regNo }, { take: 1 }) : [];
-  const [byVat] = !byReg && hit.vatId ? await data.find("gab.subject", { vatId: hit.vatId }, { take: 1 }) : [];
+  // duplicita: v adresáři (subjekt), nebo mezi firmami (`target: "company"`)
+  const obj = target === "company" ? "sys.company" : "gab.subject";
+  let byReg: RecordData | undefined;
+  let byVat: RecordData | undefined;
+  try {
+    [byReg] = hit.regNo ? await data.find(obj, { regNo: hit.regNo }, { take: 1 }) : [];
+    [byVat] = !byReg && hit.vatId ? await data.find(obj, { vatId: hit.vatId }, { take: 1 }) : [];
+  } catch {
+    /* adresář není zapnutý */
+  }
   return { ...hit, existingId: ((byReg ?? byVat)?.id as string) ?? null };
 }
 

@@ -27,13 +27,14 @@ type Msg = { intent: "success" | "error"; text: string } | null;
 
 export function UserSettings(p: {
   crumbs: { label: string; href?: string }[];
-  user: { name: string; email: string; lang: string; hasPin: boolean; notify: Record<string, boolean> };
+  user: { firstName: string; lastName: string; email: string; lang: string; hasPin: boolean; notify: Record<string, boolean> };
   L: Record<string, string>;
 }) {
   const st = useStyles();
   const router = useRouter();
   const L = p.L;
-  const [name, setName] = useState(p.user.name);
+  const [firstName, setFirstName] = useState(p.user.firstName);
+  const [lastName, setLastName] = useState(p.user.lastName);
   const [lang, setLang] = useState(p.user.lang);
   const [notify, setNotify] = useState(p.user.notify);
   const [pw, setPw] = useState({ current: "", next: "", repeat: "" });
@@ -61,8 +62,11 @@ export function UserSettings(p: {
         <div className={st.grid}>
           <section className={st.card}>
             <div className={st.title}>{L.Profile}</div>
-            <Field label={L.Name} required validationMessage={errs.name}>
-              <Input value={name} onChange={(_, d) => setName(d.value)} maxLength={120} />
+            <Field label={L.FirstName} required validationMessage={errs.firstName}>
+              <Input value={firstName} onChange={(_, d) => setFirstName(d.value)} maxLength={60} />
+            </Field>
+            <Field label={L.LastName} required validationMessage={errs.lastName}>
+              <Input value={lastName} onChange={(_, d) => setLastName(d.value)} maxLength={60} />
             </Field>
             <Field label={L.Email}>
               <Input value={p.user.email} disabled />
@@ -88,7 +92,7 @@ export function UserSettings(p: {
             </Text>
             <Note m={msg.profile} />
             <div className={st.actions}>
-              <Button appearance="primary" disabled={busy} onClick={() => run("profile", () => saveProfileAction({ name, lang, notify }), L.Saved, () => router.refresh())}>
+              <Button appearance="primary" disabled={busy} onClick={() => run("profile", () => saveProfileAction({ firstName, lastName, lang, notify }), L.Saved, () => router.refresh())}>
                 {L.Save}
               </Button>
             </div>
