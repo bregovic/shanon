@@ -42,6 +42,8 @@ export interface PrintElement {
   field?: string;
   /** obrázek jako data: URL (logo) */
   src?: string;
+  /** prvek se vytiskne jen, když pole (cesta) má hodnotu — např. kód EET */
+  showIf?: string;
   columns?: PrintColumn[];
   style?: { size?: number; bold?: boolean; italic?: boolean; align?: "left" | "center" | "right"; color?: string; border?: boolean; fill?: string };
 }

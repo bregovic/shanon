@@ -30,8 +30,13 @@ function imageSrc(el: PrintElement, data: PrintData): Buffer | null {
 }
 
 /** Prvek na pozici (mm, y relativně k `dy`). */
-function drawElement(doc: Doc, el: PrintElement, data: PrintData, locale: string, fontSize: number, dy = 0) {
+/** Vykreslí prvek; vrací skutečnou výšku v pt (text a tabulky podle obsahu). */
+function drawElement(doc: Doc, el: PrintElement, data: PrintData, locale: string, fontSize: number, dy = 0): number {
   const s = el.style ?? {};
+  if (el.showIf) {
+    const v = valueAt(data, el.showIf);
+    if (v === null || v === undefined || v === "" || v === "0" || v === "0.00") return 0;
+  }
   const x = el.x * MM;
   const y = (el.y + dy) * MM;
   const w = el.w * MM;
@@ -42,24 +47,26 @@ function drawElement(doc: Doc, el: PrintElement, data: PrintData, locale: string
     case "text": {
       font(doc, s, s.size ?? fontSize);
       const pad = s.fill || s.border ? 1.2 * MM : 0;
-      doc.fillColor(color(s.color)).text(fillText(el.text ?? "", data, locale), x + pad, y + pad, { width: w - 2 * pad, align: s.align ?? "left", lineGap: (s.size ?? fontSize) * (LINE - 1.15) });
+      const txt = fillText(el.text ?? "", data, locale);
+      const opts = { width: w - 2 * pad, align: s.align ?? "left", lineGap: (s.size ?? fontSize) * (LINE - 1.15) } as const;
+      doc.fillColor(color(s.color)).text(txt, x + pad, y + pad, opts);
       if (s.border) doc.lineWidth(0.3 * MM).strokeColor("#000").rect(x, y, w, h).stroke();
-      return;
+      return doc.heightOfString(txt || " ", opts) + 2 * pad;
     }
     case "line":
       doc.lineWidth(0.3 * MM).strokeColor(color(s.color)).moveTo(x, y).lineTo(x + w, y).stroke();
-      return;
+      return h;
     case "rect":
       doc.lineWidth(0.3 * MM).strokeColor(color(s.color)).rect(x, y, w, h).stroke();
-      return;
+      return h;
     case "image": {
       const img = imageSrc(el, data);
       if (img) doc.image(img, x, y, { fit: [w, h], align: s.align === "right" ? "right" : s.align === "center" ? "center" : undefined, valign: "center" });
-      return;
+      return h;
     }
     case "qr": {
       const text = String(valueAt(data, el.field || "qr") ?? "");
-      if (!text) return;
+      if (!text) return h;
       const qr = QRCode.create(text, { errorCorrectionLevel: "M" });
       const n = qr.modules.size;
       const size = Math.min(w, h);
@@ -68,12 +75,14 @@ function drawElement(doc: Doc, el: PrintElement, data: PrintData, locale: string
       doc.fillColor("#000000");
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.modules.get(r, c)) doc.rect(x + (c + 2) * cell, y + (r + 2) * cell, cell + 0.05, cell + 0.05);
       doc.fill().restore();
-      return;
+      return h;
     }
     case "vat":
-      drawTable(doc, el, (valueAt(data, "vat") as Record<string, unknown>[]) ?? [], locale, fontSize, y, Infinity);
-      return;
+      return drawTable(doc, el, (valueAt(data, "vat") as Record<string, unknown>[]) ?? [], locale, fontSize, y, Infinity) - y;
+    case "table":
+      return drawTable(doc, el, (valueAt(data, "lines") as Record<string, unknown>[]) ?? [], locale, fontSize, y, Infinity) - y;
   }
+  return h;
 }
 
 /**
@@ -142,7 +151,20 @@ export async function renderPdf(layout: PrintLayout, data: PrintData, opts: { lo
   const done = new Promise<Buffer>((res) => doc.on("end", () => res(Buffer.concat(chunks))));
 
   const table = layout.elements.find((e) => e.type === "table");
-  if (!table) {
+  if (flow) {
+    // účtenka: prvky pod sebou, delší obsah posune vše pod ním; skryté prvky nezabírají místo
+    const visible = layout.elements.filter((e) => {
+      if (!e.showIf) return true;
+      const v = valueAt(data, e.showIf);
+      return !(v === null || v === undefined || v === "" || v === "0" || v === "0.00");
+    });
+    const top = Math.min(...visible.map((e) => e.y));
+    let shift = -top;
+    for (const el of [...visible].sort((a, b) => a.y - b.y || a.x - b.x)) {
+      const real = drawElement(doc, el, data, locale, fs, shift) / MM;
+      shift += Math.max(0, real - el.h);
+    }
+  } else if (!table) {
     for (const el of layout.elements) drawElement(doc, el, data, locale, fs);
   } else {
     const head = layout.elements.filter((e) => e !== table && e.y < table.y);

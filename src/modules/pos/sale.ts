@@ -257,7 +257,7 @@ export interface ReceiptPrint {
   issuedAt: string;
   register: string;
   /** tradeName = název provozovny/značka nad obchodním jménem (jen když se liší) */
-  company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null };
+  company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null; logoId?: string | null };
   lines: { description: string; qty: string; unit: string; unitPrice: string; amount: string; rate: string; originalPrice?: string | null }[];
   vat: { rate: string; base: string; tax: string }[];
   gross: string;
@@ -313,6 +313,7 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
     company: {
       name: String(org?.legalName ?? company?.name ?? ""),
       tradeName: org?.tradeName && org.tradeName !== org.legalName ? String(org.tradeName) : null,
+      logoId: (org?.logo as string) ?? null,
       regNo: ((org?.regNo ?? company?.regNo) as string) ?? null,
       vatId: ((org?.vatId ?? company?.vatId) as string) ?? null,
       address: addr,

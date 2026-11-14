@@ -248,7 +248,7 @@ describe("organizace", () => {
       const { receiptPrint } = await import("@/modules/pos/sale");
       return receiptPrint(a, O.companyId, String(rec.id));
     }, client);
-    expect(print.company).toEqual({ name: "Hynek Cibulka", tradeName: "Uzeniny Hynek Cibulka", regNo: "41832744", vatId: "CZ12345678", address: "Uhelný trh 413/8, 110 00 Praha 1" });
+    expect(print.company).toEqual({ name: "Hynek Cibulka", tradeName: "Uzeniny Hynek Cibulka", regNo: "41832744", vatId: "CZ12345678", address: "Uhelný trh 413/8, 110 00 Praha 1", logoId: null });
   });
 });
 

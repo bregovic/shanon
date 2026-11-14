@@ -387,7 +387,65 @@ export const invoicePrintable: PrintableDef = {
 // Účtenka (zjednodušený daňový doklad)
 // ---------------------------------------------------------------------------
 
+/**
+ * Účtenka = zjednodušený daňový doklad (§ 30 ZDPH): obchodní firma, sídlo, IČO, DIČ,
+ * evidenční číslo, datum, předmět plnění se sazbou, celkem, rekapitulace DPH po
+ * sazbách; s EET kód POK. Malé logo nahoře, bez zkratky firmy.
+ */
 function receiptLayout(): PrintLayout {
+  return {
+    paper: "receipt80",
+    fontSize: 8.5,
+    elements: [
+      { id: "logo", type: "image", x: 16, y: 0, w: 40, h: 12, field: "company.logo", showIf: "company.logo", style: { align: "center" } },
+      T("name", 0, 13, 72, 5, "{company.name}", { bold: true, align: "center", size: 10 }),
+      T("addr", 0, 18, 72, 10, "{company.address}\nIČO {company.regNo}   DIČ {company.vatId}", { align: "center", size: 7.5 }),
+      { id: "sep1", type: "line", x: 0, y: 29, w: 72, h: 1 },
+      T("title", 0, 30, 72, 5, "Zjednodušený daňový doklad", { bold: true, align: "center", size: 8.5 }),
+      T("num", 0, 35, 72, 9, "č. {doc.number}\n{doc.dateTime}   pokladna {doc.register}", { align: "center", size: 7.5 }),
+      {
+        id: "lines",
+        type: "table",
+        x: 0,
+        y: 45,
+        w: 72,
+        h: 20,
+        style: { size: 7.5 },
+        columns: [
+          { field: "description", label: "Položka", width: 31 },
+          { field: "qty", label: "Mn.", width: 11, align: "right", format: "qty" },
+          { field: "unit", label: "MJ", width: 6 },
+          { field: "rate", label: "%", width: 6, align: "right" },
+          { field: "gross", label: "Kč", width: 18, align: "right", format: "money" },
+        ],
+      },
+      T("total", 0, 67, 72, 7, "Celkem k úhradě {doc.paid:money} Kč", { bold: true, size: 12, align: "right" }),
+      { ...T("round", 0, 74, 72, 4, "Zaokrouhlení {doc.rounding:money} Kč", { size: 7.5, align: "right" }), showIf: "doc.rounding" },
+      T("pay", 0, 78, 72, 4, "Platba: {doc.payment}", { size: 7.5, align: "right" }),
+      { ...T("cash", 0, 82, 72, 4, "Přijato {doc.cashGiven:money} Kč   Vráceno {doc.change:money} Kč", { size: 7.5, align: "right" }), showIf: "doc.cashGiven" },
+      {
+        id: "vat",
+        type: "vat",
+        x: 0,
+        y: 87,
+        w: 72,
+        h: 12,
+        style: { size: 7.5 },
+        columns: [
+          { field: "rate", label: "Sazba %", width: 18, align: "right" },
+          { field: "base", label: "Základ", width: 18, align: "right", format: "money" },
+          { field: "tax", label: "DPH", width: 16, align: "right", format: "money" },
+          { field: "gross", label: "Celkem", width: 20, align: "right", format: "money" },
+        ],
+      },
+      { ...T("eet", 0, 101, 72, 8, "Evidence tržeb – běžný režim\nPOK: {doc.fik}", { size: 7, align: "center" }), showIf: "doc.fik" },
+      T("foot", 0, 110, 72, 9, "{doc.footer}\nDěkujeme za nákup", { align: "center", size: 8 }),
+    ],
+  };
+}
+
+/** Původní účtenka (do 11/2026) — neupravené šablony se nahradí novou. */
+export function legacyReceiptLayout(): PrintLayout {
   return {
     paper: "receipt80",
     fontSize: 9,
@@ -460,4 +518,5 @@ export const receiptPrintable: PrintableDef = {
     return receiptData(await receiptPrint(data, companyId, id));
   },
   defaultLayout: receiptLayout,
+  legacyLayouts: [legacyReceiptLayout()],
 };

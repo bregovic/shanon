@@ -102,6 +102,10 @@ export function ElementView({
   flow?: boolean;
 }) {
   const s = el.style ?? {};
+  if (el.showIf && !designMode) {
+    const v = valueAt(data, el.showIf);
+    if (v === null || v === undefined || v === "" || v === "0" || v === "0.00") return null;
+  }
   const box: React.CSSProperties = {
     position: flow ? "relative" : "absolute",
     left: flow ? undefined : `${el.x}mm`,
@@ -155,7 +159,15 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
   // účtenka (papír bez pevné výšky): prvky pod sebou podle obsahu — delší text nebo
   // víc sazeb DPH posune vše pod sebou, nic se nepřekrývá
   if (!paper.h) {
-    const sorted = [...layout.elements].sort((a, b) => a.y - b.y || a.x - b.x);
+    const shown = (el: PrintElement) => {
+      if (!el.showIf) return true;
+      const v = valueAt(data, el.showIf);
+      return !(v === null || v === undefined || v === "" || v === "0" || v === "0.00");
+    };
+    const visible = layout.elements.filter(shown);
+    // skrytý prvek nahoře (logo) nenechá prázdné místo: zbytek se posune
+    const top = Math.min(...visible.map((e) => e.y));
+    const sorted = visible.map((e) => ({ ...e, y: e.y - (Number.isFinite(top) ? top : 0) })).sort((a, b) => a.y - b.y || a.x - b.x);
     // mezera nad prvkem = odstup od spodku předchozích prvků v návrhu
     const gaps = sorted.map((el, i) => Math.max(0, el.y - Math.max(0, ...sorted.slice(0, i).map((x) => x.y + x.h))));
     return (

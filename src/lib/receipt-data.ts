@@ -4,7 +4,17 @@ import type { ReceiptPrint } from "@/modules/pos/sale";
 /** Data účtenky z podkladů pro tisk (stejné na serveru i v kase). */
 export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: string; web?: string } = {}, paymentLabels: Record<string, string> = {}) {
   return {
-    company: { name: r.company.name, tradeName: r.company.tradeName ?? "", address: r.company.address ?? "", regNo: r.company.regNo ?? "", vatId: r.company.vatId ?? "", ...extra },
+    company: {
+      name: r.company.name,
+      tradeName: r.company.tradeName ?? "",
+      address: r.company.address ?? "",
+      regNo: r.company.regNo ?? "",
+      vatId: r.company.vatId ?? "",
+      // logo: v kase odkaz na přílohu, tisk na serveru ho nahradí data: URL (printJob)
+      logoId: r.company.logoId ?? "",
+      logo: r.company.logoId ? `/api/files/${r.company.logoId}` : "",
+      ...extra,
+    },
     doc: {
       number: r.receiptNum,
       date: r.issuedAt,
@@ -20,7 +30,7 @@ export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: st
       fik: r.eet?.pok ?? "",
     },
     lines: r.lines.map((l) => ({ description: l.description, qty: l.qty, unit: l.unit, unitPrice: l.unitPrice, gross: l.amount, rate: l.rate })),
-    vat: r.vat.map((v) => ({ rate: v.rate, base: v.base, tax: v.tax })),
+    vat: r.vat.map((v) => ({ rate: v.rate, base: v.base, tax: v.tax, gross: (Number(v.base) + Number(v.tax)).toFixed(2) })),
   };
 }
 
