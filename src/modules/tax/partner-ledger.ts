@@ -121,13 +121,14 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       paymentDays: { edt: Edts.Int, label: "@TAX:PaymentDays" },
       /** výchozí účet pro platby (z bankovních účtů subjektu) */
       bankAccountId: { edt: refEdt("gab.bankAccount", "@GAB:BankAccount") },
+      paymentMethodId: { edt: refEdt("bank.paymentMethod", "@TAX:PaymentMethod"), optionalRef: true },
       blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
     },
     titleField: "accountNum",
     list: ["accountNum", "subjectId", "groupId", "currencyId", "paymentDays", "blocked"],
     form: [
       { label: "@SYS:General", fields: ["accountNum", "subjectId", "groupId", "blocked"] },
-      { label: L("Terms"), fields: ["currencyId", "paymentDays", "bankAccountId"] },
+      { label: L("Terms"), fields: ["currencyId", "paymentDays", "paymentMethodId", "bankAccountId"] },
       { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
     unique: [["accountNum"], ["subjectId"]],
@@ -409,7 +410,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
             if (!acc || acc.subjectId !== d.subjectId) return { bankAccountId: "@GAB:AccountOtherSubject" };
           } else if (d.subjectId) {
             const accs = (await ctx.data.find("gab.bankAccount", { subjectId: d.subjectId, blocked: false }, { take: 50 })) as RecordData[];
-            const pick = accs.find((a) => a.isDefault) ?? accs.find((a) => a.published) ?? null;
+            const pick = accs.find((a) => a.isDefault) ?? accs.find((a) => a.published) ?? accs[0] ?? null;
             if (pick) d.bankAccountId = pick.id;
           }
         },
@@ -417,7 +418,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       } as ObjectHandlers,
     },
     menu: [
-      { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }] },
+      { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }, ...(sp.side === -1 ? [{ object: "bank.paymentOrder", module: "bank" }] : [])] },
       // nahrání dokladů k vytěžení (Integrace), cíl předvolený podle agendy
       { label: L("Module"), kind: "functions" as const, items: [{ href: `/int/doc-import?target=${m}Invoice`, label: "@INT:DocImport", module: "int" }] },
       { label: "@SYS:Setup", items: [{ object: group.id }] },

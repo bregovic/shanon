@@ -18,8 +18,8 @@ import {
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Edit24Regular } from "@fluentui/react-icons";
-import { deleteRecordsAction, duplicateRecordAction } from "@/app/actions";
+import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular } from "@fluentui/react-icons";
+import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
@@ -52,6 +52,10 @@ export interface ObjectListProps {
   focusId?: string;
   /** filtry z odkazu (?filter.pole=výraz) */
   initialFilters?: Record<string, string>;
+  /** akce nad víc vybranými záznamy (výpisy → deník HK) */
+  bulkActions?: { id: string; label: string }[];
+  /** „Hotovo {ok} z {n}.“ */
+  bulkDoneLabel?: string;
   lang: string;
   labels: UiLabels;
 }
@@ -108,6 +112,18 @@ export function ObjectListView(p: ObjectListProps) {
     !drawer.open && !confirm,
   );
 
+  const [info, setInfo] = useState<string>();
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const bulk = async (actionId: string) => {
+    setBulkBusy(true);
+    const res = await bulkRecordAction(p.objectId, selected.map((r) => String(r.id)), actionId);
+    setBulkBusy(false);
+    if (!res.ok) return setError(res.message);
+    setError(res.data.errors.length ? res.data.errors.join(" · ") : undefined);
+    setInfo((p.bulkDoneLabel ?? "{ok}/{n}").replace("{ok}", String(res.data.ok)).replace("{n}", String(selected.length)));
+    setReload((n) => n + 1);
+  };
+
   const remove = async () => {
     setConfirm(false);
     const res = await deleteRecordsAction(p.objectId, selected.map((r) => String(r.id)));
@@ -142,6 +158,11 @@ export function ObjectListView(p: ObjectListProps) {
             {p.labels.actions.delete}
           </Button>
         )}
+        {(p.bulkActions ?? []).map((a) => (
+          <Button key={a.id} icon={<Play24Regular />} disabled={!selected.length || bulkBusy} onClick={() => void bulk(a.id)}>
+            {a.label}
+          </Button>
+        ))}
         <ToolbarDivider />
         <DocuRefButton
           objectId={p.objectId}
@@ -167,6 +188,11 @@ export function ObjectListView(p: ObjectListProps) {
         {error && (
           <MessageBar intent="error">
             <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
+        {info && !error && (
+          <MessageBar intent="success">
+            <MessageBarBody>{info}</MessageBarBody>
           </MessageBar>
         )}
         <SmartGrid

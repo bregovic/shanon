@@ -32,6 +32,7 @@ import org, { orgHandlers } from "@/modules/org";
 import { aresHandlers } from "@/modules/gab/ares";
 import qa, { qaHandlers } from "@/modules/qa";
 import { bankHandlers } from "@/modules/bank/handlers";
+import { paymentHandlers } from "@/modules/bank/payments";
 import { vatReturnHandlers } from "@/modules/tax/vat-return";
 import subjectRating from "@/extensions/subject-rating";
 
@@ -62,7 +63,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

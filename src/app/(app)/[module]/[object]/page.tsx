@@ -67,6 +67,12 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       initial={{ rows: initial.rows, total: initial.total, totals: initial.totals }}
       focusId={focus}
       initialFilters={initialFilters}
+      bulkActions={
+        can(s.ctx.perms, def.id, "write")
+          ? (def.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label) }))
+          : []
+      }
+      bulkDoneLabel={t("@SYS:BulkDone")}
       lang={s.lang}
       labels={uiLabels(t)}
     />

@@ -14,6 +14,51 @@ export const SeqFormat = defineEdt({
 /** Objekty s automatickým číslováním — hodnoty doplní registr. */
 export const NumberedObject: EnumDef = { id: "NumberedObject", label: "@SYS:UsedFor", values: [] };
 
+export const TransformDirectionEnum = defineEnum({
+  id: "TransformDirection",
+  label: "@SYS:TrDirection",
+  values: [
+    { value: "export", label: "@SYS:TrExport" },
+    { value: "import", label: "@SYS:TrImport" },
+    { value: "print", label: "@SYS:TrPrint" },
+  ],
+});
+export const TransformPurposeEnum = defineEnum({
+  id: "TransformPurpose",
+  label: "@SYS:TrPurpose",
+  values: [
+    { value: "paymentOrder", label: "@SYS:TrPaymentOrder" },
+    { value: "bankStatement", label: "@SYS:TrBankStatement" },
+    { value: "paymentQr", label: "@SYS:TrPaymentQr" },
+    { value: "barcode", label: "@SYS:TrBarcode" },
+  ],
+});
+
+/**
+ * Transformace (formáty souborů a kódů): evidence formátů, které systém umí
+ * (registr v src/core/transform.ts); platební metoda si z nich vybírá formát příkazu.
+ */
+export const transformation = defineObject({
+  id: "sys.transformation",
+  table: "sys_transformation",
+  label: "@SYS:Transformation",
+  labelPlural: "@SYS:Transformations",
+  scope: "tenant",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    direction: { edt: enumEdt(TransformDirectionEnum), mandatory: true, readOnly: true },
+    purpose: { edt: enumEdt(TransformPurposeEnum), mandatory: true, readOnly: true },
+    description: { edt: Edts.Notes },
+    active: { edt: Edts.NoYes, label: "@SYS:Active", default: true },
+  },
+  titleField: "code",
+  list: ["code", "name", "direction", "purpose", "active"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "direction", "purpose", "active", "description"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+});
+
 /** Číselníky, které lze sdílet ve virtuální společnosti — hodnoty doplní registr (`ObjectDef.shareable`). */
 export const ShareableObject: EnumDef = { id: "ShareableObject", label: "@SYS:SharedObject", values: [] };
 
@@ -365,6 +410,12 @@ export const batchRun = defineObject({
 });
 
 async function sysSetup(data: DataApi) {
+  // transformace (formáty) z registru — jen chybějící
+  const { TRANSFORMS } = await import("@/core/transform");
+  for (const tr of TRANSFORMS) {
+    if ((await data.find("sys.transformation", { code: tr.code }, { take: 1 })).length) continue;
+    await data.create("sys.transformation", { code: tr.code, name: tr.name, direction: tr.direction, purpose: tr.purpose, description: tr.description, active: true });
+  }
   if ((await data.find("sys.currency", {}, { take: 1 })).length) return;
   for (const [code, name, symbol] of [
     ["CZK", "Česká koruna", "Kč"],
@@ -383,13 +434,13 @@ export default defineModule({
   icon: "Settings",
   core: true,
   dependsOn: [],
-  enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, ShareableObject, BatchClass, BatchRecurrence, BatchStatus],
+  enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, ShareableObject, TransformDirectionEnum, TransformPurposeEnum, BatchClass, BatchRecurrence, BatchStatus],
   setup: sysSetup,
-  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare, numberSeqFree],
+  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare, numberSeqFree, transformation],
   menu: [
     {
       label: "@SYS:Setup",
-      items: [{ object: "sys.company" }, { object: "sys.virtualCompany" }, { object: "sys.numberSeq" }],
+      items: [{ object: "sys.company" }, { object: "sys.virtualCompany" }, { object: "sys.numberSeq" }, { object: "sys.transformation" }],
     },
     { label: "@SYS:ModulesAndSetup", kind: "setup", items: [{ href: "/system/modules", label: "@SYS:Modules" }] },
     { label: "@SYS:Maintenance", kind: "functions", items: [{ href: "/system/setup", label: "@SYS:DefaultSetup" }, { object: "sys.batchJob" }, { object: "sys.batchRun" }] },
@@ -400,6 +451,20 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      BulkDone: "Hotovo: {ok} z {n}.",
+      Transformation: "Transformace",
+      Transformations: "Transformace",
+      TrDirection: "Směr",
+      TrExport: "Export",
+      TrImport: "Import",
+      TrPrint: "Tisk",
+      TrPurpose: "Použití",
+      TrPaymentOrder: "Platební příkaz",
+      TrBankStatement: "Bankovní výpis",
+      TrPaymentQr: "QR platba",
+      TrBarcode: "Čárový kód",
+      TrUnknown: "Systém tento formát nezná — transformace se přidávají s novou verzí.",
+      Active: "Aktivní",
       LinesAfterHeader: "Řádky půjde zadávat, jakmile vyplníte hlavičku — doklad se uloží a dostane číslo sám.",
       Continuous: "Souvislá řada",
       FreeNumber: "Nepoužité číslo",
@@ -526,7 +591,6 @@ export default defineModule({
       Name: "Název",
       Description: "Popis",
       Notes: "Poznámka",
-      Active: "Aktivní",
       Date: "Datum",
       Amount: "Částka",
       Qty: "Množství",
@@ -707,6 +771,20 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      BulkDone: "Done: {ok} of {n}.",
+      Transformation: "Transformation",
+      Transformations: "Transformations",
+      TrDirection: "Direction",
+      TrExport: "Export",
+      TrImport: "Import",
+      TrPrint: "Print",
+      TrPurpose: "Purpose",
+      TrPaymentOrder: "Payment order",
+      TrBankStatement: "Bank statement",
+      TrPaymentQr: "QR payment",
+      TrBarcode: "Barcode",
+      TrUnknown: "The system does not know this format — transformations come with new versions.",
+      Active: "Active",
       LinesAfterHeader: "Lines can be entered once the header is filled in — the document saves itself and gets its number.",
       Continuous: "Continuous sequence",
       FreeNumber: "Unused number",
@@ -833,7 +911,6 @@ export default defineModule({
       Name: "Name",
       Description: "Description",
       Notes: "Notes",
-      Active: "Active",
       Date: "Date",
       Amount: "Amount",
       Qty: "Quantity",

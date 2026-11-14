@@ -125,6 +125,13 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   rezervace, ar.invoice výdej, ap.invoice bez objednávky příjem, ap.order Přijmout na sklad,
   pos.receiptLine výdej) s kontrolou `ctx.modules`. Prodej smí do mínusu, deníky ne.
   Zatím množstevně (ocenění a účtování zásob později).
+- Transformace (`src/core/transform.ts`, Správa systému → Transformace): registr formátů
+  (ABO, SEPA, GPC, SPAYD, EAN13); platební metoda (`bank.paymentMethod`) určuje formát příkazu.
+  Platební příkaz (`bank.paymentOrder`, menu Dodavatelé): Navrhnout úhrady, výhrady z registru DPH
+  (nespolehlivý plátce, nezveřejněný účet → jen s Odsouhlaseno), soubor `payment-formats.ts`.
+- Hromadný import výpisů `src/server/bank-import.ts` (firma podle čísla účtu, protokol
+  `bank.importLog`, kontrola návaznosti `checkStatementChain`); z výpisu deník HK
+  (`journalFromStatement`). Hromadné akce v seznamu: `actions[].bulk`.
 - Číselné řady modulu se v jeho Nastavení ukážou samy (z `numberSeqs`, odkaz
   `?filter.usedFor=<modul>.*`). Seznam objektu umí filtr z odkazu `?filter.<pole>=<výraz>`.
 - Odkaz na číselník (cíl bez řádků/akcí) vede do seznamu `?focus=<id>` s vybraným

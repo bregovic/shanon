@@ -202,6 +202,7 @@ describe("číselné řady a výchozí nastavení", () => {
       "ARCUST:ar.customer",
       "ARINV:ar.invoice",
       "ARORD:ar.order",
+      "BANKPO:bank.paymentOrder",
       "GLJOURNAL:gl.journal",
       "GLVOUCHER:gl.voucher",
     ]);

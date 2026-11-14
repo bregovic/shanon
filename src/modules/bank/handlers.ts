@@ -14,6 +14,7 @@ import { UserError, type DataApi, type ObjectHandlers, type RecordData, type Val
 import { convertLines, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { checkStatement, decodeGpc, parseGpc } from "./gpc";
 import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
+import { checkStatementChain, journalFromStatement } from "./payments";
 
 const zero = BigInt(0);
 
@@ -31,7 +32,7 @@ async function assertDraft(data: DataApi, statementId: unknown) {
 }
 
 /** Obraty a konečný zůstatek výpisu z jeho řádků. */
-async function recalcStatement(data: DataApi, statementId: string) {
+export async function recalcStatement(data: DataApi, statementId: string) {
   const st = await data.get("bank.statement", statementId);
   if (!st) return;
   const lines = await data.find("bank.statementLine", { statementId });
@@ -230,6 +231,12 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
       },
       async post(ctx, st) {
         await postStatement(ctx.data, ctx.companyId, st);
+      },
+      async createJournal(ctx, st) {
+        await journalFromStatement(ctx.data, st, ctx.t);
+      },
+      async recheck(ctx, st) {
+        await checkStatementChain(ctx.data, st, ctx.t);
       },
     },
   },

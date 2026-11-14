@@ -909,6 +909,38 @@ export async function createCompanyFromRegistryAction(query: string): Promise<Ac
   }
 }
 
+/** Banka → Hromadný import výpisů: jeden soubor (může mít víc výpisů a účtů). */
+export async function bankBulkImportAction(form: FormData): Promise<ActionResult<import("@/server/bank-import").BulkRow[]>> {
+  const s = await requireSession();
+  try {
+    const file = form.get("file");
+    if (!(file instanceof File) || !file.size) throw new UserError("@SYS:Required");
+    const { importStatementsBulk } = await import("@/server/bank-import");
+    const rows = await importStatementsBulk(s, { name: file.name, data: Buffer.from(await file.arrayBuffer()) });
+    return { ok: true, data: rows };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Hromadná akce nad vybranými záznamy seznamu (výpisy → deník HK…); každý záznam zvlášť. */
+export async function bulkRecordAction(objectId: string, ids: string[], actionId: string): Promise<ActionResult<{ ok: number; errors: string[] }>> {
+  const s = await requireSession();
+  const t = await getT(s.lang, s.ctx.tenantId);
+  let ok = 0;
+  const errors: string[] = [];
+  for (const id of ids.slice(0, 500)) {
+    try {
+      await runAction(s.ctx, objectId, id, actionId);
+      ok++;
+    } catch (e) {
+      errors.push(e instanceof UserError ? t(e.label, e.params) : e instanceof Error ? e.message : String(e));
+    }
+  }
+  revalidatePath(objectHref(objectId));
+  return { ok: true, data: { ok, errors } };
+}
+
 /**
  * Integrace → Načíst doklady: jeden soubor = jeden doklad ke zpracování
  * (příloha), volitelně hned vytěžit. Volá se po souborech (limit těla akce).
