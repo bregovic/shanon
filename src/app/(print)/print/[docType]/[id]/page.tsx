@@ -28,7 +28,8 @@ export default async function PrintPage({ params, searchParams }: { params: Prom
         templates={job.templates}
         templateId={job.templateId}
         autoPrint={auto === "1"}
-        labels={{ print: t("@PRT:PrintPdf"), template: t("@PRT:Template1"), back: t("@PRT:Back") }}
+        pdfHref={`/api/pdf/${docType}/${id}`}
+        labels={{ print: t("@PRT:Print"), template: t("@PRT:Template1"), back: t("@PRT:Back"), pdf: t("@PRT:Pdf") }}
       />
       <div className="print-sheet" style={{ width: "fit-content", margin: "16px auto", background: "#fff" }}>
         <PrintDocument layout={job.layout} data={job.data} locale={s.lang === "en" ? "en-GB" : "cs-CZ"} />

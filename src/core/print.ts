@@ -75,6 +75,8 @@ export interface PrintableDef {
   dataset(data: DataApi, companyId: string | null, id: string): Promise<PrintData>;
   /** výchozí šablona (zakládá výchozí nastavení) */
   defaultLayout: () => PrintLayout;
+  /** dřívější výchozí rozvržení — neupravené šablony v této podobě se převedou na nové */
+  legacyLayouts?: PrintLayout[];
 }
 
 /** Hodnota podle cesty "doc.number" / "company.name". */

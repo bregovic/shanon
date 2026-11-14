@@ -63,7 +63,7 @@ function Table({ el, rows, locale, fontSize }: { el: PrintElement; rows: Record<
       <thead style={{ display: "table-header-group" }}>
         <tr>
           {cols.map((c, i) => (
-            <th key={i} style={{ textAlign: c.align ?? "left", borderBottom: "0.3mm solid #000", padding: "0.8mm 1mm", fontWeight: 700 }}>
+            <th key={i} style={{ textAlign: c.align ?? "left", borderBottom: "0.3mm solid #000", padding: "0.8mm 1mm", fontWeight: 700, background: el.style?.fill, color: el.style?.color }}>
               {c.label}
             </th>
           ))}
@@ -113,8 +113,8 @@ export function ElementView({
     fontStyle: s.italic ? "italic" : undefined,
     textAlign: s.align ?? "left",
     color: s.color,
-    background: s.fill,
-    border: s.border || el.type === "rect" ? "0.3mm solid #000" : undefined,
+    background: el.type === "table" || el.type === "vat" ? undefined : s.fill,
+    border: s.border || el.type === "rect" ? `0.3mm solid ${el.type === "rect" && s.color ? s.color : "#000"}` : undefined,
     boxSizing: "border-box",
     overflow: designMode ? "hidden" : "visible",
     whiteSpace: "pre-wrap",
@@ -124,12 +124,14 @@ export function ElementView({
     case "text":
       return <div style={box}>{fillText(el.text ?? "", data, locale)}</div>;
     case "line":
-      return <div style={{ ...box, height: 0, borderTop: "0.3mm solid #000", border: undefined }} />;
+      return <div style={{ ...box, height: 0, border: undefined, borderTop: `0.3mm solid ${s.color ?? "#000"}` }} />;
     case "rect":
       return <div style={box} />;
-    case "image":
+    case "image": {
+      const src = el.src || (el.field ? String(valueAt(data, el.field) ?? "") : "");
       // eslint-disable-next-line @next/next/no-img-element
-      return el.src ? <img alt="" src={el.src} style={{ ...box, objectFit: "contain" }} /> : <div style={{ ...box, border: designMode ? "0.2mm dashed #999" : undefined }} />;
+      return src ? <img alt="" src={src} style={{ ...box, objectFit: "contain", objectPosition: s.align === "right" ? "right center" : s.align === "center" ? "center" : "left center" }} /> : <div style={{ ...box, border: designMode ? "0.2mm dashed #999" : undefined }} />;
+    }
     case "qr": {
       const text = String(valueAt(data, el.field || "qr") ?? "");
       return <div style={box}>{text ? <QrSvg text={text} size={Math.min(el.w, el.h)} /> : designMode ? "QR" : null}</div>;

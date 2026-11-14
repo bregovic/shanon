@@ -592,6 +592,7 @@ model OrgEntity {
   bankAccount  String?  @map("bank_account") @db.VarChar(30)
   iban         String?  @db.VarChar(34)
   bic          String?  @db.VarChar(11)
+  logo         String?  @db.VarChar(36)
   ext          Json     @default("{}")
   version      Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at")

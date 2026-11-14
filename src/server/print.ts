@@ -2,6 +2,7 @@
  * Tisk dokladů podle šablon (Tiskové sestavy): data dokladu, výběr šablony,
  * katalog polí pro návrhář. Oprávnění: tisk = právo číst doklad.
  */
+import { storageFor } from "./storage";
 import { UserError, type RecordData } from "@/core/module";
 import { can } from "@/core/security";
 import type { PrintLayout, PrintableDef } from "@/core/print";
@@ -51,6 +52,13 @@ export async function printJob(ctx: Ctx, docType: string, recordId: string, temp
       const doc = data.doc as Record<string, unknown> | undefined;
       if (doc && (doc.payment === "cash" || doc.payment === "card")) doc.payment = resolveLabel(labelTable, doc.payment === "cash" ? "@POS:Cash" : "@POS:Card", ctx.lang ?? "cs");
       const record = (await api.get(docType, recordId)) as RecordData;
+      // logo firmy (příloha Organizace) → data: URL pro sestavu
+      const co = data.company as Record<string, unknown> | undefined;
+      if (co?.logoId) {
+        const ref = await s.tx.sysDocuRef.findFirst({ where: { id: String(co.logoId), tenantId: ctx.tenantId } });
+        const bytes = ref?.storageKey ? await storageFor(ref.storage).get(s.tx, ctx.tenantId, ref.storageKey) : null;
+        if (bytes && ref) co.logo = `data:${ref.mime ?? "image/png"};base64,${Buffer.from(bytes).toString("base64")}`;
+      }
       return {
         title: String(record[p.numberField] ?? ""),
         layout: tpl ? parseLayout(tpl.layout, p) : p.defaultLayout(),

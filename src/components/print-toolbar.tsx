@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Select } from "@fluentui/react-components";
-import { ArrowLeft24Regular, Print24Regular } from "@fluentui/react-icons";
+import { ArrowLeft24Regular, DocumentPdf24Regular, Print24Regular } from "@fluentui/react-icons";
 
 export function PrintToolbar({
   title,
@@ -12,12 +12,15 @@ export function PrintToolbar({
   templateId,
   autoPrint,
   labels,
+  pdfHref,
 }: {
   title: string;
   templates: { id: string; name: string }[];
   templateId: string | null;
   autoPrint: boolean;
-  labels: { print: string; template: string; back: string };
+  labels: { print: string; template: string; back: string; pdf?: string };
+  /** odkaz na PDF sestavy (vykreslené na serveru) */
+  pdfHref?: string;
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -44,6 +47,11 @@ export function PrintToolbar({
             </option>
           ))}
         </Select>
+      )}
+      {pdfHref && (
+        <Button icon={<DocumentPdf24Regular />} onClick={() => window.open(`${pdfHref}${templateId ? `?template=${templateId}` : ""}`, "_blank")}>
+          {labels.pdf}
+        </Button>
       )}
       <Button appearance="primary" icon={<Print24Regular />} onClick={() => window.print()}>
         {labels.print}

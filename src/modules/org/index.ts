@@ -56,6 +56,8 @@ export const entity = defineObject({
     bankAccount: { edt: BankAccount },
     iban: { edt: Iban },
     bic: { edt: Str("OrgBic", "@ORG:Bic", 11, /^[A-Z0-9]{8}([A-Z0-9]{3})?$/) },
+    // logo na tiskových sestavách (faktura, účtenka)
+    logo: { edt: Str("OrgLogo", "@ORG:Logo", 36), image: true, readOnly: true },
   },
   titleField: "legalName",
   list: ["legalName", "regNo", "vatId", "city", "email", "phone"],
@@ -65,6 +67,7 @@ export const entity = defineObject({
     { label: "@ORG:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode", "country"] },
     { label: "@ORG:Contacts", fields: ["email", "phone", "web", "dataBoxId"] },
     { label: "@ORG:Bank", fields: ["bankAccount", "iban", "bic"] },
+    { label: "@ORG:Logo", fields: ["logo"] },
   ],
 });
 
@@ -204,6 +207,7 @@ export default defineModule({
   setup: orgSetup,
   labels: {
     cs: {
+      Logo: "Logo",
       CompanyExists: "Firma se stejným IČO / DIČ už existuje.",
       CompanyLookup: "Založit firmu podle IČO / DIČ",
       CompanyLookupDesc: "Nová účtovaná firma z ARES (české IČO) nebo VIES (zahraniční DIČ): údaje organizace se sídlem a výchozí nastavení zapnutých modulů (účty, řady, DPH…). Kód firmy = IČO.",
@@ -246,6 +250,7 @@ export default defineModule({
       OneEntity: "Firma už údaje organizace má — upravte stávající záznam.",
     },
     en: {
+      Logo: "Logo",
       CompanyExists: "A company with the same ID / VAT ID already exists.",
       CompanyLookup: "Create company by ID / VAT ID",
       CompanyLookupDesc: "A new accounting company from ARES (Czech ID) or VIES (foreign VAT ID): organization details with registered address and default setup of enabled modules (accounts, sequences, VAT…). Company code = ID.",

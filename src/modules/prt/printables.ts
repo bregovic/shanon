@@ -25,10 +25,24 @@ export const COMPANY_FIELDS: PrintField[] = [
   { path: "company.web", label: "@PRT:Web" },
 ];
 
-async function companyData(data: DataApi, companyId: string | null) {
+/** Bankovní účet firmy pro platbu: z Organizace, jinak první účet v Bance (v měně dokladu). */
+async function paymentAccount(data: DataApi, org: RecordData | null, currencyId?: string | null) {
+  if (org?.bankAccount || org?.iban) return { bankAccount: (org.bankAccount as string) ?? "", iban: (org.iban as string) || czIban(org.bankAccount as string) || "" };
+  try {
+    const accs = (await data.find("bank.account", { blocked: false }, { take: 20, orderBy: { code: "asc" } })) as RecordData[];
+    const a = accs.find((x) => (x.accountNum || x.iban) && (!currencyId || !x.currencyId || x.currencyId === currencyId)) ?? null;
+    if (a) return { bankAccount: (a.accountNum as string) ?? "", iban: (a.iban as string) || czIban(a.accountNum as string) || "" };
+  } catch {
+    // Banka není zapnutá
+  }
+  return { bankAccount: "", iban: "" };
+}
+
+async function companyData(data: DataApi, companyId: string | null, currencyId?: string | null) {
   const org = (await orgOf(data)) as RecordData | null;
   const company = companyId ? await data.get("sys.company", companyId) : null;
-  const iban = (org?.iban as string) || czIban(org?.bankAccount as string) || null;
+  const pay = await paymentAccount(data, org, currencyId);
+  const iban = pay.iban || null;
   return {
     name: String(org?.legalName ?? company?.name ?? ""),
     tradeName: org?.tradeName && org.tradeName !== org.legalName ? String(org.tradeName) : "",
@@ -36,7 +50,10 @@ async function companyData(data: DataApi, companyId: string | null) {
     regNo: (org?.regNo ?? company?.regNo ?? "") as string,
     vatId: (org?.vatId ?? company?.vatId ?? "") as string,
     registration: (org?.registration ?? "") as string,
-    bankAccount: (org?.bankAccount ?? "") as string,
+    bankAccount: pay.bankAccount,
+    /** id přílohy loga (na data: URL ho převede printJob) */
+    logoId: (org?.logo ?? "") as string,
+    logo: "",
     iban: iban ?? "",
     email: (org?.email ?? "") as string,
     phone: (org?.phone ?? "") as string,
@@ -51,7 +68,7 @@ async function companyData(data: DataApi, companyId: string | null) {
 async function invoiceDataset(data: DataApi, companyId: string | null, id: string) {
   const inv = await data.get("ar.invoice", id);
   if (!inv) throw new Error("not found");
-  const company = await companyData(data, companyId);
+  const company = await companyData(data, companyId, (inv.currencyId as string) ?? null);
   const cust = await data.get("ar.customer", String(inv.customerId));
   const subj = cust ? await data.get("gab.subject", String(cust.subjectId)) : null;
   const [addr] = subj ? await data.find("gab.address", { subjectId: subj.id }, { take: 1 }) : [];
@@ -106,7 +123,85 @@ async function invoiceDataset(data: DataApi, companyId: string | null, id: strin
 
 const T = (id: string, x: number, y: number, w: number, h: number, text: string, style?: Record<string, unknown>) => ({ id, type: "text" as const, x, y, w, h, text, style });
 
+/** Původní výchozí rozvržení (do 11/2026) — neupravené šablony se nahradí novým. */
+const INK = "#1f2a37";
+const ACCENT = "#1f4e79";
+const MUTED = "#6b7280";
+const PANEL = "#f3f5f8";
+
+/** Výchozí faktura: logo, karty dodavatele a odběratele, klíčové údaje, tabulka, souhrn s QR platbou. */
 function invoiceLayout(): PrintLayout {
+  return {
+    paper: "a4",
+    fontSize: 9,
+    elements: [
+      { id: "band", type: "rect", x: 0, y: 0, w: 210, h: 3, style: { fill: ACCENT, color: ACCENT } },
+      { id: "logo", type: "image", x: 15, y: 11, w: 55, h: 20, field: "company.logo" },
+      T("title", 105, 11, 90, 10, "FAKTURA", { size: 22, bold: true, align: "right", color: ACCENT }),
+      T("sub", 105, 21, 90, 6, "daňový doklad č. {doc.number}", { size: 11, align: "right", color: INK }),
+      T("supH", 15, 38, 85, 5, "DODAVATEL", { size: 7, bold: true, color: MUTED }),
+      T("sup", 15, 43, 85, 27, "{company.name}\n{company.address}\nIČO {company.regNo}   DIČ {company.vatId}\n{company.registration}", { size: 9, color: INK }),
+      { id: "custBox", type: "rect", x: 106, y: 36, w: 89, h: 34, style: { fill: PANEL, color: PANEL } },
+      T("custH", 110, 38, 82, 5, "ODBĚRATEL", { size: 7, bold: true, color: MUTED }),
+      T("cust", 110, 43, 82, 26, "{partner.name}\n{partner.address}\nIČO {partner.regNo}   DIČ {partner.vatId}", { size: 10, bold: false, color: INK }),
+      // klíčové údaje v řadě
+      T("k1h", 15, 76, 42, 4, "DATUM VYSTAVENÍ", { size: 6.5, bold: true, color: MUTED }),
+      T("k1", 15, 80, 42, 6, "{doc.date:date}", { size: 10, bold: true, color: INK }),
+      T("k2h", 60, 76, 42, 4, "DATUM ZDAN. PLNĚNÍ", { size: 6.5, bold: true, color: MUTED }),
+      T("k2", 60, 80, 42, 6, "{doc.taxDate:date}", { size: 10, bold: true, color: INK }),
+      T("k3h", 106, 76, 42, 4, "SPLATNOST", { size: 6.5, bold: true, color: MUTED }),
+      T("k3", 106, 80, 42, 6, "{doc.dueDate:date}", { size: 10, bold: true, color: ACCENT }),
+      T("k4h", 152, 76, 43, 4, "VARIABILNÍ SYMBOL", { size: 6.5, bold: true, color: MUTED }),
+      T("k4", 152, 80, 43, 6, "{doc.vs}", { size: 10, bold: true, color: INK }),
+      { id: "sep", type: "line", x: 15, y: 89, w: 180, h: 1, style: { color: "#d1d5db" } },
+      T("pay", 15, 91, 180, 5, "Bankovní účet {company.bankAccount}   ·   IBAN {company.iban}   ·   úhrada převodem", { size: 8, color: MUTED }),
+      T("desc", 15, 97, 180, 6, "{doc.description}", { italic: true, color: INK }),
+      {
+        id: "lines",
+        type: "table",
+        x: 15,
+        y: 104,
+        w: 180,
+        h: 60,
+        style: { fill: ACCENT, color: "#ffffff", size: 8.5 },
+        columns: [
+          { field: "description", label: "Položka", width: 70 },
+          { field: "qty", label: "Množství", width: 18, align: "right", format: "qty" },
+          { field: "unit", label: "MJ", width: 10 },
+          { field: "unitPrice", label: "Cena/MJ", width: 22, align: "right", format: "money" },
+          { field: "rate", label: "DPH %", width: 14, align: "right" },
+          { field: "net", label: "Základ", width: 23, align: "right", format: "money" },
+          { field: "gross", label: "Celkem", width: 23, align: "right", format: "money" },
+        ],
+      },
+      {
+        id: "vat",
+        type: "vat",
+        x: 15,
+        y: 170,
+        w: 90,
+        h: 20,
+        style: { fill: PANEL, size: 8 },
+        columns: [
+          { field: "rate", label: "Sazba %", width: 18, align: "right" },
+          { field: "base", label: "Základ", width: 24, align: "right", format: "money" },
+          { field: "tax", label: "DPH", width: 22, align: "right", format: "money" },
+          { field: "gross", label: "Celkem", width: 26, align: "right", format: "money" },
+        ],
+      },
+      { id: "totBox", type: "rect", x: 118, y: 168, w: 77, h: 22, style: { fill: ACCENT, color: ACCENT } },
+      T("totH", 121, 170, 71, 5, "K ÚHRADĚ", { size: 7, bold: true, color: "#dbe7f3", align: "right" }),
+      T("tot", 121, 175, 71, 9, "{doc.due:money} {doc.currency}", { size: 17, bold: true, color: "#ffffff", align: "right" }),
+      T("totS", 121, 184, 71, 5, "celkem s DPH {doc.gross:money} {doc.currency}", { size: 7.5, color: "#dbe7f3", align: "right" }),
+      { id: "qr", type: "qr", x: 165, y: 194, w: 30, h: 30, field: "qr" },
+      T("qrT", 118, 200, 45, 14, "QR platba\nnaskenujte v bankovní aplikaci", { size: 7.5, align: "right", color: MUTED }),
+      { id: "footLine", type: "line", x: 15, y: 230, w: 180, h: 1, style: { color: "#d1d5db" } },
+      T("foot", 15, 232, 180, 6, "{company.email}   {company.phone}   {company.web}", { size: 7.5, color: MUTED, align: "center" }),
+    ],
+  };
+}
+
+export function legacyInvoiceLayout(): PrintLayout {
   return {
     paper: "a4",
     fontSize: 9,
@@ -199,6 +294,7 @@ export const invoicePrintable: PrintableDef = {
   ],
   dataset: invoiceDataset,
   defaultLayout: invoiceLayout,
+  legacyLayouts: [legacyInvoiceLayout()],
 };
 
 // ---------------------------------------------------------------------------

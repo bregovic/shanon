@@ -49,7 +49,20 @@ export const template = defineObject({
 /** Výchozí šablony tisknutelných dokladů modulu (jen chybějící druh); `name` = přeložený název. */
 export async function setupPrintTemplates(data: DataApi, printables: (PrintableDef & { name: string })[]) {
   for (const p of printables) {
-    if ((await data.find("prt.template", { docType: p.id }, { take: 1 })).length) continue;
+    const existing = await data.find("prt.template", { docType: p.id }, { take: 50 });
+    // neupravená šablona v původní podobě → nové výchozí rozvržení (upravené se nemění)
+    if (p.legacyLayouts?.length) {
+      const old = new Set(p.legacyLayouts.map((l) => JSON.stringify(l)));
+      for (const t of existing) if (old.has(String(t.layout))) await data.update("prt.template", String(t.id), { layout: JSON.stringify(p.defaultLayout()) });
+      // upravená šablona zůstane; nové rozvržení přibude jako další šablona na výběr
+      const now = JSON.stringify(p.defaultLayout());
+      const code2 = `${p.id.split(".").pop()!.toUpperCase().slice(0, 16)}-2026`;
+      const all = await data.find("prt.template", { docType: p.id }, { take: 50 });
+      if (all.length && !all.some((t) => String(t.layout) === now || t.code === code2)) {
+        await data.create("prt.template", { code: code2, name: `${p.name} 2026`, docType: p.id, paper: p.defaultLayout().paper, isDefault: false, layout: now });
+      }
+    }
+    if (existing.length) continue;
     const layout = p.defaultLayout();
     const code = p.id.split(".").pop()!.toUpperCase().slice(0, 20);
     await data.create("prt.template", { code, name: p.name, docType: p.id, paper: layout.paper, isDefault: true, layout: JSON.stringify(layout) });
@@ -89,6 +102,7 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      Pdf: "PDF",
       Module: "Tiskové sestavy",
       ModuleDesc: "Šablony faktur, účtenek a dalších dokladů, návrhář a tisk do PDF.",
       Template: "Šablona",
@@ -186,6 +200,7 @@ export default defineModule({
       Back: "Zpět",
     },
     en: {
+      Pdf: "PDF",
       Module: "Print layouts",
       ModuleDesc: "Templates for invoices, receipts and other documents, designer and PDF printing.",
       Template: "Template",

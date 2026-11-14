@@ -20,7 +20,7 @@ import {
   tokens,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, Save24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, Save24Regular } from "@fluentui/react-icons";
 import { useRef } from "react";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
@@ -340,6 +340,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
         {p.printHref && (
           <Button icon={<Print24Regular />} onClick={() => window.open(p.printHref, "_blank")}>
             {p.labels.actions.print}
+          </Button>
+        )}
+        {p.printHref && (
+          <Button icon={<DocumentPdf24Regular />} onClick={() => window.open(p.printHref!.replace(/^\/print\//, "/api/pdf/"), "_blank")}>
+            PDF
           </Button>
         )}
         {p.canDuplicate && p.id && (
