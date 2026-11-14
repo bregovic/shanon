@@ -10,6 +10,7 @@ import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@
 import { convertCents } from "@/modules/sys/currency";
 import { accountingCurrencyId, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { dimsOf } from "@/modules/gl/dimensions";
+import { postingAccount } from "@/modules/gl/setup";
 
 export interface InvoiceConfig {
   /** hlavička a řádky, např. ar.invoice / ar.invoiceLine */
@@ -36,6 +37,10 @@ export interface InvoiceConfig {
   item: { price: string; tax: string; groupAccount: string };
   /** +1 = vydaná (pohledávka MD, výnosy D), −1 = přijatá (závazek D, náklady MD) */
   side: 1 | -1;
+  /** stavy hlavičky, ve kterých se řádky nemění (výchozí: zaúčtováno) */
+  lockedStatuses?: string[];
+  /** zálohy partnera: objekt zálohy a pole účtu záloh ve skupině */
+  advance?: { object: string; groupAccountField: string; defaultAccount: string };
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -55,7 +60,7 @@ async function partnerAndGroup(data: DataApi, cfg: InvoiceConfig, partnerId: unk
 
 async function assertDraft(data: DataApi, cfg: InvoiceConfig, headerId: unknown) {
   const h = headerId ? await data.get(cfg.header, String(headerId)) : null;
-  if (h?.status === "posted") throw new UserError("@GL:Locked");
+  if (h && (cfg.lockedStatuses ?? ["posted"]).includes(String(h.status))) throw new UserError("@GL:Locked");
   return h;
 }
 
@@ -79,6 +84,10 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         if (!data[cfg.partnerField]) return;
         const { partner, group } = await partnerAndGroup(ctx.data, cfg, data[cfg.partnerField]);
         if (partner.blocked) return { [cfg.partnerField]: "@SYS:PartnerBlocked" };
+        if (cfg.advance && data.advanceId) {
+          const a = await ctx.data.get(cfg.advance.object, String(data.advanceId));
+          if (!a || a[cfg.partnerField] !== data[cfg.partnerField]) return { advanceId: "@TAX:AdvanceOtherPartner" };
+        }
         if (!data.invoiceDate) data.invoiceDate = today();
         if (!data.taxDate) data.taxDate = data.invoiceDate;
         if (isNew && !data.currencyId) data.currencyId = partner.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
@@ -98,6 +107,13 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         },
       },
     },
+    ...documentLineHandlers(cfg),
+  };
+}
+
+/** Řádky dokladu s položkou, cenou a DPH (faktura, objednávka): výchozí hodnoty, výpočet, součty. */
+export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectHandlers> {
+  return {
     [cfg.line]: {
       /** výchozí účet a DPH ze skupiny partnera, výpočet částek */
       async beforeSave(ctx, data, isNew) {
@@ -150,6 +166,7 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
  */
 export async function postInvoice(data: DataApi, companyId: string | null, cfg: InvoiceConfig, header: RecordData) {
   if (header.status !== "draft") throw new UserError("@GL:Locked");
+  if (!header[cfg.docNumField]) throw new UserError("@SYS:FixErrors", {}, { [cfg.docNumField]: "@SYS:Required" });
   const lines = await data.find(cfg.line, { [cfg.lineHeaderField]: header.id });
   if (!lines.length) throw new UserError("@GL:NoLines");
   const { partner, group } = await partnerAndGroup(data, cfg, header[cfg.partnerField]);
@@ -207,6 +224,24 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     text: (header.description as string) ?? null,
   });
 
+  // odpočet zálohy: přijatá záloha 324 → pohledávka 311 (poskytnutá 314 → závazek 321)
+  let advCur = BigInt(0);
+  let adv: RecordData | null = null;
+  if (cfg.advance && header.advanceId) {
+    adv = await data.get(cfg.advance.object, String(header.advanceId));
+    if (!adv || adv[cfg.partnerField] !== partner.id || !["paid", "settled"].includes(String(adv.status))) throw new UserError("@TAX:AdvanceNotPaid");
+    if (((adv.currencyId as string) ?? base) !== curId) throw new UserError("@TAX:AdvanceCurrency");
+    const avail = toCents(adv.paidAmount) - toCents(adv.settledAmount);
+    advCur = avail < grossCur ? avail : grossCur;
+    if (advCur > BigInt(0)) {
+      const advAcc = conv(advCur);
+      const advAccount = group[cfg.advance.groupAccountField] ?? (await postingAccount(data, cfg.advance.defaultAccount));
+      if (!advAccount) throw new UserError("@TAX:AdvanceAccountMissing");
+      posting.push({ accountId: String(advAccount), amount: fromCents(s * advAcc), amountCur: fromCents(s * advCur), currencyId: curId, text: String(adv.advanceNum) });
+      posting.push({ accountId: String(group[cfg.groupSummaryField]), amount: fromCents(-s * advAcc), amountCur: fromCents(-s * advCur), currencyId: curId, text: String(adv.advanceNum) });
+    }
+  }
+
   const docNum = String(header[cfg.docNumField] ?? header.invoiceNum);
   const voucher = await postVoucher(data, {
     date,
@@ -249,8 +284,16 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     currencyId: curId,
     amount: fromCents(grossAcc),
     amountCur: fromCents(grossCur),
-    paidAmount: "0",
-    closed: false,
+    paidAmount: fromCents(advCur),
+    closed: advCur >= grossCur,
   });
-  await data.update(cfg.header, String(header.id), { status: "posted", voucherId: voucher.id });
+  if (adv && advCur > BigInt(0)) {
+    const settled = toCents(adv.settledAmount) + advCur;
+    await data.update(cfg.advance!.object, String(adv.id), { settledAmount: fromCents(settled), status: settled >= toCents(adv.paidAmount) ? "settled" : "paid" });
+    // platba zálohy v saldu je vyúčtovaná
+    if (settled >= toCents(adv.paidAmount)) {
+      for (const t of await data.find(cfg.partnerTrans, { advanceId: adv.id, kind: "advance", closed: false })) await data.update(cfg.partnerTrans, String(t.id), { closed: true });
+    }
+  }
+  await data.update(cfg.header, String(header.id), { status: "posted", voucherId: voucher.id, advanceAmount: fromCents(advCur), paidAmount: fromCents(advCur) });
 }

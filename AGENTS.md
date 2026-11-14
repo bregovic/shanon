@@ -33,6 +33,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `runJournal(…, dryRun)` (postVoucher `dryRun`), Zaúčtovat po dokladech; odběratel /
   dodavatel → saldokontní účet skupiny + zápis do salda, úhrada s VS spáruje fakturu.
   Ruční zápis na saldokonto jen přes druh účtu (`PostingLine.viaSubledger`).
+- Objednávky a zálohy (`src/modules/tax/orders.ts`, z továrny partnerů): objednávka mimo
+  účetnictví (Potvrdit → Vystavit zálohu → Vytvořit fakturu, řádky přes
+  `documentLineHandlers`); záloha mimo účetnictví, úhradu páruje banka (VS → `customerAdvance`
+  / `vendorAdvance`) na účet záloh skupiny (324 / 314) a do salda jako položku „Záloha“;
+  `postInvoice` uhrazenou zálohu odečte. Saldo partnera = saldokonto + účet záloh.
 - Řádky upravované v mřížce: `lines[].inline` (`InlineLines`), sdílený sloupec polí
   `FieldDef.gridColumn`; kompaktní hlavička dokladu `ObjectDef.compactHeader`.
 - Doklady s řádky a DPH (faktury) nepsat znovu: `src/modules/tax/document.ts`

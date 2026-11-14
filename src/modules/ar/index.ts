@@ -15,6 +15,9 @@ export const ar = partnerLedger({
   side: 1,
   partnerSeq: "ARCUST",
   invoiceSeq: "ARINV",
+  orderSeq: "ARORD",
+  advanceSeq: "ARADV",
+  advanceAccount: "324",
 });
 
 export default defineModule({
@@ -29,10 +32,18 @@ export default defineModule({
   numberSeqs: [
     { code: "ARCUST", name: "@AR:Partners", format: "ODB{#####}", usedFor: "ar.customer" },
     { code: "ARINV", name: "@AR:Invoices", format: "FV{YY}{#####}", usedFor: "ar.invoice" },
+    { code: "ARORD", name: "@AR:Orders", format: "PO{YY}{#####}", usedFor: "ar.order" },
+    { code: "ARADV", name: "@AR:Advances", format: "ZF{YY}{#####}", usedFor: "ar.advance" },
   ],
   setup: ar.setup({ code: "TUZ", name: "Tuzemští odběratelé", summary: "311", line: "604", taxCode: "V21" }),
   labels: {
     cs: {
+      Order: "Prodejní objednávka",
+      Orders: "Prodejní objednávky",
+      OrderRef: "Objednávka odběratele",
+      Advance: "Zálohová faktura",
+      Advances: "Zálohové faktury",
+      AdvanceAccount: "Účet přijatých záloh",
       Module: "Odběratelé",
       ModuleDesc: "Odběratelé, vydané faktury s DPH, saldo a splatnosti.",
       Group: "Skupina odběratelů",
@@ -49,6 +60,12 @@ export default defineModule({
       TransPlural: "Saldo odběratelů",
     },
     en: {
+      Order: "Sales order",
+      Orders: "Sales orders",
+      OrderRef: "Customer reference",
+      Advance: "Advance invoice",
+      Advances: "Advance invoices",
+      AdvanceAccount: "Customer advances account",
       Module: "Accounts receivable",
       ModuleDesc: "Customers, sales invoices with VAT, balances and due dates.",
       Group: "Customer group",

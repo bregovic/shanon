@@ -15,6 +15,9 @@ export const ap = partnerLedger({
   side: -1,
   partnerSeq: "APVEND",
   invoiceSeq: "APINV",
+  orderSeq: "APORD",
+  advanceSeq: "APADV",
+  advanceAccount: "314",
   externalNum: true,
 });
 
@@ -30,10 +33,18 @@ export default defineModule({
   numberSeqs: [
     { code: "APVEND", name: "@AP:Partners", format: "DOD{#####}", usedFor: "ap.vendor" },
     { code: "APINV", name: "@AP:Invoices", format: "FP{YY}{#####}", usedFor: "ap.invoice" },
+    { code: "APORD", name: "@AP:Orders", format: "NO{YY}{#####}", usedFor: "ap.order" },
+    { code: "APADV", name: "@AP:Advances", format: "ZFD{YY}{#####}", usedFor: "ap.advance" },
   ],
   setup: ap.setup({ code: "TUZ", name: "Tuzemští dodavatelé", summary: "321", line: "518", taxCode: "P21" }),
   labels: {
     cs: {
+      Order: "Nákupní objednávka",
+      Orders: "Nákupní objednávky",
+      OrderRef: "Potvrzení dodavatele",
+      Advance: "Zálohová faktura dodavatele",
+      Advances: "Zálohové faktury dodavatelů",
+      AdvanceAccount: "Účet poskytnutých záloh",
       Module: "Dodavatelé",
       ModuleDesc: "Dodavatelé, přijaté faktury s DPH, saldo a splatnosti.",
       Group: "Skupina dodavatelů",
@@ -51,6 +62,12 @@ export default defineModule({
       TransPlural: "Saldo dodavatelů",
     },
     en: {
+      Order: "Purchase order",
+      Orders: "Purchase orders",
+      OrderRef: "Vendor confirmation",
+      Advance: "Vendor advance invoice",
+      Advances: "Vendor advance invoices",
+      AdvanceAccount: "Vendor advances account",
       Module: "Accounts payable",
       ModuleDesc: "Vendors, purchase invoices with VAT, balances and due dates.",
       Group: "Vendor group",

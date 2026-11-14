@@ -194,10 +194,14 @@ describe("číselné řady a výchozí nastavení", () => {
   it("nová firma dostane řady s Použitím, účty, deník GEN a DPH; opakované spuštění nic nepřidá", async () => {
     const seqs = (await listRecords(A, "sys.numberSeq", {}, client)).rows;
     expect(seqs.map((x) => `${x.code}:${x.usedFor}`).sort()).toEqual([
+      "APADV:ap.advance",
       "APINV:ap.invoice",
+      "APORD:ap.order",
       "APVEND:ap.vendor",
+      "ARADV:ar.advance",
       "ARCUST:ar.customer",
       "ARINV:ar.invoice",
+      "ARORD:ar.order",
       "GLJOURNAL:gl.journal",
       "GLVOUCHER:gl.voucher",
     ]);

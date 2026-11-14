@@ -16,6 +16,8 @@ export const MatchKind = defineEnum({
     { value: "none", label: "@BANK:MatchNone" },
     { value: "customer", label: "@BANK:MatchCustomer" },
     { value: "vendor", label: "@BANK:MatchVendor" },
+    { value: "customerAdvance", label: "@BANK:MatchCustomerAdvance" },
+    { value: "vendorAdvance", label: "@BANK:MatchVendorAdvance" },
     { value: "ledger", label: "@BANK:MatchLedger" },
   ],
 });
@@ -109,13 +111,15 @@ export const statementLine = defineObject({
     matchKind: { edt: enumEdt(MatchKind), readOnly: true, default: "none" },
     customerTransId: { edt: refEdt("ar.trans", "@BANK:CustomerTrans") },
     vendorTransId: { edt: refEdt("ap.trans", "@BANK:VendorTrans") },
+    customerAdvanceId: { edt: refEdt("ar.advance", "@AR:Advance") },
+    vendorAdvanceId: { edt: refEdt("ap.advance", "@AP:Advance") },
     offsetAccountId: { edt: refEdt("gl.account", "@BANK:OffsetAccount") },
   },
   titleField: "message",
-  list: ["lineNum", "date", "amount", "vs", "counterAccount", "message", "matchKind", "customerTransId", "vendorTransId", "offsetAccountId"],
+  list: ["lineNum", "date", "amount", "vs", "counterAccount", "message", "matchKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "offsetAccountId"],
   form: [
     { label: "@SYS:General", fields: ["statementId", "lineNum", "date", "amount", "vs", "counterAccount", "message"] },
-    { label: "@BANK:Matching", fields: ["matchKind", "customerTransId", "vendorTransId", "offsetAccountId"] },
+    { label: "@BANK:Matching", fields: ["matchKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "offsetAccountId"] },
   ],
   defaultSort: { field: "lineNum", dir: "asc" },
 });
@@ -134,6 +138,9 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      MatchCustomerAdvance: "Záloha odběratele",
+      MatchVendorAdvance: "Záloha dodavatele",
+      AdvanceClosed: "Záloha {doc} je už vyúčtovaná nebo zrušená.",
       Module: "Banka",
       ModuleDesc: "Bankovní účty, import výpisů, párování a zaúčtování úhrad.",
       Account: "Bankovní účet",
@@ -177,6 +184,9 @@ export default defineModule({
       TransClosed: "Faktura {doc} už je uhrazená.",
     },
     en: {
+      MatchCustomerAdvance: "Customer advance",
+      MatchVendorAdvance: "Vendor advance",
+      AdvanceClosed: "Advance {doc} is already settled or cancelled.",
       Module: "Cash and bank",
       ModuleDesc: "Bank accounts, statement import, payment matching and posting.",
       Account: "Bank account",

@@ -13,6 +13,7 @@ import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { convertLines, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { checkStatement, decodeGpc, parseGpc } from "./gpc";
+import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
 
 const zero = BigInt(0);
 
@@ -61,7 +62,20 @@ export async function autoMatch(data: DataApi, statementId: string): Promise<num
     const candidates = (await data.find(obj, { kind: "invoice", closed: false }, { take: 5000 })).filter(
       (t) => vsOf(t) === line.vs && remaining(t) > zero,
     );
-    if (candidates.length !== 1) continue; // nic, nebo víc dokladů se stejným VS → ručně
+    if (!candidates.length) {
+      // jinak neuhrazená záloha se stejným VS
+      const advObj = incoming ? "ar.advance" : "ap.advance";
+      const advs = (await data.find(advObj, { vs: line.vs, status: "open" }, { take: 2 })) as RecordData[];
+      if (advs.length === 1) {
+        await data.update("bank.statementLine", String(line.id), {
+          [incoming ? "customerAdvanceId" : "vendorAdvanceId"]: advs[0].id,
+          matchKind: incoming ? "customerAdvance" : "vendorAdvance",
+        });
+        n++;
+      }
+      continue;
+    }
+    if (candidates.length !== 1) continue; // víc dokladů se stejným VS → ručně
     await data.update("bank.statementLine", String(line.id), {
       [incoming ? "customerTransId" : "vendorTransId"]: candidates[0].id,
       matchKind: incoming ? "customer" : "vendor",
@@ -137,6 +151,8 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
     let other: string;
     if (l.matchKind === "customer") other = await summaryAccount(data, (await data.get("ar.trans", String(l.customerTransId)))!, "customer");
     else if (l.matchKind === "vendor") other = await summaryAccount(data, (await data.get("ap.trans", String(l.vendorTransId)))!, "vendor");
+    else if (l.matchKind === "customerAdvance") other = await advanceAccount(data, "customer", String(l.customerAdvanceId));
+    else if (l.matchKind === "vendorAdvance") other = await advanceAccount(data, "vendor", String(l.vendorAdvanceId));
     else other = String(l.offsetAccountId);
     posting.push({ accountId: String(account.glAccountId), amount: String(l.amount), currencyId: cur, text });
     posting.push({ accountId: other, amount: fromCents(-toCents(l.amount)), currencyId: cur, text });
@@ -153,6 +169,20 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
   // úhrady do salda: položka „Úhrada“ + navýšení Uhrazeno u faktury
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
+    if (l.matchKind === "customerAdvance" || l.matchKind === "vendorAdvance") {
+      const isCust = l.matchKind === "customerAdvance";
+      const sign = isCust ? BigInt(1) : BigInt(-1);
+      await recordAdvancePayment(data, isCust ? "customer" : "vendor", String(isCust ? l.customerAdvanceId : l.vendorAdvanceId), {
+        paidCur: sign * toCents(l.amount),
+        paidAcc: sign * toCents(converted[i * 2].amount),
+        voucherId: String(voucher.id),
+        documentNum: `${account.code}/${st.statementNum}/${l.lineNum ?? i + 1}`,
+        date: l.date,
+        vs: l.vs ?? null,
+        currencyId: cur,
+      });
+      continue;
+    }
     if (l.matchKind !== "customer" && l.matchKind !== "vendor") continue;
     const isCust = l.matchKind === "customer";
     const obj = isCust ? "ar.trans" : "ap.trans";
@@ -207,17 +237,34 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
     /** nejvýš jedna vazba; druh párování podle vyplněné vazby; směr musí sedět */
     async beforeSave(ctx, data): Promise<ValidationErrors | void> {
       await assertDraft(ctx.data, data.statementId);
-      const filled = ["customerTransId", "vendorTransId", "offsetAccountId"].filter((f) => data[f]);
+      const filled = ["customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "offsetAccountId"].filter((f) => data[f]);
       if (filled.length > 1) return { [filled[1]]: "@BANK:OneMatch" };
       const amount = toCents(data.amount);
       if (data.customerTransId && amount < zero) return { customerTransId: "@BANK:WrongDirection" };
       if (data.vendorTransId && amount > zero) return { vendorTransId: "@BANK:WrongDirection" };
+      if (data.customerAdvanceId && amount < zero) return { customerAdvanceId: "@BANK:WrongDirection" };
+      if (data.vendorAdvanceId && amount > zero) return { vendorAdvanceId: "@BANK:WrongDirection" };
+      for (const [f, obj] of [["customerAdvanceId", "ar.advance"], ["vendorAdvanceId", "ap.advance"]] as const) {
+        if (!data[f]) continue;
+        const a = await ctx.data.get(obj, String(data[f]));
+        if (!a || a.status === "settled" || a.status === "cancelled") throw new UserError("@BANK:AdvanceClosed", { doc: String(a?.advanceNum ?? "") });
+      }
       for (const [f, obj] of [["customerTransId", "ar.trans"], ["vendorTransId", "ap.trans"]] as const) {
         if (!data[f]) continue;
         const t = await ctx.data.get(obj, String(data[f]));
         if (t?.closed) throw new UserError("@BANK:TransClosed", { doc: String(t.documentNum) });
       }
-      data.matchKind = data.customerTransId ? "customer" : data.vendorTransId ? "vendor" : data.offsetAccountId ? "ledger" : "none";
+      data.matchKind = data.customerTransId
+        ? "customer"
+        : data.vendorTransId
+          ? "vendor"
+          : data.customerAdvanceId
+            ? "customerAdvance"
+            : data.vendorAdvanceId
+              ? "vendorAdvance"
+              : data.offsetAccountId
+                ? "ledger"
+                : "none";
     },
     async afterSave(ctx, data) {
       await recalcStatement(ctx.data, String(data.statementId));

@@ -10,7 +10,7 @@ import { UserError } from "@/core/module";
 import { buildEetMessage, openP12, parseEetResponse, pragueDateTime } from "@/modules/int/eet";
 import { encodeText, receiptEscPos } from "@/lib/escpos";
 import { createPrisma } from "@/server/db";
-import { getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
+import { deleteRecord, getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { revealSecret, SECRET_MASK } from "@/server/secrets";
 import { paymentStart, paymentStatus, assertPaid, eetResendPending, eetRegisterReceipt, connectionsFor } from "@/modules/int/drivers";
@@ -960,5 +960,84 @@ describe("oddělení firem a virtuální společnosti", () => {
     // nosná firma se nenabízí k práci
     const companies = await client.sysCompany.findMany({ where: { tenantId: T.tenantId, virtual: true } });
     expect(companies.length).toBe(1);
+  });
+});
+
+describe("objednávky a zálohy", () => {
+  it("prodejní objednávka → záloha → úhrada bankou na 324 → faktura s odpočtem zálohy", async () => {
+    const T = (await provisionTenant(client, { code: `t-ord-${run}`, name: "ORD", adminEmail: `ord-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "bank"], company: { code: "O", name: "O" } })).ctx;
+    const acc = async (num: string) => String((await listRecords(T, "gl.account", { filters: { accountNum: num } }, client)).rows[0].id);
+    const subj = await saveRecord(T, "gab.subject", null, { name: "Odběratel zálohy" }, undefined, client);
+    const [grp] = (await listRecords(T, "ar.group", {}, client)).rows;
+    const cust = await saveRecord(T, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+
+    const order = await saveRecord(T, "ar.order", null, { customerId: cust.id, orderDate: "2026-11-14", description: "Zakázka" }, undefined, client);
+    expect(order.orderNum).toMatch(/^PO26\d{5}$/);
+    await expect(runAction(T, "ar.order", String(order.id), "confirm", client)).rejects.toMatchObject({ label: "@GL:NoLines" });
+    await saveRecord(T, "ar.orderLine", null, { orderId: order.id, description: "Uzené", qty: "10", unitPrice: "100" }, undefined, client);
+    let o = (await getRecord(T, "ar.order", String(order.id), client))!;
+    expect([o.amountNet, o.taxAmount, o.amountGross]).toEqual(["1000.00", "210.00", "1210.00"]);
+    await runAction(T, "ar.order", String(order.id), "confirm", client);
+
+    // záloha na celou objednávku, ručně snížená na 500
+    await runAction(T, "ar.order", String(order.id), "createAdvance", client);
+    const [adv0] = (await listRecords(T, "ar.advance", { filter: { orderId: order.id } }, client)).rows;
+    expect(adv0.advanceNum).toMatch(/^ZF26\d{5}$/);
+    expect([adv0.amount, adv0.status, adv0.vs]).toEqual(["1210.00", "open", String(adv0.advanceNum).replace(/\D/g, "")]);
+    await saveRecord(T, "ar.advance", String(adv0.id), { amount: "500" }, undefined, client);
+
+    // úhrada zálohy bankou: automat spáruje VS zálohy, účtuje 221 / 324, saldo „Záloha“
+    const bank = await saveRecord(T, "bank.account", null, { code: "KB", name: "Účet", accountNum: "123456789/0100", glAccountId: await acc("221000") }, undefined, client);
+    const st = await saveRecord(T, "bank.statement", null, { bankAccountId: bank.id, statementNum: "1", date: "2026-11-15", openingBalance: "0" }, undefined, client);
+    await saveRecord(T, "bank.statementLine", null, { statementId: st.id, lineNum: 1, date: "2026-11-15", amount: "500", vs: adv0.vs }, undefined, client);
+    await runAction(T, "bank.statement", String(st.id), "match", client);
+    const [line] = (await listRecords(T, "bank.statementLine", { filter: { statementId: st.id } }, client)).rows;
+    expect(line.matchKind).toBe("customerAdvance");
+    await runAction(T, "bank.statement", String(st.id), "post", client);
+    let adv = (await getRecord(T, "ar.advance", String(adv0.id), client))!;
+    expect([adv.paidAmount, adv.status]).toEqual(["500.00", "paid"]);
+    const bal = async (num: string) => (await listRecords(T, "gl.trans", { filter: { accountId: await acc(num) }, totals: true }, client)).totals!.amount;
+    expect([await bal("221000"), await bal("324000")]).toEqual(["500.00", "-500.00"]);
+
+    // faktura z objednávky: řádky zkopírované, záloha předvyplněná, při zaúčtování odečtená
+    await runAction(T, "ar.order", String(order.id), "createInvoice", client);
+    o = (await getRecord(T, "ar.order", String(order.id), client))!;
+    expect(o.status).toBe("invoiced");
+    const inv = (await getRecord(T, "ar.invoice", String(o.invoiceId), client))!;
+    expect([inv.amountGross, inv.advanceId, inv.orderId]).toEqual(["1210.00", adv0.id, order.id]);
+    await expect(saveRecord(T, "ar.orderLine", null, { orderId: order.id, description: "x", unitPrice: "1" }, undefined, client)).rejects.toMatchObject({ label: "@GL:Locked" });
+    await runAction(T, "ar.invoice", String(inv.id), "post", client);
+    const posted = (await getRecord(T, "ar.invoice", String(inv.id), client))!;
+    expect([posted.advanceAmount, posted.paidAmount]).toEqual(["500.00", "500.00"]);
+    expect([await bal("311000"), await bal("324000")]).toEqual(["710.00", "0.00"]);
+    adv = (await getRecord(T, "ar.advance", String(adv0.id), client))!;
+    expect([adv.settledAmount, adv.status]).toEqual(["500.00", "settled"]);
+    // saldo odběratele = 311 + 324
+    const saldo = await listRecords(T, "ar.trans", { filter: { customerId: cust.id }, totals: true }, client);
+    expect(saldo.totals!.amount).toBe("710.00");
+    expect(saldo.rows.find((r) => r.kind === "advance")!.closed).toBe(true);
+  });
+
+  it("nákupní objednávka → faktura dodavatele; číslo dodavatele povinné až při zaúčtování", async () => {
+    const T = (await provisionTenant(client, { code: `t-po-${run}`, name: "PO", adminEmail: `po-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap"], company: { code: "P", name: "P" } })).ctx;
+    const subj = await saveRecord(T, "gab.subject", null, { name: "Dodavatel masa" }, undefined, client);
+    const [grp] = (await listRecords(T, "ap.group", {}, client)).rows;
+    const vend = await saveRecord(T, "ap.vendor", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const po = await saveRecord(T, "ap.order", null, { vendorId: vend.id }, undefined, client);
+    expect(po.orderNum).toMatch(/^NO26\d{5}$/);
+    await saveRecord(T, "ap.orderLine", null, { orderId: po.id, description: "Vepřové", qty: "20", unitPrice: "90" }, undefined, client);
+    await runAction(T, "ap.order", String(po.id), "createInvoice", client);
+    const o = (await getRecord(T, "ap.order", String(po.id), client))!;
+    const inv = (await getRecord(T, "ap.invoice", String(o.invoiceId), client))!;
+    expect(inv.amountNet).toBe("1800.00");
+    await expect(runAction(T, "ap.invoice", String(inv.id), "post", client)).rejects.toMatchObject({ label: "@SYS:FixErrors" });
+    // smazání konceptu vrátí objednávku k fakturaci
+    await deleteRecord(T, "ap.invoice", String(inv.id), client);
+    expect((await getRecord(T, "ap.order", String(po.id), client))!.status).toBe("confirmed");
+    await runAction(T, "ap.order", String(po.id), "createInvoice", client);
+    const inv2 = (await getRecord(T, "ap.invoice", String((await getRecord(T, "ap.order", String(po.id), client))!.invoiceId), client))!;
+    await saveRecord(T, "ap.invoice", String(inv2.id), { externalNum: "DF-77" }, undefined, client);
+    await runAction(T, "ap.invoice", String(inv2.id), "post", client);
+    expect((await getRecord(T, "ap.invoice", String(inv2.id), client))!.status).toBe("posted");
   });
 });
