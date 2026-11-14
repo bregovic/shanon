@@ -80,8 +80,22 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
           }),
       );
 
+  // související doklady: počet (tlačítko bez záznamů je neaktivní)
+  const related = isNew
+    ? []
+    : await Promise.all(
+        (def.related ?? [])
+          .filter((r) => s.ctx.modules.has(r.object.split(".")[0]) && can(s.ctx.perms, r.object, "read"))
+          .map(async (r) => ({
+            label: t(r.label),
+            href: `${objectHref(r.object)}?filter.${r.field}=${encodeURIComponent(String(record[def.titleField] ?? ""))}`,
+            count: (await listRecords(s.ctx, r.object, { filter: { [r.field]: id }, pageSize: 1 })).total,
+          })),
+      );
+
   return (
     <ObjectDetailView
+      related={related}
       key={`${id}:${record.version ?? 0}`}
       objectId={def.id}
       id={isNew ? null : id}

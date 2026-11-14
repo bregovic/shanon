@@ -101,6 +101,17 @@ interface Delegate {
 const delegate = (tx: Tx, def: ObjectDef) => (tx as unknown as Record<string, Delegate>)[delegateName(def.table)];
 
 /** „DOD00001 · Masna Novák“ — titulek s připojeným názvem odkazu (titleRef). */
+/**
+ * Název připojovaný ke kódu v odkazech a výběru (standard všech lookupů):
+ * položka „P001 · Klobása“, účet „311000 · Odběratelé“. Jen když titulek je kód
+ * (titulek není sám název) a objekt nemá titleRef (ten připojí název subjektu).
+ */
+export function nameFieldOf(def: ObjectDef): string | null {
+  if (def.titleRef) return null;
+  for (const n of ["name", "description"]) if (n !== def.titleField && def.fields[n] && def.fields[n].edt.kind === "string") return n;
+  return null;
+}
+
 const joinTitle = (a: unknown, b: unknown) => [a, b].filter((x) => x !== null && x !== undefined && String(x) !== "").map(String).join(" · ");
 
 export function getObject(objectId: string): ObjectDef {
@@ -288,7 +299,8 @@ export class Session {
     // hledání: každé slovo v některém textovém poli (nebo v titulku odkazu titleRef, např. název subjektu)
     const words = (p.q ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 5);
     if (words.length) {
-      const texts = def.list.filter((f) => def.fields[f].edt.kind === "string" || def.fields[f].edt.kind === "text");
+      const nf = nameFieldOf(def);
+      const texts = [...new Set([def.titleField, ...(nf ? [nf] : []), ...def.list])].filter((f) => def.fields[f] && (def.fields[f].edt.kind === "string" || def.fields[f].edt.kind === "text"));
       const tr = def.titleRef ? { rel: def.titleRef.replace(/Id$/, ""), title: getObject(def.fields[def.titleRef].edt.refObject!).titleField } : null;
       const perWord = words.map((w) => ({
         OR: [...texts.map((f) => ({ [f]: { contains: w, mode: "insensitive" } })), ...(tr ? [{ [tr.rel]: { [tr.title]: { contains: w, mode: "insensitive" } } }] : [])],
@@ -326,11 +338,12 @@ export class Session {
       if (!ids.length) continue;
       // titulek s připojeným názvem (odběratel → „číslo · název subjektu“)
       const tr = target.titleRef ? { rel: target.titleRef.replace(/Id$/, ""), def: getObject(target.fields[target.titleRef].edt.refObject!) } : null;
+      const nf = nameFieldOf(target);
       const found = await delegate(this.tx, target).findMany({
         where: { id: { in: ids }, ...scopeWhere(this.ctx, target) },
-        select: { id: true, [target.titleField]: true, ...(tr ? { [tr.rel]: { select: { [tr.def.titleField]: true } } } : {}) },
+        select: { id: true, [target.titleField]: true, ...(nf ? { [nf]: true } : {}), ...(tr ? { [tr.rel]: { select: { [tr.def.titleField]: true } } } : {}) },
       });
-      const map = new Map(found.map((t) => [t.id, joinTitle(t[target.titleField], tr ? (t[tr.rel] as RecordData | null)?.[tr.def.titleField] : null)]));
+      const map = new Map(found.map((t) => [t.id, joinTitle(t[target.titleField], tr ? (t[tr.rel] as RecordData | null)?.[tr.def.titleField] : nf ? t[nf] : null)]));
       for (const r of rows) {
         const titles = ((r._titles as RecordData) ??= {});
         if (r[name]) titles[name] = map.get(r[name] as string) ?? "";
@@ -654,8 +667,8 @@ export const refOptions = (ctx: Ctx, objectId: string, q: string, client?: Prism
     async (s) => {
       const def = getObject(objectId);
       const res = await s.list(objectId, { q, pageSize: 30 });
-      // druhý textový sloupec gridu jako upřesnění (u účtu název…); u odběratele název subjektu (titleRef)
-      const sub = def.list.find((f) => f !== def.titleField && def.fields[f].edt.kind === "string");
+      // upřesnění: název (položka, účet…), u odběratele název subjektu (titleRef), jinak druhý textový sloupec
+      const sub = nameFieldOf(def) ?? def.list.find((f) => f !== def.titleField && def.fields[f].edt.kind === "string");
       return res.rows.map((r) => ({
         id: String(r.id),
         title: String(r[def.titleField] ?? ""),

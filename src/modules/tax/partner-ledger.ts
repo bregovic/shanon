@@ -248,9 +248,10 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     ],
     numberSeq: { field: "orderNum", seq: sp.orderSeq },
     defaultSort: { field: "orderDate", dir: "desc" },
-    lines: [
-      { object: id("orderLine"), field: "orderId", label: "@TAX:Lines" },
-      { object: id("advance"), field: "orderId", label: L("Advances"), owned: false },
+    lines: [{ object: id("orderLine"), field: "orderId", label: "@TAX:OrderLines" }],
+    related: [
+      { object: id("invoice"), field: "orderId", label: L("Invoices") },
+      { object: id("advance"), field: "orderId", label: L("Advances") },
     ],
     actions: [
       { id: "confirm", label: "@TAX:Confirm", when: { field: "status", equals: "open" } },
@@ -264,8 +265,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   const orderLine = defineObject({
     id: id("orderLine"),
     table: `${m}_order_line`,
-    label: "@TAX:Line",
-    labelPlural: "@TAX:Lines",
+    label: "@TAX:OrderLine",
+    labelPlural: "@TAX:OrderLines",
     scope: "company",
     fields: {
       orderId: { edt: refEdt(id("order"), L("Order")), mandatory: true },

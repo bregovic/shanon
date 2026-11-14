@@ -275,8 +275,10 @@ export function RefCombobox({
         onOptionSelect={(_, d) => {
           if (!d.optionValue) return;
           const o = options.find((x) => x.id === d.optionValue);
-          onChange(f.name, d.optionValue, o?.title ?? "");
-          setQuery(o?.title ?? "");
+          // v poli zůstane i název („ODB00001 · Masna Novák“), jako po načtení záznamu
+          const shown = o ? [o.title, o.subtitle].filter(Boolean).join(" · ") : "";
+          onChange(f.name, d.optionValue, shown);
+          setQuery(shown);
         }}
       >
         {options.map((o) => (

@@ -347,7 +347,9 @@ export async function importRecords(
             if (f.edt.kind === "ref") {
               const map = await lookup(f.edt.refObject!);
               // účet zadaný syntetikou (604) = 604000
-              const id = map.get(norm(raw)) ?? (f.edt.refObject === "gl.account" && /^\d{3}$/.test(raw) ? map.get(`${raw}000`) : undefined);
+              // export dává „kód · název“ — stačí kód
+              const code = raw.includes(" · ") ? raw.split(" · ")[0].trim() : raw;
+              const id = map.get(norm(raw)) ?? map.get(norm(code)) ?? (f.edt.refObject === "gl.account" && /^\d{3}$/.test(code) ? map.get(`${code}000`) : undefined);
               if (!id) {
                 err(lineNo(i), c.header, t(id === null ? "@SYS:ImportAmbiguous" : "@SYS:ImportNotFound", { value: raw }));
                 bad = true;

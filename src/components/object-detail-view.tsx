@@ -20,7 +20,7 @@ import {
   tokens,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular, Print24Regular, Save24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, Save24Regular } from "@fluentui/react-icons";
 import { useRef } from "react";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
@@ -78,6 +78,8 @@ export interface ObjectDetailProps {
   compactHeader?: boolean;
   actions: { id: string; label: string; upload?: string; download?: boolean }[];
   lines: LineSpec[];
+  /** související doklady (tlačítka v liště, neaktivní bez záznamů) */
+  related?: { label: string; href: string; count: number }[];
   lang: string;
   labels: UiLabels;
 }
@@ -330,6 +332,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             </Button>
           ),
         )}
+        {(p.related ?? []).map((r) => (
+          <Button key={r.href} icon={<Open24Regular />} disabled={!r.count} onClick={() => router.push(r.href)}>
+            {`${r.label} (${r.count})`}
+          </Button>
+        ))}
         {p.printHref && (
           <Button icon={<Print24Regular />} onClick={() => window.open(p.printHref, "_blank")}>
             {p.labels.actions.print}

@@ -101,6 +101,11 @@ export interface ObjectDef {
   /** `copy: false` = řádky se při Duplikovat nekopírují (diskuze, historie) */
   /** `inline` = řádky se upravují přímo v mřížce (deník, řádky dokladu) */
   lines?: { object: string; field: string; label: LabelRef; owned?: boolean; copy?: boolean; inline?: boolean }[];
+  /**
+   * související doklady (faktury a zálohy objednávky): tlačítko v horní liště
+   * s počtem, otevře jejich seznam s filtrem; bez záznamů je neaktivní
+   */
+  related?: { object: string; field: string; label: LabelRef }[];
   /** stránka dokladu: hlavička jako jeden řádek nahoře, řádky přes celou stránku */
   compactHeader?: boolean;
   /**

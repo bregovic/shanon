@@ -230,7 +230,7 @@ describe("číselné řady a výchozí nastavení", () => {
     const v = await getRecord(A, "gl.voucher", String(posted!.voucherId), client);
     expect(v!.voucherNum).toBe("BV26/001");
     const tr = await listRecords(A, "gl.trans", { filter: { voucherId: v!.id } }, client);
-    expect(tr.rows.map((r) => `${r._titles && (r._titles as Record<string, string>).accountId}:${r.amount}`).sort()).toEqual(["395000:-150.00", "518000:150.00"]);
+    expect(tr.rows.map((r) => `${r._titles && String((r._titles as Record<string, string>).accountId).split(" · ")[0]}:${r.amount}`).sort()).toEqual(["395000:-150.00", "518000:150.00"]);
 
     // deník bez názvu dostane GEN
     const j2 = await saveRecord(A, "gl.journal", null, { date: "2026-11-12", description: "Bez názvu" }, undefined, client);
@@ -273,10 +273,10 @@ describe("účetní období a měny", () => {
     await runAction(A, "gl.journal", String(j.id), "post", client);
     const posted = await getRecord(A, "gl.journal", String(j.id), client);
     const tr = (await listRecords(A, "gl.trans", { filter: { voucherId: posted!.voucherId } }, client)).rows;
-    const bank = tr.find((t) => (t._titles as Record<string, string>).accountId === "261000")!;
+    const bank = tr.find((t) => String((t._titles as Record<string, string>).accountId).startsWith("261000"))!;
     expect(bank.amount).toBe("2433.50");
     expect(bank.amountCur).toBe("100.00");
-    expect((bank._titles as Record<string, string>).currencyId).toBe("EUR");
+    expect((bank._titles as Record<string, string>).currencyId).toBe("EUR · Euro");
   });
 
   it("kurzovní lístek ČNB", () => {
@@ -289,7 +289,7 @@ describe("účetní období a měny", () => {
 });
 
 describe("odběratelé a dodavatelé", () => {
-  const titles = (r: Record<string, unknown>) => (r._titles as Record<string, string>) ?? {};
+  const titles = (r: Record<string, unknown>) => Object.fromEntries(Object.entries((r._titles as Record<string, string>) ?? {}).map(([k, v]) => [k, String(v).split(" · ")[0]]));
 
   async function partner(ctx: Ctx, obj: "ar.customer" | "ap.vendor", name: string, vatId?: string) {
     const subj = await saveRecord(ctx, "gab.subject", null, { name, vatId }, undefined, client);
@@ -352,7 +352,7 @@ describe("odběratelé a dodavatelé", () => {
 });
 
 describe("banka a úhrady", () => {
-  const T = (r: Record<string, unknown>) => (r._titles as Record<string, string>) ?? {};
+  const T = (r: Record<string, unknown>) => Object.fromEntries(Object.entries((r._titles as Record<string, string>) ?? {}).map(([k, v]) => [k, String(v).split(" · ")[0]]));
   const c = (v: string) => BigInt(Math.round(Number(v) * 100));
 
   function gpc(num: string, opening: string, lines: { amount: string; vs: string; msg: string }[], account = "123456789") {
