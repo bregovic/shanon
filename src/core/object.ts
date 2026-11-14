@@ -104,6 +104,11 @@ export interface ObjectDef {
   /** stránka dokladu: hlavička jako jeden řádek nahoře, řádky přes celou stránku */
   compactHeader?: boolean;
   /**
+   * netransakční číselník (adresář, účty, položky…), který mohou firmy sdílet
+   * ve virtuální společnosti (Správa systému → Virtuální společnosti)
+   */
+  shareable?: boolean;
+  /**
    * odkaz, jehož titulek se připojí k titulku záznamu („DOD00001 · Masna Novák“)
    * a podle něhož jde záznam hledat (odběratel / dodavatel → subjekt adresáře)
    */

@@ -55,6 +55,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     label: L("Group"),
     labelPlural: L("Groups"),
     scope: "company",
+    shareable: true,
     fields: {
       code: { edt: Edts.Code, mandatory: true },
       name: { edt: Edts.Name, mandatory: true },
@@ -79,6 +80,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     label: L("Partner"),
     labelPlural: L("Partners"),
     scope: "company",
+    shareable: true,
     fields: {
       accountNum: { edt: Edts.Code, label: L("AccountNum"), mandatory: true, readOnly: true },
       subjectId: { edt: refEdt("gab.subject", "@GAB:Subject"), mandatory: true },

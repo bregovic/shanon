@@ -71,6 +71,8 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít
               overview: l.owned === false || !!ld.systemOnly,
               inline: !!l.inline,
+              // řádek s akcemi (Osamostatnit…) se otevírá na své stránce
+              openInPage: !!ld.actions?.length,
               sortField: ld.defaultSort?.field,
               editable: l.owned !== false && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               initial: { rows: initial.rows, total: initial.total, totals: initial.totals },

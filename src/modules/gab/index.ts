@@ -42,7 +42,8 @@ export const subject = defineObject({
   table: "gab_subject",
   label: "@GAB:Subject",
   labelPlural: "@GAB:Subjects",
-  scope: "tenant",
+  scope: "company",
+  shareable: true,
   fields: {
     name: { edt: Edts.Name, mandatory: true },
     type: { edt: enumEdt(SubjectType), mandatory: true, default: "organization" },
@@ -80,7 +81,8 @@ export const address = defineObject({
   table: "gab_address",
   label: "@GAB:Address",
   labelPlural: "@GAB:Addresses",
-  scope: "tenant",
+  scope: "company",
+  shareable: true,
   fields: {
     subjectId: { edt: SubjectRef, mandatory: true },
     kind: { edt: enumEdt(AddressKind), mandatory: true, default: "registered" },
@@ -100,7 +102,8 @@ export const contact = defineObject({
   table: "gab_contact",
   label: "@GAB:Contact",
   labelPlural: "@GAB:Contacts",
-  scope: "tenant",
+  scope: "company",
+  shareable: true,
   fields: {
     subjectId: { edt: SubjectRef, mandatory: true },
     kind: { edt: enumEdt(ContactKind), mandatory: true, default: "email" },

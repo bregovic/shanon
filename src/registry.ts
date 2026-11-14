@@ -10,7 +10,7 @@ import { glHandlers } from "@/modules/gl/posting";
 import { dimensionHandlers, dimensionJobs } from "@/modules/gl/dimensions";
 import { rateJobs, sysHandlers } from "@/modules/sys/currency";
 import { batchHandlers } from "@/modules/sys/batch";
-import sys, { BatchClass, NumberedObject, SecurityTarget } from "@/modules/sys";
+import sys, { BatchClass, NumberedObject, SecurityTarget, ShareableObject } from "@/modules/sys";
 import tax from "@/modules/tax";
 import ar, { ar as arLedger } from "@/modules/ar";
 import ap, { ap as apLedger } from "@/modules/ap";
@@ -51,6 +51,9 @@ SecurityTarget.values = modules.flatMap((m) => [
   { value: m.id, label: m.label },
   ...m.objects.filter((o) => !o.adminOnly).map((o) => ({ value: o.id, label: o.labelPlural })),
 ]);
+
+// číselníky sdílitelné ve virtuální společnosti
+ShareableObject.values = modules.flatMap((m) => m.objects.filter((o) => o.shareable).map((o) => ({ value: o.id, label: o.labelPlural })));
 
 // objekty s automatickým číslováním (pro pole Použití u číselné řady)
 NumberedObject.values = modules.flatMap((m) =>

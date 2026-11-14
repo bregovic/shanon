@@ -27,6 +27,7 @@ export const taxCode = defineObject({
   label: "@TAX:TaxCode",
   labelPlural: "@TAX:TaxCodes",
   scope: "company",
+  shareable: true,
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },

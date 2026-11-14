@@ -51,6 +51,8 @@ export interface LineSpec {
   overview: boolean;
   /** úprava přímo v mřížce (deník) */
   inline?: boolean;
+  /** řádek má akce — dvojklik otevře jeho stránku */
+  openInPage?: boolean;
   sortField?: string;
   initial: { rows: Row[]; total: number; totals?: Record<string, string> };
 }
@@ -171,7 +173,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
         selectable={spec.editable}
         reloadKey={reload}
         maxHeight="420px"
-        onOpen={spec.overview ? (row) => router.push(objectHref(spec.objectId, String(row.id))) : spec.editable ? open : undefined}
+        onOpen={spec.overview || spec.openInPage ? (row) => router.push(objectHref(spec.objectId, String(row.id))) : spec.editable ? open : undefined}
         onSelectionChange={setSelected}
       />
       )}

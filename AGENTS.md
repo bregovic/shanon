@@ -43,6 +43,13 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `Edts.AmountCur` ne (`noTotal`). Výchozí datum „dnes“ = `default: "$today"`.
 - Odkaz do modulu, na kterém modul nezávisí (položka na řádku faktury), má
   `optionalRef: true` — bez zapnutého cílového modulu se pole skryje.
+- Oddělení firem: data objektu se `scope: "company"` patří jedné firmě; firmy jsou
+  nezávislé subjekty. Sdílet lze jen netransakční číselníky s `shareable: true` přes
+  virtuální společnost (Správa systému → Virtuální společnosti): data leží ve skryté
+  nosné firmě (`sys.company.virtual`), `Ctx.shared` (doplní `inTenant`) mapuje objekt →
+  firma a `scopeWhere`/založení/číslování to řeší na jednom místě (`dataCompany`).
+  Pravidla a Osamostatnit (kopie + přepojení odkazů) v `src/server/virtual.ts`.
+  Doklady a transakce se nesdílí nikdy.
 - Údaje konkrétních firem (IČO, DIČ, adresy) nepatří do repa (je veřejné) —
   nastavují se přes UI nebo `scripts/company-profile.ts` se souborem zvenku.
 - Řádky, které záznamu nepatří (faktury odběratele, výpisy účtu), mají v `lines`

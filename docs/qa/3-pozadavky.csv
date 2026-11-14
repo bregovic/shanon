@@ -53,3 +53,5 @@ CR-051;bug;Účtenka: FIK a další řádky se překrývaly, když se text zalom
 CR-052;change;"Výběr odběratele/dodavatele: číslo i název, hledání podle obou; na faktuře „číslo · název“";SYS-UI;medium;uat;52;
 CR-053;change;"Odběratelé: prodejní objednávka, volná faktura, zálohová faktura; Dodavatelé: nákupní objednávka, faktura dodavatele, zálohová faktura";AR-INVOICE;high;analysis;53;Zálohová faktura = pohledávka/závazek mimo účetnictví do úhrady.
 CR-054;change;Integrace: parametr sdílených rozhraní (veřejné služby zakládat automaticky, EET ne);INT-EET;low;analysis;54;
+CR-055;change;Striktní oddělení firem a virtuální společnosti (sdílené číselníky);SYS-SECURITY;critical;uat;55;"Adresář a dimenze po firmách; Správa systému → Virtuální společnosti: firmy + sdílené číselníky; Osamostatnit firmu zkopíruje data a přepojí doklady."
+CR-056;change;Sklad: sklady a lokace (až 6 vlastních úrovní), inventurní / vyřazovací / přesunový deník, rezervace objednávkou, výdej prodejem, příjemka nad nákupní objednávkou;INV-ITEMS;high;analysis;56;"Navazuje na CR-053 (objednávky); nákupní objednávky i přes OCR (CR-046)."

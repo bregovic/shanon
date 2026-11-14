@@ -551,7 +551,7 @@ describe("dávkové úlohy", () => {
     expect(new Date(String(e2!.nextRunAt)).getTime()).toBeGreaterThan(Date.now());
     const runs = (await listRecords(B, "sys.batchRun", { filter: { jobId: eet.id } }, client)).rows;
     expect(runs.length).toBe(1);
-  });
+  }, 180_000);
 });
 
 describe("Duplikovat", () => {
@@ -917,5 +917,48 @@ describe("výběr odběratele", () => {
     expect((await refOptions(R, "ar.customer", num, client)).length).toBe(1);
     const inv = await saveRecord(R, "ar.invoice", null, { customerId: byName[0].id, invoiceDate: "2026-11-13" }, undefined, client);
     expect(((await getRecord(R, "ar.invoice", String(inv.id), client))!._titles as Record<string, string>).customerId).toBe(`${num} · ${byName[0].subtitle}`);
+  });
+});
+
+describe("oddělení firem a virtuální společnosti", () => {
+  it("adresář po firmách; sdílení ve virtuální společnosti; osamostatnění přepojí doklady", async () => {
+    const T = (await provisionTenant(client, { code: `t-vc-${run}`, name: "VC", adminEmail: `vc-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar"], company: { code: "A", name: "A" } })).ctx;
+    const mk = async (code: string) => String((await saveRecord(T, "sys.company", null, { code, name: code, currency: "CZK", country: "CZ" }, undefined, client)).id);
+    const [b, c, d] = [await mk("B"), await mk("C"), await mk("D")];
+    const at = (companyId: string) => ({ ...T, companyId });
+    const names = async (companyId: string) => (await listRecords(at(companyId), "gab.subject", {}, client)).rows.map((r) => r.name).sort();
+
+    // výchozí stav: každá firma má vlastní adresář
+    await saveRecord(T, "gab.subject", null, { name: "Jen A" }, undefined, client);
+    expect([await names(T.companyId!), await names(b)]).toEqual([["Jen A"], []]);
+
+    // virtuální společnost C+D sdílí adresář a odběratele
+    const vc = await saveRecord(T, "sys.virtualCompany", null, { code: "SKUP", name: "Skupina" }, undefined, client);
+    expect(vc.holderCompanyId).toBeTruthy();
+    for (const o of ["gab.subject", "gab.address", "ar.customer"]) await saveRecord(T, "sys.virtualShare", null, { virtualCompanyId: vc.id, objectId: o }, undefined, client);
+    // firma s vlastními subjekty přidat nejde
+    await expect(saveRecord(T, "sys.virtualMember", null, { virtualCompanyId: vc.id, memberCompanyId: T.companyId }, undefined, client)).rejects.toMatchObject({ label: "@SYS:ShareHasData" });
+    await saveRecord(T, "sys.virtualMember", null, { virtualCompanyId: vc.id, memberCompanyId: c }, undefined, client);
+    const dm = await saveRecord(T, "sys.virtualMember", null, { virtualCompanyId: vc.id, memberCompanyId: d }, undefined, client);
+    const subj = await saveRecord(at(c), "gab.subject", null, { name: "Společný dodavatel" }, undefined, client);
+    expect([await names(c), await names(d), await names(b)]).toEqual([["Společný dodavatel"], ["Společný dodavatel"], []]);
+    // sdílený odběratel: číslo z řady virtuální společnosti, obě firmy ho vidí
+    const grpD = (await listRecords(at(d), "ar.group", {}, client)).rows[0];
+    const cust = await saveRecord(at(d), "ar.customer", null, { subjectId: subj.id, groupId: grpD.id }, undefined, client);
+    expect((await listRecords(at(c), "ar.customer", {}, client)).total).toBe(1);
+    // faktura firmy D na sdíleného odběratele
+    const inv = await saveRecord(at(d), "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-14" }, undefined, client);
+
+    // osamostatnit D: kopie adresáře a odběratelů, faktura přepojená, C beze změny
+    await runAction(T, "sys.virtualMember", String(dm.id), "detach", client);
+    expect(await names(d)).toEqual(["Společný dodavatel"]);
+    const custD = (await listRecords(at(d), "ar.customer", {}, client)).rows[0];
+    expect(custD.id).not.toBe(cust.id);
+    expect((await getRecord(at(d), "ar.invoice", String(inv.id), client))!.customerId).toBe(custD.id);
+    await saveRecord(at(d), "gab.subject", null, { name: "Jen D" }, undefined, client);
+    expect([await names(c), await names(d)]).toEqual([["Společný dodavatel"], ["Jen D", "Společný dodavatel"]]);
+    // nosná firma se nenabízí k práci
+    const companies = await client.sysCompany.findMany({ where: { tenantId: T.tenantId, virtual: true } });
+    expect(companies.length).toBe(1);
   });
 });

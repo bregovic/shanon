@@ -204,6 +204,7 @@ model SysCompany {
   vatPayer  Boolean  @default(true) @map("vat_payer")
   currency  String   @default("CZK") @db.VarChar(3)
   country   String   @default("CZ") @db.VarChar(2)
+  virtual   Boolean  @default(false)
   ext       Json     @default("{}")
   version   Int      @default(1)
   createdAt DateTime @default(now()) @map("created_at")
@@ -211,56 +212,63 @@ model SysCompany {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy String?  @map("updated_by") @db.Uuid
 
-  sysNumberSeq_company      SysNumberSeq[]      @relation("SysNumberSeq_company")
-  sysBatchJob_company       SysBatchJob[]       @relation("SysBatchJob_company")
-  sysBatchRun_company       SysBatchRun[]       @relation("SysBatchRun_company")
-  prtTemplate_company       PrtTemplate[]       @relation("PrtTemplate_company")
-  orgEntity_company         OrgEntity[]         @relation("OrgEntity_company")
-  orgSite_company           OrgSite[]           @relation("OrgSite_company")
-  glParameters_company      GlParameters[]      @relation("GlParameters_company")
-  glSystemAccount_company   GlSystemAccount[]   @relation("GlSystemAccount_company")
-  glDimensionRule_company   GlDimensionRule[]   @relation("GlDimensionRule_company")
-  glAccount_company         GlAccount[]         @relation("GlAccount_company")
-  glFiscalYear_company      GlFiscalYear[]      @relation("GlFiscalYear_company")
-  glPeriod_company          GlPeriod[]          @relation("GlPeriod_company")
-  glVoucher_company         GlVoucher[]         @relation("GlVoucher_company")
-  glTrans_company           GlTrans[]           @relation("GlTrans_company")
-  glJournalName_company     GlJournalName[]     @relation("GlJournalName_company")
-  glJournal_company         GlJournal[]         @relation("GlJournal_company")
-  glJournalLine_company     GlJournalLine[]     @relation("GlJournalLine_company")
-  taxCode_company           TaxCode[]           @relation("TaxCode_company")
-  taxTrans_company          TaxTrans[]          @relation("TaxTrans_company")
-  taxParameters_company     TaxParameters[]     @relation("TaxParameters_company")
-  taxReturn_company         TaxReturn[]         @relation("TaxReturn_company")
-  invUnit_company           InvUnit[]           @relation("InvUnit_company")
-  invItemGroup_company      InvItemGroup[]      @relation("InvItemGroup_company")
-  invCategory_company       InvCategory[]       @relation("InvCategory_company")
-  invItem_company           InvItem[]           @relation("InvItem_company")
-  invDiscount_company       InvDiscount[]       @relation("InvDiscount_company")
-  arGroup_company           ArGroup[]           @relation("ArGroup_company")
-  arCustomer_company        ArCustomer[]        @relation("ArCustomer_company")
-  arInvoice_company         ArInvoice[]         @relation("ArInvoice_company")
-  arInvoiceLine_company     ArInvoiceLine[]     @relation("ArInvoiceLine_company")
-  arTrans_company           ArTrans[]           @relation("ArTrans_company")
-  apGroup_company           ApGroup[]           @relation("ApGroup_company")
-  apVendor_company          ApVendor[]          @relation("ApVendor_company")
-  apInvoice_company         ApInvoice[]         @relation("ApInvoice_company")
-  apInvoiceLine_company     ApInvoiceLine[]     @relation("ApInvoiceLine_company")
-  apTrans_company           ApTrans[]           @relation("ApTrans_company")
-  bankAccount_company       BankAccount[]       @relation("BankAccount_company")
-  bankStatement_company     BankStatement[]     @relation("BankStatement_company")
-  bankStatementLine_company BankStatementLine[] @relation("BankStatementLine_company")
-  cashDesk_company          CashDesk[]          @relation("CashDesk_company")
-  cashVoucher_company       CashVoucher[]       @relation("CashVoucher_company")
-  posRegister_company       PosRegister[]       @relation("PosRegister_company")
-  posShift_company          PosShift[]          @relation("PosShift_company")
-  posReceipt_company        PosReceipt[]        @relation("PosReceipt_company")
-  posReceiptLine_company    PosReceiptLine[]    @relation("PosReceiptLine_company")
-  posBox_company            PosBox[]            @relation("PosBox_company")
-  posBasket_company         PosBasket[]         @relation("PosBasket_company")
-  posBasketLine_company     PosBasketLine[]     @relation("PosBasketLine_company")
-  intConnection_company     IntConnection[]     @relation("IntConnection_company")
-  intLog_company            IntLog[]            @relation("IntLog_company")
+  sysNumberSeq_company            SysNumberSeq[]      @relation("SysNumberSeq_company")
+  sysBatchJob_company             SysBatchJob[]       @relation("SysBatchJob_company")
+  sysBatchRun_company             SysBatchRun[]       @relation("SysBatchRun_company")
+  sysVirtualCompany_holderCompany SysVirtualCompany[] @relation("SysVirtualCompany_holderCompany")
+  sysVirtualMember_memberCompany  SysVirtualMember[]  @relation("SysVirtualMember_memberCompany")
+  prtTemplate_company             PrtTemplate[]       @relation("PrtTemplate_company")
+  orgEntity_company               OrgEntity[]         @relation("OrgEntity_company")
+  orgSite_company                 OrgSite[]           @relation("OrgSite_company")
+  gabSubject_company              GabSubject[]        @relation("GabSubject_company")
+  gabAddress_company              GabAddress[]        @relation("GabAddress_company")
+  gabContact_company              GabContact[]        @relation("GabContact_company")
+  glParameters_company            GlParameters[]      @relation("GlParameters_company")
+  glSystemAccount_company         GlSystemAccount[]   @relation("GlSystemAccount_company")
+  glDimension_company             GlDimension[]       @relation("GlDimension_company")
+  glDimensionValue_company        GlDimensionValue[]  @relation("GlDimensionValue_company")
+  glDimensionRule_company         GlDimensionRule[]   @relation("GlDimensionRule_company")
+  glAccount_company               GlAccount[]         @relation("GlAccount_company")
+  glFiscalYear_company            GlFiscalYear[]      @relation("GlFiscalYear_company")
+  glPeriod_company                GlPeriod[]          @relation("GlPeriod_company")
+  glVoucher_company               GlVoucher[]         @relation("GlVoucher_company")
+  glTrans_company                 GlTrans[]           @relation("GlTrans_company")
+  glJournalName_company           GlJournalName[]     @relation("GlJournalName_company")
+  glJournal_company               GlJournal[]         @relation("GlJournal_company")
+  glJournalLine_company           GlJournalLine[]     @relation("GlJournalLine_company")
+  taxCode_company                 TaxCode[]           @relation("TaxCode_company")
+  taxTrans_company                TaxTrans[]          @relation("TaxTrans_company")
+  taxParameters_company           TaxParameters[]     @relation("TaxParameters_company")
+  taxReturn_company               TaxReturn[]         @relation("TaxReturn_company")
+  invUnit_company                 InvUnit[]           @relation("InvUnit_company")
+  invItemGroup_company            InvItemGroup[]      @relation("InvItemGroup_company")
+  invCategory_company             InvCategory[]       @relation("InvCategory_company")
+  invItem_company                 InvItem[]           @relation("InvItem_company")
+  invDiscount_company             InvDiscount[]       @relation("InvDiscount_company")
+  arGroup_company                 ArGroup[]           @relation("ArGroup_company")
+  arCustomer_company              ArCustomer[]        @relation("ArCustomer_company")
+  arInvoice_company               ArInvoice[]         @relation("ArInvoice_company")
+  arInvoiceLine_company           ArInvoiceLine[]     @relation("ArInvoiceLine_company")
+  arTrans_company                 ArTrans[]           @relation("ArTrans_company")
+  apGroup_company                 ApGroup[]           @relation("ApGroup_company")
+  apVendor_company                ApVendor[]          @relation("ApVendor_company")
+  apInvoice_company               ApInvoice[]         @relation("ApInvoice_company")
+  apInvoiceLine_company           ApInvoiceLine[]     @relation("ApInvoiceLine_company")
+  apTrans_company                 ApTrans[]           @relation("ApTrans_company")
+  bankAccount_company             BankAccount[]       @relation("BankAccount_company")
+  bankStatement_company           BankStatement[]     @relation("BankStatement_company")
+  bankStatementLine_company       BankStatementLine[] @relation("BankStatementLine_company")
+  cashDesk_company                CashDesk[]          @relation("CashDesk_company")
+  cashVoucher_company             CashVoucher[]       @relation("CashVoucher_company")
+  posRegister_company             PosRegister[]       @relation("PosRegister_company")
+  posShift_company                PosShift[]          @relation("PosShift_company")
+  posReceipt_company              PosReceipt[]        @relation("PosReceipt_company")
+  posReceiptLine_company          PosReceiptLine[]    @relation("PosReceiptLine_company")
+  posBox_company                  PosBox[]            @relation("PosBox_company")
+  posBasket_company               PosBasket[]         @relation("PosBasket_company")
+  posBasketLine_company           PosBasketLine[]     @relation("PosBasketLine_company")
+  intConnection_company           IntConnection[]     @relation("IntConnection_company")
+  intLog_company                  IntLog[]            @relation("IntLog_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -451,6 +459,74 @@ model SysBatchRun {
   @@map("sys_batch_run")
 }
 
+/// sys.virtualCompany — generováno z definice objektu
+model SysVirtualCompany {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  code            String   @db.VarChar(20)
+  name            String   @db.VarChar(120)
+  holderCompanyId String?  @map("holder_company_id") @db.Uuid
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  holderCompany                   SysCompany?        @relation("SysVirtualCompany_holderCompany", fields: [holderCompanyId], references: [id], onDelete: Restrict)
+  sysVirtualMember_virtualCompany SysVirtualMember[] @relation("SysVirtualMember_virtualCompany")
+  sysVirtualShare_virtualCompany  SysVirtualShare[]  @relation("SysVirtualShare_virtualCompany")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([holderCompanyId])
+  @@map("sys_virtual_company")
+}
+
+/// sys.virtualMember — generováno z definice objektu
+model SysVirtualMember {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  virtualCompanyId String   @map("virtual_company_id") @db.Uuid
+  memberCompanyId  String   @map("member_company_id") @db.Uuid
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  virtualCompany SysVirtualCompany @relation("SysVirtualMember_virtualCompany", fields: [virtualCompanyId], references: [id], onDelete: Restrict)
+  memberCompany  SysCompany        @relation("SysVirtualMember_memberCompany", fields: [memberCompanyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, virtualCompanyId, memberCompanyId])
+  @@index([tenantId])
+  @@index([virtualCompanyId])
+  @@index([memberCompanyId])
+  @@map("sys_virtual_member")
+}
+
+/// sys.virtualShare — generováno z definice objektu
+model SysVirtualShare {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  virtualCompanyId String   @map("virtual_company_id") @db.Uuid
+  objectId         String   @map("object_id") @db.VarChar(40)
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  virtualCompany SysVirtualCompany @relation("SysVirtualShare_virtualCompany", fields: [virtualCompanyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, virtualCompanyId, objectId])
+  @@index([tenantId])
+  @@index([virtualCompanyId])
+  @@map("sys_virtual_share")
+}
+
 /// prt.template — generováno z definice objektu
 model PrtTemplate {
   id        String   @id @default(uuid(7)) @db.Uuid
@@ -549,6 +625,7 @@ model OrgSite {
 model GabSubject {
   id        String   @id @default(uuid(7)) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
   name      String   @db.VarChar(120)
   type      String   @default("organization") @db.VarChar(40)
   regNo     String?  @map("reg_no") @db.VarChar(12)
@@ -564,6 +641,7 @@ model GabSubject {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy String?  @map("updated_by") @db.Uuid
 
+  company                  SysCompany         @relation("GabSubject_company", fields: [companyId], references: [id], onDelete: Restrict)
   gabAddress_subject       GabAddress[]       @relation("GabAddress_subject")
   gabContact_subject       GabContact[]       @relation("GabContact_subject")
   glDimensionValue_subject GlDimensionValue[] @relation("GlDimensionValue_subject")
@@ -572,7 +650,7 @@ model GabSubject {
   apVendor_subject         ApVendor[]         @relation("ApVendor_subject")
   cashVoucher_subject      CashVoucher[]      @relation("CashVoucher_subject")
 
-  @@index([tenantId])
+  @@index([tenantId, companyId])
   @@map("gab_subject")
 }
 
@@ -580,6 +658,7 @@ model GabSubject {
 model GabAddress {
   id        String   @id @default(uuid(7)) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
   subjectId String   @map("subject_id") @db.Uuid
   kind      String   @default("registered") @db.VarChar(40)
   street    String?  @db.VarChar(120)
@@ -593,9 +672,10 @@ model GabAddress {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy String?  @map("updated_by") @db.Uuid
 
+  company SysCompany @relation("GabAddress_company", fields: [companyId], references: [id], onDelete: Restrict)
   subject GabSubject @relation("GabAddress_subject", fields: [subjectId], references: [id], onDelete: Restrict)
 
-  @@index([tenantId])
+  @@index([tenantId, companyId])
   @@index([subjectId])
   @@map("gab_address")
 }
@@ -604,6 +684,7 @@ model GabAddress {
 model GabContact {
   id          String   @id @default(uuid(7)) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
   subjectId   String   @map("subject_id") @db.Uuid
   kind        String   @default("email") @db.VarChar(40)
   value       String   @db.VarChar(254)
@@ -615,9 +696,10 @@ model GabContact {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy   String?  @map("updated_by") @db.Uuid
 
+  company SysCompany @relation("GabContact_company", fields: [companyId], references: [id], onDelete: Restrict)
   subject GabSubject @relation("GabContact_subject", fields: [subjectId], references: [id], onDelete: Restrict)
 
-  @@index([tenantId])
+  @@index([tenantId, companyId])
   @@index([subjectId])
   @@map("gab_contact")
 }
@@ -675,6 +757,7 @@ model GlSystemAccount {
 model GlDimension {
   id          String   @id @default(uuid(7)) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
   code        String   @db.VarChar(20)
   name        String   @db.VarChar(120)
   position    Int
@@ -690,12 +773,13 @@ model GlDimension {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy   String?  @map("updated_by") @db.Uuid
 
+  company                    SysCompany         @relation("GlDimension_company", fields: [companyId], references: [id], onDelete: Restrict)
   glDimensionValue_dimension GlDimensionValue[] @relation("GlDimensionValue_dimension")
   glDimensionRule_dimension  GlDimensionRule[]  @relation("GlDimensionRule_dimension")
 
-  @@unique([tenantId, code])
-  @@unique([tenantId, position])
-  @@index([tenantId])
+  @@unique([tenantId, companyId, code])
+  @@unique([tenantId, companyId, position])
+  @@index([tenantId, companyId])
   @@map("gl_dimension")
 }
 
@@ -703,6 +787,7 @@ model GlDimension {
 model GlDimensionValue {
   id          String   @id @default(uuid(7)) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
   dimensionId String   @map("dimension_id") @db.Uuid
   code        String   @db.VarChar(20)
   name        String   @db.VarChar(120)
@@ -715,11 +800,12 @@ model GlDimensionValue {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy   String?  @map("updated_by") @db.Uuid
 
+  company   SysCompany  @relation("GlDimensionValue_company", fields: [companyId], references: [id], onDelete: Restrict)
   dimension GlDimension @relation("GlDimensionValue_dimension", fields: [dimensionId], references: [id], onDelete: Restrict)
   subject   GabSubject? @relation("GlDimensionValue_subject", fields: [subjectId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, dimensionId, code])
-  @@index([tenantId])
+  @@unique([tenantId, companyId, dimensionId, code])
+  @@index([tenantId, companyId])
   @@index([dimensionId])
   @@index([subjectId])
   @@map("gl_dimension_value")

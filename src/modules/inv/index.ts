@@ -37,6 +37,7 @@ export const unit = defineObject({
   label: "@INV:Unit",
   labelPlural: "@INV:Units",
   scope: "company",
+  shareable: true,
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
@@ -55,6 +56,7 @@ export const itemGroup = defineObject({
   label: "@INV:Group",
   labelPlural: "@INV:Groups",
   scope: "company",
+  shareable: true,
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
@@ -86,6 +88,7 @@ export const category = defineObject({
   label: "@INV:Category",
   labelPlural: "@INV:Categories",
   scope: "company",
+  shareable: true,
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
@@ -110,6 +113,7 @@ export const item = defineObject({
   label: "@INV:Item",
   labelPlural: "@INV:Items",
   scope: "company",
+  shareable: true,
   fields: {
     itemNum: { edt: Edts.Code, label: "@INV:ItemNum", mandatory: true, aliases: ["kod", "kód", "cislo", "číslo", "sku", "code", "id", "plu"] },
     name: { edt: Edts.Name, mandatory: true, aliases: ["nazev", "název", "polozka", "položka", "zbozi", "zboží", "product"] },

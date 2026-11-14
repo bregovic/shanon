@@ -29,6 +29,7 @@ export const template = defineObject({
   label: "@PRT:Template",
   labelPlural: "@PRT:Templates",
   scope: "company",
+  shareable: true,
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },

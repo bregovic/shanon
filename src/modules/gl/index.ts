@@ -165,7 +165,8 @@ export const dimension = defineObject({
   table: "gl_dimension",
   label: "@GL:Dimension",
   labelPlural: "@GL:Dimensions",
-  scope: "tenant",
+  scope: "company",
+  shareable: true,
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
@@ -197,7 +198,8 @@ export const dimensionValue = defineObject({
   table: "gl_dimension_value",
   label: "@GL:DimValue",
   labelPlural: "@GL:DimValues",
-  scope: "tenant",
+  scope: "company",
+  shareable: true,
   fields: {
     dimensionId: { edt: refEdt("gl.dimension", "@GL:Dimension"), mandatory: true },
     code: { edt: Edts.Code, mandatory: true },
@@ -219,6 +221,7 @@ export const dimensionRule = defineObject({
   label: "@GL:DimRule",
   labelPlural: "@GL:DimRules",
   scope: "company",
+  shareable: true,
   fields: {
     dimensionId: { edt: refEdt("gl.dimension", "@GL:Dimension"), mandatory: true },
     accountMask: { edt: defineEdt({ id: "DimMask", kind: "string", label: "@GL:DimMask", maxLength: 6, pattern: /^\d{1,6}$/, patternMessage: "@GL:DimMaskHelp" }), mandatory: true },
@@ -311,6 +314,7 @@ export const account = defineObject({
   label: "@GL:Account",
   labelPlural: "@GL:Accounts",
   scope: "company",
+  shareable: true,
   fields: {
     accountNum: { edt: AccountNum, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
@@ -410,6 +414,7 @@ export const journalName = defineObject({
   label: "@GL:JournalName",
   labelPlural: "@GL:JournalNames",
   scope: "company",
+  shareable: true,
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },

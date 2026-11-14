@@ -1,3 +1,4 @@
+import { sharedMap } from "./data";
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -98,7 +99,8 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   const superUser = user.role === "admin";
   const assigned = new Map(user.companies.filter((a) => a.tenantId === tenant.id).map((a) => [a.companyId, a]));
   const allCompanies = await withTenant(tenant.id, (tx) =>
-    tx.sysCompany.findMany({ where: { tenantId: tenant.id }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
+    // nosné firmy virtuálních společností nejsou pro práci (jen pro sdílená data)
+    tx.sysCompany.findMany({ where: { tenantId: tenant.id, virtual: false }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
   );
   const companies = superUser ? allCompanies : allCompanies.filter((c) => assigned.has(c.id));
   const companyId = companies.find((c) => c.id === session.companyId)?.id ?? companies[0]?.id ?? null;
@@ -122,8 +124,15 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   // finanční dimenze tenanta (popisky polí dim1…dim6)
   const dims = modules.has("gl")
     ? (
-        await withTenant(tenant.id, (tx) =>
-          tx.glDimension.findMany({ where: { tenantId: tenant.id, active: true }, select: { position: true, name: true }, orderBy: { position: "asc" } }),
+        await withTenant(tenant.id, async (tx) =>
+          // dimenze firmy (nebo sdílené ve virtuální společnosti); bez firmy žádné
+          companyId
+            ? tx.glDimension.findMany({
+                where: { tenantId: tenant.id, active: true, companyId: (await sharedMap(tx, tenant.id, companyId))["gl.dimension"] ?? companyId },
+                select: { position: true, name: true },
+                orderBy: { position: "asc" },
+              })
+            : [],
         )
       ).map((d) => ({ slot: d.position, name: d.name }))
     : [];

@@ -14,6 +14,72 @@ export const SeqFormat = defineEdt({
 /** Objekty s automatickým číslováním — hodnoty doplní registr. */
 export const NumberedObject: EnumDef = { id: "NumberedObject", label: "@SYS:UsedFor", values: [] };
 
+/** Číselníky, které lze sdílet ve virtuální společnosti — hodnoty doplní registr (`ObjectDef.shareable`). */
+export const ShareableObject: EnumDef = { id: "ShareableObject", label: "@SYS:SharedObject", values: [] };
+
+/**
+ * Virtuální společnost (obdoba AX): skupina firem jednoho provozovatele, které
+ * sdílejí vybrané netransakční číselníky. Sdílená data leží ve skryté firmě
+ * (`holderCompanyId`, sys.company.virtual); doklady a transakce zůstávají ve firmách.
+ */
+export const virtualCompany = defineObject({
+  id: "sys.virtualCompany",
+  table: "sys_virtual_company",
+  label: "@SYS:VirtualCompany",
+  labelPlural: "@SYS:VirtualCompanies",
+  scope: "tenant",
+  adminOnly: true,
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    holderCompanyId: { edt: refEdt("sys.company", "@SYS:VirtualHolder"), readOnly: true },
+  },
+  titleField: "code",
+  list: ["code", "name"],
+  form: [{ label: "@SYS:General", fields: ["code", "name"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+  lines: [
+    { object: "sys.virtualMember", field: "virtualCompanyId", label: "@SYS:VirtualMembers" },
+    { object: "sys.virtualShare", field: "virtualCompanyId", label: "@SYS:VirtualShares" },
+  ],
+});
+
+export const virtualMember = defineObject({
+  id: "sys.virtualMember",
+  table: "sys_virtual_member",
+  label: "@SYS:VirtualMember",
+  labelPlural: "@SYS:VirtualMembers",
+  scope: "tenant",
+  adminOnly: true,
+  fields: {
+    virtualCompanyId: { edt: refEdt("sys.virtualCompany", "@SYS:VirtualCompany"), mandatory: true },
+    memberCompanyId: { edt: refEdt("sys.company", "@SYS:Company"), mandatory: true },
+  },
+  titleField: "memberCompanyId",
+  list: ["memberCompanyId"],
+  form: [{ label: "@SYS:General", fields: ["virtualCompanyId", "memberCompanyId"] }],
+  unique: [["virtualCompanyId", "memberCompanyId"]],
+  actions: [{ id: "detach", label: "@SYS:Detach" }],
+});
+
+export const virtualShare = defineObject({
+  id: "sys.virtualShare",
+  table: "sys_virtual_share",
+  label: "@SYS:VirtualShare",
+  labelPlural: "@SYS:VirtualShares",
+  scope: "tenant",
+  adminOnly: true,
+  fields: {
+    virtualCompanyId: { edt: refEdt("sys.virtualCompany", "@SYS:VirtualCompany"), mandatory: true },
+    objectId: { edt: enumEdt(ShareableObject), mandatory: true },
+  },
+  titleField: "objectId",
+  list: ["objectId"],
+  form: [{ label: "@SYS:General", fields: ["virtualCompanyId", "objectId"] }],
+  unique: [["virtualCompanyId", "objectId"]],
+});
+
 export const company = defineObject({
   id: "sys.company",
   table: "sys_company",
@@ -29,6 +95,8 @@ export const company = defineObject({
     vatPayer: { edt: Edts.NoYes, label: "@SYS:VatPayer", default: true },
     currency: { edt: Edts.CurrencyCode, mandatory: true, default: "CZK" },
     country: { edt: Edts.CountryCode, mandatory: true, default: "CZ" },
+    // nosič sdílených číselníků virtuální společnosti — ne pro doklady, v přepínači firem se neukazuje
+    virtual: { edt: Edts.NoYes, label: "@SYS:VirtualHolder", readOnly: true },
   },
   titleField: "name",
   list: ["code", "name", "regNo", "vatId", "currency"],
@@ -293,13 +361,13 @@ export default defineModule({
   icon: "Settings",
   core: true,
   dependsOn: [],
-  enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, BatchClass, BatchRecurrence, BatchStatus],
+  enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, ShareableObject, BatchClass, BatchRecurrence, BatchStatus],
   setup: sysSetup,
-  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun],
+  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare],
   menu: [
     {
       label: "@SYS:Setup",
-      items: [{ object: "sys.company" }, { object: "sys.numberSeq" }],
+      items: [{ object: "sys.company" }, { object: "sys.virtualCompany" }, { object: "sys.numberSeq" }],
     },
     { label: "@SYS:ModulesAndSetup", kind: "setup", items: [{ href: "/system/modules", label: "@SYS:Modules" }] },
     { label: "@SYS:Maintenance", kind: "functions", items: [{ href: "/system/setup", label: "@SYS:DefaultSetup" }, { object: "sys.batchJob" }, { object: "sys.batchRun" }] },
@@ -310,6 +378,18 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      VirtualHolder: "Virtuální (sdílená data)",
+      VirtualCompany: "Virtuální společnost",
+      VirtualCompanies: "Virtuální společnosti",
+      VirtualMember: "Firma ve virtuální společnosti",
+      VirtualMembers: "Firmy",
+      VirtualShare: "Sdílený číselník",
+      VirtualShares: "Sdílené číselníky",
+      SharedObject: "Číselník",
+      Detach: "Osamostatnit firmu",
+      ShareHasData: "Firma {company} už má vlastní záznamy „{object}“ — sdílet lze jen prázdný číselník (nebo nejdřív data převeďte).",
+      ShareConflict: "Firma {company} už sdílí „{object}“ v jiné virtuální společnosti.",
+      VirtualNotMember: "Virtuální firmu nelze přidat jako člena.",
       RoundingMethod: "Způsob zaokrouhlení hotovosti",
       RoundNearest: "Matematicky",
       RoundUp: "Nahoru",
@@ -600,6 +680,18 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      VirtualHolder: "Virtual (shared data)",
+      VirtualCompany: "Virtual company",
+      VirtualCompanies: "Virtual companies",
+      VirtualMember: "Company in virtual company",
+      VirtualMembers: "Companies",
+      VirtualShare: "Shared table",
+      VirtualShares: "Shared tables",
+      SharedObject: "Table",
+      Detach: "Detach company",
+      ShareHasData: "Company {company} already has its own “{object}” records — only an empty table can be shared (or convert the data first).",
+      ShareConflict: "Company {company} already shares “{object}” in another virtual company.",
+      VirtualNotMember: "A virtual company cannot be added as a member.",
       RoundingMethod: "Cash rounding method",
       RoundNearest: "Nearest",
       RoundUp: "Up",

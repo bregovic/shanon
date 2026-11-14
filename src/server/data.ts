@@ -34,6 +34,7 @@ import { fieldWhere, orderByFor } from "./filter-where";
 import { setupCompany } from "./setup";
 import { storageFor } from "./storage";
 import { SECRET_MASK, isEncrypted, sealSecret } from "./secrets";
+import { detachMember, virtualBeforeSave } from "./virtual";
 
 export interface Ctx {
   tenantId: string;
@@ -48,6 +49,11 @@ export interface Ctx {
   lang?: Lang;
   /** jméno uživatele (autor příspěvků) */
   userName?: string;
+  /**
+   * sdílené číselníky aktuální firmy: objekt → firma, ve které leží (virtuální
+   * společnost). Doplní inTenant; prázdné = vše vlastní.
+   */
+  shared?: Record<string, string>;
   /** aktivní finanční dimenze (pořadí → název) — popisky a viditelnost polí dim1…dim6 */
   dims?: { slot: number; name: string }[];
 }
@@ -133,8 +139,11 @@ function assertAccess(ctx: Ctx, def: ObjectDef, need: Exclude<Level, "none">, sy
   if (!system && !can(ctx.perms, def.id, need)) throw new UserError("@SYS:NoAccess");
 }
 
+/** Firma, ve které leží data objektu: vlastní, nebo virtuální společnost (sdílený číselník). */
+export const dataCompany = (ctx: Ctx, def: ObjectDef): string | null => (def.scope === "company" ? (ctx.shared?.[def.id] ?? ctx.companyId) : null);
+
 const scopeWhere = (ctx: Ctx, def: ObjectDef): RecordData =>
-  def.scope === "company" ? { tenantId: ctx.tenantId, companyId: ctx.companyId } : { tenantId: ctx.tenantId };
+  def.scope === "company" ? { tenantId: ctx.tenantId, companyId: dataCompany(ctx, def) } : { tenantId: ctx.tenantId };
 
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -329,6 +338,19 @@ export class Session {
     }
   }
 
+  /** Číslo z řady virtuální společnosti; chybí-li, založí ji podle řady firmy (pokračuje jejím číslem). */
+  async sharedNumber(holder: string, by: { usedFor: string; code: string }): Promise<string> {
+    const inHolder = new Session(this.tx, { ...this.ctx, companyId: holder, shared: {} }, true);
+    const has = await this.tx.sysNumberSeq.findFirst({ where: { tenantId: this.ctx.tenantId, companyId: holder, OR: [{ usedFor: by.usedFor }, { code: by.code }] } });
+    if (!has) {
+      const own = await this.tx.sysNumberSeq.findFirst({ where: { tenantId: this.ctx.tenantId, companyId: this.ctx.companyId!, OR: [{ usedFor: by.usedFor }, { code: by.code }] } });
+      await this.tx.sysNumberSeq.create({
+        data: { tenantId: this.ctx.tenantId, companyId: holder, code: own?.code ?? by.code, name: own?.name ?? by.code, format: own?.format ?? `${by.code}{#####}`, nextNumber: own?.nextNumber ?? 1, usedFor: by.usedFor },
+      });
+    }
+    return inHolder.nextNumber(by);
+  }
+
   /**
    * Další číslo řady. Pořadí hledání: konkrétní řada (id) → řada určená pro
    * objekt (Použití) → řada podle kódu (výchozí z definice objektu/modulu).
@@ -391,7 +413,11 @@ export class Session {
         }
       }
       if (def.numberSeq && !merged[def.numberSeq.field]) {
-        merged[def.numberSeq.field] = await this.nextNumber({ usedFor: def.id, code: def.numberSeq.seq });
+        // sdílený číselník číslují řady virtuální společnosti (jinak by se čísla firem srazila)
+        const holder = this.ctx.shared?.[def.id];
+        merged[def.numberSeq.field] = holder
+          ? await this.sharedNumber(holder, { usedFor: def.id, code: def.numberSeq.seq })
+          : await this.nextNumber({ usedFor: def.id, code: def.numberSeq.seq });
       }
       Object.assign(errors, missingMandatory(def, merged));
     } else {
@@ -407,6 +433,8 @@ export class Session {
       if (!target) errors[name] = "@SYS:InvalidValue";
     }
 
+    // virtuální společnosti (jádro: nosná firma, pravidla sdílení)
+    if (objectId.startsWith("sys.virtual") && !Object.keys(errors).length) await virtualBeforeSave(this, objectId, merged, isNew);
     const ectx = this.eventCtx(objectId);
     for (const h of handlersFor(this.ctx, objectId)) {
       const res = await h.beforeSave?.(ectx, merged, isNew);
@@ -424,7 +452,7 @@ export class Session {
             ...values,
             ext: merged.ext,
             tenantId: this.ctx.tenantId,
-            ...(def.scope === "company" ? { companyId: this.ctx.companyId } : {}),
+            ...(def.scope === "company" ? { companyId: dataCompany(this.ctx, def) } : {}),
             createdBy: this.ctx.userId,
             updatedBy: this.ctx.userId,
           },
@@ -446,7 +474,7 @@ export class Session {
     await this.audit(objectId, String(result.id), isNew ? "create" : "update", existing && maskSecrets(def, existing), maskSecrets(def, result));
     for (const h of handlersFor(this.ctx, objectId)) await h.afterSave?.(ectx, result, isNew);
     // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
-    if (isNew && def.id === "sys.company") {
+    if (isNew && def.id === "sys.company" && !result.virtual) {
       await setupCompany(new Session(this.tx, { ...this.ctx, companyId: String(result.id) }, true).api(), this.ctx.modules);
     }
     return result;
@@ -494,6 +522,8 @@ export class Session {
     const record = await this.sys().get(objectId, id);
     if (!record) throw new UserError("@SYS:NotFound");
     if (a.when && record[a.when.field] !== a.when.equals) throw new UserError("@SYS:Locked");
+    // osamostatnění firmy z virtuální společnosti (jádro: přímý přístup k datům všech firem)
+    if (objectId === "sys.virtualMember" && actionId === "detach") return detachMember(this, record);
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];
     if (!fn) throw new UserError("@SYS:InvalidValue");
     if (a.upload && !file) throw new UserError("@SYS:Required");
@@ -533,7 +563,21 @@ export class Session {
 // ---------------------------------------------------------------------------
 
 export function inTenant<T>(ctx: Ctx, fn: (s: Session) => Promise<T>, client?: PrismaClient): Promise<T> {
-  return withTenant(ctx.tenantId, (tx) => fn(new Session(tx, ctx)), client ?? prisma);
+  return withTenant(
+    ctx.tenantId,
+    async (tx) => fn(new Session(tx, ctx.shared || !ctx.companyId ? ctx : { ...ctx, shared: await sharedMap(tx, ctx.tenantId, ctx.companyId) })),
+    client ?? prisma,
+  );
+}
+
+/** Sdílené číselníky firmy: objekt → firma virtuální společnosti, kde leží. */
+export async function sharedMap(tx: Tx, tenantId: string, companyId: string): Promise<Record<string, string>> {
+  const members = await tx.sysVirtualMember.findMany({ where: { tenantId, memberCompanyId: companyId }, select: { virtualCompanyId: true } });
+  if (!members.length) return {};
+  const vcs = await tx.sysVirtualCompany.findMany({ where: { tenantId, id: { in: members.map((m) => m.virtualCompanyId) } }, select: { id: true, holderCompanyId: true } });
+  const shares = await tx.sysVirtualShare.findMany({ where: { tenantId, virtualCompanyId: { in: vcs.map((v) => v.id) } }, select: { virtualCompanyId: true, objectId: true } });
+  const holder = new Map(vcs.map((v) => [v.id, v.holderCompanyId]));
+  return Object.fromEntries(shares.filter((x) => holder.get(x.virtualCompanyId)).map((x) => [x.objectId, String(holder.get(x.virtualCompanyId))]));
 }
 
 /**
