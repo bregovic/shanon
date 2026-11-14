@@ -26,3 +26,6 @@ SYS-SECURITY;Uživatelé, firmy, role a oprávnění;Správa systému;fat;;Super
 SYS-UI;Ovládání aplikace;Správa systému;fat;;Hledání v menu (Ctrl+K), plocha modulu, Esc zpět, Moje nastavení.
 SYS-MODULES;Zapínání a vypínání modulů;Správa systému;fat;;Zapnutí s výchozím nastavením, vypnutí i se závislými, data zůstávají.
 QA;Testování a vývoj;Testování;fat;;Tato evidence: funkce, scénáře FAT/UAT, požadavky a chyby.
+INT-ISDOC;ISDOC – export a import faktur;Integrace;uat;;ISDOC 6.0.2 z vydané faktury, vložený do PDF; import .isdoc / .isdocx / PDF s ISDOC bez vytěžování.
+SYS-HELP;Nápověda k agendám;Správa systému;uat;;Návody krok za krokem (docs/help), stránka Nápověda, „?“ u modulů a formulářů, hledání Ctrl+K.
+INT-MAIL;Odesílání dokladů e-mailem;Integrace;uat;;Napojení pošty (SMTP, testovací schránka), Odeslaná pošta, Odeslat e-mailem na vydané faktuře a záloze (PDF s ISDOC).

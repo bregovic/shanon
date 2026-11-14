@@ -122,13 +122,15 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       /** výchozí účet pro platby (z bankovních účtů subjektu) */
       bankAccountId: { edt: refEdt("gab.bankAccount", "@GAB:BankAccount") },
       paymentMethodId: { edt: refEdt("bank.paymentMethod", "@TAX:PaymentMethod"), optionalRef: true },
+      /** kam posílat doklady e-mailem (prázdné = e-mail subjektu v adresáři) */
+      docEmail: { edt: Edts.Email, label: "@TAX:DocEmail" },
       blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
     },
     titleField: "accountNum",
     list: ["accountNum", "subjectId", "groupId", "currencyId", "paymentDays", "blocked"],
     form: [
       { label: "@SYS:General", fields: ["accountNum", "subjectId", "groupId", "blocked"] },
-      { label: L("Terms"), fields: ["currencyId", "paymentDays", "paymentMethodId", "bankAccountId"] },
+      { label: L("Terms"), fields: ["currencyId", "paymentDays", "paymentMethodId", "bankAccountId", "docEmail"] },
       { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
     unique: [["accountNum"], ["subjectId"]],
@@ -167,6 +169,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     /** uhrazená záloha partnera — odečte se při zaúčtování */
     advanceId: { edt: refEdt(id("advance"), L("Advance")) },
     advanceAmount: { edt: Edts.Amount, label: "@TAX:AdvanceDeducted", readOnly: true },
+    emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
   };
   const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "description", "orderId", "advanceId"];
   const invoice = defineObject({
@@ -181,7 +184,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     form: [
       { label: "@TAX:Header", fields: headerFields },
       { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs"] },
-      { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "advanceAmount", "paidAmount", "status", "voucherId"] },
+      { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "advanceAmount", "paidAmount", "status", "voucherId", ...(sp.side === 1 ? ["emailedAt"] : [])] },
     ],
     numberSeq: { field: "invoiceNum", seq: sp.invoiceSeq },
     defaultSort: { field: "invoiceDate", dir: "desc" },
@@ -189,7 +192,12 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     lines: [{ object: id("invoiceLine"), field: "invoiceId", label: "@TAX:Lines" }],
     actions: [
       { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
-      ...(sp.side === 1 ? [{ id: "isdoc", label: "@TAX:Isdoc", download: true, module: "prt" }] : []),
+      ...(sp.side === 1
+        ? [
+            { id: "isdoc", label: "@TAX:Isdoc", download: true, module: "prt" },
+            { id: "email", label: "@INT:SendByEmail", outside: true, module: "int", when: { field: "status", equals: "posted" } },
+          ]
+        : []),
     ],
     lockedWhen: { field: "status", equals: "posted" },
   });
@@ -343,7 +351,10 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     numberSeq: { field: "advanceNum", seq: sp.advanceSeq },
     related: [{ object: "tax.trans", field: "sourceId", label: "@TAX:VatShort" }],
     defaultSort: { field: "issueDate", dir: "desc" },
-    actions: [{ id: "cancel", label: "@TAX:CancelDoc", when: { field: "status", equals: "open" } }],
+    actions: [
+      { id: "cancel", label: "@TAX:CancelDoc", when: { field: "status", equals: "open" } },
+      ...(sp.side === 1 ? [{ id: "email", label: "@INT:SendByEmail", outside: true, module: "int" }] : []),
+    ],
     lockedWhen: { field: "status", equals: "settled" },
   });
 

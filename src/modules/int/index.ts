@@ -20,6 +20,7 @@ export const ConnKind = defineEnum({
     { value: "api", label: "@INT:KindApi" },
     { value: "service", label: "@INT:KindService" },
     { value: "ocr", label: "@INT:KindOcr" },
+    { value: "mail", label: "@INT:KindMail" },
   ],
 });
 
@@ -43,6 +44,8 @@ export const Driver = defineEnum({
     { value: "dphreg", label: "@INT:DrvDphreg" },
     { value: "openai", label: "@INT:DrvOpenai" },
     { value: "openaiTest", label: "@INT:DrvOpenaiTest" },
+    { value: "smtp", label: "@INT:DrvSmtp" },
+    { value: "mailTest", label: "@INT:DrvMailTest" },
   ],
 });
 
@@ -115,6 +118,24 @@ export const OcrDocType = defineEnum({
   ],
 });
 
+export const SmtpSecurity = defineEnum({
+  id: "IntSmtpSecurity",
+  label: "@INT:SmtpSecurity",
+  values: [
+    { value: "starttls", label: "@INT:SecStarttls" },
+    { value: "tls", label: "@INT:SecTls" },
+  ],
+});
+
+export const MailStatus = defineEnum({
+  id: "IntMailStatus",
+  label: "@GL:Status",
+  values: [
+    { value: "draft", label: "@INT:MailDraft", color: "informative" },
+    { value: "sent", label: "@INT:MailSent", color: "success" },
+  ],
+});
+
 export const LogStatus = defineEnum({
   id: "IntLogStatus",
   label: "@GL:Status",
@@ -136,6 +157,9 @@ const SUMUP = { field: "driver", in: ["sumup"] };
 const SERIAL = { field: "driver", in: ["escposSerial"] };
 const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
+const MAIL = { field: "kind", in: ["mail"] };
+const SMTP = { field: "driver", in: ["smtp"] };
+const Email = Str("MailAddress", "@INT:FromEmail", 254, /^[^\s@]+@[^\s@]+\.[^\s@]+$/, "@SYS:InvalidEmail");
 
 export const connection = defineObject({
   id: "int.connection",
@@ -182,6 +206,17 @@ export const connection = defineObject({
     model: { edt: Str("OcrModel", "@INT:Model", 60), visibleWhen: OCR },
     dailyLimit: { edt: Edts.Int, label: "@INT:DailyLimit", default: 50, visibleWhen: OCR },
     autoList: { edt: Edts.NoYes, label: "@INT:AutoList", visibleWhen: OCR },
+    // pošta (SMTP)
+    smtpHost: { edt: Str("SmtpHost", "@INT:SmtpHost", 200), visibleWhen: SMTP },
+    smtpPort: { edt: Edts.Int, label: "@INT:SmtpPort", default: 587, visibleWhen: SMTP },
+    smtpSecurity: { edt: enumEdt(SmtpSecurity), default: "starttls", visibleWhen: SMTP },
+    smtpUser: { edt: Str("SmtpUser", "@INT:SmtpUser", 200), visibleWhen: SMTP },
+    smtpPassword: { edt: Secret("SmtpPassword", "@INT:SmtpPassword"), secret: true, visibleWhen: SMTP },
+    fromEmail: { edt: Email, visibleWhen: MAIL },
+    fromName: { edt: Str("MailFromName", "@INT:FromName", 120), visibleWhen: MAIL },
+    replyTo: { edt: Str("MailReplyTo", "@INT:ReplyTo", 254), visibleWhen: MAIL },
+    bccSelf: { edt: Edts.NoYes, label: "@INT:BccSelf", visibleWhen: MAIL },
+    signature: { edt: Edts.Notes, label: "@INT:Signature", visibleWhen: MAIL },
     // stav
     lastCheckAt: { edt: Edts.TransDate, label: "@INT:LastCheck", readOnly: true },
     lastResult: { edt: Edts.Description, label: "@INT:LastResult", readOnly: true },
@@ -195,6 +230,7 @@ export const connection = defineObject({
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
     { label: "@INT:ApiSettings", fields: ["scopes", "tokenPrefix"], visibleWhen: API },
     { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "autoList"], visibleWhen: OCR },
+    { label: "@INT:MailSettings", fields: ["smtpHost", "smtpPort", "smtpSecurity", "smtpUser", "smtpPassword", "fromEmail", "fromName", "replyTo", "bccSelf", "signature"], visibleWhen: MAIL },
     { label: "@INT:State", fields: ["lastCheckAt", "lastResult"] },
   ],
   unique: [["code"]],
@@ -230,6 +266,39 @@ export const log = defineObject({
     { label: "@SYS:General", fields: ["connectionId", "operation", "status", "reference", "externalId", "message"] },
     { label: "@INT:Detail", fields: ["detail"] },
   ],
+});
+
+/** Odeslaná pošta: koncept → Odeslat; přílohy = přílohy záznamu (PDF dokladu s ISDOC). */
+export const mail = defineObject({
+  id: "int.mail",
+  table: "int_mail",
+  label: "@INT:Mail",
+  labelPlural: "@INT:Mails",
+  scope: "company",
+  fields: {
+    // povinné až při odeslání (koncept bez e-mailu partnera se doplní ručně)
+    mailTo: { edt: Str("MailTo", "@INT:MailTo", 500) },
+    mailCc: { edt: Str("MailCc", "@INT:MailCc", 500) },
+    subject: { edt: Str("MailSubject", "@INT:Subject", 250), mandatory: true },
+    body: { edt: Edts.Notes, label: "@INT:Body" },
+    status: { edt: enumEdt(MailStatus), mandatory: true, default: "draft", readOnly: true },
+    connectionId: { edt: refEdt("int.connection", "@INT:Connection") },
+    reference: { edt: Edts.Description, label: "@INT:Reference", readOnly: true },
+    sourceObject: { edt: Str("MailSourceObject", "@INT:ResultObject", 40), readOnly: true },
+    sourceId: { edt: Str("MailSourceId", "@INT:ResultObject", 36), readOnly: true },
+    sentAt: { edt: Edts.DateTime, label: "@INT:SentAt", readOnly: true },
+    messageId: { edt: Edts.Description, label: "@INT:ExternalId", readOnly: true },
+    error: { edt: Edts.Description, label: "@INT:MailError", readOnly: true },
+  },
+  titleField: "subject",
+  list: ["subject", "mailTo", "reference", "status", "sentAt", "error"],
+  form: [
+    { label: "@INT:Mail", fields: ["mailTo", "mailCc", "subject", "body"] },
+    { label: "@INT:State", fields: ["status", "connectionId", "reference", "sentAt", "messageId", "error"] },
+  ],
+  defaultSort: { field: "createdAt", dir: "desc" },
+  actions: [{ id: "send", label: "@INT:Send", outside: true, when: { field: "status", equals: "draft" } }],
+  lockedWhen: { field: "status", equals: "sent" },
 });
 
 const Text40 = Str("IntDocNum", "@INT:DocNumber", 40);
@@ -339,18 +408,63 @@ export default defineModule({
   description: "@INT:ModuleDesc",
   icon: "PlugConnected",
   dependsOn: ["sys"],
-  enums: [ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType],
-  objects: [connection, log, document, documentLine],
+  enums: [ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, SmtpSecurity, MailStatus],
+  objects: [connection, log, document, documentLine, mail],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
   menu: [
     { label: "@INT:Module", items: [{ object: "int.connection" }, { object: "int.log" }] },
     { label: "@INT:Documents", items: [{ object: "int.document" }] },
+    { label: "@INT:Mails", items: [{ object: "int.mail" }] },
     { label: "@INT:Documents", kind: "functions", items: [{ href: "/int/doc-import", label: "@INT:DocImport" }] },
     { label: "@INT:Testing", kind: "functions", items: [{ href: "/int/test-env", label: "@INT:TestEnv" }] },
   ],
   labels: {
     cs: {
+      KindMail: "Pošta (e-mail)",
+      DrvSmtp: "SMTP server",
+      DrvMailTest: "Testovací schránka (neodesílá)",
+      MailSettings: "Pošta",
+      SmtpHost: "Server SMTP",
+      SmtpPort: "Port",
+      SmtpSecurity: "Zabezpečení",
+      SecStarttls: "STARTTLS (port 587)",
+      SecTls: "SSL/TLS (port 465)",
+      SmtpUser: "Uživatel",
+      SmtpPassword: "Heslo",
+      FromEmail: "Odesílatel (e-mail)",
+      FromName: "Odesílatel (jméno)",
+      ReplyTo: "Odpovědi na",
+      BccSelf: "Kopie odesílateli",
+      Signature: "Podpis",
+      Mail: "E-mail",
+      Mails: "Odeslaná pošta",
+      MailTo: "Komu",
+      MailCc: "Kopie",
+      Subject: "Předmět",
+      Body: "Text",
+      MailDraft: "Koncept",
+      MailSent: "Odesláno",
+      SentAt: "Odesláno",
+      MailError: "Chyba odeslání",
+      Send: "Odeslat",
+      SendByEmail: "Odeslat e-mailem",
+      MailNoConnection: "Chybí aktivní napojení pošty (Integrace → Napojení, druh Pošta).",
+      MailNoFrom: "Doplňte v napojení pošty e-mail odesílatele.",
+      MailNoRecipient: "Doplňte příjemce (Komu).",
+      MailNoHost: "Doplňte v napojení pošty server SMTP.",
+      MailBadAddress: "Neplatná e-mailová adresa: {address}",
+      MailFailed: "Odeslání se nepodařilo: {reason}",
+      MailTestOk: "Server {host} přijímá přihlášení.",
+      MailTestSent: "Odesláno do testovací schránky (zpráva nikam neodešla).",
+      MailInvoiceSubject: "Faktura {num} – {company}",
+      MailInvoiceBody: "Dobrý den,\n\nv příloze posíláme fakturu {num} na částku {amount} {currency} se splatností {due}.\nFaktura obsahuje ISDOC pro načtení do účetnictví.\n\nS pozdravem\n{company}",
+      MailAdvanceSubject: "Zálohová faktura {num} – {company}",
+      MailAdvanceBody: "Dobrý den,\n\nv příloze posíláme zálohovou fakturu {num} na částku {amount} {currency} se splatností {due}.\n\nS pozdravem\n{company}",
+      MailTaxDocSubject: "Daňový doklad k přijaté platbě {num} – {company}",
+      MailTaxDocBody: "Dobrý den,\n\nv příloze posíláme daňový doklad k přijaté platbě zálohy {num}.\n\nS pozdravem\n{company}",
+      TestMail: "Testovací pošta",
+      TestEnvMail: "Pošta do testovací schránky – e-maily se jen zapíšou do protokolu, nikam neodejdou",
       IsdocInvalid: "Soubor není platný ISDOC.",
       DrvDphreg: "Registr plátců DPH",
       KindOcr: "Vytěžování dokladů",
@@ -558,6 +672,50 @@ export default defineModule({
       TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
+      KindMail: "Mail (e-mail)",
+      DrvSmtp: "SMTP server",
+      DrvMailTest: "Test mailbox (does not send)",
+      MailSettings: "Mail",
+      SmtpHost: "SMTP server",
+      SmtpPort: "Port",
+      SmtpSecurity: "Security",
+      SecStarttls: "STARTTLS (port 587)",
+      SecTls: "SSL/TLS (port 465)",
+      SmtpUser: "User",
+      SmtpPassword: "Password",
+      FromEmail: "Sender (e-mail)",
+      FromName: "Sender (name)",
+      ReplyTo: "Reply to",
+      BccSelf: "Copy to sender",
+      Signature: "Signature",
+      Mail: "E-mail",
+      Mails: "Sent mail",
+      MailTo: "To",
+      MailCc: "Cc",
+      Subject: "Subject",
+      Body: "Text",
+      MailDraft: "Draft",
+      MailSent: "Sent",
+      SentAt: "Sent",
+      MailError: "Sending error",
+      Send: "Send",
+      SendByEmail: "Send by e-mail",
+      MailNoConnection: "No active mail connection (Integration → Connections, kind Mail).",
+      MailNoFrom: "Fill in the sender e-mail in the mail connection.",
+      MailNoRecipient: "Fill in the recipient (To).",
+      MailNoHost: "Fill in the SMTP server in the mail connection.",
+      MailBadAddress: "Invalid e-mail address: {address}",
+      MailFailed: "Sending failed: {reason}",
+      MailTestOk: "Server {host} accepts the login.",
+      MailTestSent: "Sent to the test mailbox (the message did not leave).",
+      MailInvoiceSubject: "Invoice {num} – {company}",
+      MailInvoiceBody: "Hello,\n\nplease find attached invoice {num} for {amount} {currency}, due on {due}.\nThe invoice contains ISDOC for import into accounting.\n\nKind regards\n{company}",
+      MailAdvanceSubject: "Advance invoice {num} – {company}",
+      MailAdvanceBody: "Hello,\n\nplease find attached advance invoice {num} for {amount} {currency}, due on {due}.\n\nKind regards\n{company}",
+      MailTaxDocSubject: "Tax document for received payment {num} – {company}",
+      MailTaxDocBody: "Hello,\n\nplease find attached the tax document for the received advance payment {num}.\n\nKind regards\n{company}",
+      TestMail: "Test mail",
+      TestEnvMail: "Mail to a test mailbox – e-mails are only written to the log, nothing is sent",
       IsdocInvalid: "The file is not a valid ISDOC.",
       DrvDphreg: "VAT payer register",
       KindOcr: "Document capture",

@@ -17,6 +17,7 @@ import { delegateName } from "@/core/object";
 import {
   UserError,
   type ActionFile,
+  type ActionOutcome,
   type DataApi,
   type DownloadFile,
   type EventContext,
@@ -568,7 +569,7 @@ export class Session {
   }
 
   /** `checkOnly` = jen oprávnění a podmínky (akce mimo transakci, `src/server/outside.ts`) */
-  async action(objectId: string, id: string, actionId: string, file?: ActionFile, checkOnly = false): Promise<void> {
+  async action(objectId: string, id: string, actionId: string, file?: ActionFile, checkOnly = false): Promise<void | ActionOutcome> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system);
     const a = def.actions?.find((x) => x.id === actionId);
@@ -584,7 +585,7 @@ export class Session {
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];
     if (!fn) throw new UserError("@SYS:InvalidValue");
     if (a.upload && !file) throw new UserError("@SYS:Required");
-    await fn(this.eventCtx(objectId), record, file);
+    return fn(this.eventCtx(objectId), record, file);
   }
 
   /** Akce se souborem ke stažení — stačí právo číst záznam. */
@@ -691,7 +692,7 @@ export const deleteRecord = (ctx: Ctx, objectId: string, id: string, client?: Pr
 export const downloadFile = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.download(objectId, id, actionId), client);
 
-export async function runAction(ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile): Promise<void> {
+export async function runAction(ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile): Promise<void | ActionOutcome> {
   if (getObject(objectId).actions?.find((x) => x.id === actionId)?.outside) {
     // síť mimo transakci: oprávnění a podmínky ověří transakce, práci obsluha po krocích
     await inTenant(ctx, (s) => s.action(objectId, id, actionId, file, true), client);

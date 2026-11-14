@@ -193,6 +193,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   tisknou, mají `prt` v `dependsOn`. QR platba: `spayd()`, IBAN z čísla účtu `czIban()`.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
+- Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,
+  `src/server/mail.ts`): Odeslat e-mailem (akce `outside`) založí koncept `int.mail` s PDF dokladu
+  v přílohách a otevře ho (akce smí vrátit `ActionOutcome.open`); Odeslat pošle napojením druhu
+  „mail“, zapíše `int.log` a u faktury `emailedAt`. Příjemce = `docEmail` partnera, jinak e-mail subjektu.
 - Nápověda: návody `docs/help/*.md` (hlavička title, module, objects, order, summary),
   `src/server/help.ts` (vlastní převod Markdownu, odkazy jen `/…` a `http…`). Návod se ukáže
   v `/help`, v hledání Ctrl+K a jako „?“ u modulu a objektů z `objects`. Nová agenda = návod;

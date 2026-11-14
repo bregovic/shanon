@@ -17,6 +17,7 @@ summary: Od založení faktury přes zaúčtování po PDF s QR kódem a ISDOC.
 3. Přidejte **řádky**: vyberte položku (doplní popis, cenu, DPH a účet výnosů), nebo napište popis a cenu ručně. Částky a DPH se počítají samy.
 4. Zkontrolujte součty a dejte **Zaúčtovat**. Vznikne účetní doklad (311 / 604 / 343), otevřená položka v saldu a daňová transakce pro přiznání DPH.
 5. **Tisk** nebo **PDF** – faktura s QR platbou. PDF má v sobě vložený **ISDOC**, takže si ji odběratel načte do účetnictví sám. Samotný ISDOC stáhnete tlačítkem **ISDOC**.
+6. **Odeslat e-mailem** – připraví e-mail odběrateli s PDF v příloze; zkontrolujete a odešlete (viz [Odesílání faktur e-mailem](/help/posta)).
 
 > Tlačítky **Doklad HK** a **DPH** nahoře ověříte, co se zaúčtovalo.
 

@@ -245,6 +245,8 @@ export default defineModule({
   labels: {
     cs: {
       Isdoc: "ISDOC",
+      DocEmail: "E-mail pro doklady",
+      EmailedAt: "Odesláno e-mailem",
       AdvanceTaxDoc: "Daňový doklad k platbě",
       AdvanceTaxDate: "Datum přijetí platby (DUZP)",
       AdvanceVat: "DPH ze zálohy",
@@ -396,6 +398,8 @@ export default defineModule({
     },
     en: {
       Isdoc: "ISDOC",
+      DocEmail: "E-mail for documents",
+      EmailedAt: "Sent by e-mail",
       AdvanceTaxDoc: "Tax document for payment",
       AdvanceTaxDate: "Payment date (tax point)",
       AdvanceVat: "VAT on advance",

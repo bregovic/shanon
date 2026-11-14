@@ -275,6 +275,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
     start(async () => {
       const res = await runRecordAction(p.objectId, p.id!, actionId);
       if (!res.ok) setMessage({ intent: "error", text: res.message });
+      else if (res.data?.open) router.push(res.data.open);
       else {
         setMessage(undefined);
         router.refresh();

@@ -157,6 +157,11 @@ export class UserError extends Error {
   }
 }
 
+/** Výsledek akce: po doběhnutí otevřít záznam (např. vzniklý koncept e-mailu). */
+export interface ActionOutcome {
+  open?: { object: string; id: string };
+}
+
 export interface ObjectHandlers {
   /** může upravit data (dopočet polí) nebo vrátit chyby */
   beforeSave?: (ctx: EventContext, data: RecordData, isNew: boolean) => void | ValidationErrors | Promise<void | ValidationErrors>;
@@ -166,7 +171,7 @@ export interface ObjectHandlers {
   /** po smazání (např. přepočet součtů hlavičky dokladu) */
   afterDelete?: (ctx: EventContext, data: RecordData) => void | Promise<void>;
   /** akce nad záznamem (tlačítka ve formuláři), klíč = id akce z ObjectDef.actions */
-  actions?: Record<string, (ctx: EventContext, record: RecordData, file?: ActionFile) => Promise<void>>;
+  actions?: Record<string, (ctx: EventContext, record: RecordData, file?: ActionFile) => Promise<void | ActionOutcome>>;
   /** akce, které vrací soubor ke stažení (XML pro úřad, PDF…); klíč = id akce */
   downloads?: Record<string, (ctx: EventContext, record: RecordData) => Promise<DownloadFile>>;
 }

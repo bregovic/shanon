@@ -16,6 +16,8 @@ const TEST_CONNECTIONS = [
   { code: "TEST-PRINT", kind: "printer", driver: "browser", name: "@INT:TestPrint", extra: { paperWidth: "80" } },
   // vytěžování dokladů klíčem z prostředí serveru (do databáze se neukládá)
   { code: "TEST-OCR", kind: "ocr", driver: "openaiTest", name: "@INT:TestOcr", extra: { model: "gpt-5-mini", dailyLimit: 30 } },
+  // pošta jen do protokolu (nic neodchází)
+  { code: "TEST-MAIL", kind: "mail", driver: "mailTest", name: "@INT:TestMail", extra: { fromEmail: "test@shanon.local", fromName: "Shanon – test" } },
 ] as const;
 
 export interface TestEnvState {

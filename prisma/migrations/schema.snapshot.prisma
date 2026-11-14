@@ -293,6 +293,7 @@ model SysCompany {
   intLog_company                  IntLog[]               @relation("IntLog_company")
   intDocument_company             IntDocument[]          @relation("IntDocument_company")
   intDocumentLine_company         IntDocumentLine[]      @relation("IntDocumentLine_company")
+  intMail_company                 IntMail[]              @relation("IntMail_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1685,6 +1686,7 @@ model ArCustomer {
   paymentDays     Int?     @map("payment_days")
   bankAccountId   String?  @map("bank_account_id") @db.Uuid
   paymentMethodId String?  @map("payment_method_id") @db.Uuid
+  docEmail        String?  @map("doc_email") @db.VarChar(254)
   blocked         Boolean  @default(false)
   ext             Json     @default("{}")
   version         Int      @default(1)
@@ -1827,6 +1829,7 @@ model ArInvoice {
   orderId       String?   @map("order_id") @db.Uuid
   advanceId     String?   @map("advance_id") @db.Uuid
   advanceAmount Decimal?  @map("advance_amount") @db.Decimal(18, 2)
+  emailedAt     DateTime? @map("emailed_at")
   ext           Json      @default("{}")
   version       Int       @default(1)
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -2039,6 +2042,7 @@ model ApVendor {
   paymentDays     Int?     @map("payment_days")
   bankAccountId   String?  @map("bank_account_id") @db.Uuid
   paymentMethodId String?  @map("payment_method_id") @db.Uuid
+  docEmail        String?  @map("doc_email") @db.VarChar(254)
   blocked         Boolean  @default(false)
   ext             Json     @default("{}")
   version         Int      @default(1)
@@ -2186,6 +2190,7 @@ model ApInvoice {
   orderId       String?   @map("order_id") @db.Uuid
   advanceId     String?   @map("advance_id") @db.Uuid
   advanceAmount Decimal?  @map("advance_amount") @db.Decimal(18, 2)
+  emailedAt     DateTime? @map("emailed_at")
   ext           Json      @default("{}")
   version       Int       @default(1)
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -3271,6 +3276,16 @@ model IntConnection {
   model          String?   @db.VarChar(60)
   dailyLimit     Int?      @default(50) @map("daily_limit")
   autoList       Boolean   @default(false) @map("auto_list")
+  smtpHost       String?   @map("smtp_host") @db.VarChar(200)
+  smtpPort       Int?      @default(587) @map("smtp_port")
+  smtpSecurity   String?   @default("starttls") @map("smtp_security") @db.VarChar(40)
+  smtpUser       String?   @map("smtp_user") @db.VarChar(200)
+  smtpPassword   String?   @map("smtp_password") @db.VarChar(4000)
+  fromEmail      String?   @map("from_email") @db.VarChar(254)
+  fromName       String?   @map("from_name") @db.VarChar(120)
+  replyTo        String?   @map("reply_to") @db.VarChar(254)
+  bccSelf        Boolean   @default(false) @map("bcc_self")
+  signature      String?
   lastCheckAt    DateTime? @map("last_check_at") @db.Date
   lastResult     String?   @map("last_result") @db.VarChar(255)
   ext            Json      @default("{}")
@@ -3284,6 +3299,7 @@ model IntConnection {
   register               PosRegister?  @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
   intLog_connection      IntLog[]      @relation("IntLog_connection")
   intDocument_connection IntDocument[] @relation("IntDocument_connection")
+  intMail_connection     IntMail[]     @relation("IntMail_connection")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -3399,6 +3415,38 @@ model IntDocumentLine {
   @@index([tenantId, companyId])
   @@index([documentId])
   @@map("int_document_line")
+}
+
+/// int.mail — generováno z definice objektu
+model IntMail {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  mailTo       String?   @map("mail_to") @db.VarChar(500)
+  mailCc       String?   @map("mail_cc") @db.VarChar(500)
+  subject      String    @db.VarChar(250)
+  body         String?
+  status       String    @default("draft") @db.VarChar(40)
+  connectionId String?   @map("connection_id") @db.Uuid
+  reference    String?   @db.VarChar(255)
+  sourceObject String?   @map("source_object") @db.VarChar(40)
+  sourceId     String?   @map("source_id") @db.VarChar(36)
+  sentAt       DateTime? @map("sent_at")
+  messageId    String?   @map("message_id") @db.VarChar(255)
+  error        String?   @db.VarChar(255)
+  ext          Json      @default("{}")
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by") @db.Uuid
+
+  company    SysCompany     @relation("IntMail_company", fields: [companyId], references: [id], onDelete: Restrict)
+  connection IntConnection? @relation("IntMail_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([connectionId])
+  @@map("int_mail")
 }
 
 /// qa.feature — generováno z definice objektu

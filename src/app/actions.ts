@@ -279,12 +279,13 @@ export async function deleteRecordsAction(objectId: string, ids: string[]): Prom
   }
 }
 
-export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult> {
+export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult<{ open?: string } | undefined>> {
   const s = await requireSession();
   try {
-    await runAction(s.ctx, objectId, id, actionId);
+    const out = await runAction(s.ctx, objectId, id, actionId);
     revalidatePath(objectHref(objectId, id));
-    return { ok: true, data: undefined };
+    // akce může otevřít vzniklý záznam (koncept e-mailu…)
+    return { ok: true, data: out?.open ? { open: objectHref(out.open.object, out.open.id) } : undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

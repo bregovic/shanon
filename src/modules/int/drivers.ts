@@ -18,6 +18,7 @@ import {
 } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
 import { newToken } from "@/server/api-token";
+import { verifyMail } from "./mail";
 import { aresByIco } from "@/modules/gab/ares";
 import { viesLookup } from "@/modules/gab/registry-lookup";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
@@ -36,6 +37,7 @@ import {
 
 export const DRIVERS: Record<string, string[]> = {
   ocr: ["openai", "openaiTest"],
+  mail: ["smtp", "mailTest"],
   eet: ["eet2", "eetSimulator"],
   printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator"],
@@ -624,6 +626,19 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         }
         if (conn.driver === "eetSimulator")
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
+        if (conn.kind === "mail") {
+          try {
+            await verifyMail(conn);
+          } catch (e) {
+            const msg = e instanceof UserError ? ctx.t(e.label, e.params) : ctx.t("@INT:MailFailed", { reason: e instanceof Error ? e.message : String(e) });
+            await writeLog(ctx.data, conn, "mail.test", "error", { message: msg });
+            await setCheck(ctx.data, conn, msg);
+            throw new UserError("@INT:MailFailed", { reason: e instanceof UserError ? ctx.t(e.label, e.params) : e instanceof Error ? e.message : String(e) });
+          }
+          const msg = conn.driver === "mailTest" ? ctx.t("@INT:TestOk") : ctx.t("@INT:MailTestOk", { host: String(conn.smtpHost) });
+          await writeLog(ctx.data, conn, "mail.test", "ok", { message: msg });
+          return setCheck(ctx.data, conn, msg);
+        }
         if (conn.kind === "ocr") {
           const model = await testOpenAi(conn).catch(async (e) => {
             await writeLog(ctx.data, conn, "ocr.test", "error", { message: ctx.t((e as UserError).label ?? "@INT:StatusError", (e as UserError).params) });

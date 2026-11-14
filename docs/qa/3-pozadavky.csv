@@ -56,3 +56,6 @@ CR-054;change;Integrace: parametr sdílených rozhraní (veřejné služby zakl�
 CR-055;change;Striktní oddělení firem a virtuální společnosti (sdílené číselníky);SYS-SECURITY;critical;uat;55;"Adresář a dimenze po firmách; Správa systému → Virtuální společnosti: firmy + sdílené číselníky; Osamostatnit firmu zkopíruje data a přepojí doklady."
 CR-056;change;Daňový doklad k přijaté platbě zálohy (DPH ze zálohy, odpočet DPH na konečné faktuře);AR-INVOICE;high;new;57;Fronta: plátce DPH přiznává daň už z přijaté zálohy.
 CR-057;change;Sklad: sklady a lokace (až 6 vlastních úrovní), inventurní / vyřazovací / přesunový deník, rezervace objednávkou, výdej prodejem, příjemka nad nákupní objednávkou;INV-ITEMS;high;analysis;56;"Navazuje na CR-053 (objednávky); nákupní objednávky i přes OCR (CR-046)."
+CR-058;change;ISDOC: export vydané faktury, ISDOC v PDF, import ISDOC do dokladů ke zpracování;INT-ISDOC;medium;uat;58;Nasazeno 14.11.2026.
+CR-059;change;Nápověda: návody k agendám, „?“ u modulů a formulářů, Ctrl+K;SYS-HELP;medium;uat;59;Nasazeno 14.11.2026.
+CR-060;change;Odesílání dokladů e-mailem (SMTP v Integraci, Odeslaná pošta);INT-MAIL;high;uat;60;Faktura a záloha s PDF (faktura s ISDOC); hromadné odeslání a upomínky později.
