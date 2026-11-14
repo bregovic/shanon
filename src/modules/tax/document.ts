@@ -235,6 +235,8 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
 
   // odpočet zálohy: přijatá záloha 324 → pohledávka 311 (poskytnutá 314 → závazek 321)
   let advCur = BigInt(0);
+  let advTax = BigInt(0);
+  let advCode: RecordData | null = null;
   let adv: RecordData | null = null;
   if (cfg.advance && header.advanceId) {
     adv = await data.get(cfg.advance.object, String(header.advanceId));
@@ -246,7 +248,15 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
       const advAcc = conv(advCur);
       const advAccount = group[cfg.advance.groupAccountField] ?? (await postingAccount(data, cfg.advance.defaultAccount));
       if (!advAccount) throw new UserError("@TAX:AdvanceAccountMissing");
-      posting.push({ accountId: String(advAccount), amount: fromCents(s * advAcc), amountCur: fromCents(s * advCur), currencyId: curId, text: String(adv.advanceNum) });
+      // DPH už přiznaná ze zálohy: poměrná část se odečte (343 proti 324 / 314)
+      const advTaxAll = toCents(adv.taxAmount);
+      const paidAll = toCents(adv.paidAmount);
+      advTax = advTaxAll > BigInt(0) && paidAll > BigInt(0) ? (advTaxAll * advCur) / paidAll : BigInt(0);
+      posting.push({ accountId: String(advAccount), amount: fromCents(s * (advAcc - advTax)), amountCur: fromCents(s * (advCur - advTax)), currencyId: curId, text: String(adv.advanceNum) });
+      if (advTax > BigInt(0)) {
+        advCode = await data.get("tax.taxCode", String(adv.taxCodeId));
+        posting.push({ accountId: String(advCode!.accountId), amount: fromCents(s * advTax), amountCur: fromCents(s * advTax), currencyId: curId, text: String(adv.taxDocNum ?? adv.advanceNum) });
+      }
       posting.push({ accountId: String(group[cfg.groupSummaryField]), amount: fromCents(-s * advAcc), amountCur: fromCents(-s * advCur), currencyId: curId, text: String(adv.advanceNum) });
     }
   }
@@ -273,6 +283,26 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
       currencyId: curId,
       baseCur: fromCents(t.baseCur),
       taxCur: fromCents(t.taxCur),
+      subjectId: partner.subjectId ?? null,
+      vatId: subject?.vatId ?? null,
+      documentNum: docNum,
+      voucherId: voucher.id,
+      sourceObject: cfg.header,
+      sourceId: String(header.id),
+    });
+  }
+  // odpočet DPH zálohy v daňových transakcích (záporný základ a daň k DUZP faktury)
+  if (adv && advCode && advTax > BigInt(0)) {
+    const advBase = (toCents(adv.taxBase) * advCur) / toCents(adv.paidAmount);
+    await data.create("tax.trans", {
+      taxDate,
+      taxCodeId: advCode.id,
+      direction: advCode.direction,
+      base: fromCents(-advBase),
+      tax: fromCents(-advTax),
+      currencyId: curId,
+      baseCur: fromCents(-advBase),
+      taxCur: fromCents(-advTax),
       subjectId: partner.subjectId ?? null,
       vatId: subject?.vatId ?? null,
       documentNum: docNum,

@@ -800,7 +800,7 @@ describe("tiskové sestavy", () => {
     const { fillText } = await import("@/lib/print-render");
     const P = (await provisionTenant(client, { code: `t-prt-${run}`, name: "Prt", adminEmail: `prt-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "pos", "org"], company: { code: "P", name: "Tisk s.r.o." } })).ctx;
     const tpls = (await listRecords(P, "prt.template", {}, client)).rows.map((r) => [r.docType, r.paper, r.isDefault]);
-    expect(tpls.sort()).toEqual([["ar.invoice", "a4", true], ["pos.receipt", "receipt80", true]]);
+    expect(tpls.sort()).toEqual([["ar.advance", "a4", true], ["ar.invoice", "a4", true], ["pos.receipt", "receipt80", true]]);
     // bankovní účet firmy → QR platba na faktuře
     const [org] = (await listRecords(P, "org.entity", {}, client)).rows;
     await saveRecord(P, "org.entity", String(org.id), { bankAccount: "19-2000145399/0800" }, undefined, client);
@@ -812,6 +812,11 @@ describe("tiskové sestavy", () => {
     const job = await printJob(P, "ar.invoice", String(inv.id), null, client);
     const d = job.data as { doc: Record<string, unknown>; partner: Record<string, unknown>; lines: unknown[]; qr: string };
     expect([d.partner.name, d.lines.length, d.qr.startsWith("SPD*1.0*ACC:CZ6508000000192000145399*AM:")]).toEqual(["Restaurace U Lípy", 1, true]);
+    // QR platba se řídí transformací: vypnutá = bez QR
+    const [qrTr] = (await listRecords(P, "sys.transformation", { filter: { code: "SPAYD" } }, client)).rows;
+    await saveRecord(P, "sys.transformation", String(qrTr.id), { active: false }, undefined, client);
+    expect(((await printJob(P, "ar.invoice", String(inv.id), null, client)).data as { qr: string }).qr).toBe("");
+    await saveRecord(P, "sys.transformation", String(qrTr.id), { active: true }, undefined, client);
     expect(fillText("Faktura {doc.number} k úhradě {doc.due:money}", job.data, "cs-CZ")).toMatch(/^Faktura \S+ k úhradě 1\s210,00$/);
     // tisk bez práva číst doklad nejde
     await expect(printJob({ ...P, perms: { admin: false, levels: {} } }, "ar.invoice", String(inv.id), null, client)).rejects.toMatchObject({ label: "@SYS:NoAccess" });
@@ -1004,7 +1009,15 @@ describe("objednávky a zálohy", () => {
     let adv = (await getRecord(T, "ar.advance", String(adv0.id), client))!;
     expect([adv.paidAmount, adv.status]).toEqual(["500.00", "paid"]);
     const bal = async (num: string) => (await listRecords(T, "gl.trans", { filter: { accountId: await acc(num) }, totals: true }, client)).totals!.amount;
-    expect([await bal("221000"), await bal("324000")]).toEqual(["500.00", "-500.00"]);
+    // daňový doklad k platbě: DPH 21 % z 500 = 86,78 (324 / 343), daň na výstupu k datu platby
+    expect([await bal("221000"), await bal("324000"), await bal("343000")]).toEqual(["500.00", "-413.22", "-86.78"]);
+    expect([adv.taxDocNum, adv.taxBase, adv.taxAmount]).toEqual([expect.stringMatching(/^DZ26\d{5}$/), "413.22", "86.78"]);
+    const advTax = (await listRecords(T, "tax.trans", { filter: { sourceId: String(adv0.id) } }, client)).rows;
+    expect(advTax.map((t) => [t.base, t.tax, t.direction])).toEqual([["413.22", "86.78", "output"]]);
+    // tisk: po platbě daňový doklad k přijaté platbě s rekapitulací DPH
+    const { advancePrintable } = await import("@/modules/prt/printables");
+    const pd = await inTenant(T, (x) => advancePrintable.dataset(x.sys().api(), T.companyId, String(adv0.id)), client);
+    expect([(pd.doc as Record<string, unknown>).title, (pd.vat as Record<string, unknown>[])[0]]).toEqual(["DAŇOVÝ DOKLAD", { rate: "21", base: "413.22", tax: "86.78", gross: "500.00" }]);
 
     // faktura z objednávky: řádky zkopírované, záloha předvyplněná, při zaúčtování odečtená
     await runAction(T, "ar.order", String(order.id), "createInvoice", client);
@@ -1016,7 +1029,10 @@ describe("objednávky a zálohy", () => {
     await runAction(T, "ar.invoice", String(inv.id), "post", client);
     const posted = (await getRecord(T, "ar.invoice", String(inv.id), client))!;
     expect([posted.advanceAmount, posted.paidAmount]).toEqual(["500.00", "500.00"]);
-    expect([await bal("311000"), await bal("324000")]).toEqual(["710.00", "0.00"]);
+    // odpočet zálohy i s DPH: 324 a 311 vyrovnané, na 343 jen daň faktury (210)
+    expect([await bal("311000"), await bal("324000"), await bal("343000")]).toEqual(["710.00", "0.00", "-210.00"]);
+    const invTax = (await listRecords(T, "tax.trans", { filter: { sourceId: String(inv.id) } }, client)).rows;
+    expect(invTax.map((t) => [t.base, t.tax]).sort()).toEqual([["-413.22", "-86.78"], ["1000.00", "210.00"]]);
     adv = (await getRecord(T, "ar.advance", String(adv0.id), client))!;
     expect([adv.settledAmount, adv.status]).toEqual(["500.00", "settled"]);
     // saldo odběratele = 311 + 324

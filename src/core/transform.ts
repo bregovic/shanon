@@ -4,6 +4,8 @@
  * jako moduly; Správa systému → Transformace je jejich evidence (popis,
  * zapnutí) a platební metoda si z ní vybírá formát příkazu.
  */
+import { spayd } from "./print";
+
 export type TransformDirection = "export" | "import" | "print";
 export type TransformPurpose = "paymentOrder" | "bankStatement" | "paymentQr" | "barcode";
 
@@ -27,6 +29,16 @@ export const TRANSFORMS: TransformDef[] = [
 ];
 
 export const transformByCode = (code: unknown) => TRANSFORMS.find((t) => t.code === code) ?? null;
+
+/** Text QR platby podle transformace (dnes SPAYD — Short Payment Descriptor ČBA). */
+export function paymentQrText(code: string, p: Parameters<typeof spayd>[0]): string {
+  switch (code) {
+    case "SPAYD":
+      return spayd(p);
+    default:
+      return "";
+  }
+}
 
 /** Kontrolní číslice EAN-13 (z prvních 12 číslic). */
 export function ean13Check(digits12: string): number {

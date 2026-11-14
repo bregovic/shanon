@@ -199,6 +199,7 @@ describe("číselné řady a výchozí nastavení", () => {
       "APORD:ap.order",
       "APVEND:ap.vendor",
       "ARADV:ar.advance",
+      "ARADVT:null",
       "ARCUST:ar.customer",
       "ARINV:ar.invoice",
       "ARORD:ar.order",

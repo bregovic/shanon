@@ -20,7 +20,7 @@ import { invHandlers } from "@/modules/inv/handlers";
 import pos from "@/modules/pos";
 import cash from "@/modules/cash";
 import prt, { PrintDocType, prtHandlers } from "@/modules/prt";
-import { invoicePrintable, receiptPrintable } from "@/modules/prt/printables";
+import { advancePrintable, invoicePrintable, receiptPrintable } from "@/modules/prt/printables";
 import { cashHandlers } from "@/modules/cash/handlers";
 import { posHandlers } from "@/modules/pos/sale";
 import { basketHandlers } from "@/modules/pos/basket";
@@ -44,7 +44,7 @@ sys.jobs = rateJobs;
 gl.jobs = dimensionJobs;
 int.jobs = intJobs;
 // tisknutelné doklady (definice v Tiskových sestavách, data z modulu dokladu)
-ar.printables = [invoicePrintable];
+ar.printables = [invoicePrintable, advancePrintable];
 pos.printables = [receiptPrintable];
 PrintDocType.values = modules.flatMap((m) => (m.printables ?? []).map((p) => ({ value: p.id, label: p.label })));
 BatchClass.values = modules.flatMap((m) => (m.jobs ?? []).map((j) => ({ value: j.id, label: j.label })));

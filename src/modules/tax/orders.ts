@@ -109,6 +109,10 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
           if (!o || o[pf] !== d[pf]) return { orderId: "@TAX:AdvanceOtherPartner" };
         }
         if (isNew && !d.currencyId) d.currencyId = p.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
+        if (isNew && !d.taxCodeId && (await vatPayer(ctx.data))) {
+          const g = await ctx.data.get(cfg.groupObject, String(p.groupId));
+          d.taxCodeId = g?.taxCodeId ?? null;
+        }
         if (!d.vs && d[docs.vsSource]) {
           const digits = String(d[docs.vsSource]).replace(/\D/g, "").slice(-10);
           if (digits) d.vs = digits;
@@ -134,6 +138,75 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
  * položku „Záloha“ (otevřená, dokud ji konečná faktura nevyúčtuje).
  * `paidCur` = kladná částka v měně zálohy, `paidAcc` v účetní měně.
  */
+/** Je firma plátce DPH (Organizace; bez ní ano). */
+export async function vatPayer(data: DataApi): Promise<boolean> {
+  const [org] = await data.find("org.entity", {}, { take: 1 }).catch(() => [] as RecordData[]);
+  return org ? org.vatPayer !== false : true;
+}
+
+/** DPH obsažená v částce s daní (zaokrouhleno na haléře). */
+export function taxFromGross(gross: bigint, rate: unknown): bigint {
+  const r = BigInt(Math.round(Number(rate ?? 0) * 100)); // sazba ×100
+  if (r === BigInt(0)) return BigInt(0);
+  const num = gross * r;
+  const den = BigInt(10000) + r;
+  const q = num / den;
+  return (num % den) * BigInt(2) >= den ? q + BigInt(1) : q;
+}
+
+/**
+ * Daňový doklad k platbě zálohy: DPH z přijaté (poskytnuté) platby k datu platby.
+ * Odběratel: 324 MD / 343 D, daň na výstupu; dodavatel: 343 MD / 314 D, odpočet.
+ */
+async function advanceVat(data: DataApi, kind: "customer" | "vendor", a: RecordData, paidAcc: bigint, date: string) {
+  if (!a.taxCodeId || !(await vatPayer(data))) return;
+  const code = await data.get("tax.taxCode", String(a.taxCodeId));
+  if (!code || !Number(code.rate)) return;
+  const tax = taxFromGross(paidAcc, code.rate);
+  if (tax === BigInt(0)) return;
+  const s = kind === "customer" ? BigInt(1) : BigInt(-1);
+  const advAcc = await advanceAccount(data, kind, String(a.id));
+  const obj = kind === "customer" ? "ar.advance" : "ap.advance";
+  let docNum = (a.taxDocNum as string) || null;
+  if (!docNum && kind === "customer") docNum = await data.nextNumber("ARADVT");
+  docNum ??= String(a.externalNum ?? a.advanceNum);
+  const partner = await data.get(kind === "customer" ? "ar.customer" : "ap.vendor", String(a[`${kind}Id`]));
+  const subject = partner ? await data.get("gab.subject", String(partner.subjectId)) : null;
+  const { postVoucher } = await import("@/modules/gl/posting");
+  const v = await postVoucher(data, {
+    date,
+    description: `${docNum}${subject ? ` · ${subject.name}` : ""}`,
+    sourceObject: obj,
+    sourceId: String(a.id),
+    partner: (partner?.accountNum as string) ?? null,
+    lines: [
+      { accountId: advAcc, amount: fromCents(s * tax), text: docNum },
+      { accountId: String(code.accountId), amount: fromCents(-s * tax), text: docNum },
+    ],
+  });
+  await data.create("tax.trans", {
+    taxDate: date,
+    taxCodeId: code.id,
+    direction: code.direction,
+    base: fromCents(paidAcc - tax),
+    tax: fromCents(tax),
+    baseCur: fromCents(paidAcc - tax),
+    taxCur: fromCents(tax),
+    subjectId: partner?.subjectId ?? null,
+    vatId: subject?.vatId ?? null,
+    documentNum: docNum,
+    voucherId: v.id,
+    sourceObject: obj,
+    sourceId: String(a.id),
+  });
+  await data.update(obj, String(a.id), {
+    taxDocNum: docNum,
+    taxDate: a.taxDate ?? date,
+    taxBase: fromCents(toCents(a.taxBase) + paidAcc - tax),
+    taxAmount: fromCents(toCents(a.taxAmount) + tax),
+  });
+}
+
 export async function recordAdvancePayment(
   data: DataApi,
   kind: "customer" | "vendor",
@@ -162,6 +235,7 @@ export async function recordAdvancePayment(
     paidAmount: "0",
     closed: false,
   });
+  await advanceVat(data, kind, (await data.get(obj, advanceId))!, p.paidAcc, String(p.date).slice(0, 10));
 }
 
 /** Účet záloh partnera zálohy (ze skupiny, jinak první účet syntetiky 324 / 314). */

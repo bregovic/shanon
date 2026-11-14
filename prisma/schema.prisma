@@ -1305,9 +1305,11 @@ model TaxCode {
   arGroup_taxCode              ArGroup[]        @relation("ArGroup_taxCode")
   arOrderLine_taxCode          ArOrderLine[]    @relation("ArOrderLine_taxCode")
   arInvoiceLine_taxCode        ArInvoiceLine[]  @relation("ArInvoiceLine_taxCode")
+  arAdvance_taxCode            ArAdvance[]      @relation("ArAdvance_taxCode")
   apGroup_taxCode              ApGroup[]        @relation("ApGroup_taxCode")
   apOrderLine_taxCode          ApOrderLine[]    @relation("ApOrderLine_taxCode")
   apInvoiceLine_taxCode        ApInvoiceLine[]  @relation("ApInvoiceLine_taxCode")
+  apAdvance_taxCode            ApAdvance[]      @relation("ApAdvance_taxCode")
   cashVoucher_taxCode          CashVoucher[]    @relation("CashVoucher_taxCode")
   posReceiptLine_taxCode       PosReceiptLine[] @relation("PosReceiptLine_taxCode")
 
@@ -1899,6 +1901,11 @@ model ArAdvance {
   vs            String?   @db.VarChar(10)
   description   String?   @db.VarChar(255)
   amount        Decimal   @db.Decimal(18, 2)
+  taxCodeId     String?   @map("tax_code_id") @db.Uuid
+  taxDocNum     String?   @map("tax_doc_num") @db.VarChar(20)
+  taxDate       DateTime? @map("tax_date") @db.Date
+  taxBase       Decimal?  @map("tax_base") @db.Decimal(18, 2)
+  taxAmount     Decimal?  @map("tax_amount") @db.Decimal(18, 2)
   paidAmount    Decimal?  @map("paid_amount") @db.Decimal(18, 2)
   settledAmount Decimal?  @map("settled_amount") @db.Decimal(18, 2)
   status        String    @default("open") @db.VarChar(40)
@@ -1913,6 +1920,7 @@ model ArAdvance {
   customer                          ArCustomer          @relation("ArAdvance_customer", fields: [customerId], references: [id], onDelete: Restrict)
   order                             ArOrder?            @relation("ArAdvance_order", fields: [orderId], references: [id], onDelete: Restrict)
   currency                          SysCurrency?        @relation("ArAdvance_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxCode                           TaxCode?            @relation("ArAdvance_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   arInvoice_advance                 ArInvoice[]         @relation("ArInvoice_advance")
   arTrans_advance                   ArTrans[]           @relation("ArTrans_advance")
   bankStatementLine_customerAdvance BankStatementLine[] @relation("BankStatementLine_customerAdvance")
@@ -1921,6 +1929,7 @@ model ArAdvance {
   @@index([customerId])
   @@index([orderId])
   @@index([currencyId])
+  @@index([taxCodeId])
   @@map("ar_advance")
 }
 
@@ -2252,6 +2261,11 @@ model ApAdvance {
   vs            String?   @db.VarChar(10)
   description   String?   @db.VarChar(255)
   amount        Decimal   @db.Decimal(18, 2)
+  taxCodeId     String?   @map("tax_code_id") @db.Uuid
+  taxDocNum     String?   @map("tax_doc_num") @db.VarChar(20)
+  taxDate       DateTime? @map("tax_date") @db.Date
+  taxBase       Decimal?  @map("tax_base") @db.Decimal(18, 2)
+  taxAmount     Decimal?  @map("tax_amount") @db.Decimal(18, 2)
   paidAmount    Decimal?  @map("paid_amount") @db.Decimal(18, 2)
   settledAmount Decimal?  @map("settled_amount") @db.Decimal(18, 2)
   status        String    @default("open") @db.VarChar(40)
@@ -2266,6 +2280,7 @@ model ApAdvance {
   vendor                          ApVendor            @relation("ApAdvance_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
   order                           ApOrder?            @relation("ApAdvance_order", fields: [orderId], references: [id], onDelete: Restrict)
   currency                        SysCurrency?        @relation("ApAdvance_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxCode                         TaxCode?            @relation("ApAdvance_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   apInvoice_advance               ApInvoice[]         @relation("ApInvoice_advance")
   apTrans_advance                 ApTrans[]           @relation("ApTrans_advance")
   bankStatementLine_vendorAdvance BankStatementLine[] @relation("BankStatementLine_vendorAdvance")
@@ -2274,6 +2289,7 @@ model ApAdvance {
   @@index([vendorId])
   @@index([orderId])
   @@index([currencyId])
+  @@index([taxCodeId])
   @@map("ap_advance")
 }
 

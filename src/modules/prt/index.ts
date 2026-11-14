@@ -102,6 +102,9 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      DocAdvance: "Zálohová faktura / daňový doklad k platbě",
+      DocTitle: "Nadpis dokladu",
+      AdvanceNum: "Číslo zálohy",
       Pdf: "PDF",
       Module: "Tiskové sestavy",
       ModuleDesc: "Šablony faktur, účtenek a dalších dokladů, návrhář a tisk do PDF.",
@@ -200,6 +203,9 @@ export default defineModule({
       Back: "Zpět",
     },
     en: {
+      DocAdvance: "Advance invoice / tax document for payment",
+      DocTitle: "Document title",
+      AdvanceNum: "Advance number",
       Pdf: "PDF",
       Module: "Print layouts",
       ModuleDesc: "Templates for invoices, receipts and other documents, designer and PDF printing.",

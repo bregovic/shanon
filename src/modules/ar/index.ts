@@ -34,10 +34,12 @@ export default defineModule({
     { code: "ARINV", name: "@AR:Invoices", format: "FV{YY}{#####}", usedFor: "ar.invoice", continuous: true },
     { code: "ARORD", name: "@AR:Orders", format: "PO{YY}{#####}", usedFor: "ar.order" },
     { code: "ARADV", name: "@AR:Advances", format: "ZF{YY}{#####}", usedFor: "ar.advance" },
+    { code: "ARADVT", name: "@AR:AdvanceTaxDocs", format: "DZ{YY}{#####}", continuous: true },
   ],
   setup: ar.setup({ code: "TUZ", name: "Tuzemští odběratelé", summary: "311", line: "604", taxCode: "V21" }),
   labels: {
     cs: {
+      AdvanceTaxDocs: "Daňové doklady k přijatým platbám",
       Order: "Prodejní objednávka",
       Orders: "Prodejní objednávky",
       OrderRef: "Objednávka odběratele",
@@ -60,6 +62,7 @@ export default defineModule({
       TransPlural: "Saldo odběratelů",
     },
     en: {
+      AdvanceTaxDocs: "Tax documents for received payments",
       Order: "Sales order",
       Orders: "Sales orders",
       OrderRef: "Customer reference",

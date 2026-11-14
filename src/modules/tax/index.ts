@@ -244,6 +244,11 @@ export default defineModule({
   setup: taxSetup,
   labels: {
     cs: {
+      AdvanceTaxDoc: "Daňový doklad k platbě",
+      AdvanceTaxDate: "Datum přijetí platby (DUZP)",
+      AdvanceVat: "DPH ze zálohy",
+      AdvanceTaxText: "DPH z přijaté zálohy {num}",
+      AdvanceTaxSettle: "Odpočet DPH zálohy {num}",
       PaymentMethod: "Platební metoda",
       VatShort: "DPH",
       NoTaxCode: "Řádek „{line}“ nemá daňový kód — plátce DPH musí mít u každého řádku sazbu (i 0 %).",
@@ -389,6 +394,11 @@ export default defineModule({
       Closed: "Vyrovnáno",
     },
     en: {
+      AdvanceTaxDoc: "Tax document for payment",
+      AdvanceTaxDate: "Payment date (tax point)",
+      AdvanceVat: "VAT on advance",
+      AdvanceTaxText: "VAT on received advance {num}",
+      AdvanceTaxSettle: "Advance VAT deduction {num}",
       PaymentMethod: "Payment method",
       VatShort: "VAT",
       NoTaxCode: "Line “{line}” has no tax code — a VAT payer needs a rate on every line (0 % included).",

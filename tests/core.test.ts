@@ -116,12 +116,12 @@ describe("evidence testování (docs/qa)", () => {
 describe("PDF sestavy", () => {
   it("faktura do PDF: písmo s diakritikou, QR, stránkování dlouhé tabulky; neupravená stará šablona se převede", async () => {
     const { renderPdf } = await import("@/server/print-pdf");
-    const { invoicePrintable, legacyInvoiceLayout, invoiceLayoutV1 } = await import("@/modules/prt/printables");
+    const { invoicePrintable, legacyInvoiceLayout, invoiceLayoutV1, invoiceLayoutV2 } = await import("@/modules/prt/printables");
     const lines = Array.from({ length: 60 }, (_, i) => ({ description: `Uzená krkovice ${i}`, qty: "1", unit: "kg", unitPrice: "100", rate: "12", net: "100", tax: "12", gross: "112" }));
     const pdf = await renderPdf(invoicePrintable.defaultLayout(), { company: { name: "Žluťoučký kůň" }, doc: { number: "FV1", due: "6720" }, partner: {}, lines, vat: [], qr: "SPD*1.0*ACC:CZ6501000000000123456789*AM:10.00*CC:CZK" });
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     // víc stránek (60 řádků se na A4 nevejde)
     expect((pdf.toString("latin1").match(/\/Type \/Page\b/g) ?? []).length).toBeGreaterThan(1);
-    expect(invoicePrintable.legacyLayouts?.map((l) => JSON.stringify(l))).toEqual([JSON.stringify(legacyInvoiceLayout()), JSON.stringify(invoiceLayoutV1())]);
+    expect(invoicePrintable.legacyLayouts?.map((l) => JSON.stringify(l))).toEqual([JSON.stringify(legacyInvoiceLayout()), JSON.stringify(invoiceLayoutV1()), JSON.stringify(invoiceLayoutV2())]);
   });
 });
