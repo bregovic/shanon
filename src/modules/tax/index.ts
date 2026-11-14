@@ -244,6 +244,10 @@ export default defineModule({
   setup: taxSetup,
   labels: {
     cs: {
+      Warehouse: "Sklad",
+      Receive: "Přijmout na sklad",
+      Receipts: "Příjemky",
+      DeliveredQty: "Dodáno",
       KindAdvance: "Záloha",
       OrderStatus: "Stav",
       OrderOpen: "Otevřená",
@@ -382,6 +386,10 @@ export default defineModule({
       Closed: "Vyrovnáno",
     },
     en: {
+      Warehouse: "Warehouse",
+      Receive: "Receive into stock",
+      Receipts: "Receipts",
+      DeliveredQty: "Delivered",
       KindAdvance: "Advance",
       OrderStatus: "Status",
       OrderOpen: "Open",

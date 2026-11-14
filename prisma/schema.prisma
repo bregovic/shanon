@@ -275,6 +275,14 @@ model SysCompany {
   posBox_company                  PosBox[]            @relation("PosBox_company")
   posBasket_company               PosBasket[]         @relation("PosBasket_company")
   posBasketLine_company           PosBasketLine[]     @relation("PosBasketLine_company")
+  whsLocationLevel_company        WhsLocationLevel[]  @relation("WhsLocationLevel_company")
+  whsWarehouse_company            WhsWarehouse[]      @relation("WhsWarehouse_company")
+  whsLocation_company             WhsLocation[]       @relation("WhsLocation_company")
+  whsOnhand_company               WhsOnhand[]         @relation("WhsOnhand_company")
+  whsTrans_company                WhsTrans[]          @relation("WhsTrans_company")
+  whsReservation_company          WhsReservation[]    @relation("WhsReservation_company")
+  whsJournal_company              WhsJournal[]        @relation("WhsJournal_company")
+  whsJournalLine_company          WhsJournalLine[]    @relation("WhsJournalLine_company")
   intConnection_company           IntConnection[]     @relation("IntConnection_company")
   intLog_company                  IntLog[]            @relation("IntLog_company")
   intDocument_company             IntDocument[]       @relation("IntDocument_company")
@@ -656,7 +664,8 @@ model OrgSite {
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?  @map("updated_by") @db.Uuid
 
-  company SysCompany @relation("OrgSite_company", fields: [companyId], references: [id], onDelete: Restrict)
+  company           SysCompany     @relation("OrgSite_company", fields: [companyId], references: [id], onDelete: Restrict)
+  whsWarehouse_site WhsWarehouse[] @relation("WhsWarehouse_site")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -1531,6 +1540,10 @@ model InvItem {
   apInvoiceLine_item  ApInvoiceLine[]  @relation("ApInvoiceLine_item")
   posReceiptLine_item PosReceiptLine[] @relation("PosReceiptLine_item")
   posBasketLine_item  PosBasketLine[]  @relation("PosBasketLine_item")
+  whsOnhand_item      WhsOnhand[]      @relation("WhsOnhand_item")
+  whsTrans_item       WhsTrans[]       @relation("WhsTrans_item")
+  whsReservation_item WhsReservation[] @relation("WhsReservation_item")
+  whsJournalLine_item WhsJournalLine[] @relation("WhsJournalLine_item")
 
   @@unique([tenantId, companyId, itemNum])
   @@index([tenantId, companyId])
@@ -1670,6 +1683,7 @@ model ArOrder {
   customerId   String    @map("customer_id") @db.Uuid
   orderDate    DateTime  @default(now()) @map("order_date") @db.Date
   deliveryDate DateTime? @map("delivery_date") @db.Date
+  warehouseId  String?   @map("warehouse_id") @db.Uuid
   currencyId   String?   @map("currency_id") @db.Uuid
   description  String?   @db.VarChar(255)
   amountNet    Decimal?  @map("amount_net") @db.Decimal(18, 2)
@@ -1686,6 +1700,7 @@ model ArOrder {
 
   company           SysCompany    @relation("ArOrder_company", fields: [companyId], references: [id], onDelete: Restrict)
   customer          ArCustomer    @relation("ArOrder_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  warehouse         WhsWarehouse? @relation("ArOrder_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
   currency          SysCurrency?  @relation("ArOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   invoice           ArInvoice?    @relation("ArOrder_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
   arOrderLine_order ArOrderLine[] @relation("ArOrderLine_order")
@@ -1694,6 +1709,7 @@ model ArOrder {
 
   @@index([tenantId, companyId])
   @@index([customerId])
+  @@index([warehouseId])
   @@index([currencyId])
   @@index([invoiceId])
   @@map("ar_order")
@@ -1720,6 +1736,7 @@ model ArOrderLine {
   dim6             String?  @db.VarChar(20)
   amountNet        Decimal? @map("amount_net") @db.Decimal(18, 2)
   taxAmount        Decimal? @map("tax_amount") @db.Decimal(18, 2)
+  deliveredQty     Decimal? @map("delivered_qty") @db.Decimal(18, 4)
   ext              Json     @default("{}")
   version          Int      @default(1)
   createdAt        DateTime @default(now()) @map("created_at")
@@ -2011,6 +2028,7 @@ model ApOrder {
   vendorId     String    @map("vendor_id") @db.Uuid
   orderDate    DateTime  @default(now()) @map("order_date") @db.Date
   deliveryDate DateTime? @map("delivery_date") @db.Date
+  warehouseId  String?   @map("warehouse_id") @db.Uuid
   currencyId   String?   @map("currency_id") @db.Uuid
   description  String?   @db.VarChar(255)
   amountNet    Decimal?  @map("amount_net") @db.Decimal(18, 2)
@@ -2025,16 +2043,19 @@ model ApOrder {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?   @map("updated_by") @db.Uuid
 
-  company           SysCompany    @relation("ApOrder_company", fields: [companyId], references: [id], onDelete: Restrict)
-  vendor            ApVendor      @relation("ApOrder_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
-  currency          SysCurrency?  @relation("ApOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  invoice           ApInvoice?    @relation("ApOrder_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
-  apOrderLine_order ApOrderLine[] @relation("ApOrderLine_order")
-  apInvoice_order   ApInvoice[]   @relation("ApInvoice_order")
-  apAdvance_order   ApAdvance[]   @relation("ApAdvance_order")
+  company                  SysCompany    @relation("ApOrder_company", fields: [companyId], references: [id], onDelete: Restrict)
+  vendor                   ApVendor      @relation("ApOrder_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  warehouse                WhsWarehouse? @relation("ApOrder_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+  currency                 SysCurrency?  @relation("ApOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  invoice                  ApInvoice?    @relation("ApOrder_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  apOrderLine_order        ApOrderLine[] @relation("ApOrderLine_order")
+  apInvoice_order          ApInvoice[]   @relation("ApInvoice_order")
+  apAdvance_order          ApAdvance[]   @relation("ApAdvance_order")
+  whsJournal_purchaseOrder WhsJournal[]  @relation("WhsJournal_purchaseOrder")
 
   @@index([tenantId, companyId])
   @@index([vendorId])
+  @@index([warehouseId])
   @@index([currencyId])
   @@index([invoiceId])
   @@map("ap_order")
@@ -2061,6 +2082,7 @@ model ApOrderLine {
   dim6             String?  @db.VarChar(20)
   amountNet        Decimal? @map("amount_net") @db.Decimal(18, 2)
   taxAmount        Decimal? @map("tax_amount") @db.Decimal(18, 2)
+  deliveredQty     Decimal? @map("delivered_qty") @db.Decimal(18, 4)
   ext              Json     @default("{}")
   version          Int      @default(1)
   createdAt        DateTime @default(now()) @map("created_at")
@@ -2068,12 +2090,13 @@ model ApOrderLine {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company        SysCompany @relation("ApOrderLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  order          ApOrder    @relation("ApOrderLine_order", fields: [orderId], references: [id], onDelete: Restrict)
-  item           InvItem?   @relation("ApOrderLine_item", fields: [itemId], references: [id], onDelete: Restrict)
-  unit           InvUnit?   @relation("ApOrderLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
-  expenseAccount GlAccount? @relation("ApOrderLine_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
-  taxCode        TaxCode?   @relation("ApOrderLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  company                  SysCompany       @relation("ApOrderLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  order                    ApOrder          @relation("ApOrderLine_order", fields: [orderId], references: [id], onDelete: Restrict)
+  item                     InvItem?         @relation("ApOrderLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit                     InvUnit?         @relation("ApOrderLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  expenseAccount           GlAccount?       @relation("ApOrderLine_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  taxCode                  TaxCode?         @relation("ApOrderLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  whsJournalLine_orderLine WhsJournalLine[] @relation("WhsJournalLine_orderLine")
 
   @@index([tenantId, companyId])
   @@index([orderId])
@@ -2457,6 +2480,7 @@ model PosRegister {
   code          String   @db.VarChar(20)
   name          String   @db.VarChar(120)
   template      String   @default("counter") @db.VarChar(40)
+  warehouseId   String?  @map("warehouse_id") @db.Uuid
   cashAccountId String   @map("cash_account_id") @db.Uuid
   cardAccountId String   @map("card_account_id") @db.Uuid
   receiptFooter String?  @map("receipt_footer") @db.VarChar(255)
@@ -2469,6 +2493,7 @@ model PosRegister {
   updatedBy     String?  @map("updated_by") @db.Uuid
 
   company                SysCompany      @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
+  warehouse              WhsWarehouse?   @relation("PosRegister_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
   cashAccount            GlAccount       @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
   cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
   posShift_register      PosShift[]      @relation("PosShift_register")
@@ -2478,6 +2503,7 @@ model PosRegister {
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
+  @@index([warehouseId])
   @@index([cashAccountId])
   @@index([cardAccountId])
   @@map("pos_register")
@@ -2679,6 +2705,258 @@ model PosBasketLine {
   @@index([basketId])
   @@index([itemId])
   @@map("pos_basket_line")
+}
+
+/// whs.locationLevel — generováno z definice objektu
+model WhsLocationLevel {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  position  Int
+  name      String   @db.VarChar(120)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("WhsLocationLevel_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, position])
+  @@index([tenantId, companyId])
+  @@map("whs_location_level")
+}
+
+/// whs.warehouse — generováno z definice objektu
+model WhsWarehouse {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  siteId    String?  @map("site_id") @db.Uuid
+  isDefault Boolean  @default(false) @map("is_default")
+  blocked   Boolean  @default(false)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company                  SysCompany       @relation("WhsWarehouse_company", fields: [companyId], references: [id], onDelete: Restrict)
+  site                     OrgSite?         @relation("WhsWarehouse_site", fields: [siteId], references: [id], onDelete: Restrict)
+  arOrder_warehouse        ArOrder[]        @relation("ArOrder_warehouse")
+  apOrder_warehouse        ApOrder[]        @relation("ApOrder_warehouse")
+  posRegister_warehouse    PosRegister[]    @relation("PosRegister_warehouse")
+  whsLocation_warehouse    WhsLocation[]    @relation("WhsLocation_warehouse")
+  whsOnhand_warehouse      WhsOnhand[]      @relation("WhsOnhand_warehouse")
+  whsTrans_warehouse       WhsTrans[]       @relation("WhsTrans_warehouse")
+  whsReservation_warehouse WhsReservation[] @relation("WhsReservation_warehouse")
+  whsJournal_warehouse     WhsJournal[]     @relation("WhsJournal_warehouse")
+  whsJournal_toWarehouse   WhsJournal[]     @relation("WhsJournal_toWarehouse")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([siteId])
+  @@map("whs_warehouse")
+}
+
+/// whs.location — generováno z definice objektu
+model WhsLocation {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  warehouseId String   @map("warehouse_id") @db.Uuid
+  parentId    String?  @map("parent_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  path        String?  @db.VarChar(120)
+  name        String?  @db.VarChar(120)
+  level       Int?
+  levelName   String?  @map("level_name") @db.VarChar(120)
+  blocked     Boolean  @default(false)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company                   SysCompany       @relation("WhsLocation_company", fields: [companyId], references: [id], onDelete: Restrict)
+  warehouse                 WhsWarehouse     @relation("WhsLocation_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+  parent                    WhsLocation?     @relation("WhsLocation_parent", fields: [parentId], references: [id], onDelete: Restrict)
+  whsLocation_parent        WhsLocation[]    @relation("WhsLocation_parent")
+  whsOnhand_location        WhsOnhand[]      @relation("WhsOnhand_location")
+  whsTrans_location         WhsTrans[]       @relation("WhsTrans_location")
+  whsJournalLine_location   WhsJournalLine[] @relation("WhsJournalLine_location")
+  whsJournalLine_toLocation WhsJournalLine[] @relation("WhsJournalLine_toLocation")
+
+  @@unique([tenantId, companyId, warehouseId, path])
+  @@index([tenantId, companyId])
+  @@index([warehouseId])
+  @@index([parentId])
+  @@map("whs_location")
+}
+
+/// whs.onhand — generováno z definice objektu
+model WhsOnhand {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  itemId      String   @map("item_id") @db.Uuid
+  warehouseId String   @map("warehouse_id") @db.Uuid
+  locationId  String?  @map("location_id") @db.Uuid
+  qty         Decimal  @default(0) @db.Decimal(18, 4)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company   SysCompany   @relation("WhsOnhand_company", fields: [companyId], references: [id], onDelete: Restrict)
+  item      InvItem      @relation("WhsOnhand_item", fields: [itemId], references: [id], onDelete: Restrict)
+  warehouse WhsWarehouse @relation("WhsOnhand_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+  location  WhsLocation? @relation("WhsOnhand_location", fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([itemId])
+  @@index([warehouseId])
+  @@index([locationId])
+  @@map("whs_onhand")
+}
+
+/// whs.trans — generováno z definice objektu
+model WhsTrans {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  date         DateTime @db.Date
+  kind         String   @db.VarChar(40)
+  itemId       String   @map("item_id") @db.Uuid
+  warehouseId  String   @map("warehouse_id") @db.Uuid
+  locationId   String?  @map("location_id") @db.Uuid
+  qty          Decimal  @db.Decimal(18, 4)
+  documentNum  String?  @map("document_num") @db.VarChar(255)
+  sourceObject String?  @map("source_object") @db.VarChar(40)
+  sourceId     String?  @map("source_id") @db.VarChar(36)
+  reason       String?  @db.VarChar(255)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company   SysCompany   @relation("WhsTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
+  item      InvItem      @relation("WhsTrans_item", fields: [itemId], references: [id], onDelete: Restrict)
+  warehouse WhsWarehouse @relation("WhsTrans_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+  location  WhsLocation? @relation("WhsTrans_location", fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([itemId])
+  @@index([warehouseId])
+  @@index([locationId])
+  @@map("whs_trans")
+}
+
+/// whs.reservation — generováno z definice objektu
+model WhsReservation {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  itemId       String   @map("item_id") @db.Uuid
+  warehouseId  String   @map("warehouse_id") @db.Uuid
+  qty          Decimal  @db.Decimal(18, 4)
+  documentNum  String?  @map("document_num") @db.VarChar(255)
+  sourceObject String?  @map("source_object") @db.VarChar(40)
+  sourceId     String?  @map("source_id") @db.VarChar(36)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company   SysCompany   @relation("WhsReservation_company", fields: [companyId], references: [id], onDelete: Restrict)
+  item      InvItem      @relation("WhsReservation_item", fields: [itemId], references: [id], onDelete: Restrict)
+  warehouse WhsWarehouse @relation("WhsReservation_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([itemId])
+  @@index([warehouseId])
+  @@map("whs_reservation")
+}
+
+/// whs.journal — generováno z definice objektu
+model WhsJournal {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  journalNum      String   @map("journal_num") @db.VarChar(20)
+  kind            String   @default("receipt") @db.VarChar(40)
+  warehouseId     String   @map("warehouse_id") @db.Uuid
+  toWarehouseId   String?  @map("to_warehouse_id") @db.Uuid
+  date            DateTime @default(now()) @db.Date
+  description     String?  @db.VarChar(255)
+  purchaseOrderId String?  @map("purchase_order_id") @db.Uuid
+  status          String   @default("draft") @db.VarChar(40)
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  company                SysCompany       @relation("WhsJournal_company", fields: [companyId], references: [id], onDelete: Restrict)
+  warehouse              WhsWarehouse     @relation("WhsJournal_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+  toWarehouse            WhsWarehouse?    @relation("WhsJournal_toWarehouse", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+  purchaseOrder          ApOrder?         @relation("WhsJournal_purchaseOrder", fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  whsJournalLine_journal WhsJournalLine[] @relation("WhsJournalLine_journal")
+
+  @@index([tenantId, companyId])
+  @@index([warehouseId])
+  @@index([toWarehouseId])
+  @@index([purchaseOrderId])
+  @@map("whs_journal")
+}
+
+/// whs.journalLine — generováno z definice objektu
+model WhsJournalLine {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  journalId    String   @map("journal_id") @db.Uuid
+  itemId       String   @map("item_id") @db.Uuid
+  locationId   String?  @map("location_id") @db.Uuid
+  toLocationId String?  @map("to_location_id") @db.Uuid
+  qty          Decimal? @db.Decimal(18, 4)
+  onhandQty    Decimal? @map("onhand_qty") @db.Decimal(18, 4)
+  countedQty   Decimal? @map("counted_qty") @db.Decimal(18, 4)
+  reason       String?  @db.VarChar(255)
+  orderLineId  String?  @map("order_line_id") @db.Uuid
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company    SysCompany   @relation("WhsJournalLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journal    WhsJournal   @relation("WhsJournalLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
+  item       InvItem      @relation("WhsJournalLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  location   WhsLocation? @relation("WhsJournalLine_location", fields: [locationId], references: [id], onDelete: Restrict)
+  toLocation WhsLocation? @relation("WhsJournalLine_toLocation", fields: [toLocationId], references: [id], onDelete: Restrict)
+  orderLine  ApOrderLine? @relation("WhsJournalLine_orderLine", fields: [orderLineId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([journalId])
+  @@index([itemId])
+  @@index([locationId])
+  @@index([toLocationId])
+  @@index([orderLineId])
+  @@map("whs_journal_line")
 }
 
 /// int.connection — generováno z definice objektu

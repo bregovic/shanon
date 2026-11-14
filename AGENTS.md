@@ -119,6 +119,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   podle obou; import přijme i „kód · název“.
 - PDF sestav na serveru: `src/server/print-pdf.ts` (pdfkit, DejaVu Sans), `/api/pdf/<doklad>/<id>`;
   prvky pod tabulkou řádků drží navrženou pozici a posunou se jen při přetečení.
+- Sklad (`src/modules/whs`): pohyb jen přes `move()` (whs.trans + whs.onhand v jednom),
+  lokace stromem (úroveň = nadřazená + 1, max. podle `whs.locationLevel`, cesta A.01.R1.3),
+  deníky příjemka/inventura/vyřazení/přesun; napojení obsluhami na cizí objekty (ar.order
+  rezervace, ar.invoice výdej, ap.invoice bez objednávky příjem, ap.order Přijmout na sklad,
+  pos.receiptLine výdej) s kontrolou `ctx.modules`. Prodej smí do mínusu, deníky ne.
+  Zatím množstevně (ocenění a účtování zásob později).
 - Číselné řady modulu se v jeho Nastavení ukážou samy (z `numberSeqs`, odkaz
   `?filter.usedFor=<modul>.*`). Seznam objektu umí filtr z odkazu `?filter.<pole>=<výraz>`.
 - Odkaz na číselník (cíl bez řádků/akcí) vede do seznamu `?focus=<id>` s vybraným

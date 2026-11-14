@@ -246,6 +246,7 @@ export class Session {
       objectId,
       data: this.api(),
       t: (ref, params) => fillLabel(resolveLabel(labelTable, ref, this.ctx.lang ?? "cs"), params),
+      modules: this.ctx.modules,
     };
   }
 
@@ -526,7 +527,8 @@ export class Session {
   async remove(objectId: string, id: string): Promise<void> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "delete", this.system);
-    if (def.systemOnly) throw new UserError("@SYS:InvalidValue");
+    // systémové záznamy (rezervace…) maže jen logika modulu, uživatel ne
+    if (def.systemOnly && !this.system) throw new UserError("@SYS:InvalidValue");
     const existing = await this.sys().get(objectId, id);
     if (!existing) throw new UserError("@SYS:NotFound");
     if (def.lockedWhen && existing[def.lockedWhen.field] === def.lockedWhen.equals) throw new UserError("@SYS:Locked");

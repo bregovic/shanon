@@ -127,6 +127,8 @@ export interface EventContext {
   data: DataApi;
   /** překlad labelu do jazyka uživatele (texty do souborů, varování) */
   t: (ref: LabelRef, params?: Record<string, string>) => string;
+  /** zapnuté moduly tenanta (obsluha jiného modulu se podle toho vypne) */
+  modules?: ReadonlySet<string>;
 }
 
 export type ValidationErrors = Record<string, LabelRef>;

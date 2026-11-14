@@ -58,6 +58,8 @@ export const register = defineObject({
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
     template: { edt: enumEdt(PosTemplate), mandatory: true, default: "counter" },
+    // výdej prodaného zboží (prázdné = výchozí sklad)
+    warehouseId: { edt: refEdt("whs.warehouse", "@POS:Warehouse"), optionalRef: true },
     cashAccountId: { edt: AccountRef("@POS:CashAccount"), mandatory: true },
     cardAccountId: { edt: AccountRef("@POS:CardAccount"), mandatory: true },
     /** hotovost se zaokrouhluje na celé koruny (mince pod 1 Kč nejsou) */
@@ -67,7 +69,7 @@ export const register = defineObject({
   titleField: "code",
   list: ["code", "name", "template", "cashAccountId", "cardAccountId", "blocked"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "template", "receiptFooter", "blocked"] },
+    { label: "@SYS:General", fields: ["code", "name", "template", "warehouseId", "receiptFooter", "blocked"] },
     { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId"] },
   ],
   unique: [["code"]],
@@ -293,6 +295,7 @@ export default defineModule({
   setup: posSetup,
   labels: {
     cs: {
+      Warehouse: "Sklad",
       Box: "Box",
       Boxes: "Boxy",
       BoxLabels: "Štítky boxů",
@@ -428,6 +431,7 @@ export default defineModule({
       OpenDrawer: "Otevřít zásuvku",
     },
     en: {
+      Warehouse: "Warehouse",
       Box: "Box",
       Boxes: "Boxes",
       BoxLabels: "Box labels",
