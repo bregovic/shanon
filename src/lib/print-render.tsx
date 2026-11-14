@@ -197,7 +197,8 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
           <ElementView key={el.id} el={el} data={data} locale={locale} fontSize={fs} />
         ))}
       </div>
-      <div style={{ marginLeft: `${table.x}mm` }}>
+      {/* tabulka zabere aspoň navrženou výšku → souhrn zůstane dole, posune se jen při přetečení */}
+      <div style={{ marginLeft: `${table.x}mm`, minHeight: `${table.h}mm` }}>
         <Table el={table} rows={rows} locale={locale} fontSize={fs} />
       </div>
       <div style={{ position: "relative", height: `${restH + 2}mm`, breakInside: "avoid" }}>

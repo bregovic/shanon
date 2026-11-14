@@ -158,7 +158,8 @@ export async function renderPdf(layout: PrintLayout, data: PrintData, opts: { lo
     // zbytek pod tabulkou; když se nevejde, na novou stránku
     const bottom = table.y + table.h;
     const restH = Math.max(0, ...rest.map((e) => e.y - bottom + e.h));
-    let base = endY + 2;
+    // prvky pod tabulkou zůstanou na navržené pozici (dolní část stránky), posunou se jen při přetečení
+    let base = Math.max(endY + 2, bottom);
     if (!flow && base + restH > pageH - MARGIN / 2) base = newPage() / MM;
     for (const el of rest) drawElement(doc, el, data, locale, fs, base - bottom);
   }
