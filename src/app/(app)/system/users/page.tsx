@@ -46,6 +46,7 @@ export default async function UsersPage() {
       roles={roles.map((r) => ({ id: String(r.id), label: `${r.code} · ${r.name}` }))}
       labels={{
         new: t("@SYS:New"),
+        edit: t("@SYS:Edit"),
         save: t("@SYS:Save"),
         cancel: t("@SYS:Cancel"),
         close: t("@SYS:Close"),

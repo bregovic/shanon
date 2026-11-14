@@ -32,7 +32,7 @@ import {
   Text,
   tokens,
 } from "@fluentui/react-components";
-import { Add24Regular, Dismiss24Regular } from "@fluentui/react-icons";
+import { Add24Regular, Dismiss24Regular, Edit24Regular } from "@fluentui/react-icons";
 import { saveUserAction, type UserCompanyInput, type UserInput } from "@/app/actions";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { useShortcuts } from "./shortcuts";
@@ -52,6 +52,7 @@ interface User {
 
 type Labels = Record<
   | "new"
+  | "edit"
   | "save"
   | "cancel"
   | "close"
@@ -121,6 +122,7 @@ export function UsersView({
   const s = useStyles();
   const router = useRouter();
   const [edit, setEdit] = useState<UserInput | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string>();
   const [busy, start] = useTransition();
@@ -165,6 +167,9 @@ export function UsersView({
         <Button appearance="primary" icon={<Add24Regular />} onClick={() => open(null)}>
           {labels.new}
         </Button>
+        <Button icon={<Edit24Regular />} disabled={!selected} onClick={() => open(users.find((u) => u.id === selected) ?? null)}>
+          {labels.edit}
+        </Button>
       </ActionBar>
       <PageContent>
         <div className={s.card}>
@@ -179,9 +184,21 @@ export function UsersView({
             </TableHeader>
             <TableBody>
               {users.map((u) => (
-                <TableRow key={u.id} className={s.row} onDoubleClick={() => open(u)} onKeyDown={(e) => e.key === "Enter" && open(u)} tabIndex={0}>
+                <TableRow
+                  key={u.id}
+                  className={s.row}
+                  aria-selected={selected === u.id}
+                  style={selected === u.id ? { background: tokens.colorNeutralBackground1Selected } : undefined}
+                  onClick={() => setSelected(u.id)}
+                  onDoubleClick={() => open(u)}
+                  onKeyDown={(e) => e.key === "Enter" && open(u)}
+                  tabIndex={0}
+                >
                   <TableCell>
-                    <strong>{u.name}</strong>
+                    {/* jméno = odkaz na úpravu (i na dotykovém displeji) */}
+                    <Button appearance="transparent" size="small" style={{ padding: 0, minWidth: 0, fontWeight: 600 }} onClick={() => open(u)}>
+                      {u.name}
+                    </Button>
                   </TableCell>
                   <TableCell>{u.email}</TableCell>
                   <TableCell>
