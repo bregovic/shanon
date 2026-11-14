@@ -9,6 +9,7 @@
  *   D tržby (účty skupin položek) + D DPH po kódech ± zaokrouhlení,
  *   a založí daňové transakce jako zjednodušené doklady (KH oddíl A.5).
  */
+import { convertPrice } from "@/modules/gl/posting";
 import { fromCents, mulCents, roundCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { accountingCurrencyId, currencyRounding, postVoucher, systemAccount, type PostingLine } from "@/modules/gl/posting";
@@ -47,9 +48,11 @@ async function saleLine(data: DataApi, itemId: string, qtyRaw: string) {
   const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
   const group = await data.get("inv.itemGroup", String(item.groupId));
   // akční cena / sleva platná dnes (nejvýhodnější)
-  const regular = toCents(item.priceGross);
+  // cena v měně položky → účetní měna (kurz dne prodeje)
+  const priceGross = await convertPrice(data, data.companyId ?? null, item.priceGross, item.currencyId as string, null, today());
+  const regular = toCents(priceGross);
   const disc = await bestDiscount(data, item, regular, today());
-  const unitPrice = disc ? fromCents(disc.price) : String(item.priceGross);
+  const unitPrice = disc ? fromCents(disc.price) : String(priceGross);
   const gross = mulCents(qty, 4, unitPrice, 2);
   const net = netFromGross(gross, code?.rate ?? 0);
   return {
@@ -58,7 +61,7 @@ async function saleLine(data: DataApi, itemId: string, qtyRaw: string) {
     qty,
     unitId: (item.unitId as string) ?? null,
     unitPrice,
-    originalPrice: disc ? String(item.priceGross) : null,
+    originalPrice: disc ? String(priceGross) : null,
     discountId: disc ? String(disc.discount.id) : null,
     taxCodeId: (item.taxCodeId as string) ?? null,
     revenueAccountId: (group?.revenueAccountId as string) ?? null,

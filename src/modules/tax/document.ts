@@ -8,7 +8,7 @@
 import { fromCents, mulCents, percentOf, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents } from "@/modules/sys/currency";
-import { accountingCurrencyId, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { accountingCurrencyId, convertPrice, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { dimsOf } from "@/modules/gl/dimensions";
 import { postingAccount } from "@/modules/gl/setup";
 
@@ -127,7 +127,11 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
             const ig = await ctx.data.get("inv.itemGroup", String(item.groupId));
             if (!data.description) data.description = item.name;
             if (!data.unitId) data.unitId = item.unitId;
-            if (data.unitPrice === null || data.unitPrice === undefined || data.unitPrice === "") data.unitPrice = item[cfg.item.price] ?? null;
+            if (data.unitPrice === null || data.unitPrice === undefined || data.unitPrice === "") {
+              // cena v měně položky → měna dokladu (kurz k datu dokladu)
+              const date = String(h.invoiceDate ?? h.orderDate ?? new Date().toISOString().slice(0, 10));
+              data.unitPrice = await convertPrice(ctx.data, ctx.companyId, item[cfg.item.price] ?? null, item.currencyId as string, h.currencyId as string, date);
+            }
             if (isNew && !data.taxCodeId) data.taxCodeId = (cfg.side === 1 ? item.taxCodeId : null) ?? ig?.[cfg.item.tax] ?? null;
             if (isNew && !data[cfg.lineAccountField]) data[cfg.lineAccountField] = ig?.[cfg.item.groupAccount] ?? null;
           }

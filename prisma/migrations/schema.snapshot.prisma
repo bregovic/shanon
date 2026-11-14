@@ -332,6 +332,7 @@ model SysCurrency {
   glTrans_currency                GlTrans[]         @relation("GlTrans_currency")
   glJournalLine_currency          GlJournalLine[]   @relation("GlJournalLine_currency")
   taxTrans_currency               TaxTrans[]        @relation("TaxTrans_currency")
+  invItem_currency                InvItem[]         @relation("InvItem_currency")
   arCustomer_currency             ArCustomer[]      @relation("ArCustomer_currency")
   arOrder_currency                ArOrder[]         @relation("ArOrder_currency")
   arInvoice_currency              ArInvoice[]       @relation("ArInvoice_currency")
@@ -1429,6 +1430,7 @@ model InvItem {
   unitId         String   @map("unit_id") @db.Uuid
   ean            String?  @db.VarChar(14)
   salesPrice     Decimal? @map("sales_price") @db.Decimal(18, 2)
+  currencyId     String?  @map("currency_id") @db.Uuid
   priceInclTax   Boolean  @default(false) @map("price_incl_tax")
   taxCodeId      String?  @map("tax_code_id") @db.Uuid
   priceNet       Decimal? @map("price_net") @db.Decimal(18, 2)
@@ -1452,6 +1454,7 @@ model InvItem {
   group               InvItemGroup     @relation("InvItem_group", fields: [groupId], references: [id], onDelete: Restrict)
   category            InvCategory?     @relation("InvItem_category", fields: [categoryId], references: [id], onDelete: Restrict)
   unit                InvUnit          @relation("InvItem_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  currency            SysCurrency?     @relation("InvItem_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   taxCode             TaxCode?         @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   vendor              ApVendor?        @relation("InvItem_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
   invDiscount_item    InvDiscount[]    @relation("InvDiscount_item")
@@ -1467,6 +1470,7 @@ model InvItem {
   @@index([groupId])
   @@index([categoryId])
   @@index([unitId])
+  @@index([currencyId])
   @@index([taxCodeId])
   @@index([vendorId])
   @@map("inv_item")

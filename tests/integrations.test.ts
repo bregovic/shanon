@@ -353,7 +353,7 @@ describe("parametry hlavní knihy a kurzy ECB", () => {
     expect(days.get("2026-11-12")!.get("CZK")).toBe(25);
     const G = (await provisionTenant(client, { code: `t-gl-${run}`, name: "GL", adminEmail: `gl-${run}@test.local`, adminPassword: "heslo-12345", modules: ["gl"], company: { code: "G", name: "G" } })).ctx;
     const [p] = (await listRecords(G, "gl.parameters", {}, client)).rows;
-    expect([p.rateSource, p.rateMaxAgeDays, (p._titles as Record<string, string>).accountingCurrencyId]).toEqual(["cnb", 7, "CZK"]);
+    expect([p.rateSource, p.rateMaxAgeDays, (p._titles as Record<string, string>).accountingCurrencyId]).toEqual(["cnb", 7, "CZK · Česká koruna"]);
     // systémové účty podle osnovy, chybějící hlásí srozumitelně
     const sys = (await listRecords(G, "gl.systemAccount", {}, client)).rows;
     expect(Object.fromEntries(sys.map((r) => [r.postingType, (r._titles as Record<string, string>).accountId.slice(0, 6)]))).toMatchObject({ realizedGain: "663000", roundingGain: "648000", error: "395000", profitLoss: "431000" });

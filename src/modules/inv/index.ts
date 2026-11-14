@@ -123,6 +123,8 @@ export const item = defineObject({
     unitId: { edt: refEdt("inv.unit", "@INV:Unit"), mandatory: true, aliases: ["mj", "měrná jednotka", "unit", "uom"] },
     ean: { edt: Ean, aliases: ["carovy kod", "čárový kód", "barcode", "gtin"] },
     salesPrice: { edt: Edts.Price, label: "@INV:SalesPrice", aliases: ["cena", "prodejni cena", "price"] },
+    /** měna prodejní i nákupní ceny; prázdné = účetní měna (doklad i pokladna přepočtou kurzem) */
+    currencyId: { edt: refEdt("sys.currency", "@INV:PriceCurrency"), aliases: ["mena", "měna", "currency"] },
     priceInclTax: { edt: Edts.NoYes, label: "@INV:PriceInclTax", aliases: ["s dph", "vcetne dph", "včetně dph"] },
     taxCodeId: { edt: TaxRef(), aliases: ["dph", "sazba dph", "vat"] },
     priceNet: { edt: Edts.Price, label: "@INV:PriceNet", readOnly: true },
@@ -141,7 +143,7 @@ export const item = defineObject({
   list: ["image", "itemNum", "name", "categoryId", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "vendorId", "weighed", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["itemNum", "name", "itemType", "categoryId", "groupId", "unitId", "ean", "weighed", "blocked"] },
-    { label: "@INV:Prices", fields: ["salesPrice", "priceInclTax", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
+    { label: "@INV:Prices", fields: ["salesPrice", "currencyId", "priceInclTax", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
     { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName"] },
     { label: "@SYS:Image", fields: ["image"] },
     { label: "@INV:Description", fields: ["description"] },
@@ -237,6 +239,7 @@ export default defineModule({
   setup: invSetup,
   labels: {
     cs: {
+      PriceCurrency: "Měna cen",
       Module: "Položky",
       ModuleDesc: "Zboží, výrobky a služby s cenami, DPH a jednotkami — pro faktury, pokladnu i e-shop.",
       Item: "Položka",
@@ -290,6 +293,7 @@ export default defineModule({
       DiscountValue: "Vyplňte výši slevy.",
     },
     en: {
+      PriceCurrency: "Price currency",
       Module: "Products",
       ModuleDesc: "Goods, products and services with prices, VAT and units — for invoices, POS and e-shop.",
       Item: "Item",

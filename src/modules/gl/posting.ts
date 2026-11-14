@@ -93,6 +93,31 @@ export async function ledgerRate(data: DataApi, companyId: string | null, curren
   });
 }
 
+/**
+ * Cena z jedné měny do druhé (položka v EUR → faktura v CZK i naopak) kurzem
+ * k datu přes účetní měnu. Prázdná měna = účetní měna firmy.
+ */
+export async function convertPrice(data: DataApi, companyId: string | null, price: unknown, fromCur: string | null | undefined, toCur: string | null | undefined, date: string): Promise<string> {
+  if (price === null || price === undefined || price === "") return price as string;
+  const base = await accountingCurrencyId(data, companyId);
+  const f = fromCur || base;
+  const t = toCur || base;
+  if (f === t) return String(price);
+  let cents = toCents(price);
+  if (f !== base) {
+    const r = await ledgerRate(data, companyId, f!, date);
+    cents = convertCents(fromCents(cents), r.rate, r.amount);
+  }
+  if (t !== base) {
+    // účetní měna → cizí: částka × počet jednotek / kurz (zaokrouhleno na haléře)
+    const r = await ledgerRate(data, companyId, t!, date);
+    const rate = BigInt(Math.round(Number(r.rate) * 1_000_000));
+    const num = cents * BigInt(r.amount || 1) * BigInt(1_000_000);
+    cents = (num + rate / BigInt(2)) / rate;
+  }
+  return fromCents(cents);
+}
+
 /** Řádky v cizí měně přepočte kurzem k datu; částka v měně zůstane v amountCur. */
 export async function convertLines(data: DataApi, companyId: string | null, date: string, lines: PostingLine[]): Promise<PostingLine[]> {
   const base = await accountingCurrencyId(data, companyId);
