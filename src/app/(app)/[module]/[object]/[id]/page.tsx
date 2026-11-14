@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ObjectDetailView, type LineSpec } from "@/components/object-detail-view";
 import type { RecordData } from "@/core/module";
 import { coerce } from "@/core/validate";
@@ -41,8 +41,9 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
     if (dup && "values" in dup) record = { ...record, ...dup.values, _titles: dup.titles };
   }
   else {
-    const r = await getRecord(s.ctx, def.id, id);
-    if (!r) notFound();
+    const r = await getRecord(s.ctx, def.id, id).catch(() => null);
+    // záznam v aktuální firmě není (např. po přepnutí firmy) → přehled
+    if (!r) redirect(objectHref(def.id));
     record = r;
   }
 

@@ -206,6 +206,7 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      LookupUpdate: "Aktualizovat z registru",
       AccountNum: "Číslo účtu",
       AccountNumHelp: "Ve tvaru předčíslí-číslo/kód banky, např. 19-123456789/0100.",
       Iban: "IBAN",
@@ -283,6 +284,7 @@ export default defineModule({
       AresUnavailable: "ARES neodpovídá ({status}). Zkuste to později.",
     },
     en: {
+      LookupUpdate: "Update from register",
       AccountNum: "Account number",
       AccountNumHelp: "Format prefix-number/bank code, e.g. 19-123456789/0100.",
       Iban: "IBAN",

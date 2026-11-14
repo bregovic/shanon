@@ -25,6 +25,7 @@ export default async function LookupPage() {
         alsoCustomer: k("LookupAlsoCustomer"),
         source: k("LookupSource"),
         exists: k("LookupExists"),
+        update: k("LookupUpdate"),
         open: k("LookupOpen"),
         notFound: k("LookupNotFound"),
         regNo: t("@SYS:RegNo"),

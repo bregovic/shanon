@@ -754,7 +754,11 @@ describe("adresář: založení z registru, dodavatel a odběratel", () => {
       expect((await api.find("ap.vendor", { subjectId: id }, { take: 2 })).length).toBe(1);
       expect((await api.find("ar.customer", { subjectId: id }, { take: 2 })).length).toBe(1);
       expect((await lookupRegistry(api, "27079864"))?.existingId).toBe(id);
-      await expect(createFromRegistry(api, "27079864", {})).rejects.toMatchObject({ label: "@GAB:SubjectExists" });
+      // znovu: existující subjekt se z registru aktualizuje (žádný nový, žádná chyba)
+      await api.update("gab.subject", id, { name: "Staré jméno" });
+      expect(await createFromRegistry(api, "27079864", {})).toBe(id);
+      expect((await api.get("gab.subject", id))!.name).toBe("Uzenářství s.r.o.");
+      expect((await api.find("gab.subject", { regNo: "27079864" }, { take: 5 })).length).toBe(1);
       const v = await lookupRegistry(api, "DE123456789");
       expect([v?.source, v?.name, v?.vatId, v?.zipCode, v?.city, v?.country]).toEqual(["vies", "Wurst GmbH", "DE123456789", "80331", "München", "DE"]);
       expect(await lookupRegistry(api, "DE999")).toBeNull();
@@ -829,7 +833,10 @@ describe("založení firmy z rejstříku", () => {
     const [org] = (await listRecords(C2, "org.entity", {}, client)).rows;
     expect([org.legalName, org.street, org.houseNo, org.orientNo, org.city, org.zipCode]).toEqual(["Uzenářství s.r.o.", "Na náměstí", "97", "3", "Davle", "252 06"]);
     expect((await listRecords(C2, "gl.account", { pageSize: 1 }, client)).total).toBeGreaterThan(10);
-    await expect(createCompanyFromRegistry(T, "27079864", client)).rejects.toMatchObject({ label: "@ORG:CompanyExists" });
+    // znovu: firma se jen aktualizuje (stejné id, údaje organizace z registru)
+    await saveRecord(T, "sys.company", id, { name: "Staré" }, undefined, client);
+    expect(await createCompanyFromRegistry(T, "27079864", client)).toBe(id);
+    expect((await getRecord(T, "sys.company", id, client))!.name).toBe("Uzenářství s.r.o.");
   });
 });
 

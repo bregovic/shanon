@@ -97,11 +97,34 @@ export async function createPartner(data: DataApi, subjectId: string, objectId: 
   return data.create(objectId, { subjectId, groupId: group.id });
 }
 
-/** Založí subjekt z nálezu v registru (a sídlo), případně dodavatele a odběratele. */
+/** Údaje subjektu a sídlo z nálezu registru (aktualizace existujícího subjektu). */
+async function updateSubjectFromHit(data: DataApi, id: string, hit: RegistryHit) {
+  await data.update("gab.subject", id, { name: hit.name.slice(0, 120), type: hit.person ? "person" : "organization", regNo: hit.regNo, vatId: hit.vatId, country: hit.country });
+  if (hit.city || hit.street) {
+    const [addr] = await data.find("gab.address", { subjectId: id, kind: "registered" }, { take: 1 });
+    const values = { subjectId: id, kind: "registered", street: hit.street, city: hit.city, zipCode: hit.zipCode, country: hit.country };
+    if (addr) await data.update("gab.address", String(addr.id), values);
+    else await data.create("gab.address", values);
+  }
+}
+
+/**
+ * Založí subjekt z nálezu v registru (a sídlo), případně dodavatele a odběratele.
+ * Subjekt už v adresáři je → údaje se z registru aktualizují (a doplní účty z registru DPH).
+ */
 export async function createFromRegistry(data: DataApi, query: string, opts: { vendor?: boolean; customer?: boolean }): Promise<string> {
   const hit = await lookupRegistry(data, query);
   if (!hit) throw new UserError("@GAB:AresNotFound", { query });
-  if (hit.existingId) throw new UserError("@GAB:SubjectExists");
+  if (hit.existingId) {
+    await updateSubjectFromHit(data, hit.existingId, hit);
+    if (hit.vatId && /^CZ/i.test(String(hit.vatId))) {
+      const { checkSubjectVat } = await import("./vat-registry");
+      await checkSubjectVat(data, hit.existingId).catch(() => null);
+    }
+    if (opts.vendor && !(await data.find("ap.vendor", { subjectId: hit.existingId }, { take: 1 })).length) await createPartner(data, hit.existingId, "ap.vendor");
+    if (opts.customer && !(await data.find("ar.customer", { subjectId: hit.existingId }, { take: 1 })).length) await createPartner(data, hit.existingId, "ar.customer");
+    return hit.existingId;
+  }
   const s = await data.create("gab.subject", {
     name: hit.name.slice(0, 120),
     type: hit.person ? "person" : "organization",

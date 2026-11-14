@@ -26,7 +26,7 @@ const useStyles = makeStyles({
   name: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },
 });
 
-type Labels = Record<"desc" | "query" | "find" | "create" | "alsoVendor" | "alsoCustomer" | "source" | "exists" | "open" | "notFound" | "regNo" | "vatId" | "address", string>;
+type Labels = Record<"desc" | "query" | "find" | "create" | "alsoVendor" | "alsoCustomer" | "source" | "exists" | "update" | "open" | "notFound" | "regNo" | "vatId" | "address", string>;
 
 export function RegistryLookupView({
   crumbs,
@@ -117,14 +117,23 @@ export function RegistryLookupView({
                 )}
               </div>
               {hit.existingId ? (
-                <MessageBar intent="warning">
-                  <MessageBarBody>
-                    {L.exists} ·{" "}
-                    <Button appearance="transparent" size="small" onClick={() => router.push(mode === "company" ? `/sys/company?focus=${hit.existingId}` : `/gab/subject/${hit.existingId}`)}>
-                      {L.open}
+                <>
+                  <MessageBar intent="warning">
+                    <MessageBarBody>
+                      {L.exists} ·{" "}
+                      <Button appearance="transparent" size="small" onClick={() => router.push(mode === "company" ? `/sys/company?focus=${hit.existingId}` : `/gab/subject/${hit.existingId}`)}>
+                        {L.open}
+                      </Button>
+                    </MessageBarBody>
+                  </MessageBar>
+                  <div className={s.row}>
+                    <Button appearance="primary" disabled={busy} onClick={create}>
+                      {L.update}
                     </Button>
-                  </MessageBarBody>
-                </MessageBar>
+                    {vendor && <Checkbox label={L.alsoVendor} checked={opts.vendor} onChange={(_, d) => setOpts((o) => ({ ...o, vendor: !!d.checked }))} />}
+                    {customer && <Checkbox label={L.alsoCustomer} checked={opts.customer} onChange={(_, d) => setOpts((o) => ({ ...o, customer: !!d.checked }))} />}
+                  </div>
+                </>
               ) : (
                 <div className={s.row}>
                   <Button appearance="primary" icon={<Add24Regular />} disabled={busy} onClick={create}>

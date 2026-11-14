@@ -25,6 +25,7 @@ export default async function CompanyLookupPage() {
         alsoCustomer: "",
         source: k("LookupSource"),
         exists: t("@ORG:CompanyExists"),
+        update: k("LookupUpdate"),
         open: k("LookupOpen"),
         notFound: k("LookupNotFound"),
         regNo: t("@SYS:RegNo"),

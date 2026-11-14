@@ -902,3 +902,13 @@ describe("souvislá řada", () => {
     expect(String(d.invoiceNum) > String(b.invoiceNum)).toBe(true);
   });
 });
+
+describe("hledání v seznamu", () => {
+  it("mezery, zástupné a řídicí znaky nevadí", async () => {
+    await saveRecord(A, "gab.subject", null, { name: "Hledaná Krkovice s.r.o." }, undefined, client);
+    for (const q of ["  krkovice  ", "krk%", "krk_ovice", "hledaná\tkrk", "  hledaná   krkovice\n", "%%%", "\\"]) {
+      const r = await listRecords(A, "gab.subject", { q }, client);
+      if (/krk|hledan/i.test(q)) expect(r.rows.map((x) => x.name)).toContain("Hledaná Krkovice s.r.o.");
+    }
+  });
+});

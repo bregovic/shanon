@@ -298,7 +298,15 @@ export class Session {
     }
     if (and.length) where.AND = and;
     // hledání: každé slovo v některém textovém poli (nebo v titulku odkazu titleRef, např. název subjektu)
-    const words = (p.q ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 5);
+    // hledání: bez řídicích znaků a zástupných znaků LIKE (%, _, \), mezery kdekoli, nejvýš 5 slov
+    const words = (p.q ?? "")
+      .normalize("NFC")
+      .replace(/[\u0000-\u001f\u007f%_\\]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w.slice(0, 60))
+      .slice(0, 5);
     if (words.length) {
       const nf = nameFieldOf(def);
       const texts = [...new Set([def.titleField, ...(nf ? [nf] : []), ...def.list])].filter((f) => def.fields[f] && (def.fields[f].edt.kind === "string" || def.fields[f].edt.kind === "text"));

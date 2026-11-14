@@ -15,9 +15,11 @@ export function createCompanyFromRegistry(
       const hit = await lookupRegistry(sess.sys().api(), query, "company");
       if (!hit)
         throw new UserError("@GAB:AresNotFound", { query: String(query) });
-      if (hit.existingId) throw new UserError("@ORG:CompanyExists");
+      // firma už existuje → údaje z registru se jen aktualizují
       const code = String(hit.regNo ?? hit.vatId ?? "").slice(0, 20);
-      const company = await sess.save("sys.company", null, {
+      const company = hit.existingId
+        ? await sess.save("sys.company", hit.existingId, { name: hit.name.slice(0, 120), regNo: hit.regNo, vatId: hit.vatId, vatPayer: !!hit.vatId, country: hit.country })
+        : await sess.save("sys.company", null, {
         code,
         name: hit.name.slice(0, 120),
         regNo: hit.regNo,
@@ -51,8 +53,15 @@ export function createCompanyFromRegistry(
           zipCode: hit.zipCode,
           country: hit.country,
         };
-        if (org) await api.update("org.entity", String(org.id), values);
-        else await api.create("org.entity", values);
+        // bankovní účet: první zveřejněný v registru plátců DPH (když v organizaci chybí)
+        let bankAccount: string | null = (org?.bankAccount as string) ?? null;
+        if (!bankAccount && hit.vatId && /^CZ\d+$/i.test(String(hit.vatId))) {
+          const { vatRegistryStatus } = await import("@/modules/gab/vat-registry");
+          const st = await vatRegistryStatus([String(hit.vatId).slice(2)]).catch(() => null);
+          bankAccount = st?.get(String(hit.vatId).slice(2))?.accounts.find((a) => a.accountNum)?.accountNum ?? null;
+        }
+        if (org) await api.update("org.entity", String(org.id), { ...values, bankAccount });
+        else await api.create("org.entity", { ...values, bankAccount });
       }
       return String(company.id);
     },
