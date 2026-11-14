@@ -19,7 +19,7 @@ import {
   tokens,
   Tooltip,
 } from "@fluentui/react-components";
-import { Building24Regular, Checkmark24Regular, Home24Regular, Settings24Regular, SignOut24Regular } from "@fluentui/react-icons";
+import { Building24Regular, Checkmark24Regular, Home24Regular, QuestionCircle24Regular, Settings24Regular, SignOut24Regular } from "@fluentui/react-icons";
 import { logoutAction, switchCompanyAction } from "@/app/actions";
 import { FavoritesMenu } from "./favorites";
 import { RecentMenu } from "./recent-menu";
@@ -40,7 +40,7 @@ interface Props {
   companies: { id: string; code: string; name: string }[];
   companyId: string | null;
   user: { name: string; email: string; initials: string; admin: boolean };
-  labels: { home: string; settings: string; signOut: string; search: string; noResults: string; recent: string; noRecent: string };
+  labels: { home: string; settings: string; signOut: string; search: string; noResults: string; recent: string; noRecent: string; help: string };
   menu: MenuHit[];
   children: React.ReactNode;
 }
@@ -157,6 +157,9 @@ export function AppShell({ modules, companies, companyId, user, labels, menu, ch
 
           <div className={s.divider} />
 
+          <Tooltip content={labels.help} relationship="label">
+            <Button appearance="subtle" icon={<QuestionCircle24Regular />} aria-label={labels.help} onClick={() => router.push("/help")} />
+          </Tooltip>
           <Tooltip content={labels.settings} relationship="label">
             <Button appearance="subtle" icon={<Settings24Regular />} aria-label={labels.settings} onClick={() => router.push("/settings")} />
           </Tooltip>

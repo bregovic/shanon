@@ -21,7 +21,7 @@ import {
   ToolbarDivider,
   Text,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, Save24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
 import { useRef } from "react";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
@@ -88,6 +88,9 @@ export interface ObjectDetailProps {
   /** Smazat se ukáže i u zamčeného dokladu (neaktivní) — rozložení lišty se nemění */
   showDelete?: boolean;
   lines: LineSpec[];
+  /** návod k agendě (Nápověda) */
+  helpHref?: string;
+  helpLabel?: string;
   /** související doklady (tlačítka v liště, neaktivní bez záznamů) */
   related?: { label: string; href: string; count: number }[];
   lang: string;
@@ -377,6 +380,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             </Button>
           </>
         )}
+        {p.helpHref && <Button appearance="subtle" icon={<QuestionCircle24Regular />} title={p.helpLabel} aria-label={p.helpLabel} onClick={() => router.push(p.helpHref!)} />}
       </ActionBar>
 
       <PageContent>

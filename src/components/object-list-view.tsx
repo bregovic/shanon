@@ -18,7 +18,7 @@ import {
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular, QuestionCircle24Regular } from "@fluentui/react-icons";
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
@@ -56,6 +56,9 @@ export interface ObjectListProps {
   bulkActions?: { id: string; label: string }[];
   /** „Hotovo {ok} z {n}.“ */
   bulkDoneLabel?: string;
+  /** návod k agendě (Nápověda) */
+  helpHref?: string;
+  helpLabel?: string;
   lang: string;
   labels: UiLabels;
 }
@@ -182,6 +185,7 @@ export function ObjectListView(p: ObjectListProps) {
         <Button appearance="subtle" icon={<ArrowClockwise24Regular />} title={`${p.labels.actions.refresh} (Shift+R)`} onClick={() => setReload((n) => n + 1)}>
           {p.labels.actions.refresh}
         </Button>
+        {p.helpHref && <Button appearance="subtle" icon={<QuestionCircle24Regular />} title={p.helpLabel} aria-label={p.helpLabel} onClick={() => router.push(p.helpHref!)} />}
       </ActionBar>
 
       <PageContent>

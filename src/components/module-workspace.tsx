@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, makeStyles, Text, tokens, ToolbarDivider } from "@fluentui/react-components";
-import { ChevronDown16Regular, ChevronDown24Regular, ChevronRight16Regular, ChevronUp24Regular } from "@fluentui/react-icons";
+import { ChevronDown16Regular, ChevronDown24Regular, ChevronRight16Regular, ChevronUp24Regular, QuestionCircle24Regular } from "@fluentui/react-icons";
 import { FavoriteStar } from "./favorites";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 
@@ -67,10 +67,15 @@ export function ModuleWorkspace({
   crumbs,
   columns,
   labels,
+  helpHref,
+  helpLabel,
 }: {
   crumbs: { label: string; href?: string }[];
   columns: WorkspaceColumn[];
   labels: { expandAll: string; collapseAll: string };
+  /** návod k modulu (Nápověda) */
+  helpHref?: string;
+  helpLabel?: string;
 }) {
   const s = useStyles();
   const router = useRouter();
@@ -96,6 +101,9 @@ export function ModuleWorkspace({
           {labels.collapseAll}
         </Button>
         <ToolbarDivider />
+        {helpHref && (
+          <Button as="a" appearance="subtle" href={helpHref} icon={<QuestionCircle24Regular />} title={helpLabel} aria-label={helpLabel} />
+        )}
       </ActionBar>
       <PageContent>
         <div className={s.columns}>

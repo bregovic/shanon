@@ -1,3 +1,4 @@
+import { helpFor } from "@/server/help";
 import { notFound, redirect } from "next/navigation";
 import { ObjectDetailView, type LineSpec } from "@/components/object-detail-view";
 import type { RecordData } from "@/core/module";
@@ -101,6 +102,8 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
   return (
     <ObjectDetailView
       related={related}
+      helpHref={helpFor(def.id) ? `/help/${helpFor(def.id)!.id}` : undefined}
+      helpLabel={t("@SYS:HelpOpen")}
       key={`${id}:${record.version ?? 0}`}
       objectId={def.id}
       id={isNew ? null : id}

@@ -3,6 +3,7 @@
  * vidět (objekty s právem číst, správa jen pro správce). Jeden zdroj pro
  * plochu modulu, vyhledávání v přehledu i v hlavičce.
  */
+import { helpTopics } from "./help";
 import "server-only";
 import type { MenuGroup, ModuleDef } from "@/core/module";
 import { can, canSeeModule } from "@/core/security";
@@ -69,5 +70,10 @@ export function moduleMenu(s: Session, t: T, mod: ModuleDef): (MenuEntry & { sec
 
 /** Celé menu uživatele (pro vyhledávání). */
 export function menuIndex(s: Session, t: T): MenuEntry[] {
-  return visibleModules(s).flatMap((m) => moduleMenu(s, t, m).map(({ sectionIndex: _i, ...e }) => (void _i, e)));
+  const entries = visibleModules(s).flatMap((m) => moduleMenu(s, t, m).map(({ sectionIndex: _i, ...e }) => (void _i, e)));
+  // návody nápovědy (hledání Ctrl+K najde i „jak na…“)
+  const help = helpTopics()
+    .filter((h) => !h.module || h.module === "general" || s.ctx.modules.has(h.module))
+    .map((h) => ({ module: "help", moduleLabel: t("@SYS:Help"), icon: "BookQuestionMark", section: t("@SYS:Help"), kind: "functions" as MenuKind, label: h.title, href: `/help/${h.id}` }));
+  return [...entries, ...help];
 }

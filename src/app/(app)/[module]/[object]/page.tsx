@@ -1,3 +1,4 @@
+import { helpFor } from "@/server/help";
 import { notFound } from "next/navigation";
 import { ObjectListView } from "@/components/object-list-view";
 import { coerce } from "@/core/validate";
@@ -67,6 +68,8 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       initial={{ rows: initial.rows, total: initial.total, totals: initial.totals }}
       focusId={focus}
       initialFilters={initialFilters}
+      helpHref={helpFor(def.id) ? `/help/${helpFor(def.id)!.id}` : undefined}
+      helpLabel={t("@SYS:HelpOpen")}
       bulkActions={
         can(s.ctx.perms, def.id, "write")
           ? (def.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label) }))

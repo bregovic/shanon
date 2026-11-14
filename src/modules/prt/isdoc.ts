@@ -147,7 +147,9 @@ function parseXml(xml: string): Node {
   for (const m of xml.matchAll(re)) {
     const top = stack[stack.length - 1];
     if (m[1] !== undefined) top.text += m[1];
-    else if (m[2]) stack.length > 1 && stack.pop();
+    else if (m[2]) {
+      if (stack.length > 1) stack.pop();
+    }
     else if (m[3]) {
       const attrs: Record<string, string> = {};
       for (const a of (m[4] ?? "").matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) attrs[local(a[1])] = unesc(a[2] ?? a[3] ?? "");

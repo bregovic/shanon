@@ -1,3 +1,4 @@
+import { helpFor } from "@/server/help";
 import { notFound } from "next/navigation";
 import { ModuleWorkspace, type WorkspaceColumn } from "@/components/module-workspace";
 import { registry } from "@/registry";
@@ -31,6 +32,8 @@ export default async function ModulePage({ params }: { params: Promise<{ module:
 
   return (
     <ModuleWorkspace
+      helpHref={helpFor(mod.id) ? `/help/${helpFor(mod.id)!.id}` : undefined}
+      helpLabel={t("@SYS:HelpOpen")}
       crumbs={[{ label: t("@SYS:Modules"), href: "/" }, { label: t(mod.label) }]}
       columns={columns}
       labels={{ expandAll: t("@SYS:ExpandAll"), collapseAll: t("@SYS:CollapseAll") }}

@@ -451,6 +451,12 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      Help: "Nápověda",
+      HelpGeneral: "Obecně",
+      HelpSearch: "Hledat v návodech",
+      HelpIntro: "Postupy krok za krokem pro běžné agendy. Odkazy v návodech vedou rovnou do aplikace.",
+      HelpNone: "Žádný návod neodpovídá hledání.",
+      HelpOpen: "Nápověda k této agendě",
       BulkDone: "Hotovo: {ok} z {n}.",
       Transformation: "Transformace",
       Transformations: "Transformace",
@@ -771,6 +777,12 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      Help: "Help",
+      HelpGeneral: "General",
+      HelpSearch: "Search guides",
+      HelpIntro: "Step-by-step guides for common tasks. Links in the guides open the app directly.",
+      HelpNone: "No guide matches the search.",
+      HelpOpen: "Help for this task",
       BulkDone: "Done: {ok} of {n}.",
       Transformation: "Transformation",
       Transformations: "Transformations",
