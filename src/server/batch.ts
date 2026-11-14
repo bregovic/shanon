@@ -105,7 +105,8 @@ export async function runDueJobs(now = new Date(), client: PrismaClient = prisma
     const enabled = new Set([...dependencyClosure(registry, ["sys", ...t.modules.map((m) => m.moduleId)])].filter((x) => registry.modules.has(x)));
     const due = await withTenant(
       t.id,
-      (tx) => tx.sysBatchJob.findMany({ where: { tenantId: t.id, active: true, nextRunAt: { lte: now } }, orderBy: { nextRunAt: "asc" }, take: 50 }),
+      // úlohy jen skutečných firem (ne nosných firem virtuálních společností)
+      (tx) => tx.sysBatchJob.findMany({ where: { tenantId: t.id, active: true, nextRunAt: { lte: now }, company: { virtual: false } }, orderBy: { nextRunAt: "asc" }, take: 50 }),
       client,
     );
     for (const job of due) {
