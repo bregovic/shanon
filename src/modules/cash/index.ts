@@ -67,6 +67,7 @@ export const voucher = defineObject({
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
     voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher"), readOnly: true },
   },
+  related: [{ object: "gl.trans", field: "voucherId", label: "@GL:VoucherLines", ref: "voucherId" }, { object: "tax.trans", field: "voucherId", label: "@TAX:VatShort", ref: "voucherId" }],
   titleField: "docNum",
   list: ["docNum", "date", "deskId", "direction", "description", "partnerName", "amount", "status"],
   form: [

@@ -173,6 +173,11 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
   if (!header[cfg.docNumField]) throw new UserError("@SYS:FixErrors", {}, { [cfg.docNumField]: "@SYS:Required" });
   const lines = await data.find(cfg.line, { [cfg.lineHeaderField]: header.id });
   if (!lines.length) throw new UserError("@GL:NoLines");
+  // plátce DPH: každý řádek musí mít daňový kód, jinak by DPH nevzniklo a chybělo v přiznání
+  const org = await data.find("org.entity", {}, { take: 1 }).catch(() => [] as RecordData[]);
+  const vatPayer = org.length ? org[0].vatPayer !== false : true;
+  const noCode = vatPayer ? lines.find((l) => !l.taxCodeId) : undefined;
+  if (noCode) throw new UserError("@TAX:NoTaxCode", { line: String(noCode.description ?? "") });
   const { partner, group } = await partnerAndGroup(data, cfg, header[cfg.partnerField]);
   const subject = partner.subjectId ? await data.get("gab.subject", String(partner.subjectId)) : null;
   const date = String(header.invoiceDate);

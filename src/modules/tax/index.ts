@@ -244,6 +244,8 @@ export default defineModule({
   setup: taxSetup,
   labels: {
     cs: {
+      VatShort: "DPH",
+      NoTaxCode: "Řádek „{line}“ nemá daňový kód — plátce DPH musí mít u každého řádku sazbu (i 0 %).",
       Warehouse: "Sklad",
       Receive: "Přijmout na sklad",
       Receipts: "Příjemky",
@@ -386,6 +388,8 @@ export default defineModule({
       Closed: "Vyrovnáno",
     },
     en: {
+      VatShort: "VAT",
+      NoTaxCode: "Line “{line}” has no tax code — a VAT payer needs a rate on every line (0 % included).",
       Warehouse: "Warehouse",
       Receive: "Receive into stock",
       Receipts: "Receipts",

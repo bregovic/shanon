@@ -86,11 +86,15 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
     : await Promise.all(
         (def.related ?? [])
           .filter((r) => s.ctx.modules.has(r.object.split(".")[0]) && can(s.ctx.perms, r.object, "read"))
-          .map(async (r) => ({
-            label: t(r.label),
-            href: `${objectHref(r.object)}?filter.${r.field}=${encodeURIComponent(String(record[def.titleField] ?? ""))}`,
-            count: (await listRecords(s.ctx, r.object, { filter: { [r.field]: id }, pageSize: 1 })).total,
-          })),
+          .map(async (r) => {
+            const value = r.ref ? record[r.ref] : id;
+            const title = r.ref ? ((record._titles as Record<string, string> | undefined)?.[r.ref] ?? "").split(" · ")[0] : String(record[def.titleField] ?? "");
+            return {
+              label: t(r.label),
+              href: `${objectHref(r.object)}?filter.${r.field}=${encodeURIComponent(title)}`,
+              count: value ? (await listRecords(s.ctx, r.object, { filter: { [r.field]: value }, pageSize: 1 })).total : 0,
+            };
+          }),
       );
 
   return (
@@ -111,15 +115,19 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       readOnly={readOnly}
       canAttach={mayWrite}
       canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
+      showDelete={!isNew && !def.systemOnly && can(s.ctx.perms, def.id, "delete")}
       canDuplicate={!isNew && !def.systemOnly && mayWrite}
       compactHeader={!!def.compactHeader}
       autoCreate={isNew && !!def.numberSeq && (def.lines ?? []).some((l) => l.owned !== false)}
       newLinesHint={t("@SYS:LinesAfterHeader")}
       printHref={!isNew && s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/${id}` : undefined}
       actions={
+        // tlačítka stojí pořád na stejném místě; mimo svůj stav jsou jen neaktivní
         isNew || !mayWrite
           ? []
-          : (def.actions ?? []).filter((a) => (!a.when || record[a.when.field] === a.when.equals) && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), upload: a.upload, download: a.download }))
+          : (def.actions ?? [])
+              .filter((a) => !a.module || s.ctx.modules.has(a.module))
+              .map((a) => ({ id: a.id, label: t(a.label), upload: a.upload, download: a.download, disabled: !!a.when && record[a.when.field] !== a.when.equals }))
       }
       lines={lines}
       lang={s.lang}

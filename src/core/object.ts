@@ -103,9 +103,11 @@ export interface ObjectDef {
   lines?: { object: string; field: string; label: LabelRef; owned?: boolean; copy?: boolean; inline?: boolean }[];
   /**
    * související doklady (faktury a zálohy objednávky): tlačítko v horní liště
-   * s počtem, otevře jejich seznam s filtrem; bez záznamů je neaktivní
+   * s počtem, otevře jejich seznam s filtrem; bez záznamů je neaktivní.
+   * `ref` = párovat podle odkazu záznamu (voucherId → zápisy HK a DPH dokladu),
+   * jinak podle id záznamu
    */
-  related?: { object: string; field: string; label: LabelRef }[];
+  related?: { object: string; field: string; label: LabelRef; ref?: string }[];
   /** stránka dokladu: hlavička jako jeden řádek nahoře, řádky přes celou stránku */
   compactHeader?: boolean;
   /**

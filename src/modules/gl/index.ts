@@ -610,6 +610,7 @@ export default defineModule({
   setup: glSetup,
   labels: {
     cs: {
+      VoucherLines: "Doklad HK",
       JournalType: "Druh deníku",
       JtDaily: "Obecný",
       JtVendorPayment: "Platby dodavatelům",
@@ -802,6 +803,7 @@ export default defineModule({
       AmountCur: "Částka v měně",
     },
     en: {
+      VoucherLines: "Ledger voucher",
       JournalType: "Journal type",
       JtDaily: "Daily",
       JtVendorPayment: "Vendor payments",

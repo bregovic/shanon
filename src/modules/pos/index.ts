@@ -98,6 +98,7 @@ export const shift = defineObject({
     expectedCash: { edt: Edts.Balance, label: "@POS:ExpectedCash", readOnly: true },
     voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher"), readOnly: true },
   },
+  related: [{ object: "gl.trans", field: "voucherId", label: "@GL:VoucherLines", ref: "voucherId" }, { object: "tax.trans", field: "voucherId", label: "@TAX:VatShort", ref: "voucherId" }],
   titleField: "shiftNum",
   list: ["shiftNum", "registerId", "openDate", "status", "receiptCount", "salesGross", "cashTotal", "cardTotal", "taxAmount"],
   form: [

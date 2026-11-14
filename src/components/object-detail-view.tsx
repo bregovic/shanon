@@ -84,7 +84,9 @@ export interface ObjectDetailProps {
   autoCreate?: boolean;
   /** text místo řádků u nového dokladu */
   newLinesHint?: string;
-  actions: { id: string; label: string; upload?: string; download?: boolean }[];
+  actions: { id: string; label: string; upload?: string; download?: boolean; disabled?: boolean }[];
+  /** Smazat se ukáže i u zamčeného dokladu (neaktivní) — rozložení lišty se nemění */
+  showDelete?: boolean;
   lines: LineSpec[];
   /** související doklady (tlačítka v liště, neaktivní bez záznamů) */
   related?: { label: string; href: string; count: number }[];
@@ -317,8 +319,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       <ActionBar>
         <Crumbs items={[...p.crumbs, { label: p.recordTitle }]} />
         <Spacer />
-        {!p.readOnly && (
-          <Button appearance="primary" icon={<Save24Regular />} title={`${p.labels.actions.save} (Shift+S)`} disabled={busy} onClick={() => save()}>
+        {(!p.readOnly || p.id) && (
+          <Button appearance="primary" icon={<Save24Regular />} title={`${p.labels.actions.save} (Shift+S)`} disabled={busy || p.readOnly} onClick={() => save()}>
             {p.labels.actions.save}
           </Button>
         )}
@@ -327,15 +329,15 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             <Button
               key={a.id}
               icon={<ArrowDownload24Regular />}
-              disabled={busy}
+              disabled={busy || a.disabled}
               onClick={() => (window.location.href = `/api/download/${p.objectId}/${p.id}/${a.id}`)}
             >
               {a.label}
             </Button>
           ) : a.upload ? (
-            <UploadButton key={a.id} label={a.label} accept={a.upload} disabled={busy} onFile={(f) => upload(a.id, f)} />
+            <UploadButton key={a.id} label={a.label} accept={a.upload} disabled={busy || !!a.disabled} onFile={(f) => upload(a.id, f)} />
           ) : (
-            <Button key={a.id} icon={<Play24Regular />} disabled={busy} onClick={() => act(a.id)}>
+            <Button key={a.id} icon={<Play24Regular />} disabled={busy || a.disabled} onClick={() => act(a.id)}>
               {a.label}
             </Button>
           ),
@@ -367,10 +369,10 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             <HistoryButton objectId={p.objectId} recordId={p.id} recordTitle={p.recordTitle} labels={p.labels.history} />
           </>
         )}
-        {p.canDelete && (
+        {(p.canDelete || p.showDelete) && (
           <>
             <ToolbarDivider />
-            <Button icon={<Delete24Regular />} disabled={busy} onClick={() => setConfirm(true)}>
+            <Button icon={<Delete24Regular />} disabled={busy || !p.canDelete} onClick={() => setConfirm(true)}>
               {p.labels.actions.delete}
             </Button>
           </>

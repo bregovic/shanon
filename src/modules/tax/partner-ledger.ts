@@ -184,6 +184,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     ],
     numberSeq: { field: "invoiceNum", seq: sp.invoiceSeq },
     defaultSort: { field: "invoiceDate", dir: "desc" },
+    related: [{ object: "gl.trans", field: "voucherId", label: "@GL:VoucherLines", ref: "voucherId" }, { object: "tax.trans", field: "voucherId", label: "@TAX:VatShort", ref: "voucherId" }],
     lines: [{ object: id("invoiceLine"), field: "invoiceId", label: "@TAX:Lines" }],
     actions: [{ id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } }],
     lockedWhen: { field: "status", equals: "posted" },

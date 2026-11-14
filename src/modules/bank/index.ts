@@ -78,6 +78,7 @@ export const statement = defineObject({
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
     voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher"), readOnly: true },
   },
+  related: [{ object: "gl.trans", field: "voucherId", label: "@GL:VoucherLines", ref: "voucherId" }, { object: "tax.trans", field: "voucherId", label: "@TAX:VatShort", ref: "voucherId" }],
   titleField: "statementNum",
   list: ["bankAccountId", "statementNum", "date", "openingBalance", "credit", "debit", "closingBalance", "status"],
   form: [
