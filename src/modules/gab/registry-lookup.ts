@@ -6,6 +6,7 @@
 import { UserError, type DataApi, type RecordData } from "@/core/module";
 import { withService } from "@/modules/int/services";
 import { aresByIco } from "./ares";
+import { checkSubjectVat } from "./vat-registry";
 
 export interface RegistryHit {
   source: "ares" | "vies";
@@ -118,7 +119,6 @@ export async function createFromRegistry(data: DataApi, query: string, opts: { v
   if (hit.existingId) {
     await updateSubjectFromHit(data, hit.existingId, hit);
     if (hit.vatId && /^CZ/i.test(String(hit.vatId))) {
-      const { checkSubjectVat } = await import("./vat-registry");
       await checkSubjectVat(data, hit.existingId).catch(() => null);
     }
     if (opts.vendor && !(await data.find("ap.vendor", { subjectId: hit.existingId }, { take: 1 })).length) await createPartner(data, hit.existingId, "ap.vendor");
@@ -137,7 +137,6 @@ export async function createFromRegistry(data: DataApi, query: string, opts: { v
   }
   // plátce DPH: spolehlivost a zveřejněné účty
   if (hit.vatId && /^CZ/i.test(String(hit.vatId))) {
-    const { checkSubjectVat } = await import("./vat-registry");
     await checkSubjectVat(data, String(s.id)).catch(() => null);
   }
   if (opts.vendor) await createPartner(data, String(s.id), "ap.vendor");

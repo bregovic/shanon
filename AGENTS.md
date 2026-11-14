@@ -17,6 +17,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   tabulky jsou v `prisma/base.prisma`.
 - Pole používá existující typ z `Edts` nebo vlastní `defineEdt` — ne vlastní
   délky a validace přímo u pole.
+- Žádné kruhové importy mezi soubory modulů (A importuje B a B importuje A): produkční
+  bundler je sloučí a importované funkce můžou být při volání nedefinované (500 jen v produkci,
+  testy to neodhalí). Obsluhu dej do souboru, který importuje, ne naopak; kontrola
+  `npx madge --circular --extensions ts src/modules`. Dynamický `await import()` modulů nepoužívat.
 - Žádný vlastní CRUD v modulech. Čtení/zápis jen přes `src/server/data.ts`;
   byznys logika přes události (`ObjectHandlers`) a `DataApi`.
 - Do hlavní knihy jen přes `postVoucher()` (`src/modules/gl/posting.ts`) — hlídá

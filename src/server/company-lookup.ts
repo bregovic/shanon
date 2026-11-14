@@ -3,6 +3,7 @@ import { UserError } from "@/core/module";
 import { lookupRegistry } from "@/modules/gab/registry-lookup";
 import { inTenant, Session, type Ctx } from "./data";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { vatRegistryStatus } from "@/modules/gab/vat-registry";
 
 export function createCompanyFromRegistry(
   ctx: Ctx,
@@ -56,7 +57,6 @@ export function createCompanyFromRegistry(
         // bankovní účet: první zveřejněný v registru plátců DPH (když v organizaci chybí)
         let bankAccount: string | null = (org?.bankAccount as string) ?? null;
         if (!bankAccount && hit.vatId && /^CZ\d+$/i.test(String(hit.vatId))) {
-          const { vatRegistryStatus } = await import("@/modules/gab/vat-registry");
           const st = await vatRegistryStatus([String(hit.vatId).slice(2)]).catch(() => null);
           bankAccount = st?.get(String(hit.vatId).slice(2))?.accounts.find((a) => a.accountNum)?.accountNum ?? null;
         }

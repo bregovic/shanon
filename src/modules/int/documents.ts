@@ -10,6 +10,7 @@
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type RecordData } from "@/core/module";
 import type { OcrParty, OcrResult } from "./ocr";
+import { createFromRegistry, createPartner } from "@/modules/gab/registry-lookup";
 
 /** Cíl dokladu → objekt agendy a strana partnera. */
 export const TARGETS: Record<string, { object: string; partner: "ap.vendor" | "ar.customer"; field: "vendorId" | "customerId" }> = {
@@ -154,7 +155,6 @@ export async function createDocPartner(data: DataApi, doc: RecordData, t: T): Pr
   if (!tg) throw new UserError("@INT:DocNoTarget");
   let subj = await findSubject(data, doc);
   if (!subj) {
-    const { createFromRegistry } = await import("@/modules/gab/registry-lookup");
     const query = String(doc.regNo || doc.vatId || "");
     let id: string | null = null;
     if (query) id = await createFromRegistry(data, query, {}).catch(() => null);
@@ -164,7 +164,6 @@ export async function createDocPartner(data: DataApi, doc: RecordData, t: T): Pr
   }
   const [has] = await data.find(tg.partner, { subjectId: subj!.id }, { take: 1 });
   if (!has) {
-    const { createPartner } = await import("@/modules/gab/registry-lookup");
     await createPartner(data, String(subj!.id), tg.partner);
   }
   return checkDocument(data, (await data.get("int.document", String(doc.id)))!, t);

@@ -10,7 +10,7 @@
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { postingAccount } from "@/modules/gl/setup";
-import { accountingCurrencyId } from "@/modules/gl/posting";
+import { accountingCurrencyId, postVoucher } from "@/modules/gl/posting";
 import type { InvoiceConfig } from "./document";
 
 export interface OrderDocs {
@@ -172,7 +172,6 @@ async function advanceVat(data: DataApi, kind: "customer" | "vendor", a: RecordD
   docNum ??= String(a.externalNum ?? a.advanceNum);
   const partner = await data.get(kind === "customer" ? "ar.customer" : "ap.vendor", String(a[`${kind}Id`]));
   const subject = partner ? await data.get("gab.subject", String(partner.subjectId)) : null;
-  const { postVoucher } = await import("@/modules/gl/posting");
   const v = await postVoucher(data, {
     date,
     description: `${docNum}${subject ? ` · ${subject.name}` : ""}`,

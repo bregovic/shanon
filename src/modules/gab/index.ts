@@ -1,6 +1,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { checkAllSubjectsVat } from "./vat-registry";
 
 export const SubjectType = defineEnum({
   id: "SubjectType",
@@ -191,7 +192,6 @@ export default defineModule({
       label: "@GAB:JobVatCheck",
       default: { recurrence: "days", every: 1, at: "06:30" },
       async run(ctx) {
-        const { checkAllSubjectsVat } = await import("./vat-registry");
         const r = await checkAllSubjectsVat(ctx.data);
         return ctx.t("@GAB:VatChecked", { checked: String(r.checked), unreliable: String(r.unreliable) });
       },

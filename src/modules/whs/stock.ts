@@ -12,6 +12,7 @@
  */
 import { fromCents, mulCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
+import { convertPrice, postVoucher } from "@/modules/gl/posting";
 
 const Q = 10_000; // množství na 4 desetinná místa
 const q = (v: unknown) => Math.round(Number(v ?? 0) * Q) / Q;
@@ -88,7 +89,6 @@ export async function whsParams(data: DataApi): Promise<RecordData | null> {
 async function fallbackCost(data: DataApi, itemId: string, date: string): Promise<string> {
   const item = await data.get("inv.item", itemId);
   if (!item?.purchasePrice) return "0";
-  const { convertPrice } = await import("@/modules/gl/posting");
   return convertPrice(data, data.companyId ?? null, item.purchasePrice, item.currencyId as string, null, date);
 }
 
@@ -132,7 +132,6 @@ export async function postStockValue(data: DataApi, filter: { sourceObject?: str
     const k = t.sourceObject === "pos.receipt" ? `pos|${t.date}` : `${t.sourceObject}|${t.sourceId}|${t.date}`;
     groups.set(k, [...(groups.get(k) ?? []), t]);
   }
-  const { postVoucher } = await import("@/modules/gl/posting");
   let n = 0;
   for (const [k, list] of groups) {
     const acc = new Map<string, bigint>();
@@ -188,7 +187,6 @@ async function release(data: DataApi, sourceObject: string, sourceId: string) {
 
 /** Řádky dokladu (faktura, objednávka) → pohyb skladových položek. */
 async function moveDocLines(data: DataApi, lines: RecordData[], sign: 1 | -1, p: { kind: Move["kind"]; date: string; warehouseId: string; documentNum: string; sourceObject: string; sourceId: string; currencyId?: string | null }) {
-  const { convertPrice } = await import("@/modules/gl/posting");
   for (const l of lines) {
     if (!(await stocked(data, l.itemId))) continue;
     // příjem z faktury: hodnota = základ řádku v účetní měně
@@ -271,7 +269,6 @@ async function receiveOrder(data: DataApi, order: RecordData) {
     if (!(await stocked(data, l.itemId))) continue;
     const rest = q(l.qty) - q(l.deliveredQty);
     if (rest <= 0) continue;
-    const { convertPrice } = await import("@/modules/gl/posting");
     const unitCost = l.unitPrice ? await convertPrice(data, data.companyId ?? null, l.unitPrice, order.currencyId as string, null, today()) : null;
     await data.create("whs.journalLine", { journalId: j.id, itemId: l.itemId, qty: qs(rest), orderLineId: l.id, unitCost });
     n++;

@@ -3,7 +3,6 @@
  * Volají ho deníky, a později i pomocné knihy (odběratelé, dodavatelé,
  * pokladna, majetek) — každá transakce má tak obraz v hlavní knize.
  */
-import { runJournal } from "./journal";
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type ValidationErrors, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents, rateFor } from "@/modules/sys/currency";
@@ -230,7 +229,7 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
 }
 
 /** Název deníku: zadaný, jinak GEN, jinak první nezablokovaný. */
-async function resolveJournalName(data: DataApi, id: unknown): Promise<RecordData> {
+export async function resolveJournalName(data: DataApi, id: unknown): Promise<RecordData> {
   if (id) {
     const jn = await data.get("gl.journalName", String(id));
     if (jn) return jn;
@@ -247,7 +246,7 @@ async function assertJournalOpen(data: DataApi, journalId: unknown) {
 }
 
 /** Výsledek Ověřit / Zaúčtovat pro hlavičku deníku. */
-function checkText(ctx: EventContext, r: { vouchers: number; debit: string; credit: string; errors: string[] }) {
+export function checkText(ctx: EventContext, r: { vouchers: number; debit: string; credit: string; errors: string[] }) {
   return (r.errors.length ? ctx.t("@GL:CheckErrors", { n: String(r.errors.length), list: r.errors.slice(0, 5).join(" | ") }) : ctx.t("@GL:CheckOk", { n: String(r.vouchers), debit: r.debit, credit: r.credit })).slice(0, 255);
 }
 
@@ -268,27 +267,6 @@ export const glHandlers: Record<string, ObjectHandlers> = {
     actions: {
       async periods(ctx, fy) {
         await createPeriods(ctx.data, fy);
-      },
-    },
-  },
-  "gl.journal": {
-    async beforeSave(ctx, data) {
-      const jn = await resolveJournalName(ctx.data, data.journalNameId);
-      if (jn.blocked) return { journalNameId: "@GL:JournalNameBlocked" };
-      data.journalNameId = jn.id;
-    },
-    actions: {
-      /** Ověřit: rozdělení na doklady, vyrovnanost, účty, období, dimenze — bez účtování */
-      async validate(ctx, journal) {
-        const r = await runJournal(ctx, journal, true);
-        await ctx.data.update("gl.journal", String(journal.id), { checkResult: checkText(ctx, r) });
-      },
-      async post(ctx, journal) {
-        if (journal.status !== "draft") throw new UserError("@GL:Locked");
-        const jn = await resolveJournalName(ctx.data, journal.journalNameId);
-        if (jn.blocked) throw new UserError("@GL:JournalNameBlocked", { name: String(jn.code) });
-        const r = await runJournal(ctx, journal, false);
-        await ctx.data.update("gl.journal", String(journal.id), { checkResult: checkText(ctx, r) });
       },
     },
   },

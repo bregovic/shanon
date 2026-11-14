@@ -7,6 +7,7 @@ import { ADMIN_ONLY } from "@/core/security";
 import gab from "@/modules/gab";
 import gl from "@/modules/gl";
 import { glHandlers } from "@/modules/gl/posting";
+import { journalHandlers } from "@/modules/gl/journal";
 import { dimensionHandlers, dimensionJobs } from "@/modules/gl/dimensions";
 import { rateJobs, sysHandlers } from "@/modules/sys/currency";
 import { batchHandlers } from "@/modules/sys/batch";
@@ -63,7 +64,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

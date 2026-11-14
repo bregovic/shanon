@@ -9,8 +9,8 @@
  *   banka = účet hlavní knihy bankovního účtu; pokladna = účet pokladny.
  */
 import { fromCents, toCents } from "@/core/money";
-import { UserError, type DataApi, type EventContext, type RecordData } from "@/core/module";
-import { convertLines, postVoucher, type PostingLine } from "./posting";
+import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
+import { checkText, convertLines, postVoucher, resolveJournalName, type PostingLine } from "./posting";
 import { dimsOf } from "./dimensions";
 
 const zero = BigInt(0);
@@ -289,3 +289,32 @@ async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher:
     closed: isPayment,
   });
 }
+
+/**
+ * Obsluha deníku (Ověřit, Zaúčtovat). Je tady, ne v posting.ts: deník importuje
+ * účtování, ne naopak — kruhový import posting ↔ journal produkční bundler
+ * sloučil a funkce z dimensions.ts byly při načtení ještě nedefinované.
+ */
+export const journalHandlers: Record<string, ObjectHandlers> = {
+  "gl.journal": {
+    async beforeSave(ctx, data) {
+      const jn = await resolveJournalName(ctx.data, data.journalNameId);
+      if (jn.blocked) return { journalNameId: "@GL:JournalNameBlocked" };
+      data.journalNameId = jn.id;
+    },
+    actions: {
+      /** Ověřit: rozdělení na doklady, vyrovnanost, účty, období, dimenze — bez účtování */
+      async validate(ctx, journal) {
+        const r = await runJournal(ctx, journal, true);
+        await ctx.data.update("gl.journal", String(journal.id), { checkResult: checkText(ctx, r) });
+      },
+      async post(ctx, journal) {
+        if (journal.status !== "draft") throw new UserError("@GL:Locked");
+        const jn = await resolveJournalName(ctx.data, journal.journalNameId);
+        if (jn.blocked) throw new UserError("@GL:JournalNameBlocked", { name: String(jn.code) });
+        const r = await runJournal(ctx, journal, false);
+        await ctx.data.update("gl.journal", String(journal.id), { checkResult: checkText(ctx, r) });
+      },
+    },
+  },
+};

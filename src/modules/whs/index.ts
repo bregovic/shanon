@@ -13,6 +13,8 @@ import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { availability, valuationReport } from "./report";
+import { postingAccount } from "@/modules/gl/setup";
+import { postStockValue } from "./stock";
 
 const Str = (id: string, label: string, maxLength: number) => defineEdt({ id, kind: "string", label, maxLength, transform: "trim" });
 const LocCode = defineEdt({ id: "WhsLocCode", kind: "string", label: "@WHS:LocCode", maxLength: 20, pattern: /^[A-Za-z0-9._]+$/, patternMessage: "@WHS:LocCodeHelp", transform: "trim" });
@@ -312,7 +314,6 @@ async function whsSetup(data: DataApi) {
   }
   if (!(await data.find("whs.warehouse", {}, { take: 1 })).length) await data.create("whs.warehouse", { code: "HLAVNI", name: "Hlavní sklad", isDefault: true });
   if (!(await data.find("whs.parameters", {}, { take: 1 })).length) {
-    const { postingAccount } = await import("@/modules/gl/setup");
     await data.create("whs.parameters", {
       code: "SKLAD",
       valuation: false,
@@ -343,7 +344,6 @@ export default defineModule({
       label: "@WHS:JobPostValue",
       default: { recurrence: "hours", every: 1 },
       async run(ctx) {
-        const { postStockValue } = await import("./stock");
         const n = await postStockValue(ctx.data, {});
         return ctx.t("@WHS:ValuePosted", { n: String(n) });
       },

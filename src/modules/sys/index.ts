@@ -1,6 +1,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt, type EnumDef } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { TRANSFORMS } from "@/core/transform";
 
 export const SeqFormat = defineEdt({
   id: "SeqFormat",
@@ -411,7 +412,6 @@ export const batchRun = defineObject({
 
 async function sysSetup(data: DataApi) {
   // transformace (formáty) z registru — jen chybějící
-  const { TRANSFORMS } = await import("@/core/transform");
   for (const tr of TRANSFORMS) {
     if ((await data.find("sys.transformation", { code: tr.code }, { take: 1 })).length) continue;
     await data.create("sys.transformation", { code: tr.code, name: tr.name, direction: tr.direction, purpose: tr.purpose, description: tr.description, active: true });
