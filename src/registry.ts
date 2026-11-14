@@ -22,6 +22,7 @@ import pos from "@/modules/pos";
 import cash from "@/modules/cash";
 import prt, { PrintDocType, prtHandlers } from "@/modules/prt";
 import { advancePrintable, invoicePrintable, receiptPrintable } from "@/modules/prt/printables";
+import { isdocHandlers } from "@/modules/prt/isdoc";
 import { cashHandlers } from "@/modules/cash/handlers";
 import { posHandlers } from "@/modules/pos/sale";
 import { basketHandlers } from "@/modules/pos/basket";
@@ -64,7 +65,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

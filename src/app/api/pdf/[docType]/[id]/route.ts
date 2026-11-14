@@ -12,7 +12,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ docType:
   const url = new URL(req.url);
   try {
     const job = await printJob(s.ctx, docType, id, url.searchParams.get("template"));
-    const pdf = await renderPdf(job.layout, job.data, { locale: s.lang === "en" ? "en-GB" : "cs-CZ", title: job.title });
+    const pdf = await renderPdf(job.layout, job.data, { locale: s.lang === "en" ? "en-GB" : "cs-CZ", title: job.title, attachments: job.attachments });
     const name = `${(job.title || "doklad").replace(/[^\w.-]+/g, "_")}.pdf`;
     return new Response(new Uint8Array(pdf), {
       headers: {

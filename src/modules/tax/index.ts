@@ -244,6 +244,7 @@ export default defineModule({
   setup: taxSetup,
   labels: {
     cs: {
+      Isdoc: "ISDOC",
       AdvanceTaxDoc: "Daňový doklad k platbě",
       AdvanceTaxDate: "Datum přijetí platby (DUZP)",
       AdvanceVat: "DPH ze zálohy",
@@ -394,6 +395,7 @@ export default defineModule({
       Closed: "Vyrovnáno",
     },
     en: {
+      Isdoc: "ISDOC",
       AdvanceTaxDoc: "Tax document for payment",
       AdvanceTaxDate: "Payment date (tax point)",
       AdvanceVat: "VAT on advance",

@@ -11,6 +11,7 @@ import { UserError, type RecordData } from "@/core/module";
 import { applyExtraction, listDocument } from "@/modules/int/documents";
 import { writeLog } from "@/modules/int/drivers";
 import { extractWithOpenAi } from "@/modules/int/ocr";
+import { isdocFromFile, parseIsdoc } from "@/modules/prt/isdoc";
 import { addFile, readFile } from "./docuref";
 import { ADMIN } from "@/core/security";
 import { inTenant, type Ctx } from "./data";
@@ -57,10 +58,23 @@ export async function extractDocument(ctx: Ctx, id: string, client?: PrismaClien
     },
     client,
   );
-  const conn = await pickConnection(ctx, client);
-  await inTenant(ctx, (s) => s.sys().api().update("int.document", id, { status: "processing", connectionId: conn.id, message: null }), client);
   const file = await readFile({ ...ctx, perms: ADMIN }, prep.ref, client);
   const c = prep.company;
+  // ISDOC (.isdoc, .isdocx, PDF s vloženým ISDOC): údaje přímo z XML, bez vytěžování
+  const isdoc = isdocFromFile(file.name, file.data);
+  if (isdoc) {
+    return inTenant(
+      ctx,
+      async (s) => {
+        const api = s.sys().api();
+        const doc = (await api.get("int.document", id))!;
+        return applyExtraction(api, doc, parseIsdoc(isdoc), c, s.sys().eventCtx("int.document").t);
+      },
+      client,
+    );
+  }
+  const conn = await pickConnection(ctx, client);
+  await inTenant(ctx, (s) => s.sys().api().update("int.document", id, { status: "processing", connectionId: conn.id, message: null }), client);
   const context = `Naše firma (příjemce nákupních a vystavitel prodejních dokladů): ${c?.name ?? "?"}, IČO ${c?.regNo ?? "-"}, DIČ ${c?.vatId ?? "-"}.`;
 
   // (2) síť

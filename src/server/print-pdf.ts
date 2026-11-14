@@ -135,7 +135,11 @@ function drawTable(doc: Doc, el: PrintElement, rows: Record<string, unknown>[], 
 }
 
 /** PDF sestavy (A4/A5/štítek; účtenka jako jedna dlouhá stránka). */
-export async function renderPdf(layout: PrintLayout, data: PrintData, opts: { locale?: string; title?: string } = {}): Promise<Buffer> {
+export async function renderPdf(
+  layout: PrintLayout,
+  data: PrintData,
+  opts: { locale?: string; title?: string; attachments?: { name: string; mime: string; data: string | Buffer }[] } = {},
+): Promise<Buffer> {
   const locale = opts.locale ?? "cs-CZ";
   const paper = PAPERS[layout.paper] ?? PAPERS.a4;
   const fs = layout.fontSize || 9;
@@ -185,6 +189,8 @@ export async function renderPdf(layout: PrintLayout, data: PrintData, opts: { lo
     if (!flow && base + restH > pageH - MARGIN / 2) base = newPage() / MM;
     for (const el of rest) drawElement(doc, el, data, locale, fs, base - bottom);
   }
+  // vložené soubory (ISDOC faktury — účetní programy odběratelů si ho načtou samy)
+  for (const a of opts.attachments ?? []) doc.file(Buffer.isBuffer(a.data) ? a.data : Buffer.from(a.data, "utf8"), { name: a.name, type: a.mime, description: a.name });
   doc.end();
   return done;
 }

@@ -59,7 +59,10 @@ export async function printJob(ctx: Ctx, docType: string, recordId: string, temp
         const bytes = ref?.storageKey ? await storageFor(ref.storage).get(s.tx, ctx.tenantId, ref.storageKey) : null;
         if (bytes && ref) co.logo = `data:${ref.mime ?? "image/png"};base64,${Buffer.from(bytes).toString("base64")}`;
       }
+      // přílohy PDF (ISDOC); chyba přílohy tisk nezastaví
+      const attachments = p.attachments ? await p.attachments(api, ctx.companyId, recordId).catch(() => []) : [];
       return {
+        attachments,
         title: String(record[p.numberField] ?? ""),
         layout: tpl ? parseLayout(tpl.layout, p) : p.defaultLayout(),
         templateId: tpl ? String(tpl.id) : null,

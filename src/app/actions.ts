@@ -951,7 +951,7 @@ export async function docImportAction(form: FormData): Promise<ActionResult<{ id
     const file = form.get("file");
     if (!(file instanceof File) || !file.size) throw new UserError("@SYS:Required");
     const name = file.name.slice(0, 200);
-    if (!/\.(pdf|jpe?g|png|webp)$/i.test(name)) throw new UserError("@INT:OcrFileType");
+    if (!/\.(pdf|jpe?g|png|webp|isdoc|isdocx|xml)$/i.test(name)) throw new UserError("@INT:OcrFileType");
     const target = String(form.get("target") ?? "auto");
     const doc = await saveRecord(s.ctx, "int.document", null, { fileName: name, target });
     const { addFile } = await import("@/server/docuref");

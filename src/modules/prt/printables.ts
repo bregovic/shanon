@@ -6,6 +6,7 @@ import { fromCents, toCents } from "@/core/money";
 import type { DataApi, RecordData } from "@/core/module";
 import { czIban, spayd, type PrintField, type PrintLayout, type PrintableDef } from "@/core/print";
 import { paymentQrText } from "@/core/transform";
+import { invoiceIsdoc } from "./isdoc";
 import { addressLine, orgOf } from "@/modules/org";
 import { receiptPrint } from "@/modules/pos/sale";
 import { receiptData } from "@/lib/receipt-data";
@@ -484,6 +485,11 @@ export const invoicePrintable: PrintableDef = {
     { path: "gross", label: "@PRT:Gross", format: "money" },
   ],
   dataset: invoiceDataset,
+  // ISDOC v PDF faktury
+  attachments: async (data, companyId, id) => {
+    const x = await invoiceIsdoc(data, companyId, id);
+    return [{ name: x.name, mime: "application/xml", data: x.xml }];
+  },
   defaultLayout: invoiceLayout,
   legacyLayouts: [legacyInvoiceLayout(), invoiceLayoutV1(), invoiceLayoutV2()],
 };

@@ -129,7 +129,7 @@ export function DocImportView(p: {
               ref={input}
               type="file"
               multiple
-              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.isdoc,.isdocx,.xml,application/pdf,image/*"
               hidden
               onChange={(e) => {
                 add(e.target.files);

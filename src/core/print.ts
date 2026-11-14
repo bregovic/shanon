@@ -79,6 +79,8 @@ export interface PrintableDef {
   defaultLayout: () => PrintLayout;
   /** dřívější výchozí rozvržení — neupravené šablony v této podobě se převedou na nové */
   legacyLayouts?: PrintLayout[];
+  /** soubory vložené do PDF (ISDOC u faktury) */
+  attachments?: (data: DataApi, companyId: string | null, id: string) => Promise<{ name: string; mime: string; data: string | Buffer }[]>;
 }
 
 /** Hodnota podle cesty "doc.number" / "company.name". */

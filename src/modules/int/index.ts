@@ -246,7 +246,7 @@ export const document = defineObject({
   scope: "company",
   fields: {
     docNum: { edt: Edts.Code, label: "@INT:DocNum", mandatory: true, readOnly: true },
-    fileName: { edt: Edts.Description, label: "@INT:FileName", readOnly: true },
+    fileName: { edt: Edts.Description, label: "@INT:FileName" },
     target: { edt: enumEdt(DocTarget), mandatory: true, default: "auto" },
     status: { edt: enumEdt(DocStatus), mandatory: true, default: "new", readOnly: true },
     docType: { edt: enumEdt(OcrDocType), readOnly: true },
@@ -351,6 +351,7 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      IsdocInvalid: "Soubor není platný ISDOC.",
       DrvDphreg: "Registr plátců DPH",
       KindOcr: "Vytěžování dokladů",
       DrvOpenai: "OpenAI",
@@ -361,7 +362,7 @@ export default defineModule({
       OcrSettings: "Vytěžování",
       OcrNoKey: "Doplňte API klíč v napojení.",
       OcrNoTestKey: "Server nemá testovací klíč pro vytěžování (SHANON_TEST_OCR_KEY).",
-      OcrFileType: "Vytěžit lze PDF nebo obrázek (JPG, PNG).",
+      OcrFileType: "Načíst lze PDF, obrázek (JPG, PNG) nebo ISDOC.",
       OcrFailed: "Vytěžení se nepodařilo: {reason}",
       OcrNoConnection: "Chybí aktivní napojení pro vytěžování dokladů (Integrace → Napojení, druh Vytěžování dokladů).",
       OcrDailyLimit: "Denní limit napojení {code} ({limit} dokladů) je vyčerpaný.",
@@ -420,7 +421,7 @@ export default defineModule({
       ListDoc: "Zalistovat",
       Reject: "Zamítnout",
       DocImport: "Načíst doklady",
-      DocImportIntro: "Nahrajte PDF nebo fotky dokladů. Každý soubor se vytěží a zkontroluje; připravené doklady zalistujete v seznamu Doklady ke zpracování.",
+      DocImportIntro: "Nahrajte PDF, fotky nebo ISDOC dokladů (ISDOC se načte přesně, bez vytěžování). Každý soubor se vytěží a zkontroluje; připravené doklady zalistujete v seznamu Doklady ke zpracování.",
       DocImportFiles: "Vybrat soubory",
       DocImportDrop: "nebo je sem přetáhněte",
       DocImportExtract: "Vytěžit hned",
@@ -557,6 +558,7 @@ export default defineModule({
       TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
+      IsdocInvalid: "The file is not a valid ISDOC.",
       DrvDphreg: "VAT payer register",
       KindOcr: "Document capture",
       DrvOpenai: "OpenAI",
@@ -567,7 +569,7 @@ export default defineModule({
       OcrSettings: "Document capture",
       OcrNoKey: "Enter the API key in the connection.",
       OcrNoTestKey: "The server has no test key for document capture (SHANON_TEST_OCR_KEY).",
-      OcrFileType: "Only PDF or image files (JPG, PNG) can be captured.",
+      OcrFileType: "Only PDF, image files (JPG, PNG) or ISDOC can be loaded.",
       OcrFailed: "Capture failed: {reason}",
       OcrNoConnection: "No active document capture connection (Integration → Connections, kind Document capture).",
       OcrDailyLimit: "The daily limit of connection {code} ({limit} documents) is used up.",
