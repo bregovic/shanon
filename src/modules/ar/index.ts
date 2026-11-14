@@ -31,7 +31,7 @@ export default defineModule({
   menu: ar.menu,
   numberSeqs: [
     { code: "ARCUST", name: "@AR:Partners", format: "ODB{#####}", usedFor: "ar.customer" },
-    { code: "ARINV", name: "@AR:Invoices", format: "FV{YY}{#####}", usedFor: "ar.invoice" },
+    { code: "ARINV", name: "@AR:Invoices", format: "FV{YY}{#####}", usedFor: "ar.invoice", continuous: true },
     { code: "ARORD", name: "@AR:Orders", format: "PO{YY}{#####}", usedFor: "ar.order" },
     { code: "ARADV", name: "@AR:Advances", format: "ZF{YY}{#####}", usedFor: "ar.advance" },
   ],

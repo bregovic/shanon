@@ -110,6 +110,15 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   zprávu), `default` = výchozí nastavení úlohu ve firmě založí. Plánovač
   `src/server/batch.ts` (z `src/instrumentation.ts`, každou minutu, `BATCH_SCHEDULER=off`
   vypne), plán v pražském čase, zmeškané běhy se nedohánějí, historie `sys.batchRun`.
+- Nový doklad s číselnou řadou a vlastními řádky se uloží sám, jakmile jsou vyplněná povinná
+  pole (výběr odběratele) — dostane číslo a hned jdou zadávat řádky (`autoCreate`).
+  Souvislá řada (`sys.numberSeq.continuous`, v definici `numberSeqs[].continuous`): číslo
+  smazaného konceptu jde do `sys.numberSeqFree` a `nextNumber` ho přidělí přednostně.
+- Související doklady jako tlačítka v liště: `ObjectDef.related` (počet, bez záznamů neaktivní).
+- Lookup standard: odkaz = „kód · název“ (`nameFieldOf`, u partnerů `titleRef`), hledá se
+  podle obou; import přijme i „kód · název“.
+- PDF sestav na serveru: `src/server/print-pdf.ts` (pdfkit, DejaVu Sans), `/api/pdf/<doklad>/<id>`;
+  prvky pod tabulkou řádků drží navrženou pozici a posunou se jen při přetečení.
 - Číselné řady modulu se v jeho Nastavení ukážou samy (z `numberSeqs`, odkaz
   `?filter.usedFor=<modul>.*`). Seznam objektu umí filtr z odkazu `?filter.<pole>=<výraz>`.
 - Odkaz na číselník (cíl bez řádků/akcí) vede do seznamu `?focus=<id>` s vybraným

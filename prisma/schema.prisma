@@ -217,6 +217,7 @@ model SysCompany {
   sysBatchRun_company             SysBatchRun[]       @relation("SysBatchRun_company")
   sysVirtualCompany_holderCompany SysVirtualCompany[] @relation("SysVirtualCompany_holderCompany")
   sysVirtualMember_memberCompany  SysVirtualMember[]  @relation("SysVirtualMember_memberCompany")
+  sysNumberSeqFree_company        SysNumberSeqFree[]  @relation("SysNumberSeqFree_company")
   prtTemplate_company             PrtTemplate[]       @relation("PrtTemplate_company")
   orgEntity_company               OrgEntity[]         @relation("OrgEntity_company")
   orgSite_company                 OrgSite[]           @relation("OrgSite_company")
@@ -293,6 +294,7 @@ model SysNumberSeq {
   format     String   @db.VarChar(40)
   nextNumber Int      @default(1) @map("next_number")
   usedFor    String?  @map("used_for") @db.VarChar(40)
+  continuous Boolean  @default(false)
   ext        Json     @default("{}")
   version    Int      @default(1)
   createdAt  DateTime @default(now()) @map("created_at")
@@ -300,8 +302,9 @@ model SysNumberSeq {
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy  String?  @map("updated_by") @db.Uuid
 
-  company                  SysCompany      @relation("SysNumberSeq_company", fields: [companyId], references: [id], onDelete: Restrict)
-  glJournalName_voucherSeq GlJournalName[] @relation("GlJournalName_voucherSeq")
+  company                  SysCompany         @relation("SysNumberSeq_company", fields: [companyId], references: [id], onDelete: Restrict)
+  sysNumberSeqFree_seq     SysNumberSeqFree[] @relation("SysNumberSeqFree_seq")
+  glJournalName_voucherSeq GlJournalName[]    @relation("GlJournalName_voucherSeq")
 
   @@unique([tenantId, companyId, code])
   @@unique([tenantId, companyId, usedFor])
@@ -538,6 +541,29 @@ model SysVirtualShare {
   @@index([tenantId])
   @@index([virtualCompanyId])
   @@map("sys_virtual_share")
+}
+
+/// sys.numberSeqFree — generováno z definice objektu
+model SysNumberSeqFree {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  seqId     String   @map("seq_id") @db.Uuid
+  number    String   @db.VarChar(20)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany   @relation("SysNumberSeqFree_company", fields: [companyId], references: [id], onDelete: Restrict)
+  seq     SysNumberSeq @relation("SysNumberSeqFree_seq", fields: [seqId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, seqId, number])
+  @@index([tenantId, companyId])
+  @@index([seqId])
+  @@map("sys_number_seq_free")
 }
 
 /// prt.template — generováno z definice objektu

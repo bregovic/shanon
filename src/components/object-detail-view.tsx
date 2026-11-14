@@ -19,6 +19,7 @@ import {
   MessageBarBody,
   tokens,
   ToolbarDivider,
+  Text,
 } from "@fluentui/react-components";
 import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, Save24Regular } from "@fluentui/react-icons";
 import { useRef } from "react";
@@ -76,6 +77,13 @@ export interface ObjectDetailProps {
   printHref?: string;
   /** hlavička jako kompaktní pruh (deník), řádky přes celou stránku */
   compactHeader?: boolean;
+  /**
+   * nový doklad s číselnou řadou a řádky: uloží se sám po vyplnění povinných
+   * polí (výběr odběratele) — dostane číslo a hned jdou zadávat řádky
+   */
+  autoCreate?: boolean;
+  /** text místo řádků u nového dokladu */
+  newLinesHint?: string;
   actions: { id: string; label: string; upload?: string; download?: boolean }[];
   lines: LineSpec[];
   /** související doklady (tlačítka v liště, neaktivní bez záznamů) */
@@ -233,11 +241,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   const [busy, start] = useTransition();
   const [confirm, setConfirm] = useState(false);
 
-  const save = () =>
+  const save = (current: Values = values) =>
     start(async () => {
       const editable = p.groups.flatMap((g) => g.fields).filter((f) => !f.readOnly);
       const v: Values = {};
-      for (const f of editable) v[f.name] = values[f.name] ?? null;
+      for (const f of editable) v[f.name] = current[f.name] ?? null;
       const res = await saveRecordAction(p.objectId, p.id, v, p.version);
       if (!res.ok) {
         setErrors(res.errors ?? {});
@@ -310,7 +318,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
         <Crumbs items={[...p.crumbs, { label: p.recordTitle }]} />
         <Spacer />
         {!p.readOnly && (
-          <Button appearance="primary" icon={<Save24Regular />} title={`${p.labels.actions.save} (Shift+S)`} disabled={busy} onClick={save}>
+          <Button appearance="primary" icon={<Save24Regular />} title={`${p.labels.actions.save} (Shift+S)`} disabled={busy} onClick={() => save()}>
             {p.labels.actions.save}
           </Button>
         )}
@@ -387,12 +395,19 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             openLabel={p.labels.drawer.open}
             record={{ objectId: p.objectId, id: p.id, labels: p.labels.drawer.image }}
             onChange={(name, value, t) => {
-              setValues((v) => ({ ...v, [name]: value }));
+              const next = { ...values, [name]: value };
+              setValues(next);
               if (t !== undefined) setTitles((x) => ({ ...x, [name]: t }));
               setErrors((e) => ({ ...e, [name]: "" }));
+              // nový doklad: výběrem v odkazu (odběratel) se hlavička uloží, když je vše povinné vyplněné
+              if (p.autoCreate && !p.id && !busy && t !== undefined && value) {
+                const fields = p.groups.flatMap((g) => g.fields).filter((f) => !f.readOnly);
+                if (fields.every((f) => !f.mandatory || (next[f.name] !== null && next[f.name] !== undefined && next[f.name] !== ""))) save(next);
+              }
             }}
           />
         </div>
+        {!p.id && p.autoCreate && p.newLinesHint && <Text style={{ color: tokens.colorNeutralForeground3 }}>{p.newLinesHint}</Text>}
         {p.id &&
           p.lines.map((l) => (
             <Lines key={l.objectId} spec={l} parentId={p.id!} lang={p.lang} labels={p.labels} />

@@ -882,3 +882,22 @@ describe("hlavní kniha", () => {
     await expectUserError(deleteRecord(A, "gl.account", String(cash.id), client), "@SYS:InUse");
   });
 });
+
+describe("souvislá řada", () => {
+  it("číslo smazaného konceptu faktury se přidělí znovu", async () => {
+    const subj = await saveRecord(A, "gab.subject", null, { name: "Souvislý odběratel" }, undefined, client);
+    const [grp] = (await listRecords(A, "ar.group", {}, client)).rows;
+    const cust = await saveRecord(A, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const [seq] = (await listRecords(A, "sys.numberSeq", { filter: { usedFor: "ar.invoice" } }, client)).rows;
+    await saveRecord(A, "sys.numberSeq", String(seq.id), { continuous: true }, undefined, client);
+    const a = await saveRecord(A, "ar.invoice", null, { customerId: cust.id }, undefined, client);
+    const b = await saveRecord(A, "ar.invoice", null, { customerId: cust.id }, undefined, client);
+    await deleteRecord(A, "ar.invoice", String(a.id), client);
+    const free = (await listRecords(A, "sys.numberSeqFree", { filter: { seqId: seq.id } }, client)).rows;
+    expect(free.map((f) => f.number)).toEqual([a.invoiceNum]);
+    const c = await saveRecord(A, "ar.invoice", null, { customerId: cust.id }, undefined, client);
+    expect(c.invoiceNum).toBe(a.invoiceNum);
+    const d = await saveRecord(A, "ar.invoice", null, { customerId: cust.id }, undefined, client);
+    expect(d.invoiceNum > String(b.invoiceNum)).toBe(true);
+  });
+});

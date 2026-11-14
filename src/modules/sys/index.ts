@@ -120,15 +120,37 @@ export const numberSeq = defineObject({
     format: { edt: SeqFormat, mandatory: true },
     nextNumber: { edt: Edts.Int, label: "@SYS:NextNumber", mandatory: true, default: 1 },
     usedFor: { edt: enumEdt(NumberedObject) },
+    /** souvislá řada: číslo smazaného nepoužitého dokladu se vrátí a použije přednostně */
+    continuous: { edt: Edts.NoYes, label: "@SYS:Continuous" },
   },
   titleField: "code",
-  list: ["code", "name", "format", "nextNumber", "usedFor"],
+  list: ["code", "name", "format", "nextNumber", "usedFor", "continuous"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "format", "nextNumber"] },
+    { label: "@SYS:General", fields: ["code", "name", "format", "nextNumber", "continuous"] },
     { label: "@SYS:Usage", fields: ["usedFor"] },
   ],
   unique: [["code"], ["usedFor"]],
   defaultSort: { field: "code", dir: "asc" },
+  lines: [{ object: "sys.numberSeqFree", field: "seqId", label: "@SYS:FreeNumbers", owned: false }],
+});
+
+/** Nepoužitá čísla souvislé řady (ze smazaných konceptů) — přidělí se přednostně. */
+export const numberSeqFree = defineObject({
+  id: "sys.numberSeqFree",
+  table: "sys_number_seq_free",
+  label: "@SYS:FreeNumber",
+  labelPlural: "@SYS:FreeNumbers",
+  scope: "company",
+  systemOnly: true,
+  fields: {
+    seqId: { edt: refEdt("sys.numberSeq", "@SYS:NumberSeq"), mandatory: true },
+    number: { edt: Edts.Code, label: "@SYS:Number", mandatory: true },
+  },
+  titleField: "number",
+  list: ["number"],
+  form: [{ label: "@SYS:General", fields: ["seqId", "number"] }],
+  unique: [["seqId", "number"]],
+  defaultSort: { field: "number", dir: "asc" },
 });
 
 /** Úroveň oprávnění (vyšší zahrnuje nižší). */
@@ -363,7 +385,7 @@ export default defineModule({
   dependsOn: [],
   enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, ShareableObject, BatchClass, BatchRecurrence, BatchStatus],
   setup: sysSetup,
-  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare],
+  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare, numberSeqFree],
   menu: [
     {
       label: "@SYS:Setup",
@@ -378,6 +400,11 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      LinesAfterHeader: "Řádky půjde zadávat, jakmile vyplníte hlavičku — doklad se uloží a dostane číslo sám.",
+      Continuous: "Souvislá řada",
+      FreeNumber: "Nepoužité číslo",
+      FreeNumbers: "Nepoužitá čísla",
+      Number: "Číslo",
       VirtualHolder: "Virtuální (sdílená data)",
       VirtualCompany: "Virtuální společnost",
       VirtualCompanies: "Virtuální společnosti",
@@ -504,7 +531,6 @@ export default defineModule({
       Amount: "Částka",
       Qty: "Množství",
       Percent: "Procento",
-      Number: "Číslo",
       Email: "E-mail",
       Phone: "Telefon",
       Country: "Země",
@@ -681,6 +707,11 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      LinesAfterHeader: "Lines can be entered once the header is filled in — the document saves itself and gets its number.",
+      Continuous: "Continuous sequence",
+      FreeNumber: "Unused number",
+      FreeNumbers: "Unused numbers",
+      Number: "Number",
       VirtualHolder: "Virtual (shared data)",
       VirtualCompany: "Virtual company",
       VirtualCompanies: "Virtual companies",
@@ -807,7 +838,6 @@ export default defineModule({
       Amount: "Amount",
       Qty: "Quantity",
       Percent: "Percent",
-      Number: "Number",
       Email: "Email",
       Phone: "Phone",
       Country: "Country",

@@ -364,6 +364,27 @@ export class Session {
     return inHolder.nextNumber(by);
   }
 
+  /** Řada podle id / Použití / kódu (stejné pořadí jako nextNumber). */
+  private async findSeq(by: { id?: string; usedFor?: string; code?: string }) {
+    const base = { tenantId: this.ctx.tenantId, companyId: this.ctx.companyId! };
+    for (const w of [by.id ? { id: by.id } : null, by.usedFor ? { usedFor: by.usedFor } : null, by.code ? { code: by.code } : null]) {
+      if (!w) continue;
+      const r = await this.tx.sysNumberSeq.findFirst({ where: { ...base, ...w }, select: { id: true, continuous: true } });
+      if (r) return r;
+    }
+    return null;
+  }
+
+  /** Smazaný doklad souvislé řady: jeho číslo se vrátí k dalšímu použití. */
+  private async releaseNumber(def: ObjectDef, record: RecordData) {
+    if (!def.numberSeq || !this.ctx.companyId || this.ctx.shared?.[def.id]) return;
+    const num = record[def.numberSeq.field];
+    if (!num) return;
+    const seq = await this.findSeq({ usedFor: def.id, code: def.numberSeq.seq });
+    if (!seq?.continuous) return;
+    await this.tx.sysNumberSeqFree.createMany({ data: [{ tenantId: this.ctx.tenantId, companyId: this.ctx.companyId, seqId: seq.id, number: String(num) }], skipDuplicates: true });
+  }
+
   /**
    * Další číslo řady. Pořadí hledání: konkrétní řada (id) → řada určená pro
    * objekt (Použití) → řada podle kódu (výchozí z definice objektu/modulu).
@@ -378,6 +399,15 @@ export class Session {
         UPDATE sys_number_seq SET next_number = next_number + 1, version = version + 1, updated_at = now()
         WHERE ${scope} AND ${cond}
         RETURNING format, next_number - 1 AS n`;
+    // souvislá řada: nejdřív nepoužité číslo smazaného konceptu
+    const seqRow = await this.findSeq(by);
+    if (seqRow?.continuous) {
+      const [free] = await this.tx.$queryRaw<{ number: string }[]>`
+        DELETE FROM sys_number_seq_free WHERE id = (
+          SELECT id FROM sys_number_seq_free WHERE ${scope} AND seq_id = ${seqRow.id}::uuid ORDER BY number LIMIT 1 FOR UPDATE SKIP LOCKED
+        ) RETURNING number`;
+      if (free) return free.number;
+    }
     let rows: { format: string; n: number }[] = [];
     if (by.id) rows = await take(Prisma.sql`id = ${by.id}::uuid`);
     if (!rows.length && by.usedFor) rows = await take(Prisma.sql`used_for = ${by.usedFor}`);
@@ -523,6 +553,7 @@ export class Session {
     for (const r of refs) if (r.storageKey) await storageFor(r.storage).remove(this.tx, this.ctx.tenantId, r.storageKey);
     if (refs.length) await this.tx.sysDocuRef.deleteMany({ where: { id: { in: refs.map((r) => r.id) } } });
     await this.audit(objectId, id, "delete", maskSecrets(def, existing), null);
+    await this.releaseNumber(def, existing);
     for (const h of handlersFor(this.ctx, objectId)) await h.afterDelete?.(ectx, existing);
   }
 

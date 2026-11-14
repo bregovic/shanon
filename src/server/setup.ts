@@ -41,6 +41,7 @@ export async function setupCompany(api: DataApi, enabled: Set<string>, lang: Lan
         format: s.format,
         nextNumber: 1,
         usedFor,
+        continuous: !!s.continuous,
       });
     }
     await m.setup?.(counting);

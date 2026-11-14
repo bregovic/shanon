@@ -113,6 +113,8 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
       canDuplicate={!isNew && !def.systemOnly && mayWrite}
       compactHeader={!!def.compactHeader}
+      autoCreate={isNew && !!def.numberSeq && (def.lines ?? []).some((l) => l.owned !== false)}
+      newLinesHint={t("@SYS:LinesAfterHeader")}
       printHref={!isNew && s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/${id}` : undefined}
       actions={
         isNew || !mayWrite

@@ -51,7 +51,7 @@ export interface ModuleDef {
    * Výchozí číselné řady modulu. „Výchozí nastavení“ je založí ve firmě,
    * pokud řada s tímto kódem chybí; tenant si je pak upraví.
    */
-  numberSeqs?: { code: string; name: LabelRef; format: string; usedFor?: string }[];
+  numberSeqs?: { code: string; name: LabelRef; format: string; usedFor?: string; continuous?: boolean }[];
   /**
    * Další výchozí nastavení firmy (účtový rozvrh, názvy deníků…). Musí být
    * idempotentní — zakládá jen to, co chybí, nic nepřepisuje.
