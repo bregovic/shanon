@@ -4,6 +4,8 @@ import { openBaskets } from "@/modules/pos/basket";
 import { accountingCurrencyId, currencyRounding } from "@/modules/gl/posting";
 import { notFound } from "next/navigation";
 import { PosTerminal } from "@/components/pos-terminal";
+import { PosLock } from "@/components/pos-lock";
+import { isUnlocked, registerPin } from "@/server/pos-lock";
 import { can } from "@/core/security";
 import { requireSession } from "@/server/auth";
 import { getRecord, inTenant } from "@/server/data";
@@ -25,6 +27,21 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
   }
   const reg = await getRecord(s.ctx, "pos.register", id).catch(() => null);
   if (!reg) notFound();
+  // zámek PINem: bez odemčení jen zadání PINu (směna běží dál)
+  const raw = await inTenant(s.ctx, (sess) => sess.tx.posRegister.findFirst({ where: { id, tenantId: s.ctx.tenantId }, select: { pin: true } }));
+  const regWithPin = { ...reg, pin: raw?.pin ?? null };
+  const hasPin = !!registerPin(regWithPin);
+  if (!(await isUnlocked(s.user.id, regWithPin))) {
+    return (
+      <PosLock
+        registerId={id}
+        registerName={String(reg.name)}
+        user={s.user.name}
+        backHref="/kasa"
+        labels={{ title: t("@POS:Locked"), enter: t("@POS:EnterPin"), wrong: t("@POS:WrongPin"), wait: t("@POS:PinWait"), back: t("@POS:Back") }}
+      />
+    );
+  }
   const data = await inTenant(s.ctx, async (sess) => {
     const items = await sess.find("inv.item", { blocked: false }, 5000, { name: "asc" });
     const groups = await sess.find("inv.itemGroup", {}, 500, { code: "asc" });
@@ -103,6 +120,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       payment={data.conns.payment ? { driver: String(data.conns.payment.driver) } : null}
       eet={data.conns.eet ? { pending: data.eetPending } : null}
       user={s.user.name}
+      canLock={hasPin}
       lang={s.lang}
       labels={labels}
     />

@@ -966,3 +966,26 @@ export async function docImportAction(form: FormData): Promise<ActionResult<{ id
     return fail(e, s.lang, s.ctx.tenantId);
   }
 }
+
+/** Pokladna: odemknout PINem (cookie pro uživatele a pokladnu). */
+export async function posUnlockAction(registerId: string, pin: string): Promise<ActionResult<"ok" | "wrong" | "wait">> {
+  const s = await requireSession();
+  try {
+    const reg = await getRecord(s.ctx, "pos.register", registerId);
+    if (!reg) throw new UserError("@SYS:NotFound");
+    const raw = await inTenant(s.ctx, (sess) => sess.tx.posRegister.findFirst({ where: { id: registerId, tenantId: s.ctx.tenantId } }));
+    const { unlock } = await import("@/server/pos-lock");
+    return { ok: true, data: await unlock(s.user.id, { ...reg, pin: raw?.pin ?? null }, String(pin).replace(/\D/g, "").slice(0, 4)) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Pokladna: zamknout (směna zůstává otevřená). */
+export async function posLockAction(registerId: string): Promise<ActionResult> {
+  const s = await requireSession();
+  const { lock } = await import("@/server/pos-lock");
+  await lock(registerId);
+  void s;
+  return { ok: true, data: undefined };
+}

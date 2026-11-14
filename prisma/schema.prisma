@@ -2689,6 +2689,7 @@ model PosRegister {
   cashAccountId String   @map("cash_account_id") @db.Uuid
   cardAccountId String   @map("card_account_id") @db.Uuid
   receiptFooter String?  @map("receipt_footer") @db.VarChar(255)
+  pin           String?  @db.VarChar(200)
   blocked       Boolean  @default(false)
   ext           Json     @default("{}")
   version       Int      @default(1)

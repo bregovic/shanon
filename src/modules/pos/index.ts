@@ -7,7 +7,7 @@
  * Prodej běží v terminálu /kasa (src/app/(pos)), logika v ./sale.ts.
  * Do hlavní knihy jde až uzávěrka směny (souhrnně za směnu, DPH po kódech).
  */
-import { Edts, defineEnum, enumEdt, refEdt } from "@/core/edt";
+import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { postingAccount } from "@/modules/gl/setup";
@@ -64,12 +64,14 @@ export const register = defineObject({
     cardAccountId: { edt: AccountRef("@POS:CardAccount"), mandatory: true },
     /** hotovost se zaokrouhluje na celé koruny (mince pod 1 Kč nejsou) */
     receiptFooter: { edt: Edts.Description, label: "@POS:ReceiptFooter" },
+    // čtyřmístný PIN: pokladnu lze zamknout bez uzávěrky (šifrovaně, ven jen maska)
+    pin: { edt: defineEdt({ id: "PosPin", kind: "string", label: "@POS:Pin", maxLength: 200, pattern: /^\d{4}$/, patternMessage: "@POS:PinHelp" }), secret: true },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "code",
   list: ["code", "name", "template", "cashAccountId", "cardAccountId", "blocked"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "template", "warehouseId", "receiptFooter", "blocked"] },
+    { label: "@SYS:General", fields: ["code", "name", "template", "warehouseId", "receiptFooter", "pin", "blocked"] },
     { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId"] },
   ],
   unique: [["code"]],
@@ -296,6 +298,15 @@ export default defineModule({
   setup: posSetup,
   labels: {
     cs: {
+      Pin: "PIN pokladny",
+      PinHelp: "Čtyři číslice.",
+      Lock: "Zamknout",
+      Locked: "Pokladna je zamčená",
+      EnterPin: "Zadejte PIN",
+      WrongPin: "Nesprávný PIN",
+      PinWait: "Příliš mnoho pokusů, zkuste to za minutu.",
+      ShiftOpen: "Směna",
+      ReceiptsN: "{n} účtenek",
       Warehouse: "Sklad",
       Box: "Box",
       Boxes: "Boxy",
@@ -432,6 +443,15 @@ export default defineModule({
       OpenDrawer: "Otevřít zásuvku",
     },
     en: {
+      Pin: "Register PIN",
+      PinHelp: "Four digits.",
+      Lock: "Lock",
+      Locked: "The register is locked",
+      EnterPin: "Enter PIN",
+      WrongPin: "Wrong PIN",
+      PinWait: "Too many attempts, try again in a minute.",
+      ShiftOpen: "Shift",
+      ReceiptsN: "{n} receipts",
       Warehouse: "Warehouse",
       Box: "Box",
       Boxes: "Boxes",

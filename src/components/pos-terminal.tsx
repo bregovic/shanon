@@ -54,6 +54,7 @@ import {
   posOpenShiftAction,
   posSellAction,
   posShiftSummaryAction,
+  posLockAction,
 } from "@/app/actions";
 import type { BasketView } from "@/modules/pos/basket";
 import type { PrintLayout } from "@/core/print";
@@ -253,6 +254,8 @@ export function PosTerminal(p: {
   payment: { driver: string } | null;
   eet: { pending: number } | null;
   user: string;
+  /** pokladna má PIN — jde zamknout bez uzávěrky */
+  canLock?: boolean;
   lang: string;
   labels: Record<string, string>;
 }) {
@@ -713,6 +716,18 @@ export function PosTerminal(p: {
         {serialPrinter && !portReady && (
           <Button icon={<Print24Regular />} onClick={connectPrinter}>
             {L.PrinterConnect}
+          </Button>
+        )}
+        {p.canLock && (
+          <Button
+            icon={<LockClosed24Regular />}
+            disabled={busy}
+            onClick={async () => {
+              await posLockAction(p.register.id);
+              window.location.reload();
+            }}
+          >
+            {L.Lock}
           </Button>
         )}
         {shift && (
