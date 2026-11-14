@@ -135,3 +135,69 @@ describe("sklad a pokladna", () => {
     expect((await rows(T, "whs.trans", { warehouseId: shop.id }))[0].kind).toBe("sale");
   });
 });
+
+describe("ocenění zásob", () => {
+  it("průměrná cena, nákup na 131, příjemka 132/131, prodej 504/132, inventura a vyřazení; sklad sedí na 132", async () => {
+    const T = (await provisionTenant(client, { code: `t-val-${run}`, name: "VAL", adminEmail: `val-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "whs"], company: { code: "V", name: "V" } })).ctx;
+    const [par] = await rows(T, "whs.parameters");
+    await save(T, "whs.parameters", { valuation: true }, String(par.id));
+    const acc = async (n: string) => String((await rows(T, "gl.account", { accountNum: `${n}000` }))[0].id);
+    const bal = async (n: string) => (await listRecords(T, "gl.trans", { filter: { accountId: await acc(n) }, totals: true }, client)).totals!.amount;
+    const [main] = await rows(T, "whs.warehouse");
+    const [grp] = await rows(T, "inv.itemGroup");
+    const [unit] = await rows(T, "inv.unit");
+    const item = await save(T, "inv.item", { itemNum: "K1", name: "Klobása", groupId: grp.id, unitId: unit.id, salesPrice: "200", purchasePrice: "100" });
+    const vs = await save(T, "gab.subject", { name: "Dodavatel" });
+    const [vg] = await rows(T, "ap.group");
+    const vend = await save(T, "ap.vendor", { subjectId: vs.id, groupId: vg.id });
+
+    // objednávka 10 ks po 100 → řádek na 131; příjemka 10 ks = 1 000 (132/131)
+    const po = await save(T, "ap.order", { vendorId: vend.id });
+    const pol = await save(T, "ap.orderLine", { orderId: po.id, itemId: item.id, qty: "10", unitPrice: "100" });
+    expect(pol.expenseAccountId).toBe(await acc("131"));
+    await runAction(T, "ap.order", String(po.id), "receive", client);
+    const [rc] = await rows(T, "whs.journal", { purchaseOrderId: po.id });
+    await runAction(T, "whs.journal", String(rc.id), "post", client);
+    // faktura z objednávky: 131 vyrovnaný
+    await runAction(T, "ap.order", String(po.id), "createInvoice", client);
+    const pinv = (await getRecord(T, "ap.order", String(po.id), client))!.invoiceId;
+    await save(T, "ap.invoice", { externalNum: "F-1" }, String(pinv));
+    await runAction(T, "ap.invoice", String(pinv), "post", client);
+    expect([await bal("132"), await bal("131")]).toEqual(["1000.00", "0.00"]);
+
+    // přijatá faktura bez objednávky: 5 ks po 130 → průměr (1000 + 650) / 15 = 110
+    const f2 = await save(T, "ap.invoice", { vendorId: vend.id, externalNum: "F-2" });
+    await save(T, "ap.invoiceLine", { invoiceId: f2.id, itemId: item.id, qty: "5", unitPrice: "130" });
+    await runAction(T, "ap.invoice", String(f2.id), "post", client);
+    let cost = (await rows(T, "whs.itemCost", { itemId: item.id }))[0];
+    expect([cost.qty, cost.value, cost.avgCost]).toEqual(["15.0000", "1650.00", "110.00"]);
+    expect([await bal("132"), await bal("131")]).toEqual(["1650.00", "0.00"]);
+
+    // prodej 3 ks fakturou: 504 / 132 za 330
+    const cs = await save(T, "gab.subject", { name: "Odběratel" });
+    const [cg] = await rows(T, "ar.group");
+    const cust = await save(T, "ar.customer", { subjectId: cs.id, groupId: cg.id });
+    const si = await save(T, "ar.invoice", { customerId: cust.id });
+    await save(T, "ar.invoiceLine", { invoiceId: si.id, itemId: item.id, qty: "3" });
+    await runAction(T, "ar.invoice", String(si.id), "post", client);
+    expect([await bal("132"), await bal("504")]).toEqual(["1320.00", "330.00"]);
+
+    // vyřazení 2 ks (549) a inventura: napočítáno 9 místo 10 → manko 1 ks (549)
+    const sc = await save(T, "whs.journal", { kind: "scrap", warehouseId: main.id });
+    await save(T, "whs.journalLine", { journalId: sc.id, itemId: item.id, qty: "2", reason: "Prošlé" });
+    await runAction(T, "whs.journal", String(sc.id), "post", client);
+    const cnt = await save(T, "whs.journal", { kind: "count", warehouseId: main.id });
+    await runAction(T, "whs.journal", String(cnt.id), "loadOnhand", client);
+    const [cl] = await rows(T, "whs.journalLine", { journalId: cnt.id });
+    await save(T, "whs.journalLine", { countedQty: "9" }, String(cl.id));
+    await runAction(T, "whs.journal", String(cnt.id), "post", client);
+    expect([await bal("132"), await bal("549")]).toEqual(["990.00", "330.00"]);
+    cost = (await rows(T, "whs.itemCost", { itemId: item.id }))[0];
+    expect([cost.qty, cost.value]).toEqual(["9.0000", "990.00"]);
+
+    // report: hodnota = účet 132, rozdíl 0
+    const { valuationReport } = await import("@/modules/whs/report");
+    const rep = await inTenant(T, (s) => valuationReport.run(s.sys().api(), {}, { companyId: T.companyId, t: (x) => String(x) }), client);
+    expect(rep.rows.map((r) => r.value)).toEqual(["990.00", "990.00", "990.00", "0.00"]);
+  });
+});

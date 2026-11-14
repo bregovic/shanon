@@ -287,6 +287,8 @@ model SysCompany {
   whsReservation_company          WhsReservation[]       @relation("WhsReservation_company")
   whsJournal_company              WhsJournal[]           @relation("WhsJournal_company")
   whsJournalLine_company          WhsJournalLine[]       @relation("WhsJournalLine_company")
+  whsParameters_company           WhsParameters[]        @relation("WhsParameters_company")
+  whsItemCost_company             WhsItemCost[]          @relation("WhsItemCost_company")
   intConnection_company           IntConnection[]        @relation("IntConnection_company")
   intLog_company                  IntLog[]               @relation("IntLog_company")
   intDocument_company             IntDocument[]          @relation("IntDocument_company")
@@ -1012,6 +1014,12 @@ model GlAccount {
   posRegister_cashAccount         PosRegister[]       @relation("PosRegister_cashAccount")
   posRegister_cardAccount         PosRegister[]       @relation("PosRegister_cardAccount")
   posReceiptLine_revenueAccount   PosReceiptLine[]    @relation("PosReceiptLine_revenueAccount")
+  whsParameters_stockAccount      WhsParameters[]     @relation("WhsParameters_stockAccount")
+  whsParameters_inTransitAccount  WhsParameters[]     @relation("WhsParameters_inTransitAccount")
+  whsParameters_cogsAccount       WhsParameters[]     @relation("WhsParameters_cogsAccount")
+  whsParameters_lossAccount       WhsParameters[]     @relation("WhsParameters_lossAccount")
+  whsParameters_gainAccount       WhsParameters[]     @relation("WhsParameters_gainAccount")
+  whsParameters_scrapAccount      WhsParameters[]     @relation("WhsParameters_scrapAccount")
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
@@ -1095,6 +1103,7 @@ model GlVoucher {
   bankStatement_voucher BankStatement[] @relation("BankStatement_voucher")
   cashVoucher_voucher   CashVoucher[]   @relation("CashVoucher_voucher")
   posShift_voucher      PosShift[]      @relation("PosShift_voucher")
+  whsTrans_voucher      WhsTrans[]      @relation("WhsTrans_voucher")
 
   @@unique([tenantId, companyId, voucherNum])
   @@index([tenantId, companyId])
@@ -1576,6 +1585,7 @@ model InvItem {
   whsTrans_item       WhsTrans[]       @relation("WhsTrans_item")
   whsReservation_item WhsReservation[] @relation("WhsReservation_item")
   whsJournalLine_item WhsJournalLine[] @relation("WhsJournalLine_item")
+  whsItemCost_item    WhsItemCost[]    @relation("WhsItemCost_item")
 
   @@unique([tenantId, companyId, itemNum])
   @@index([tenantId, companyId])
@@ -3037,6 +3047,9 @@ model WhsTrans {
   sourceObject String?  @map("source_object") @db.VarChar(40)
   sourceId     String?  @map("source_id") @db.VarChar(36)
   reason       String?  @db.VarChar(255)
+  unitCost     Decimal? @map("unit_cost") @db.Decimal(18, 2)
+  value        Decimal? @db.Decimal(18, 2)
+  voucherId    String?  @map("voucher_id") @db.Uuid
   ext          Json     @default("{}")
   version      Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at")
@@ -3048,11 +3061,13 @@ model WhsTrans {
   item      InvItem      @relation("WhsTrans_item", fields: [itemId], references: [id], onDelete: Restrict)
   warehouse WhsWarehouse @relation("WhsTrans_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
   location  WhsLocation? @relation("WhsTrans_location", fields: [locationId], references: [id], onDelete: Restrict)
+  voucher   GlVoucher?   @relation("WhsTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([itemId])
   @@index([warehouseId])
   @@index([locationId])
+  @@index([voucherId])
   @@map("whs_trans")
 }
 
@@ -3129,6 +3144,7 @@ model WhsJournalLine {
   qty          Decimal? @db.Decimal(18, 4)
   onhandQty    Decimal? @map("onhand_qty") @db.Decimal(18, 4)
   countedQty   Decimal? @map("counted_qty") @db.Decimal(18, 4)
+  unitCost     Decimal? @map("unit_cost") @db.Decimal(18, 2)
   reason       String?  @db.VarChar(255)
   orderLineId  String?  @map("order_line_id") @db.Uuid
   ext          Json     @default("{}")
@@ -3152,6 +3168,70 @@ model WhsJournalLine {
   @@index([toLocationId])
   @@index([orderLineId])
   @@map("whs_journal_line")
+}
+
+/// whs.parameters — generováno z definice objektu
+model WhsParameters {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  companyId          String   @map("company_id") @db.Uuid
+  code               String   @default("SKLAD") @db.VarChar(20)
+  valuation          Boolean  @default(false)
+  stockAccountId     String?  @map("stock_account_id") @db.Uuid
+  inTransitAccountId String?  @map("in_transit_account_id") @db.Uuid
+  cogsAccountId      String?  @map("cogs_account_id") @db.Uuid
+  lossAccountId      String?  @map("loss_account_id") @db.Uuid
+  gainAccountId      String?  @map("gain_account_id") @db.Uuid
+  scrapAccountId     String?  @map("scrap_account_id") @db.Uuid
+  ext                Json     @default("{}")
+  version            Int      @default(1)
+  createdAt          DateTime @default(now()) @map("created_at")
+  createdBy          String?  @map("created_by") @db.Uuid
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy          String?  @map("updated_by") @db.Uuid
+
+  company          SysCompany @relation("WhsParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  stockAccount     GlAccount? @relation("WhsParameters_stockAccount", fields: [stockAccountId], references: [id], onDelete: Restrict)
+  inTransitAccount GlAccount? @relation("WhsParameters_inTransitAccount", fields: [inTransitAccountId], references: [id], onDelete: Restrict)
+  cogsAccount      GlAccount? @relation("WhsParameters_cogsAccount", fields: [cogsAccountId], references: [id], onDelete: Restrict)
+  lossAccount      GlAccount? @relation("WhsParameters_lossAccount", fields: [lossAccountId], references: [id], onDelete: Restrict)
+  gainAccount      GlAccount? @relation("WhsParameters_gainAccount", fields: [gainAccountId], references: [id], onDelete: Restrict)
+  scrapAccount     GlAccount? @relation("WhsParameters_scrapAccount", fields: [scrapAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([stockAccountId])
+  @@index([inTransitAccountId])
+  @@index([cogsAccountId])
+  @@index([lossAccountId])
+  @@index([gainAccountId])
+  @@index([scrapAccountId])
+  @@map("whs_parameters")
+}
+
+/// whs.itemCost — generováno z definice objektu
+model WhsItemCost {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  itemId    String   @map("item_id") @db.Uuid
+  qty       Decimal  @default(0) @db.Decimal(18, 4)
+  value     Decimal  @default(0) @db.Decimal(18, 2)
+  avgCost   Decimal? @map("avg_cost") @db.Decimal(18, 2)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("WhsItemCost_company", fields: [companyId], references: [id], onDelete: Restrict)
+  item    InvItem    @relation("WhsItemCost_item", fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, itemId])
+  @@index([tenantId, companyId])
+  @@index([itemId])
+  @@map("whs_item_cost")
 }
 
 /// int.connection — generováno z definice objektu

@@ -12,7 +12,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
-import { availability } from "./report";
+import { availability, valuationReport } from "./report";
 
 const Str = (id: string, label: string, maxLength: number) => defineEdt({ id, kind: "string", label, maxLength, transform: "trim" });
 const LocCode = defineEdt({ id: "WhsLocCode", kind: "string", label: "@WHS:LocCode", maxLength: 20, pattern: /^[A-Za-z0-9._]+$/, patternMessage: "@WHS:LocCodeHelp", transform: "trim" });
@@ -159,10 +159,14 @@ export const trans = defineObject({
     sourceObject: { edt: ObjId },
     sourceId: { edt: RecId },
     reason: { edt: Edts.Description, label: "@WHS:Reason" },
+    // ocenění (průměrná cena): hodnota pohybu (+ příjem, − výdej) a její zaúčtování
+    unitCost: { edt: Edts.Price, label: "@WHS:UnitCost" },
+    value: { edt: Edts.Amount, label: "@WHS:Value" },
+    voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher") },
   },
   titleField: "documentNum",
-  list: ["date", "kind", "itemId", "warehouseId", "locationId", "qty", "documentNum", "reason"],
-  form: [{ label: "@SYS:General", fields: ["date", "kind", "itemId", "warehouseId", "locationId", "qty", "documentNum", "reason"] }],
+  list: ["date", "kind", "itemId", "warehouseId", "locationId", "qty", "unitCost", "value", "documentNum", "reason", "voucherId"],
+  form: [{ label: "@SYS:General", fields: ["date", "kind", "itemId", "warehouseId", "locationId", "qty", "unitCost", "value", "documentNum", "reason", "voucherId"] }],
   defaultSort: { field: "date", dir: "desc" },
 });
 
@@ -235,12 +239,63 @@ export const journalLine = defineObject({
     qty: { edt: Edts.Qty, label: "@WHS:Qty" },
     onhandQty: { edt: Edts.Qty, label: "@WHS:OnhandQty", readOnly: true },
     countedQty: { edt: Edts.Qty, label: "@WHS:CountedQty" },
+    /** příjemka: pořizovací cena za jednotku (z objednávky / faktury) */
+    unitCost: { edt: Edts.Price, label: "@WHS:UnitCost" },
     reason: { edt: Edts.Description, label: "@WHS:Reason" },
     orderLineId: { edt: refEdt("ap.orderLine", "@WHS:OrderLine"), optionalRef: true, readOnly: true },
   },
   titleField: "itemId",
-  list: ["itemId", "locationId", "toLocationId", "qty", "onhandQty", "countedQty", "reason"],
-  form: [{ label: "@SYS:General", fields: ["journalId", "itemId", "locationId", "toLocationId", "qty", "onhandQty", "countedQty", "reason"] }],
+  list: ["itemId", "locationId", "toLocationId", "qty", "unitCost", "onhandQty", "countedQty", "reason"],
+  form: [{ label: "@SYS:General", fields: ["journalId", "itemId", "locationId", "toLocationId", "qty", "unitCost", "onhandQty", "countedQty", "reason"] }],
+});
+
+const AccountRef = (label: string) => refEdt("gl.account", label);
+
+/** Parametry skladu: ocenění zásob průměrnou cenou a účty (způsob A). */
+export const parameters = defineObject({
+  id: "whs.parameters",
+  table: "whs_parameters",
+  label: "@WHS:Parameters",
+  labelPlural: "@WHS:Parameters",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true, default: "SKLAD", readOnly: true },
+    valuation: { edt: Edts.NoYes, label: "@WHS:Valuation" },
+    stockAccountId: { edt: AccountRef("@WHS:StockAccount") },
+    inTransitAccountId: { edt: AccountRef("@WHS:InTransitAccount") },
+    cogsAccountId: { edt: AccountRef("@WHS:CogsAccount") },
+    lossAccountId: { edt: AccountRef("@WHS:LossAccount") },
+    gainAccountId: { edt: AccountRef("@WHS:GainAccount") },
+    scrapAccountId: { edt: AccountRef("@WHS:ScrapAccount") },
+  },
+  titleField: "code",
+  list: ["code", "valuation", "stockAccountId", "inTransitAccountId", "cogsAccountId"],
+  form: [
+    { label: "@WHS:Valuation", fields: ["valuation"] },
+    { label: "@GL:Posting", fields: ["stockAccountId", "inTransitAccountId", "cogsAccountId", "lossAccountId", "gainAccountId", "scrapAccountId"] },
+  ],
+  unique: [["code"]],
+});
+
+/** Průměrná cena položky (za firmu): množství, hodnota, průměr. */
+export const itemCost = defineObject({
+  id: "whs.itemCost",
+  table: "whs_item_cost",
+  label: "@WHS:ItemCost",
+  labelPlural: "@WHS:ItemCosts",
+  scope: "company",
+  systemOnly: true,
+  fields: {
+    itemId: { edt: refEdt("inv.item", "@INV:Item"), mandatory: true },
+    qty: { edt: Edts.Qty, label: "@WHS:Qty", mandatory: true, default: 0 },
+    value: { edt: Edts.Amount, label: "@WHS:Value", mandatory: true, default: 0 },
+    avgCost: { edt: Edts.Price, label: "@WHS:AvgCost" },
+  },
+  titleField: "itemId",
+  list: ["itemId", "qty", "avgCost", "value"],
+  form: [{ label: "@SYS:General", fields: ["itemId", "qty", "avgCost", "value"] }],
+  unique: [["itemId"]],
+  defaultSort: { field: "itemId", dir: "asc" },
 });
 
 /** Výchozí nastavení: úrovně lokací a hlavní sklad. */
@@ -256,6 +311,19 @@ async function whsSetup(data: DataApi) {
     }
   }
   if (!(await data.find("whs.warehouse", {}, { take: 1 })).length) await data.create("whs.warehouse", { code: "HLAVNI", name: "Hlavní sklad", isDefault: true });
+  if (!(await data.find("whs.parameters", {}, { take: 1 })).length) {
+    const { postingAccount } = await import("@/modules/gl/setup");
+    await data.create("whs.parameters", {
+      code: "SKLAD",
+      valuation: false,
+      stockAccountId: await postingAccount(data, "132"),
+      inTransitAccountId: await postingAccount(data, "131"),
+      cogsAccountId: await postingAccount(data, "504"),
+      lossAccountId: await postingAccount(data, "549"),
+      gainAccountId: await postingAccount(data, "648"),
+      scrapAccountId: await postingAccount(data, "549"),
+    });
+  }
 }
 
 export default defineModule({
@@ -265,17 +333,51 @@ export default defineModule({
   icon: "BoxMultiple",
   dependsOn: ["inv"],
   enums: [WhsTransKind, WhsJournalKind, WhsStatus],
-  objects: [locationLevel, warehouse, location, onhand, trans, reservation, journal, journalLine],
+  objects: [locationLevel, warehouse, location, onhand, trans, reservation, journal, journalLine, parameters, itemCost],
   numberSeqs: [{ code: "WHSJ", name: "@WHS:Journals", format: "SKL{YY}{#####}", usedFor: "whs.journal" }],
   setup: whsSetup,
-  reports: [availability],
+  reports: [availability, valuationReport],
+  jobs: [
+    {
+      id: "whs.postStockValue",
+      label: "@WHS:JobPostValue",
+      default: { recurrence: "hours", every: 1 },
+      async run(ctx) {
+        const { postStockValue } = await import("./stock");
+        const n = await postStockValue(ctx.data, {});
+        return ctx.t("@WHS:ValuePosted", { n: String(n) });
+      },
+    },
+  ],
   menu: [
     { label: "@WHS:Module", items: [{ object: "whs.onhand" }, { object: "whs.journal" }, { object: "whs.trans" }, { object: "whs.reservation" }] },
-    { label: "@SYS:Reports", kind: "reports", items: [{ href: "/report/whs/availability", label: "@WHS:Availability" }] },
-    { label: "@SYS:Setup", kind: "setup", items: [{ object: "whs.warehouse" }, { object: "whs.location" }, { object: "whs.locationLevel" }] },
+    { label: "@SYS:Reports", kind: "reports", items: [{ href: "/report/whs/availability", label: "@WHS:Availability" }, { href: "/report/whs/valuation", label: "@WHS:ValuationReport" }] },
+    { label: "@WHS:Module", kind: "functions", items: [{ object: "whs.itemCost" }] },
+    { label: "@SYS:Setup", kind: "setup", items: [{ object: "whs.parameters" }, { object: "whs.warehouse" }, { object: "whs.location" }, { object: "whs.locationLevel" }] },
   ],
   labels: {
     cs: {
+      UnitCost: "Cena za jednotku",
+      Value: "Hodnota",
+      AvgCost: "Průměrná cena",
+      Parameters: "Parametry skladu",
+      Valuation: "Oceňovat zásoby (průměrná cena, účtování způsobem A)",
+      StockAccount: "Zboží na skladě (132)",
+      InTransitAccount: "Pořízení zboží (131)",
+      CogsAccount: "Prodané zboží (504)",
+      LossAccount: "Inventurní manko (549)",
+      GainAccount: "Inventurní přebytek (648)",
+      ScrapAccount: "Vyřazení, škody (549)",
+      ItemCost: "Průměrná cena položky",
+      ItemCosts: "Průměrné ceny",
+      ValuationReport: "Ocenění zásob",
+      ValuationDesc: "Množství, průměrná cena a hodnota zásob; porovnání s účtem zboží na skladě.",
+      LedgerBalance: "Zůstatek účtu skladu",
+      TotalValue: "Hodnota zásob celkem",
+      Difference: "Rozdíl",
+      JobPostValue: "Zaúčtování skladových pohybů",
+      ValuePosted: "Zaúčtováno dokladů: {n}.",
+      StockText: "Sklad {doc}",
       Module: "Sklad",
       ModuleDesc: "Sklady a lokace, zásoby, příjemky, inventury, vyřazení, přesuny a rezervace.",
       Level: "Úroveň lokace",
@@ -346,6 +448,27 @@ export default defineModule({
       NothingToReceive: "Na objednávce už není nic k přijetí.",
     },
     en: {
+      UnitCost: "Unit cost",
+      Value: "Value",
+      AvgCost: "Average cost",
+      Parameters: "Warehouse parameters",
+      Valuation: "Value inventory (average cost, perpetual)",
+      StockAccount: "Goods in stock (132)",
+      InTransitAccount: "Goods purchase (131)",
+      CogsAccount: "Cost of goods sold (504)",
+      LossAccount: "Count shortage (549)",
+      GainAccount: "Count surplus (648)",
+      ScrapAccount: "Scrap, damage (549)",
+      ItemCost: "Item average cost",
+      ItemCosts: "Average costs",
+      ValuationReport: "Inventory valuation",
+      ValuationDesc: "Quantity, average cost and value of stock; comparison with the stock account.",
+      LedgerBalance: "Stock account balance",
+      TotalValue: "Total stock value",
+      Difference: "Difference",
+      JobPostValue: "Post inventory transactions",
+      ValuePosted: "Posted vouchers: {n}.",
+      StockText: "Stock {doc}",
       Module: "Warehouse",
       ModuleDesc: "Warehouses and locations, stock, receipts, counts, scrapping, transfers and reservations.",
       Level: "Location level",

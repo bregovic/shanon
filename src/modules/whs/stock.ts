@@ -10,6 +10,7 @@
  * - řádek účtenky z pokladny → výdej (sklad pokladny, jinak výchozí)
  * Výdej z prodeje smí jít do mínusu (prodej se nezastaví), deníky ne.
  */
+import { fromCents, mulCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 
 const Q = 10_000; // množství na 4 desetinná místa
@@ -56,6 +57,100 @@ export interface Move {
   sourceId?: string | null;
   reason?: string | null;
   allowNegative?: boolean;
+  /** příjem: pořizovací hodnota celého pohybu v účetní měně (haléře); bez ní průměrná cena */
+  receiptValue?: bigint | null;
+}
+
+// ---------------------------------------------------------------------------
+// Ocenění: průměrná cena za firmu (klouzavý průměr), hodnota pohybů
+// ---------------------------------------------------------------------------
+
+const Z = BigInt(0);
+const QS = BigInt(10_000); // množství ×10⁴
+const qBig = (v: unknown) => BigInt(Math.round(Number(v ?? 0) * 10_000));
+/** a / b zaokrouhleno na celé (b > 0) */
+const divRound = (a: bigint, b: bigint) => {
+  const neg = a < Z;
+  const x = neg ? -a : a;
+  const r = (x * BigInt(2) + b) / (b * BigInt(2));
+  return neg ? -r : r;
+};
+
+export async function whsParams(data: DataApi): Promise<RecordData | null> {
+  try {
+    return ((await data.find("whs.parameters", {}, { take: 1 })) as RecordData[])[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Náhradní cena, když položka nemá průměr: nákupní cena položky v účetní měně. */
+async function fallbackCost(data: DataApi, itemId: string, date: string): Promise<string> {
+  const item = await data.get("inv.item", itemId);
+  if (!item?.purchasePrice) return "0";
+  const { convertPrice } = await import("@/modules/gl/posting");
+  return convertPrice(data, data.companyId ?? null, item.purchasePrice, item.currencyId as string, null, date);
+}
+
+/** Hodnota pohybu (haléře, se znaménkem) a nový stav průměrné ceny položky. */
+async function valueMove(data: DataApi, m: Move): Promise<{ value: bigint; unitCost: string } | null> {
+  if (m.kind === "transfer") return null; // přesun hodnotu firmy nemění
+  const p = await whsParams(data);
+  if (!p?.valuation) return null;
+  const [row] = (await data.find("whs.itemCost", { itemId: m.itemId }, { take: 1 })) as RecordData[];
+  const qty0 = qBig(row?.qty);
+  const val0 = toCents(row?.value ?? 0);
+  const mq = qBig(m.qty);
+  const avgCents = async () => (qty0 > Z ? null : toCents(row?.avgCost ?? (await fallbackCost(data, m.itemId, m.date))));
+  let value: bigint;
+  if (mq > Z && m.receiptValue !== undefined && m.receiptValue !== null) value = m.receiptValue;
+  else if (qty0 > Z) value = divRound(val0 * mq, qty0); // průměr ze zásoby
+  else value = divRound((await avgCents())! * mq, QS); // bez zásoby: poslední průměr / nákupní cena
+  const qty1 = qty0 + mq;
+  // vyprodáno: zbytek hodnoty (haléřové rozdíly) odejde s posledním výdejem
+  if (qty1 === Z && mq < Z) value = -val0;
+  const val1 = val0 + value;
+  const avg = qty1 > Z ? fromCents(divRound(val1 * QS, qty1)) : (row?.avgCost as string) ?? fromCents(value < Z ? -divRound(value * QS, mq) : divRound(value * QS, mq));
+  const values = { qty: (Number(qty1) / 10_000).toFixed(4), value: fromCents(val1), avgCost: avg };
+  if (row) await data.update("whs.itemCost", String(row.id), values);
+  else await data.create("whs.itemCost", { itemId: m.itemId, ...values });
+  const unit = mq !== Z ? fromCents(divRound((value < Z ? -value : value) * QS, mq < Z ? -mq : mq)) : "0";
+  return { value, unitCost: unit };
+}
+
+/**
+ * Zaúčtování ocenění pohybů (způsob A): jeden doklad za zdrojový doklad a den.
+ *   příjem 132/131 · výdej a prodej 504/132 · vyřazení 549/132 · inventura manko 549/132, přebytek 132/648
+ */
+export async function postStockValue(data: DataApi, filter: { sourceObject?: string; sourceId?: string }): Promise<number> {
+  const p = await whsParams(data);
+  if (!p?.valuation) return 0;
+  const rows = ((await data.find("whs.trans", { ...filter, voucherId: null }, { take: 10_000, orderBy: { date: "asc" } })) as RecordData[]).filter((t) => t.value && toCents(t.value) !== Z);
+  const groups = new Map<string, RecordData[]>();
+  for (const t of rows) {
+    // pokladna: jeden doklad za den, ostatní za zdrojový doklad
+    const k = t.sourceObject === "pos.receipt" ? `pos|${t.date}` : `${t.sourceObject}|${t.sourceId}|${t.date}`;
+    groups.set(k, [...(groups.get(k) ?? []), t]);
+  }
+  const { postVoucher } = await import("@/modules/gl/posting");
+  let n = 0;
+  for (const [k, list] of groups) {
+    const acc = new Map<string, bigint>();
+    const add = (a: unknown, c: bigint) => acc.set(String(a), (acc.get(String(a)) ?? Z) + c);
+    for (const t of list) {
+      const v = toCents(t.value);
+      add(p.stockAccountId, v);
+      const other = t.kind === "receipt" ? p.inTransitAccountId : t.kind === "scrap" ? p.scrapAccountId : t.kind === "count" ? (v > Z ? p.gainAccountId : p.lossAccountId) : p.cogsAccountId;
+      add(other, -v);
+    }
+    const lines = [...acc].filter(([, c]) => c !== Z).map(([accountId, c]) => ({ accountId, amount: fromCents(c), text: String(list[0].documentNum ?? "") }));
+    if (!lines.length) continue;
+    const doc = k.startsWith("pos|") ? `POS ${list[0].date}` : String(list[0].documentNum ?? "");
+    const v = await postVoucher(data, { date: String(list[0].date), description: doc.slice(0, 255), sourceObject: "whs.trans", sourceId: String(list[0].sourceId ?? list[0].id), lines });
+    for (const t of list) await data.update("whs.trans", String(t.id), { voucherId: v.id });
+    n++;
+  }
+  return n;
 }
 
 /** Pohyb + zásoba. Výdej pod nulu jen s `allowNegative`. */
@@ -68,7 +163,21 @@ export async function move(data: DataApi, m: Move) {
     const [item, wh] = [await data.get("inv.item", m.itemId), await data.get("whs.warehouse", m.warehouseId)];
     throw new UserError("@WHS:NotEnough", { item: String(item?.name ?? ""), wh: String(wh?.code ?? ""), qty: String(q(row?.qty)) });
   }
-  await data.create("whs.trans", { date: m.date, kind: m.kind, itemId: m.itemId, warehouseId: m.warehouseId, locationId: loc, qty: qs(m.qty), documentNum: m.documentNum ?? null, sourceObject: m.sourceObject ?? null, sourceId: m.sourceId ?? null, reason: m.reason ?? null });
+  const val = await valueMove(data, m);
+  await data.create("whs.trans", {
+    date: m.date,
+    kind: m.kind,
+    itemId: m.itemId,
+    warehouseId: m.warehouseId,
+    locationId: loc,
+    qty: qs(m.qty),
+    documentNum: m.documentNum ?? null,
+    sourceObject: m.sourceObject ?? null,
+    sourceId: m.sourceId ?? null,
+    reason: m.reason ?? null,
+    unitCost: val?.unitCost ?? null,
+    value: val ? fromCents(val.value) : null,
+  });
   if (row) await data.update("whs.onhand", String(row.id), { qty: qs(next) });
   else await data.create("whs.onhand", { itemId: m.itemId, warehouseId: m.warehouseId, locationId: loc, qty: qs(next) });
 }
@@ -78,11 +187,15 @@ async function release(data: DataApi, sourceObject: string, sourceId: string) {
 }
 
 /** Řádky dokladu (faktura, objednávka) → pohyb skladových položek. */
-async function moveDocLines(data: DataApi, lines: RecordData[], sign: 1 | -1, p: { kind: Move["kind"]; date: string; warehouseId: string; documentNum: string; sourceObject: string; sourceId: string }) {
+async function moveDocLines(data: DataApi, lines: RecordData[], sign: 1 | -1, p: { kind: Move["kind"]; date: string; warehouseId: string; documentNum: string; sourceObject: string; sourceId: string; currencyId?: string | null }) {
+  const { convertPrice } = await import("@/modules/gl/posting");
   for (const l of lines) {
     if (!(await stocked(data, l.itemId))) continue;
-    await move(data, { ...p, itemId: String(l.itemId), qty: sign * q(l.qty), allowNegative: true });
+    // příjem z faktury: hodnota = základ řádku v účetní měně
+    const receiptValue = sign > 0 && l.amountNet ? toCents(await convertPrice(data, data.companyId ?? null, l.amountNet, p.currencyId ?? null, null, p.date)) : null;
+    await move(data, { ...p, itemId: String(l.itemId), qty: sign * q(l.qty), allowNegative: true, receiptValue });
   }
+  await postStockValue(data, { sourceObject: p.sourceObject, sourceId: p.sourceId });
 }
 
 const already = async (data: DataApi, sourceObject: string, sourceId: string) => (await data.find("whs.trans", { sourceObject, sourceId }, { take: 1 })).length > 0;
@@ -115,7 +228,7 @@ export async function postJournal(data: DataApi, j: RecordData) {
     const reason = (l.reason as string) ?? null;
     switch (j.kind) {
       case "receipt":
-        await move(data, { ...base, kind: "receipt", itemId, warehouseId: wh, locationId: loc, qty: q(l.qty), reason });
+        await move(data, { ...base, kind: "receipt", itemId, warehouseId: wh, locationId: loc, qty: q(l.qty), reason, receiptValue: l.unitCost !== null && l.unitCost !== undefined && l.unitCost !== "" ? mulCents(qs(q(l.qty)), 4, l.unitCost, 2) : null });
         if (l.orderLineId) {
           const ol = await data.get("ap.orderLine", String(l.orderLineId));
           if (ol) await data.update("ap.orderLine", String(ol.id), { deliveredQty: qs(q(ol.deliveredQty) + q(l.qty)) });
@@ -137,6 +250,7 @@ export async function postJournal(data: DataApi, j: RecordData) {
     }
   }
   await data.update("whs.journal", String(j.id), { status: "posted" });
+  await postStockValue(data, { sourceObject: "whs.journal", sourceId: String(j.id) });
 }
 
 /** Inventura: řádky se stavem v evidenci pro všechny zásoby skladu. */
@@ -157,7 +271,9 @@ async function receiveOrder(data: DataApi, order: RecordData) {
     if (!(await stocked(data, l.itemId))) continue;
     const rest = q(l.qty) - q(l.deliveredQty);
     if (rest <= 0) continue;
-    await data.create("whs.journalLine", { journalId: j.id, itemId: l.itemId, qty: qs(rest), orderLineId: l.id });
+    const { convertPrice } = await import("@/modules/gl/posting");
+    const unitCost = l.unitPrice ? await convertPrice(data, data.companyId ?? null, l.unitPrice, order.currencyId as string, null, today()) : null;
+    await data.create("whs.journalLine", { journalId: j.id, itemId: l.itemId, qty: qs(rest), orderLineId: l.id, unitCost });
     n++;
   }
   if (!n) {
@@ -169,6 +285,12 @@ async function receiveOrder(data: DataApi, order: RecordData) {
 // ---------------------------------------------------------------------------
 // Obsluhy
 // ---------------------------------------------------------------------------
+
+async function purchaseAccount(ctx: EventContext, d: RecordData, isNew: boolean): Promise<void> {
+  if (!on(ctx) || !isNew || !d.itemId) return;
+  const p = await whsParams(ctx.data);
+  if (p?.valuation && p.inTransitAccountId && (await stocked(ctx.data, d.itemId))) d.expenseAccountId = p.inTransitAccountId;
+}
 
 export const whsHandlers: Record<string, ObjectHandlers> = {
   "whs.location": {
@@ -233,6 +355,9 @@ export const whsHandlers: Record<string, ObjectHandlers> = {
   },
 
   // --- napojení na doklady jiných modulů -----------------------------------
+  // ocenění zapnuté: nákup skladové položky na účet pořízení (131) místo nákladů
+  "ap.invoiceLine": { beforeSave: (ctx, d, isNew) => purchaseAccount(ctx, d, isNew) },
+  "ap.orderLine": { beforeSave: (ctx, d, isNew) => purchaseAccount(ctx, d, isNew) },
   "ap.order": {
     actions: {
       async receive(ctx, order) {
@@ -269,7 +394,7 @@ export const whsHandlers: Record<string, ObjectHandlers> = {
       if (!on(ctx) || inv.status !== "posted" || inv.orderId || (await already(ctx.data, "ap.invoice", String(inv.id)))) return;
       const wh = String((await defaultWarehouse(ctx.data)).id);
       const lines = await ctx.data.find("ap.invoiceLine", { invoiceId: inv.id }, { take: 5000 });
-      await moveDocLines(ctx.data, lines, 1, { kind: "receipt", date: String(inv.invoiceDate), warehouseId: wh, documentNum: String(inv.externalNum ?? inv.invoiceNum), sourceObject: "ap.invoice", sourceId: String(inv.id) });
+      await moveDocLines(ctx.data, lines, 1, { kind: "receipt", date: String(inv.invoiceDate), warehouseId: wh, documentNum: String(inv.externalNum ?? inv.invoiceNum), sourceObject: "ap.invoice", sourceId: String(inv.id), currencyId: (inv.currencyId as string) ?? null });
     },
   },
   "pos.receiptLine": {
