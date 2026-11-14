@@ -197,6 +197,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `src/server/mail.ts`): Odeslat e-mailem (akce `outside`) založí koncept `int.mail` s PDF dokladu
   v přílohách a otevře ho (akce smí vrátit `ActionOutcome.open`); Odeslat pošle napojením druhu
   „mail“, zapíše `int.log` a u faktury `emailedAt`. Příjemce = `docEmail` partnera, jinak e-mail subjektu.
+- Upozornění (zvoneček): `notify(data, { kind, title: label, params, message, href, key })`
+  (`src/modules/sys/notify.ts`) — patří firmě, text se překládá až při zobrazení, `key` brání
+  opakování (výchozí 24 h). Přečtení po uživatelích (`sys.notificationRead`), čtení `src/server/notices.ts`.
+  Hlásí se jen to, co čeká na člověka (chyba dávky, doklady ke kontrole, nespolehlivý plátce, EET).
 - Nápověda: návody `docs/help/*.md` (hlavička title, module, objects, order, summary),
   `src/server/help.ts` (vlastní převod Markdownu, odkazy jen `/…` a `http…`). Návod se ukáže
   v `/help`, v hledání Ctrl+K a jako „?“ u modulu a objektů z `objects`. Nová agenda = návod;

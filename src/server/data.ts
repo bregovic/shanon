@@ -277,7 +277,8 @@ export class Session {
     assertAccess(this.ctx, def, "read", this.system);
     const rows = await delegate(this.tx, def).findMany({
       where: { ...toDb(def, where), ...scopeWhere(this.ctx, def) },
-      orderBy: [...Object.entries(orderBy ?? {}).filter(([f]) => f in def.fields).map(([f, d]) => ({ [f]: d })), { createdAt: "asc" }, { id: "asc" }],
+      // řazení podle polí objektu i podle času založení / změny
+      orderBy: [...Object.entries(orderBy ?? {}).filter(([f]) => f in def.fields || f === "createdAt" || f === "updatedAt").map(([f, d]) => ({ [f]: d })), { createdAt: "asc" }, { id: "asc" }],
       take,
     });
     return rows.map((r) => serialize(def, r));

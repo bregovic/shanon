@@ -7,6 +7,7 @@
  * jako systémová operace firmy; chyba se zapíše do historie a úloha běží dál
  * podle plánu. Zmeškané běhy se nedohánějí — další termín je vždy v budoucnu.
  */
+import { notify } from "@/modules/sys/notify";
 import type { EventContext, JobDef, RecordData } from "@/core/module";
 import { moduleOf } from "@/core/object";
 import { ADMIN } from "@/core/security";
@@ -95,6 +96,9 @@ const errorText = (ctx: EventContext, e: unknown) => {
 
 /** Zápis běhu do historie a další termín úlohy. */
 export async function recordRun(ctx: EventContext, job: RecordData, started: number, status: string, message: string, now = new Date()): Promise<RecordData> {
+  // chyba dávky do zvonečku (stejná úloha nejvýš jednou za 24 h)
+  if (status === "error")
+    await notify(ctx.data, { kind: "error", title: "@SYS:NotifyBatchFailed", params: { job: String(job.name ?? job.code) }, message, href: `/sys/batchJob?focus=${job.id}`, key: `batch:${job.id}` });
   const next = job.nextRunAt ? nextRun(new Date(String(job.nextRunAt)), String(job.recurrence), Number(job.every), now) : null;
   await ctx.data.create("sys.batchRun", { jobId: job.id, startedAt: new Date(started).toISOString(), durationMs: Date.now() - started, status, message: message.slice(0, 255) });
   return ctx.data.update("sys.batchJob", String(job.id), {

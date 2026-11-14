@@ -421,6 +421,8 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      NotifyEetPending: "Neodeslané tržby EET: {count} – odešlete je do 48 hodin od prodeje",
+      NotifyDocs: "Doklady ke zpracování: {attention} ke kontrole, {failed} s chybou",
       KindMail: "Pošta (e-mail)",
       DrvSmtp: "SMTP server",
       DrvMailTest: "Testovací schránka (neodesílá)",
@@ -672,6 +674,8 @@ export default defineModule({
       TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
+      NotifyEetPending: "Unsent EET sales: {count} – send them within 48 hours of the sale",
+      NotifyDocs: "Documents to process: {attention} to review, {failed} failed",
       KindMail: "Mail (e-mail)",
       DrvSmtp: "SMTP server",
       DrvMailTest: "Test mailbox (does not send)",

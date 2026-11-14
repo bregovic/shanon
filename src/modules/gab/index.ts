@@ -206,6 +206,7 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      NotifyUnreliable: "{name} ({dic}) je nově nespolehlivý plátce DPH",
       LookupUpdate: "Aktualizovat z registru",
       AccountNum: "Číslo účtu",
       AccountNumHelp: "Ve tvaru předčíslí-číslo/kód banky, např. 19-123456789/0100.",
@@ -284,6 +285,7 @@ export default defineModule({
       AresUnavailable: "ARES neodpovídá ({status}). Zkuste to později.",
     },
     en: {
+      NotifyUnreliable: "{name} ({dic}) is newly an unreliable VAT payer",
       LookupUpdate: "Update from register",
       AccountNum: "Account number",
       AccountNumHelp: "Format prefix-number/bank code, e.g. 19-123456789/0100.",

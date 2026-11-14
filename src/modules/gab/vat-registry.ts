@@ -6,6 +6,7 @@
  * Výsledek se ukládá k subjektu adresáře (Spolehlivost DPH, Ověřeno, FÚ)
  * a zveřejněné účty do jedné tabulky bankovních účtů subjektů (gab.bankAccount).
  */
+import { notify } from "@/modules/sys/notify";
 import { UserError, type DataApi, type RecordData } from "@/core/module";
 import { withService } from "@/modules/int/services";
 
@@ -108,7 +109,12 @@ export async function checkAllSubjectsVat(data: DataApi, limit = 500): Promise<{
     const map = await withService(data, "dphreg", "dphreg.batch", () => vatRegistryStatus(chunk.map((s) => czDic(s.vatId)!)), (m) => `${m.size} DIČ`);
     for (const s of chunk) {
       const st = map.get(czDic(s.vatId)!);
-      if (st?.reliability === "unreliable") unreliable++;
+      if (st?.reliability === "unreliable") {
+        unreliable++;
+        // nově nespolehlivý plátce: upozornit (za DPH z plateb mu ručíme)
+        if (s.vatReliability !== "unreliable")
+          await notify(data, { kind: "warning", title: "@GAB:NotifyUnreliable", params: { name: String(s.name ?? ""), dic: String(s.vatId ?? "") }, href: `/gab/subject?focus=${s.id}`, key: `vat:${s.id}`, dedupeHours: 24 * 30 });
+      }
       await applyVatStatus(data, s, st);
     }
   }

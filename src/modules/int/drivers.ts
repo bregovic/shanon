@@ -19,6 +19,7 @@ import {
 import { revealSecret } from "@/server/secrets";
 import { newToken } from "@/server/api-token";
 import { verifyMail } from "./mail";
+import { notify } from "@/modules/sys/notify";
 import { aresByIco } from "@/modules/gab/ares";
 import { viesLookup } from "@/modules/gab/registry-lookup";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
@@ -743,6 +744,9 @@ export const intJobs: JobDef[] = [
         sent += x.sent;
         pending += x.pending;
       }
+      // tržby, které se nedaří odeslat: lhůta je 48 h od prodeje
+      if (pending > 0)
+        await notify(ctx.data, { kind: "warning", title: "@INT:NotifyEetPending", params: { count: String(pending) }, href: "/pos/receipt", key: "eet-pending", dedupeHours: 6 });
       return ctx.t("@INT:EetResent", {
         sent: String(sent),
         pending: String(pending),

@@ -14,6 +14,7 @@ import { extractWithOpenAi } from "@/modules/int/ocr";
 import { isdocFromFile, parseIsdoc } from "@/modules/prt/isdoc";
 import { addFile, readFile } from "./docuref";
 import { ADMIN } from "@/core/security";
+import { notify } from "@/modules/sys/notify";
 import { inTenant, type Ctx } from "./data";
 
 /** Zpracovávaný doklad, který visí déle než 10 minut (pád serveru), jde zpracovat znovu. */
@@ -134,10 +135,12 @@ export async function processPendingDocuments(ctx: Ctx, client?: PrismaClient): 
   let done = 0;
   let failed = 0;
   let listed = 0;
+  let attention = 0;
   for (const id of ids) {
     try {
       const doc = await extractDocument(ctx, id, client);
       done++;
+      if (doc.status === "attention") attention++;
       const conn = doc.connectionId ? await inTenant(ctx, (s) => s.sys().api().get("int.connection", String(doc.connectionId)), client) : null;
       if (doc.status === "ready" && conn?.autoList) {
         await listDocumentWithFile(ctx, id, client);
@@ -150,5 +153,19 @@ export async function processPendingDocuments(ctx: Ctx, client?: PrismaClient): 
       if (label === "@INT:OcrDailyLimit" || label === "@INT:OcrNoConnection") break;
     }
   }
+  if (attention || failed)
+    await inTenant(
+      ctx,
+      (s) =>
+        notify(s.sys().api(), {
+          kind: failed ? "error" : "warning",
+          title: "@INT:NotifyDocs",
+          params: { attention: String(attention), failed: String(failed) },
+          href: "/int/document",
+          key: `docs:${new Date().toISOString().slice(0, 13)}`,
+          dedupeHours: 1,
+        }),
+      client,
+    );
   return inTenant(ctx, async (s) => s.sys().eventCtx("int.document").t("@INT:DocsProcessed", { done: String(done), failed: String(failed), listed: String(listed) }), client);
 }

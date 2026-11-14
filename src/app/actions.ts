@@ -25,6 +25,7 @@ import { assertPaid, connectionsFor, eetRegisterReceipt, eetResendPending, payme
 import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
+import { listNotices, markNoticesRead, type NoticeView } from "@/server/notices";
 
 export interface FormState {
   message?: string;
@@ -989,4 +990,15 @@ export async function posLockAction(registerId: string): Promise<ActionResult> {
   await lock(registerId);
   void s;
   return { ok: true, data: undefined };
+}
+
+/** Zvoneček: upozornění aktuální firmy. */
+export async function noticesAction(): Promise<{ items: NoticeView[]; unread: number }> {
+  const s = await requireSession();
+  return listNotices(s.ctx, s.lang);
+}
+
+export async function markNoticesReadAction(ids: string[]): Promise<void> {
+  const s = await requireSession();
+  await markNoticesRead(s.ctx, Array.isArray(ids) ? ids.map(String) : []);
 }

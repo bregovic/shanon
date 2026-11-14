@@ -29,3 +29,4 @@ QA;Testování a vývoj;Testování;fat;;Tato evidence: funkce, scénáře FAT/U
 INT-ISDOC;ISDOC – export a import faktur;Integrace;uat;;ISDOC 6.0.2 z vydané faktury, vložený do PDF; import .isdoc / .isdocx / PDF s ISDOC bez vytěžování.
 SYS-HELP;Nápověda k agendám;Správa systému;uat;;Návody krok za krokem (docs/help), stránka Nápověda, „?“ u modulů a formulářů, hledání Ctrl+K.
 INT-MAIL;Odesílání dokladů e-mailem;Integrace;uat;;Napojení pošty (SMTP, testovací schránka), Odeslaná pošta, Odeslat e-mailem na vydané faktuře a záloze (PDF s ISDOC).
+SYS-NOTICES;Upozornění (zvoneček);Správa systému;uat;;Zvoneček v hlavičce: chyby dávkových úloh, doklady ke kontrole, nespolehlivý plátce DPH, neodeslané tržby EET; přečtení po uživatelích.

@@ -218,6 +218,8 @@ model SysCompany {
   sysVirtualCompany_holderCompany SysVirtualCompany[]    @relation("SysVirtualCompany_holderCompany")
   sysVirtualMember_memberCompany  SysVirtualMember[]     @relation("SysVirtualMember_memberCompany")
   sysNumberSeqFree_company        SysNumberSeqFree[]     @relation("SysNumberSeqFree_company")
+  sysNotification_company         SysNotification[]      @relation("SysNotification_company")
+  sysNotificationRead_company     SysNotificationRead[]  @relation("SysNotificationRead_company")
   prtTemplate_company             PrtTemplate[]          @relation("PrtTemplate_company")
   orgEntity_company               OrgEntity[]            @relation("OrgEntity_company")
   orgSite_company                 OrgSite[]              @relation("OrgSite_company")
@@ -606,6 +608,54 @@ model SysTransformation {
   @@unique([tenantId, code])
   @@index([tenantId])
   @@map("sys_transformation")
+}
+
+/// sys.notification — generováno z definice objektu
+model SysNotification {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  kind      String   @default("info") @db.VarChar(40)
+  title     String   @db.VarChar(120)
+  params    String?
+  message   String?  @db.VarChar(255)
+  href      String?  @db.VarChar(255)
+  key       String?  @db.VarChar(120)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company                          SysCompany            @relation("SysNotification_company", fields: [companyId], references: [id], onDelete: Restrict)
+  sysNotificationRead_notification SysNotificationRead[] @relation("SysNotificationRead_notification")
+
+  @@index([tenantId, companyId])
+  @@map("sys_notification")
+}
+
+/// sys.notificationRead — generováno z definice objektu
+model SysNotificationRead {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  notificationId String   @map("notification_id") @db.Uuid
+  userId         String   @map("user_id") @db.VarChar(36)
+  ext            Json     @default("{}")
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?  @map("updated_by") @db.Uuid
+
+  company      SysCompany      @relation("SysNotificationRead_company", fields: [companyId], references: [id], onDelete: Restrict)
+  notification SysNotification @relation("SysNotificationRead_notification", fields: [notificationId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, notificationId, userId])
+  @@index([tenantId, companyId])
+  @@index([notificationId])
+  @@map("sys_notification_read")
 }
 
 /// prt.template — generováno z definice objektu

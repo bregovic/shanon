@@ -410,6 +410,61 @@ export const batchRun = defineObject({
   defaultSort: { field: "startedAt", dir: "desc" },
 });
 
+export const NoticeKind = defineEnum({
+  id: "SysNoticeKind",
+  label: "@SYS:NoticeKind",
+  values: [
+    { value: "info", label: "@SYS:NoticeInfo", color: "informative" },
+    { value: "warning", label: "@SYS:NoticeWarning", color: "warning" },
+    { value: "error", label: "@SYS:NoticeError", color: "danger" },
+  ],
+});
+
+const NoticeText = defineEdt({ id: "NoticeTitle", kind: "string", label: "@SYS:NoticeTitle", maxLength: 120 });
+const NoticeHref = defineEdt({ id: "NoticeHref", kind: "string", label: "@SYS:NoticeHref", maxLength: 255 });
+const NoticeKey = defineEdt({ id: "NoticeKey", kind: "string", label: "@SYS:NoticeKey", maxLength: 120 });
+const UserIdEdt = defineEdt({ id: "NoticeUserId", kind: "string", label: "@SYS:User", maxLength: 36 });
+
+/** Upozornění pro uživatele firmy (zvoneček); zakládá je jen logika (src/modules/sys/notify.ts). */
+export const notification = defineObject({
+  id: "sys.notification",
+  table: "sys_notification",
+  label: "@SYS:Notice",
+  labelPlural: "@SYS:Notices",
+  scope: "company",
+  systemOnly: true,
+  fields: {
+    kind: { edt: enumEdt(NoticeKind), mandatory: true, default: "info" },
+    title: { edt: NoticeText, mandatory: true },
+    params: { edt: Edts.Notes, label: "@SYS:NoticeParams" },
+    message: { edt: Edts.Description, label: "@SYS:NoticeMessage" },
+    href: { edt: NoticeHref },
+    key: { edt: NoticeKey },
+  },
+  titleField: "title",
+  list: ["kind", "title", "message"],
+  form: [{ label: "@SYS:General", fields: ["kind", "title", "params", "message", "href", "key"] }],
+  defaultSort: { field: "createdAt", dir: "desc" },
+});
+
+/** Kdo upozornění přečetl. */
+export const notificationRead = defineObject({
+  id: "sys.notificationRead",
+  table: "sys_notification_read",
+  label: "@SYS:NoticeRead",
+  labelPlural: "@SYS:NoticeRead",
+  scope: "company",
+  systemOnly: true,
+  fields: {
+    notificationId: { edt: refEdt("sys.notification", "@SYS:Notice"), mandatory: true },
+    userId: { edt: UserIdEdt, mandatory: true },
+  },
+  titleField: "userId",
+  list: ["notificationId", "userId"],
+  form: [{ label: "@SYS:General", fields: ["notificationId", "userId"] }],
+  unique: [["notificationId", "userId"]],
+});
+
 async function sysSetup(data: DataApi) {
   // transformace (formáty) z registru — jen chybějící
   for (const tr of TRANSFORMS) {
@@ -434,9 +489,9 @@ export default defineModule({
   icon: "Settings",
   core: true,
   dependsOn: [],
-  enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, ShareableObject, TransformDirectionEnum, TransformPurposeEnum, BatchClass, BatchRecurrence, BatchStatus],
+  enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, ShareableObject, TransformDirectionEnum, TransformPurposeEnum, BatchClass, BatchRecurrence, BatchStatus, NoticeKind],
   setup: sysSetup,
-  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare, numberSeqFree, transformation],
+  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare, numberSeqFree, transformation, notification, notificationRead],
   menu: [
     {
       label: "@SYS:Setup",
@@ -451,6 +506,22 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      Notice: "Upozornění",
+      Notices: "Upozornění",
+      NoticeRead: "Přečtení upozornění",
+      NoticeKind: "Druh",
+      NoticeInfo: "Informace",
+      NoticeWarning: "Upozornění",
+      NoticeError: "Chyba",
+      NoticeTitle: "Text",
+      NoticeParams: "Parametry",
+      NoticeMessage: "Podrobnosti",
+      NoticeHref: "Odkaz",
+      NoticeKey: "Klíč",
+      NoticesEmpty: "Žádná nová upozornění.",
+      NoticesAllRead: "Označit vše jako přečtené",
+      NoticesShowRead: "Zobrazit i přečtené",
+      NotifyBatchFailed: "Dávková úloha {job} skončila chybou",
       Help: "Nápověda",
       HelpGeneral: "Obecně",
       HelpSearch: "Hledat v návodech",
@@ -777,6 +848,22 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      Notice: "Notification",
+      Notices: "Notifications",
+      NoticeRead: "Notification read",
+      NoticeKind: "Kind",
+      NoticeInfo: "Information",
+      NoticeWarning: "Warning",
+      NoticeError: "Error",
+      NoticeTitle: "Text",
+      NoticeParams: "Parameters",
+      NoticeMessage: "Details",
+      NoticeHref: "Link",
+      NoticeKey: "Key",
+      NoticesEmpty: "No new notifications.",
+      NoticesAllRead: "Mark all as read",
+      NoticesShowRead: "Show read too",
+      NotifyBatchFailed: "Batch job {job} failed",
       Help: "Help",
       HelpGeneral: "General",
       HelpSearch: "Search guides",

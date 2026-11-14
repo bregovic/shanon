@@ -59,3 +59,4 @@ CR-057;change;Sklad: sklady a lokace (až 6 vlastních úrovní), inventurní / 
 CR-058;change;ISDOC: export vydané faktury, ISDOC v PDF, import ISDOC do dokladů ke zpracování;INT-ISDOC;medium;uat;58;Nasazeno 14.11.2026.
 CR-059;change;Nápověda: návody k agendám, „?“ u modulů a formulářů, Ctrl+K;SYS-HELP;medium;uat;59;Nasazeno 14.11.2026.
 CR-060;change;Odesílání dokladů e-mailem (SMTP v Integraci, Odeslaná pošta);INT-MAIL;high;uat;60;Faktura a záloha s PDF (faktura s ISDOC); hromadné odeslání a upomínky později.
+CR-061;change;Zvoneček interních upozornění (chyby, čekající doklady, registr DPH, EET);SYS-NOTICES;medium;uat;61;Workflow schvalování později.
