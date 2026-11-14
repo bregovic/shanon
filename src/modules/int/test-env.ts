@@ -14,6 +14,8 @@ const TEST_CONNECTIONS = [
   { code: "TEST-EET", kind: "eet", driver: "eet2", name: "@INT:TestEet", extra: { unitId: "1", posId: "TEST", environment: "playground", certPassword: PLAYGROUND_CERT_PASSWORD, certData: PLAYGROUND_CERT_P12, certSubject: PLAYGROUND_CERT_DIC, certValidTo: "2027-05-14" } },
   { code: "TEST-PAY", kind: "payment", driver: "simulator", name: "@INT:TestPay", extra: {} },
   { code: "TEST-PRINT", kind: "printer", driver: "browser", name: "@INT:TestPrint", extra: { paperWidth: "80" } },
+  // vytěžování dokladů klíčem z prostředí serveru (do databáze se neukládá)
+  { code: "TEST-OCR", kind: "ocr", driver: "openaiTest", name: "@INT:TestOcr", extra: { model: "gpt-5-mini", dailyLimit: 30 } },
 ] as const;
 
 export interface TestEnvState {

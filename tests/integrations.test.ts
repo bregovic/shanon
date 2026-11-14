@@ -536,7 +536,7 @@ describe("dávkové úlohy", () => {
     const { runDueJobs } = await import("@/server/batch");
     const B = (await provisionTenant(client, { code: `t-bat-${run}`, name: "Batch", adminEmail: `bat-${run}@test.local`, adminPassword: "heslo-12345", modules: ["gl", "int"], company: { code: "B", name: "B" } })).ctx;
     const jobs = (await listRecords(B, "sys.batchJob", {}, client)).rows;
-    expect(jobs.map((j) => j.jobClass).sort()).toEqual(["gl.dimensionRules", "int.eetResend", "sys.ratesCnb", "sys.ratesEcb"]);
+    expect(jobs.map((j) => j.jobClass).sort()).toEqual(["gl.dimensionRules", "int.eetResend", "int.processDocuments", "sys.ratesCnb", "sys.ratesEcb"]);
     const dim = jobs.find((j) => j.jobClass === "gl.dimensionRules")!;
     await runAction(B, "sys.batchJob", String(dim.id), "run", client);
     const after = await getRecord(B, "sys.batchJob", String(dim.id), client);
@@ -673,7 +673,7 @@ describe("testovací prostředí a datové služby (CR-036)", () => {
       const api = s.sys().api();
       await enableTestEnv(api, (x) => x, true);
       const st = await testEnvState(api);
-      expect([st.active, st.connections.map((c) => c.code).sort(), st.paused]).toEqual([true, ["TEST-EET", "TEST-PAY", "TEST-PRINT"], ["SUMUP"]]);
+      expect([st.active, st.connections.map((c) => c.code).sort(), st.paused]).toEqual([true, ["TEST-EET", "TEST-OCR", "TEST-PAY", "TEST-PRINT"], ["SUMUP"]]);
       expect((await api.find("pos.box", {}, { take: 10 })).length).toBe(5);
       const conns = await connectionsFor(api, reg);
       expect([conns.eet?.driver, conns.eet?.environment, conns.eet?.certSubject, conns.payment?.driver, conns.printer?.driver]).toEqual(["eet2", "playground", "CZ8551015704", "simulator", "browser"]);

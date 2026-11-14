@@ -275,6 +275,8 @@ model SysCompany {
   posBasketLine_company           PosBasketLine[]     @relation("PosBasketLine_company")
   intConnection_company           IntConnection[]     @relation("IntConnection_company")
   intLog_company                  IntLog[]            @relation("IntLog_company")
+  intDocument_company             IntDocument[]       @relation("IntDocument_company")
+  intDocumentLine_company         IntDocumentLine[]   @relation("IntDocumentLine_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -659,6 +661,7 @@ model GabSubject {
   arCustomer_subject       ArCustomer[]       @relation("ArCustomer_subject")
   apVendor_subject         ApVendor[]         @relation("ApVendor_subject")
   cashVoucher_subject      CashVoucher[]      @relation("CashVoucher_subject")
+  intDocument_subject      IntDocument[]      @relation("IntDocument_subject")
 
   @@index([tenantId, companyId])
   @@map("gab_subject")
@@ -1572,6 +1575,7 @@ model ArCustomer {
   arInvoice_customer           ArInvoice[]     @relation("ArInvoice_customer")
   arAdvance_customer           ArAdvance[]     @relation("ArAdvance_customer")
   arTrans_customer             ArTrans[]       @relation("ArTrans_customer")
+  intDocument_customer         IntDocument[]   @relation("IntDocument_customer")
 
   @@unique([tenantId, companyId, accountNum])
   @@unique([tenantId, companyId, subjectId])
@@ -1909,6 +1913,7 @@ model ApVendor {
   apInvoice_vendor           ApInvoice[]     @relation("ApInvoice_vendor")
   apAdvance_vendor           ApAdvance[]     @relation("ApAdvance_vendor")
   apTrans_vendor             ApTrans[]       @relation("ApTrans_vendor")
+  intDocument_vendor         IntDocument[]   @relation("IntDocument_vendor")
 
   @@unique([tenantId, companyId, accountNum])
   @@unique([tenantId, companyId, subjectId])
@@ -2632,6 +2637,9 @@ model IntConnection {
   scopes         String?   @db.VarChar(400)
   tokenPrefix    String?   @map("token_prefix") @db.VarChar(40)
   tokenHash      String?   @map("token_hash") @db.VarChar(64)
+  model          String?   @db.VarChar(60)
+  dailyLimit     Int?      @default(50) @map("daily_limit")
+  autoList       Boolean   @default(false) @map("auto_list")
   lastCheckAt    DateTime? @map("last_check_at") @db.Date
   lastResult     String?   @map("last_result") @db.VarChar(255)
   ext            Json      @default("{}")
@@ -2641,9 +2649,10 @@ model IntConnection {
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy      String?   @map("updated_by") @db.Uuid
 
-  company           SysCompany   @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
-  register          PosRegister? @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
-  intLog_connection IntLog[]     @relation("IntLog_connection")
+  company                SysCompany    @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register               PosRegister?  @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
+  intLog_connection      IntLog[]      @relation("IntLog_connection")
+  intDocument_connection IntDocument[] @relation("IntDocument_connection")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -2676,6 +2685,89 @@ model IntLog {
   @@index([tenantId, companyId])
   @@index([connectionId])
   @@map("int_log")
+}
+
+/// int.document — generováno z definice objektu
+model IntDocument {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  docNum       String    @map("doc_num") @db.VarChar(20)
+  fileName     String?   @map("file_name") @db.VarChar(255)
+  target       String    @default("auto") @db.VarChar(40)
+  status       String    @default("new") @db.VarChar(40)
+  docType      String?   @map("doc_type") @db.VarChar(40)
+  partnerName  String?   @map("partner_name") @db.VarChar(120)
+  regNo        String?   @map("reg_no") @db.VarChar(12)
+  vatId        String?   @map("vat_id") @db.VarChar(16)
+  bankAccount  String?   @map("bank_account") @db.VarChar(60)
+  subjectId    String?   @map("subject_id") @db.Uuid
+  vendorId     String?   @map("vendor_id") @db.Uuid
+  customerId   String?   @map("customer_id") @db.Uuid
+  docNumber    String?   @map("doc_number") @db.VarChar(40)
+  orderNumber  String?   @map("order_number") @db.VarChar(40)
+  issueDate    DateTime? @map("issue_date") @db.Date
+  taxDate      DateTime? @map("tax_date") @db.Date
+  dueDate      DateTime? @map("due_date") @db.Date
+  vs           String?   @db.VarChar(10)
+  currencyCode String?   @map("currency_code") @db.VarChar(10)
+  amountNet    Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount    Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  amountGross  Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  message      String?   @db.VarChar(255)
+  connectionId String?   @map("connection_id") @db.Uuid
+  resultObject String?   @map("result_object") @db.VarChar(40)
+  resultId     String?   @map("result_id") @db.VarChar(36)
+  resultTitle  String?   @map("result_title") @db.VarChar(255)
+  raw          String?
+  ext          Json      @default("{}")
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by") @db.Uuid
+
+  company                  SysCompany        @relation("IntDocument_company", fields: [companyId], references: [id], onDelete: Restrict)
+  subject                  GabSubject?       @relation("IntDocument_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+  vendor                   ApVendor?         @relation("IntDocument_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  customer                 ArCustomer?       @relation("IntDocument_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  connection               IntConnection?    @relation("IntDocument_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+  intDocumentLine_document IntDocumentLine[] @relation("IntDocumentLine_document")
+
+  @@index([tenantId, companyId])
+  @@index([subjectId])
+  @@index([vendorId])
+  @@index([customerId])
+  @@index([connectionId])
+  @@map("int_document")
+}
+
+/// int.documentLine — generováno z definice objektu
+model IntDocumentLine {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  documentId  String   @map("document_id") @db.Uuid
+  lineNum     Int?     @map("line_num")
+  description String   @db.VarChar(255)
+  qty         Decimal  @default(1) @db.Decimal(18, 4)
+  unit        String?  @db.VarChar(10)
+  unitPrice   Decimal? @map("unit_price") @db.Decimal(18, 2)
+  taxRate     Decimal? @map("tax_rate") @db.Decimal(7, 4)
+  amountNet   Decimal? @map("amount_net") @db.Decimal(18, 2)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company  SysCompany  @relation("IntDocumentLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  document IntDocument @relation("IntDocumentLine_document", fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([documentId])
+  @@map("int_document_line")
 }
 
 /// qa.feature — generováno z definice objektu

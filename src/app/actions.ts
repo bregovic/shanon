@@ -908,3 +908,29 @@ export async function createCompanyFromRegistryAction(query: string): Promise<Ac
     return fail(e, s.lang, s.ctx.tenantId);
   }
 }
+
+/**
+ * Integrace → Načíst doklady: jeden soubor = jeden doklad ke zpracování
+ * (příloha), volitelně hned vytěžit. Volá se po souborech (limit těla akce).
+ */
+export async function docImportAction(form: FormData): Promise<ActionResult<{ id: string; docNum: string; status: string; message: string | null }>> {
+  const s = await requireSession();
+  try {
+    const file = form.get("file");
+    if (!(file instanceof File) || !file.size) throw new UserError("@SYS:Required");
+    const name = file.name.slice(0, 200);
+    if (!/\.(pdf|jpe?g|png|webp)$/i.test(name)) throw new UserError("@INT:OcrFileType");
+    const target = String(form.get("target") ?? "auto");
+    const doc = await saveRecord(s.ctx, "int.document", null, { fileName: name, target });
+    const { addFile } = await import("@/server/docuref");
+    await addFile(s.ctx, "int.document", String(doc.id), { name, type: file.type, data: Buffer.from(await file.arrayBuffer()) });
+    let out = doc;
+    if (form.get("extract") === "1") {
+      const { extractDocument } = await import("@/server/doc-import");
+      out = await extractDocument(s.ctx, String(doc.id)).catch(async () => (await getRecord(s.ctx, "int.document", String(doc.id)))!);
+    }
+    return { ok: true, data: { id: String(doc.id), docNum: String(out.docNum ?? doc.docNum), status: String(out.status), message: (out.message as string) ?? null } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}

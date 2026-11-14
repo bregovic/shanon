@@ -89,6 +89,13 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   CASHIN/CASHOUT), DPH zjednodušeného dokladu do `tax.trans` (`simplified`), výdej do
   mínusu nejde; report čte `gl.trans` účtu pokladny (i uzávěrky směn z kasy).
   Reporty umí parametr `kind: "ref"` (výběr záznamu objektu `refObject`).
+- Síť mimo transakci (transakce max. 20 s): akce `outside: true` / úloha `JobDef.outside`
+  — obsluha v `src/server/outside.ts`, oprávnění ověří `runAction` předem (`checkOnly`).
+- Vytěžování dokladů (`src/modules/int/ocr.ts`, `documents.ts`, `src/server/doc-import.ts`):
+  napojení druhu „ocr“ (OpenAI Responses API, strukturovaný výstup; `openaiTest` = klíč
+  `SHANON_TEST_OCR_KEY` z prostředí, nikdy v DB), mezitabulka `int.document` (+ řádky),
+  Vytěžit → kontrola (partner podle IČO/DIČ, součty, duplicita) → Zalistovat = koncept
+  dokladu v agendě s přiloženým souborem. Denní limit napojení, dávka `int.processDocuments`.
 - Veřejné datové služby (ARES, ČNB, ECB) volat přes `withService(data, "ares"|"cnb"|"ecb", …)`
   (`src/modules/int/services.ts`): napojení druhu „service“ (zakládá výchozí nastavení)
   je jde vypnout, otestovat a volání jdou do `int.log`; bez Integrace běží služba bez logu.

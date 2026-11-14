@@ -18,7 +18,7 @@ export default async function TestEnvPage() {
     <TestEnvView
       crumbs={[{ label: k("Module"), href: "/int" }, { label: k("TestEnv") }]}
       initial={state}
-      items={[k("TestEnvEet"), k("TestEnvPay"), k("TestEnvPrint"), ...(s.ctx.modules.has("pos") ? [k("TestEnvBoxes")] : [])]}
+      items={[k("TestEnvEet"), k("TestEnvPay"), k("TestEnvPrint"), k("TestEnvOcr"), ...(s.ctx.modules.has("pos") ? [k("TestEnvBoxes")] : [])]}
       labels={{
         intro: k("TestEnvIntro"),
         will: k("TestEnvWill"),

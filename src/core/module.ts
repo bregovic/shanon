@@ -19,6 +19,8 @@ export interface MenuItem {
   object?: string;
   href?: string;
   label?: LabelRef;
+  /** položka jen se zapnutým modulem (odkaz do modulu, na kterém tento nezávisí) */
+  module?: string;
 }
 
 export interface MenuGroup {
@@ -72,6 +74,11 @@ export interface JobDef {
   id: string;
   label: LabelRef;
   run: (ctx: EventContext) => Promise<string | void>;
+  /**
+   * úloha volá síť (vytěžování dokladů): běží mimo databázovou transakci,
+   * data čte a zapisuje po krocích sama (`src/server/outside.ts`); `run` se pak nevolá
+   */
+  outside?: boolean;
   default?: { recurrence: "minutes" | "hours" | "days" | "weeks" | "months"; every: number; at?: string; active?: boolean };
 }
 

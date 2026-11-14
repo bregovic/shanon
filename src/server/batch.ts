@@ -83,9 +83,18 @@ export async function executeJob(ctx: EventContext, job: RecordData, now = new D
     message = (await def.run(ctx)) ?? ctx.t("@SYS:BatchDone");
   } catch (e) {
     status = "error";
-    const ref = (e as { label?: string }).label;
-    message = ref ? ctx.t(ref, (e as { params?: Record<string, string> }).params) : e instanceof Error ? e.message : String(e);
+    message = errorText(ctx, e);
   }
+  return recordRun(ctx, job, started, status, message, now);
+}
+
+const errorText = (ctx: EventContext, e: unknown) => {
+  const ref = (e as { label?: string }).label;
+  return ref ? ctx.t(ref, (e as { params?: Record<string, string> }).params) : e instanceof Error ? e.message : String(e);
+};
+
+/** Zápis běhu do historie a další termín úlohy. */
+export async function recordRun(ctx: EventContext, job: RecordData, started: number, status: string, message: string, now = new Date()): Promise<RecordData> {
   const next = job.nextRunAt ? nextRun(new Date(String(job.nextRunAt)), String(job.recurrence), Number(job.every), now) : null;
   await ctx.data.create("sys.batchRun", { jobId: job.id, startedAt: new Date(started).toISOString(), durationMs: Date.now() - started, status, message: message.slice(0, 255) });
   return ctx.data.update("sys.batchJob", String(job.id), {
@@ -121,6 +130,7 @@ export async function runDueJobs(now = new Date(), client: PrismaClient = prisma
         extensions: new Set(),
         lang: "cs",
       };
+      const outside = jobDefs().get(job.jobClass)?.outside;
       await inTenant(
         ctx,
         async (s) => {
@@ -132,14 +142,32 @@ export async function runDueJobs(now = new Date(), client: PrismaClient = prisma
             await sys.api().update("sys.batchJob", job.id, { active: false, status: "error", lastMessage: sys.eventCtx("sys.batchJob").t("@SYS:BatchModuleOff") });
             return;
           }
-          await executeJob(sys.eventCtx("sys.batchJob"), rec, now);
+          if (!outside) await executeJob(sys.eventCtx("sys.batchJob"), rec, now);
         },
         client,
       ).catch((e) => console.error(`[batch] ${t.code}/${job.code}:`, e));
+      if (outside && enabled.has(moduleOf(job.jobClass))) await executeOutsideJob(ctx, job.id, now, client).catch((e) => console.error(`[batch] ${t.code}/${job.code}:`, e));
       count++;
     }
   }
   return count;
+}
+
+/** Úloha mimo transakci (síť): práce po krocích, pak zápis běhu. */
+export async function executeOutsideJob(ctx: Ctx, jobId: string, now = new Date(), client: PrismaClient = prisma): Promise<void> {
+  const job = await inTenant(ctx, (s) => s.sys().api().get("sys.batchJob", jobId), client);
+  if (!job) return;
+  const started = Date.now();
+  const { runOutsideJob } = await import("./outside");
+  let status = "ok";
+  let message = "";
+  try {
+    message = await runOutsideJob(ctx, String(job.jobClass), client);
+  } catch (e) {
+    status = "error";
+    message = await inTenant(ctx, async (s) => errorText(s.sys().eventCtx("sys.batchJob"), e), client);
+  }
+  await inTenant(ctx, async (s) => void (await recordRun(s.sys().eventCtx("sys.batchJob"), job, started, status, message, now)), client);
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;

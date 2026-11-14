@@ -9,7 +9,12 @@ export const batchHandlers: Record<string, ObjectHandlers> = {
     },
     actions: {
       async run(ctx, rec) {
-        const { executeJob } = await import("@/server/batch");
+        const { executeJob, jobDefs } = await import("@/server/batch");
+        // úloha se sítí běží mimo transakci — plánovač ji spustí do minuty
+        if (jobDefs().get(String(rec.jobClass))?.outside) {
+          await ctx.data.update("sys.batchJob", String(rec.id), { active: true, nextRunAt: new Date().toISOString(), lastMessage: ctx.t("@SYS:BatchQueued") });
+          return;
+        }
         await executeJob(ctx, rec);
       },
     },

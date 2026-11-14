@@ -396,6 +396,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     },
     menu: [
       { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }] },
+      // nahrání dokladů k vytěžení (Integrace), cíl předvolený podle agendy
+      { label: L("Module"), kind: "functions" as const, items: [{ href: `/int/doc-import?target=${m}Invoice`, label: "@INT:DocImport", module: "int" }] },
       { label: "@SYS:Setup", items: [{ object: group.id }] },
     ],
     /** výchozí skupina partnerů (účtovací profil) podle čísel účtů */

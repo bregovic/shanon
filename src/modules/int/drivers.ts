@@ -5,6 +5,8 @@
  *
  * Každá komunikace s vnější službou se zapíše do protokolu int.log.
  */
+import { checkDocument, createDocPartner } from "./documents";
+import { testOpenAi } from "./ocr";
 import { randomUUID } from "node:crypto";
 import {
   UserError,
@@ -32,6 +34,7 @@ import {
 } from "./eet";
 
 export const DRIVERS: Record<string, string[]> = {
+  ocr: ["openai", "openaiTest"],
   eet: ["eet2", "eetSimulator"],
   printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator"],
@@ -474,6 +477,20 @@ export async function paymentCancel(
 // ---------------------------------------------------------------------------
 
 export const intHandlers: Record<string, ObjectHandlers> = {
+  "int.document": {
+    actions: {
+      async check(ctx, doc) {
+        if (doc.status === "listed") throw new UserError("@SYS:Locked");
+        await checkDocument(ctx.data, doc, ctx.t);
+      },
+      async createPartner(ctx, doc) {
+        await createDocPartner(ctx.data, doc, ctx.t);
+      },
+      async reject(ctx, doc) {
+        await ctx.data.update("int.document", String(doc.id), { status: "rejected" });
+      },
+    },
+  },
   "int.connection": {
     beforeSave(_ctx, d) {
       const e: Record<string, string> = {};
@@ -604,6 +621,14 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         }
         if (conn.driver === "eetSimulator")
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
+        if (conn.kind === "ocr") {
+          const model = await testOpenAi(conn).catch(async (e) => {
+            await writeLog(ctx.data, conn, "ocr.test", "error", { message: ctx.t((e as UserError).label ?? "@INT:StatusError", (e as UserError).params) });
+            throw e;
+          });
+          await writeLog(ctx.data, conn, "ocr.test", "ok", { message: model });
+          return setCheck(ctx.data, conn, ctx.t("@INT:OcrTestOk", { model }));
+        }
         if (conn.kind === "eet") {
           const cert = eetCertOf(conn);
           const eic = await eetDic(ctx.data, ctx.companyId, conn, cert);
@@ -680,6 +705,8 @@ export const intHandlers: Record<string, ObjectHandlers> = {
 
 /** Dávka: dodatečné odeslání čekajících účtenek do EET (všechny pokladny firmy). */
 export const intJobs: JobDef[] = [
+  // vytěžení nových dokladů (síť → mimo transakci, src/server/doc-import.ts)
+  { id: "int.processDocuments", label: "@INT:JobDocuments", outside: true, default: { recurrence: "minutes", every: 15 }, run: async () => undefined },
   {
     id: "int.eetResend",
     label: "@INT:JobEetResend",

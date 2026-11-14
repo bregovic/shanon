@@ -513,7 +513,8 @@ export class Session {
     for (const h of handlersFor(this.ctx, objectId)) await h.afterDelete?.(ectx, existing);
   }
 
-  async action(objectId: string, id: string, actionId: string, file?: ActionFile): Promise<void> {
+  /** `checkOnly` = jen oprávnění a podmínky (akce mimo transakci, `src/server/outside.ts`) */
+  async action(objectId: string, id: string, actionId: string, file?: ActionFile, checkOnly = false): Promise<void> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system);
     const a = def.actions?.find((x) => x.id === actionId);
@@ -522,6 +523,8 @@ export class Session {
     const record = await this.sys().get(objectId, id);
     if (!record) throw new UserError("@SYS:NotFound");
     if (a.when && record[a.when.field] !== a.when.equals) throw new UserError("@SYS:Locked");
+    if (checkOnly) return;
+    if (a.outside) throw new UserError("@SYS:InvalidValue");
     // osamostatnění firmy z virtuální společnosti (jádro: přímý přístup k datům všech firem)
     if (objectId === "sys.virtualMember" && actionId === "detach") return detachMember(this, record);
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];
@@ -634,8 +637,15 @@ export const deleteRecord = (ctx: Ctx, objectId: string, id: string, client?: Pr
 export const downloadFile = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.download(objectId, id, actionId), client);
 
-export const runAction = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile) =>
-  inTenant(ctx, (s) => s.action(objectId, id, actionId, file), client);
+export async function runAction(ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile): Promise<void> {
+  if (getObject(objectId).actions?.find((x) => x.id === actionId)?.outside) {
+    // síť mimo transakci: oprávnění a podmínky ověří transakce, práci obsluha po krocích
+    await inTenant(ctx, (s) => s.action(objectId, id, actionId, file, true), client);
+    const { runOutsideAction } = await import("./outside");
+    return runOutsideAction(ctx, objectId, id, actionId, client);
+  }
+  return inTenant(ctx, (s) => s.action(objectId, id, actionId, file), client);
+}
 
 /** Možnosti pro výběr odkazu (combobox ve formuláři). */
 export const refOptions = (ctx: Ctx, objectId: string, q: string, client?: PrismaClient) =>

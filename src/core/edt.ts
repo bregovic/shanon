@@ -93,7 +93,7 @@ export const Edts = {
   Balance: defineEdt({ id: "Balance", kind: "decimal", label: "@SYS:Balance", precision: 18, scale: 2, align: "right", noTotal: true }),
   /** částka v měně dokladu — v seznamu může být víc měn, nesčítá se */
   AmountCur: defineEdt({ id: "AmountCur", kind: "decimal", label: "@SYS:AmountCur", precision: 18, scale: 2, align: "right", noTotal: true }),
-  Percent: defineEdt({ id: "Percent", kind: "decimal", label: "@SYS:Percent", precision: 7, scale: 4, align: "right" }),
+  Percent: defineEdt({ id: "Percent", kind: "decimal", label: "@SYS:Percent", precision: 7, scale: 4, align: "right", noTotal: true }),
   Int: defineEdt({ id: "Int", kind: "int", label: "@SYS:Number", align: "right" }),
   Email: defineEdt({
     id: "Email",
