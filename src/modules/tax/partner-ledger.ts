@@ -119,13 +119,15 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       groupId: { edt: refEdt(id("group"), L("Group")), mandatory: true },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
       paymentDays: { edt: Edts.Int, label: "@TAX:PaymentDays" },
+      /** výchozí účet pro platby (z bankovních účtů subjektu) */
+      bankAccountId: { edt: refEdt("gab.bankAccount", "@GAB:BankAccount") },
       blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
     },
     titleField: "accountNum",
     list: ["accountNum", "subjectId", "groupId", "currencyId", "paymentDays", "blocked"],
     form: [
       { label: "@SYS:General", fields: ["accountNum", "subjectId", "groupId", "blocked"] },
-      { label: L("Terms"), fields: ["currencyId", "paymentDays"] },
+      { label: L("Terms"), fields: ["currencyId", "paymentDays", "bankAccountId"] },
       { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
     unique: [["accountNum"], ["subjectId"]],
@@ -393,7 +395,20 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       // faktura z objednávky: smazáním konceptu se objednávka vrátí k fakturaci
       [invoice.id]: { ...inv[invoice.id], beforeDelete: (ctx: EventContext, d: RecordData) => releaseOrder(ctx.data, docs, d) },
       // údaje partnera = údaje jeho subjektu v adresáři
-      [partner.id]: { actions: { ares: async (ctx: EventContext, p: RecordData) => void (await fillFromAres(ctx.data, String(p.subjectId))) } } as ObjectHandlers,
+      [partner.id]: {
+        // výchozí účet musí patřit subjektu partnera; bez zadání první zveřejněný / výchozí
+        async beforeSave(ctx: EventContext, d: RecordData) {
+          if (d.bankAccountId) {
+            const acc = await ctx.data.get("gab.bankAccount", String(d.bankAccountId));
+            if (!acc || acc.subjectId !== d.subjectId) return { bankAccountId: "@GAB:AccountOtherSubject" };
+          } else if (d.subjectId) {
+            const accs = (await ctx.data.find("gab.bankAccount", { subjectId: d.subjectId, blocked: false }, { take: 50 })) as RecordData[];
+            const pick = accs.find((a) => a.isDefault) ?? accs.find((a) => a.published) ?? null;
+            if (pick) d.bankAccountId = pick.id;
+          }
+        },
+        actions: { ares: async (ctx: EventContext, p: RecordData) => void (await fillFromAres(ctx.data, String(p.subjectId))) },
+      } as ObjectHandlers,
     },
     menu: [
       { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }] },

@@ -898,6 +898,6 @@ describe("souvislá řada", () => {
     const c = await saveRecord(A, "ar.invoice", null, { customerId: cust.id }, undefined, client);
     expect(c.invoiceNum).toBe(a.invoiceNum);
     const d = await saveRecord(A, "ar.invoice", null, { customerId: cust.id }, undefined, client);
-    expect(d.invoiceNum > String(b.invoiceNum)).toBe(true);
+    expect(String(d.invoiceNum) > String(b.invoiceNum)).toBe(true);
   });
 });

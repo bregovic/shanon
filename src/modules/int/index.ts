@@ -40,6 +40,7 @@ export const Driver = defineEnum({
     { value: "cnb", label: "@INT:DrvCnb" },
     { value: "ecb", label: "@INT:DrvEcb" },
     { value: "vies", label: "@INT:DrvVies" },
+    { value: "dphreg", label: "@INT:DrvDphreg" },
     { value: "openai", label: "@INT:DrvOpenai" },
     { value: "openaiTest", label: "@INT:DrvOpenaiTest" },
   ],
@@ -324,6 +325,7 @@ async function intSetup(data: DataApi) {
     ["CNB", "cnb", "Kurzy ČNB"],
     ["ECB", "ecb", "Kurzy ECB"],
     ["VIES", "vies", "VIES – plátci DPH v EU"],
+    ["DPH", "dphreg", "Registr plátců DPH (Finanční správa)"],
   ]) {
     if (!(await data.find("int.connection", { kind: "service", driver }, { take: 1 })).length) {
       await data.create("int.connection", { code, name, kind: "service", driver, active: true });
@@ -349,6 +351,7 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      DrvDphreg: "Registr plátců DPH",
       KindOcr: "Vytěžování dokladů",
       DrvOpenai: "OpenAI",
       DrvOpenaiTest: "OpenAI – testovací klíč serveru",
@@ -554,6 +557,7 @@ export default defineModule({
       TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
+      DrvDphreg: "VAT payer register",
       KindOcr: "Document capture",
       DrvOpenai: "OpenAI",
       DrvOpenaiTest: "OpenAI – server test key",

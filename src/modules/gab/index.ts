@@ -36,6 +36,30 @@ const City = defineEdt({ id: "City", kind: "string", label: "@GAB:City", maxLeng
 const ZipCode = defineEdt({ id: "ZipCode", kind: "string", label: "@GAB:ZipCode", maxLength: 10 });
 const ContactValue = defineEdt({ id: "ContactValue", kind: "string", label: "@GAB:ContactValue", maxLength: 254 });
 const SubjectRef = refEdt("gab.subject", "@GAB:Subject");
+const SubjBankAccount = defineEdt({ id: "SubjectBankAccountNum", kind: "string", label: "@GAB:AccountNum", maxLength: 30, pattern: /^(\d{1,6}-)?\d{2,10}\/\d{4}$/, patternMessage: "@GAB:AccountNumHelp", transform: "trim" });
+const SubjIban = defineEdt({ id: "SubjectIban", kind: "string", label: "@GAB:Iban", maxLength: 34, pattern: /^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/, patternMessage: "@GAB:IbanHelp", transform: "upper" });
+const Bic = defineEdt({ id: "SubjectBic", kind: "string", label: "@GAB:Bic", maxLength: 11, pattern: /^[A-Z0-9]{8}([A-Z0-9]{3})?$/, transform: "upper" });
+const TaxOffice = defineEdt({ id: "TaxOfficeNo", kind: "string", label: "@GAB:TaxOffice", maxLength: 10 });
+
+export const VatReliability = defineEnum({
+  id: "VatReliability",
+  label: "@GAB:VatReliability",
+  values: [
+    { value: "reliable", label: "@GAB:VatReliable", color: "success" },
+    { value: "unreliable", label: "@GAB:VatUnreliable", color: "danger" },
+    { value: "notFound", label: "@GAB:VatNotFound", color: "subtle" },
+  ],
+});
+
+export const BankAccountSource = defineEnum({
+  id: "BankAccountSource",
+  label: "@GAB:AccountSource",
+  values: [
+    { value: "manual", label: "@GAB:SourceManual" },
+    { value: "vatRegistry", label: "@GAB:SourceVatRegistry" },
+    { value: "document", label: "@GAB:SourceDocument" },
+  ],
+});
 
 export const subject = defineObject({
   id: "gab.subject",
@@ -53,27 +77,67 @@ export const subject = defineObject({
     phone: { edt: Edts.Phone },
     country: { edt: Edts.CountryCode, default: "CZ" },
     notes: { edt: Edts.Notes },
+    // registr plátců DPH
+    vatReliability: { edt: enumEdt(VatReliability), readOnly: true },
+    vatCheckedAt: { edt: Edts.TransDate, label: "@GAB:VatCheckedAt", readOnly: true },
+    taxOffice: { edt: TaxOffice, readOnly: true },
   },
   titleField: "name",
-  list: ["name", "type", "regNo", "vatId", "email", "phone"],
+  list: ["name", "type", "regNo", "vatId", "vatReliability", "email", "phone"],
   form: [
     { label: "@SYS:General", fields: ["name", "type", "country"] },
-    { label: "@SYS:Identification", fields: ["regNo", "vatId"] },
+    { label: "@SYS:Identification", fields: ["regNo", "vatId", "vatReliability", "vatCheckedAt", "taxOffice"] },
     { label: "@GAB:Contacts", fields: ["email", "phone", "notes"] },
   ],
   defaultSort: { field: "name", dir: "asc" },
   lines: [
     { object: "gab.address", field: "subjectId", label: "@GAB:Addresses" },
     { object: "gab.contact", field: "subjectId", label: "@GAB:Contacts" },
+    { object: "gab.bankAccount", field: "subjectId", label: "@GAB:BankAccounts" },
     // dodavatel a odběratel subjektu (jen se zapnutým modulem)
     { object: "ap.vendor", field: "subjectId", label: "@GAB:Vendors", owned: false },
     { object: "ar.customer", field: "subjectId", label: "@GAB:Customers", owned: false },
   ],
   actions: [
     { id: "ares", label: "@GAB:FromAres" },
+    { id: "vatCheck", label: "@GAB:VatCheck" },
     { id: "createVendor", label: "@GAB:CreateVendor", module: "ap" },
     { id: "createCustomer", label: "@GAB:CreateCustomer", module: "ar" },
   ],
+});
+
+/**
+ * Bankovní účty subjektů — jedna tabulka pro všechny (dodavatel, odběratel,
+ * zaměstnanec…); dodavatel a odběratel mají odkaz na výchozí účet. Zveřejněné
+ * účty plátců DPH doplní registr (Ověřit v registru DPH).
+ */
+export const bankAccount = defineObject({
+  id: "gab.bankAccount",
+  table: "gab_bank_account",
+  label: "@GAB:BankAccount",
+  labelPlural: "@GAB:BankAccounts",
+  scope: "company",
+  shareable: true,
+  fields: {
+    subjectId: { edt: SubjectRef, mandatory: true },
+    accountNum: { edt: SubjBankAccount },
+    iban: { edt: SubjIban },
+    bic: { edt: Bic },
+    currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
+    isDefault: { edt: Edts.NoYes, label: "@GAB:DefaultAccount" },
+    published: { edt: Edts.NoYes, label: "@GAB:Published", readOnly: true },
+    publishedAt: { edt: Edts.TransDate, label: "@GAB:PublishedAt", readOnly: true },
+    source: { edt: enumEdt(BankAccountSource), default: "manual", readOnly: true },
+    blocked: { edt: Edts.NoYes, label: "@GAB:Blocked" },
+  },
+  titleField: "accountNum",
+  titleRef: "subjectId",
+  list: ["accountNum", "iban", "currencyId", "isDefault", "published", "publishedAt", "source", "blocked"],
+  form: [
+    { label: "@SYS:General", fields: ["subjectId", "accountNum", "iban", "bic", "currencyId", "isDefault", "blocked"] },
+    { label: "@GAB:VatRegistry", fields: ["published", "publishedAt", "source"] },
+  ],
+  defaultSort: { field: "accountNum", dir: "asc" },
 });
 
 export const address = defineObject({
@@ -121,15 +185,56 @@ export default defineModule({
   label: "@GAB:Module",
   description: "@GAB:ModuleDesc",
   icon: "BuildingBank",
+  jobs: [
+    {
+      id: "gab.vatCheck",
+      label: "@GAB:JobVatCheck",
+      default: { recurrence: "days", every: 1, at: "06:30" },
+      async run(ctx) {
+        const { checkAllSubjectsVat } = await import("./vat-registry");
+        const r = await checkAllSubjectsVat(ctx.data);
+        return ctx.t("@GAB:VatChecked", { checked: String(r.checked), unreliable: String(r.unreliable) });
+      },
+    },
+  ],
   dependsOn: ["sys"],
-  enums: [SubjectType, AddressKind, ContactKind],
-  objects: [subject, address, contact],
+  enums: [VatReliability, BankAccountSource, SubjectType, AddressKind, ContactKind],
+  objects: [subject, bankAccount, address, contact],
   menu: [
     { label: "@GAB:Module", items: [{ object: "gab.subject" }] },
     { label: "@GAB:Functions", kind: "functions", items: [{ href: "/gab/lookup", label: "@GAB:Lookup" }] },
   ],
   labels: {
     cs: {
+      AccountNum: "Číslo účtu",
+      AccountNumHelp: "Ve tvaru předčíslí-číslo/kód banky, např. 19-123456789/0100.",
+      Iban: "IBAN",
+      IbanHelp: "IBAN velkými písmeny bez mezer.",
+      Bic: "BIC / SWIFT",
+      TaxOffice: "Finanční úřad",
+      VatReliability: "Spolehlivost DPH",
+      VatReliable: "Spolehlivý",
+      VatUnreliable: "Nespolehlivý",
+      VatNotFound: "Není plátce",
+      VatCheckedAt: "Ověřeno v registru DPH",
+      VatCheck: "Ověřit v registru DPH",
+      VatRegistry: "Registr plátců DPH",
+      VatRegistryFailed: "Registr plátců DPH neodpověděl: {reason}",
+      VatRegistryNoDic: "Subjekt nemá české DIČ.",
+      BankAccount: "Bankovní účet",
+      BankAccounts: "Bankovní účty",
+      DefaultAccount: "Výchozí",
+      Published: "Zveřejněný",
+      PublishedAt: "Zveřejněn od",
+      AccountSource: "Zdroj",
+      SourceManual: "Ručně",
+      SourceVatRegistry: "Registr DPH",
+      SourceDocument: "Doklad",
+      Blocked: "Blokovaný",
+      AccountOtherSubject: "Účet patří jinému subjektu.",
+      AccountRequired: "Vyplňte číslo účtu nebo IBAN.",
+      JobVatCheck: "Ověření spolehlivosti plátců DPH",
+      VatChecked: "Ověřeno {checked} subjektů, nespolehlivých {unreliable}.",
       Vendors: "Dodavatelé",
       Customers: "Odběratelé",
       CreateVendor: "Vytvořit dodavatele",
@@ -178,6 +283,35 @@ export default defineModule({
       AresUnavailable: "ARES neodpovídá ({status}). Zkuste to později.",
     },
     en: {
+      AccountNum: "Account number",
+      AccountNumHelp: "Format prefix-number/bank code, e.g. 19-123456789/0100.",
+      Iban: "IBAN",
+      IbanHelp: "IBAN in capitals without spaces.",
+      Bic: "BIC / SWIFT",
+      TaxOffice: "Tax office",
+      VatReliability: "VAT reliability",
+      VatReliable: "Reliable",
+      VatUnreliable: "Unreliable",
+      VatNotFound: "Not a VAT payer",
+      VatCheckedAt: "Checked in VAT register",
+      VatCheck: "Check in VAT register",
+      VatRegistry: "VAT payer register",
+      VatRegistryFailed: "The VAT register did not respond: {reason}",
+      VatRegistryNoDic: "The subject has no Czech VAT ID.",
+      BankAccount: "Bank account",
+      BankAccounts: "Bank accounts",
+      DefaultAccount: "Default",
+      Published: "Published",
+      PublishedAt: "Published since",
+      AccountSource: "Source",
+      SourceManual: "Manual",
+      SourceVatRegistry: "VAT register",
+      SourceDocument: "Document",
+      Blocked: "Blocked",
+      AccountOtherSubject: "The account belongs to another subject.",
+      AccountRequired: "Enter an account number or IBAN.",
+      JobVatCheck: "VAT payer reliability check",
+      VatChecked: "Checked {checked} subjects, unreliable {unreliable}.",
       Vendors: "Vendors",
       Customers: "Customers",
       CreateVendor: "Create vendor",

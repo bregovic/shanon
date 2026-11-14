@@ -112,6 +112,11 @@ export async function createFromRegistry(data: DataApi, query: string, opts: { v
   if (hit.city || hit.street) {
     await data.create("gab.address", { subjectId: s.id, kind: "registered", street: hit.street, city: hit.city, zipCode: hit.zipCode, country: hit.country });
   }
+  // plátce DPH: spolehlivost a zveřejněné účty
+  if (hit.vatId && /^CZ/i.test(String(hit.vatId))) {
+    const { checkSubjectVat } = await import("./vat-registry");
+    await checkSubjectVat(data, String(s.id)).catch(() => null);
+  }
   if (opts.vendor) await createPartner(data, String(s.id), "ap.vendor");
   if (opts.customer) await createPartner(data, String(s.id), "ar.customer");
   return String(s.id);

@@ -666,7 +666,7 @@ describe("testovací prostředí a datové služby (CR-036)", () => {
     await saveRecord(T, "pos.shift", null, { registerId: reg }, undefined, client);
     // výchozí datové služby
     const svc = (await listRecords(T, "int.connection", { filter: { kind: "service" } }, client)).rows.map((c) => c.driver).sort();
-    expect(svc).toEqual(["ares", "cnb", "ecb", "vies"]);
+    expect(svc).toEqual(["ares", "cnb", "dphreg", "ecb", "vies"]);
     // ostré platební napojení se pozastaví
     const real = await saveRecord(T, "int.connection", null, { code: "SUMUP", name: "SumUp", kind: "payment", driver: "manual" }, undefined, client);
     await inTenant(T, async (s) => {
@@ -762,7 +762,7 @@ describe("adresář: založení z registru, dodavatel a odběratel", () => {
       // ARES i VIES jdou do protokolu napojení
       const conns = await api.find("int.connection", { kind: "service" }, { take: 10 });
       const logs = await api.find("int.log", {}, { take: 50 });
-      expect(new Set(logs.map((l) => conns.find((c) => c.id === l.connectionId)?.driver))).toEqual(new Set(["ares", "vies"]));
+      expect(new Set(logs.map((l) => conns.find((c) => c.id === l.connectionId)?.driver))).toEqual(new Set(["ares", "dphreg", "vies"]));
     }, client);
     // akce na záznamu adresáře
     const sub = await saveRecord(A, "gab.subject", null, { name: "Bez partnera" }, undefined, client);

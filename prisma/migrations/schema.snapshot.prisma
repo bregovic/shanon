@@ -222,6 +222,7 @@ model SysCompany {
   orgEntity_company               OrgEntity[]         @relation("OrgEntity_company")
   orgSite_company                 OrgSite[]           @relation("OrgSite_company")
   gabSubject_company              GabSubject[]        @relation("GabSubject_company")
+  gabBankAccount_company          GabBankAccount[]    @relation("GabBankAccount_company")
   gabAddress_company              GabAddress[]        @relation("GabAddress_company")
   gabContact_company              GabContact[]        @relation("GabContact_company")
   glParameters_company            GlParameters[]      @relation("GlParameters_company")
@@ -330,6 +331,7 @@ model SysCurrency {
   updatedBy          String?  @map("updated_by") @db.Uuid
 
   sysExchangeRate_currency        SysExchangeRate[] @relation("SysExchangeRate_currency")
+  gabBankAccount_currency         GabBankAccount[]  @relation("GabBankAccount_currency")
   glParameters_accountingCurrency GlParameters[]    @relation("GlParameters_accountingCurrency")
   glParameters_reportingCurrency  GlParameters[]    @relation("GlParameters_reportingCurrency")
   glTrans_currency                GlTrans[]         @relation("GlTrans_currency")
@@ -663,25 +665,29 @@ model OrgSite {
 
 /// gab.subject — generováno z definice objektu
 model GabSubject {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  name      String   @db.VarChar(120)
-  type      String   @default("organization") @db.VarChar(40)
-  regNo     String?  @map("reg_no") @db.VarChar(12)
-  vatId     String?  @map("vat_id") @db.VarChar(16)
-  email     String?  @db.VarChar(254)
-  phone     String?  @db.VarChar(30)
-  country   String?  @default("CZ") @db.VarChar(2)
-  notes     String?
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  name           String    @db.VarChar(120)
+  type           String    @default("organization") @db.VarChar(40)
+  regNo          String?   @map("reg_no") @db.VarChar(12)
+  vatId          String?   @map("vat_id") @db.VarChar(16)
+  email          String?   @db.VarChar(254)
+  phone          String?   @db.VarChar(30)
+  country        String?   @default("CZ") @db.VarChar(2)
+  notes          String?
+  vatReliability String?   @map("vat_reliability") @db.VarChar(40)
+  vatCheckedAt   DateTime? @map("vat_checked_at") @db.Date
+  taxOffice      String?   @map("tax_office") @db.VarChar(10)
+  ext            Json      @default("{}")
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?   @map("updated_by") @db.Uuid
 
   company                  SysCompany         @relation("GabSubject_company", fields: [companyId], references: [id], onDelete: Restrict)
+  gabBankAccount_subject   GabBankAccount[]   @relation("GabBankAccount_subject")
   gabAddress_subject       GabAddress[]       @relation("GabAddress_subject")
   gabContact_subject       GabContact[]       @relation("GabContact_subject")
   glDimensionValue_subject GlDimensionValue[] @relation("GlDimensionValue_subject")
@@ -693,6 +699,40 @@ model GabSubject {
 
   @@index([tenantId, companyId])
   @@map("gab_subject")
+}
+
+/// gab.bankAccount — generováno z definice objektu
+model GabBankAccount {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  subjectId   String    @map("subject_id") @db.Uuid
+  accountNum  String?   @map("account_num") @db.VarChar(30)
+  iban        String?   @db.VarChar(34)
+  bic         String?   @db.VarChar(11)
+  currencyId  String?   @map("currency_id") @db.Uuid
+  isDefault   Boolean   @default(false) @map("is_default")
+  published   Boolean   @default(false)
+  publishedAt DateTime? @map("published_at") @db.Date
+  source      String?   @default("manual") @db.VarChar(40)
+  blocked     Boolean   @default(false)
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company                SysCompany   @relation("GabBankAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  subject                GabSubject   @relation("GabBankAccount_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+  currency               SysCurrency? @relation("GabBankAccount_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  arCustomer_bankAccount ArCustomer[] @relation("ArCustomer_bankAccount")
+  apVendor_bankAccount   ApVendor[]   @relation("ApVendor_bankAccount")
+
+  @@index([tenantId, companyId])
+  @@index([subjectId])
+  @@index([currencyId])
+  @@map("gab_bank_account")
 }
 
 /// gab.address — generováno z definice objektu
@@ -1574,32 +1614,34 @@ model ArGroup {
 
 /// ar.customer — generováno z definice objektu
 model ArCustomer {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
-  accountNum  String   @map("account_num") @db.VarChar(20)
-  subjectId   String   @map("subject_id") @db.Uuid
-  dim1        String?  @db.VarChar(20)
-  dim2        String?  @db.VarChar(20)
-  dim3        String?  @db.VarChar(20)
-  dim4        String?  @db.VarChar(20)
-  dim5        String?  @db.VarChar(20)
-  dim6        String?  @db.VarChar(20)
-  groupId     String   @map("group_id") @db.Uuid
-  currencyId  String?  @map("currency_id") @db.Uuid
-  paymentDays Int?     @map("payment_days")
-  blocked     Boolean  @default(false)
-  ext         Json     @default("{}")
-  version     Int      @default(1)
-  createdAt   DateTime @default(now()) @map("created_at")
-  createdBy   String?  @map("created_by") @db.Uuid
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?  @map("updated_by") @db.Uuid
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  accountNum    String   @map("account_num") @db.VarChar(20)
+  subjectId     String   @map("subject_id") @db.Uuid
+  dim1          String?  @db.VarChar(20)
+  dim2          String?  @db.VarChar(20)
+  dim3          String?  @db.VarChar(20)
+  dim4          String?  @db.VarChar(20)
+  dim5          String?  @db.VarChar(20)
+  dim6          String?  @db.VarChar(20)
+  groupId       String   @map("group_id") @db.Uuid
+  currencyId    String?  @map("currency_id") @db.Uuid
+  paymentDays   Int?     @map("payment_days")
+  bankAccountId String?  @map("bank_account_id") @db.Uuid
+  blocked       Boolean  @default(false)
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
 
   company                      SysCompany      @relation("ArCustomer_company", fields: [companyId], references: [id], onDelete: Restrict)
   subject                      GabSubject      @relation("ArCustomer_subject", fields: [subjectId], references: [id], onDelete: Restrict)
   group                        ArGroup         @relation("ArCustomer_group", fields: [groupId], references: [id], onDelete: Restrict)
   currency                     SysCurrency?    @relation("ArCustomer_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  bankAccount                  GabBankAccount? @relation("ArCustomer_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
   glJournalLine_customer       GlJournalLine[] @relation("GlJournalLine_customer")
   glJournalLine_offsetCustomer GlJournalLine[] @relation("GlJournalLine_offsetCustomer")
   arOrder_customer             ArOrder[]       @relation("ArOrder_customer")
@@ -1614,6 +1656,7 @@ model ArCustomer {
   @@index([subjectId])
   @@index([groupId])
   @@index([currencyId])
+  @@index([bankAccountId])
   @@map("ar_customer")
 }
 
@@ -1911,32 +1954,34 @@ model ApGroup {
 
 /// ap.vendor — generováno z definice objektu
 model ApVendor {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
-  accountNum  String   @map("account_num") @db.VarChar(20)
-  subjectId   String   @map("subject_id") @db.Uuid
-  dim1        String?  @db.VarChar(20)
-  dim2        String?  @db.VarChar(20)
-  dim3        String?  @db.VarChar(20)
-  dim4        String?  @db.VarChar(20)
-  dim5        String?  @db.VarChar(20)
-  dim6        String?  @db.VarChar(20)
-  groupId     String   @map("group_id") @db.Uuid
-  currencyId  String?  @map("currency_id") @db.Uuid
-  paymentDays Int?     @map("payment_days")
-  blocked     Boolean  @default(false)
-  ext         Json     @default("{}")
-  version     Int      @default(1)
-  createdAt   DateTime @default(now()) @map("created_at")
-  createdBy   String?  @map("created_by") @db.Uuid
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?  @map("updated_by") @db.Uuid
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  accountNum    String   @map("account_num") @db.VarChar(20)
+  subjectId     String   @map("subject_id") @db.Uuid
+  dim1          String?  @db.VarChar(20)
+  dim2          String?  @db.VarChar(20)
+  dim3          String?  @db.VarChar(20)
+  dim4          String?  @db.VarChar(20)
+  dim5          String?  @db.VarChar(20)
+  dim6          String?  @db.VarChar(20)
+  groupId       String   @map("group_id") @db.Uuid
+  currencyId    String?  @map("currency_id") @db.Uuid
+  paymentDays   Int?     @map("payment_days")
+  bankAccountId String?  @map("bank_account_id") @db.Uuid
+  blocked       Boolean  @default(false)
+  ext           Json     @default("{}")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdBy     String?  @map("created_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by") @db.Uuid
 
   company                    SysCompany      @relation("ApVendor_company", fields: [companyId], references: [id], onDelete: Restrict)
   subject                    GabSubject      @relation("ApVendor_subject", fields: [subjectId], references: [id], onDelete: Restrict)
   group                      ApGroup         @relation("ApVendor_group", fields: [groupId], references: [id], onDelete: Restrict)
   currency                   SysCurrency?    @relation("ApVendor_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  bankAccount                GabBankAccount? @relation("ApVendor_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
   glJournalLine_vendor       GlJournalLine[] @relation("GlJournalLine_vendor")
   glJournalLine_offsetVendor GlJournalLine[] @relation("GlJournalLine_offsetVendor")
   invItem_vendor             InvItem[]       @relation("InvItem_vendor")
@@ -1952,6 +1997,7 @@ model ApVendor {
   @@index([subjectId])
   @@index([groupId])
   @@index([currencyId])
+  @@index([bankAccountId])
   @@map("ap_vendor")
 }
 

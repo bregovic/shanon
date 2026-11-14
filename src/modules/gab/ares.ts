@@ -3,6 +3,7 @@
  * služba bez přihlášení. Dohledá subjekt podle IČO (nebo jednoznačně podle
  * názvu) a doplní obchodní jméno, DIČ, právní formu a adresu sídla.
  */
+import { checkSubjectVat, czDic } from "./vat-registry";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { withService } from "@/modules/int/services";
 import { createPartner } from "./registry-lookup";
@@ -106,6 +107,8 @@ export async function fillFromAres(data: DataApi, subjectId: string) {
     if (addr) await data.update("gab.address", String(addr.id), values);
     else await data.create("gab.address", values);
   }
+  // plátce DPH: spolehlivost a zveřejněné účty (výpadek registru doplnění z ARES nezastaví)
+  if (czDic(a.vatId)) await checkSubjectVat(data, subjectId).catch(() => null);
   return a;
 }
 
@@ -116,10 +119,18 @@ const partnerActions: ObjectHandlers["actions"] = {
 };
 
 export const aresHandlers: Record<string, ObjectHandlers> = {
+  "gab.bankAccount": {
+    beforeSave(_ctx, d) {
+      if (!d.accountNum && !d.iban) return { accountNum: "@GAB:AccountRequired" };
+    },
+  },
   "gab.subject": {
     actions: {
       async ares(ctx, subj) {
         await fillFromAres(ctx.data, String(subj.id));
+      },
+      async vatCheck(ctx, subj) {
+        await checkSubjectVat(ctx.data, String(subj.id));
       },
       ...partnerActions,
     },
