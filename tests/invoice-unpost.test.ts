@@ -44,4 +44,23 @@ describe("zrušit zaúčtování faktury", () => {
     await inTenant(T, (x) => x.sys().api().create("tax.return", { kind: "dp3", year: 2026, month: 10, period: "2026-10", status: "filed" }), client);
     await expect(runAction(T, "ar.invoice", String(inv.id), "unpost", client)).rejects.toMatchObject({ label: "@TAX:UnpostFiled" });
   }, 120_000);
+
+  it("účtenka v přijatých fakturách: bez čísla dokladu dodavatele, DPH jako zjednodušený doklad", async () => {
+    const T = (await provisionTenant(client, { code: `t-rc-${run}`, name: "Rc", adminEmail: `rc-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap"], company: { code: "R", name: "R" } })).ctx;
+    const grp = (await listRecords(T, "ap.group", {}, client)).rows[0];
+    const s = await saveRecord(T, "gab.subject", null, { name: "Papírnictví" }, undefined, client);
+    const v = await saveRecord(T, "ap.vendor", null, { subjectId: s.id, groupId: grp.id }, undefined, client);
+    // bez čísla dodavatele a bez příznaku účtenky zaúčtovat nejde
+    const plain = await saveRecord(T, "ap.invoice", null, { vendorId: v.id, invoiceDate: "2026-11-10" }, undefined, client);
+    await saveRecord(T, "ap.invoiceLine", null, { invoiceId: plain.id, description: "Papír", qty: "1", unitPrice: "100" }, undefined, client);
+    await expect(runAction(T, "ap.invoice", String(plain.id), "post", client)).rejects.toMatchObject({ label: "@SYS:FixErrors" });
+    // účtenka ano
+    const h = (await getRecord(T, "ap.invoice", String(plain.id), client))!;
+    await saveRecord(T, "ap.invoice", String(plain.id), { ...h, receipt: true }, undefined, client);
+    await runAction(T, "ap.invoice", String(plain.id), "post", client);
+    const posted = (await getRecord(T, "ap.invoice", String(plain.id), client))!;
+    const tt = (await listRecords(T, "tax.trans", { filter: { voucherId: String(posted.voucherId) } }, client)).rows;
+    expect(tt.length).toBeGreaterThan(0);
+    expect(tt.every((t) => t.simplified === true && t.documentNum === posted.invoiceNum)).toBe(true);
+  }, 120_000);
 });

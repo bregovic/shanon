@@ -162,6 +162,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     invoiceNum: { edt: Edts.Code, label: "@TAX:InvoiceNum", mandatory: true, readOnly: sp.side !== 1 },
     // povinné až při zaúčtování (faktura z objednávky ho ještě nezná)
     ...(sp.externalNum ? { externalNum: { edt: Edts.Code, label: L("ExternalNum") } } : {}),
+    // přijatá: účtenka = zjednodušený daňový doklad (do 10 000 Kč, KH B.3, číslo dokladu dodavatele nepovinné)
+    ...(sp.side === -1 ? { receipt: { edt: Edts.NoYes, label: "@TAX:Receipt" } } : {}),
     [partnerId]: { edt: refEdt(id(sp.partner), L("Partner")), mandatory: true },
     invoiceDate: { edt: Edts.TransDate, label: "@TAX:InvoiceDate", mandatory: true, default: "$today" },
     taxDate: { edt: Edts.TransDate, label: "@TAX:TaxDate" },
@@ -184,7 +186,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     advanceAmount: { edt: Edts.Amount, label: "@TAX:AdvanceDeducted", readOnly: true },
     emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
   };
-  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "taxGroupId", "description", "orderId", "advanceId"];
+  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["receipt"] : []), partnerId, "taxGroupId", "description", "orderId", "advanceId"];
   const invoice = defineObject({
     id: id("invoice"),
     table: `${m}_invoice`,

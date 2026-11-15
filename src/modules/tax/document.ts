@@ -249,7 +249,8 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
  */
 export async function postInvoice(data: DataApi, companyId: string | null, cfg: InvoiceConfig, header: RecordData) {
   if (header.status !== "draft") throw new UserError("@GL:Locked");
-  if (!header[cfg.docNumField]) throw new UserError("@SYS:FixErrors", {}, { [cfg.docNumField]: "@SYS:Required" });
+  // účtenka (zjednodušený daňový doklad) může být bez čísla dokladu dodavatele — pak naše číslo
+  if (!header[cfg.docNumField] && !header.receipt) throw new UserError("@SYS:FixErrors", {}, { [cfg.docNumField]: "@SYS:Required" });
   const lines = await data.find(cfg.line, { [cfg.lineHeaderField]: header.id });
   if (!lines.length) throw new UserError("@GL:NoLines");
   // plátce DPH: každý řádek musí mít daňový kód, jinak by DPH nevzniklo a chybělo v přiznání
@@ -351,7 +352,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     }
   }
 
-  const docNum = String(header[cfg.docNumField] ?? header.invoiceNum);
+  const docNum = String(header[cfg.docNumField] || header.invoiceNum);
   const voucher = await postVoucher(data, {
     date,
     description: `${docNum}${subject ? ` · ${subject.name}` : ""}`,
@@ -377,6 +378,8 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
         voucherId: voucher.id,
         sourceObject: cfg.header,
         sourceId: String(header.id),
+        // účtenka → KH souhrnně (B.3 / A.5)
+        simplified: !!header.receipt,
       });
   }
   // odpočet DPH zálohy v daňových transakcích (záporný základ a daň k DUZP faktury)

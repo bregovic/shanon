@@ -2494,6 +2494,7 @@ model ApInvoice {
   companyId     String    @map("company_id") @db.Uuid
   invoiceNum    String    @map("invoice_num") @db.VarChar(20)
   externalNum   String?   @map("external_num") @db.VarChar(20)
+  receipt       Boolean   @default(false)
   vendorId      String    @map("vendor_id") @db.Uuid
   invoiceDate   DateTime  @default(now()) @map("invoice_date") @db.Date
   taxDate       DateTime? @map("tax_date") @db.Date

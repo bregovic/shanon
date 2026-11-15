@@ -203,7 +203,7 @@ export async function listDocument(data: DataApi, doc: RecordData, t: T): Promis
   if (kind === "invoice") {
     header = await data.create(tg.object, {
       ...common,
-      ...(tg.partner === "ap.vendor" ? { externalNum: checked.docNumber ?? null } : {}),
+      ...(tg.partner === "ap.vendor" ? { externalNum: checked.docNumber ?? null, receipt: checked.docType === "receipt" } : {}),
       invoiceDate: checked.issueDate,
       taxDate: checked.taxDate ?? checked.issueDate,
       dueDate: checked.dueDate ?? null,
