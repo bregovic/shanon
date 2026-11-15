@@ -42,8 +42,9 @@ describe("platební příkazy", () => {
     const methods = await rows(T, "bank.paymentMethod");
     const abo = methods.find((m) => m.code === "PREVOD")!;
     const sepa = methods.find((m) => m.code === "SEPA")!;
-    await save(T, "bank.paymentMethod", { bankAccountId: bank.id }, String(abo.id));
-    await save(T, "bank.paymentMethod", { bankAccountId: bank.id }, String(sepa.id));
+    // metody patří bankovnímu účtu (ABO výchozí, SEPA)
+    await save(T, "bank.accountMethod", { bankAccountId: bank.id, paymentMethodId: abo.id, isDefault: true });
+    await save(T, "bank.accountMethod", { bankAccountId: bank.id, paymentMethodId: sepa.id });
 
     // dodavatelé: spolehlivý se zveřejněným účtem, nespolehlivý
     const [vg] = await rows(T, "ap.group");
@@ -64,8 +65,11 @@ describe("platební příkazy", () => {
     await inv(good, "FA-100", "1000");
     await inv(bad, "FA-200", "500");
 
-    const po = await save(T, "bank.paymentOrder", { paymentMethodId: abo.id, paymentDate: "2026-11-20", dueTo: "2026-12-31" });
-    expect(po.bankAccountId).toBe(bank.id);
+    // příkaz z bankovního účtu: metoda = výchozí metoda účtu; metoda bez přiřazení k účtu nejde
+    const po = await save(T, "bank.paymentOrder", { bankAccountId: bank.id, paymentDate: "2026-11-20", dueTo: "2026-12-31" });
+    expect([po.bankAccountId, po.paymentMethodId]).toEqual([bank.id, abo.id]);
+    const cash = methods.find((m) => m.code === "HOTOVE")!;
+    await expect(save(T, "bank.paymentOrder", { bankAccountId: bank.id, paymentMethodId: cash.id })).rejects.toMatchObject({ fields: { paymentMethodId: "@BANK:MethodNotOnAccount" } });
     await runAction(T, "bank.paymentOrder", String(po.id), "suggest", client);
     let lines = await rows(T, "bank.paymentOrderLine", { paymentOrderId: po.id });
     expect(lines.map((l) => [l.documentNum, l.amount, l.accountNum, l.warning]).sort()).toEqual([

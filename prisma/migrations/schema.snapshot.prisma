@@ -267,6 +267,7 @@ model SysCompany {
   apAdvance_company               ApAdvance[]            @relation("ApAdvance_company")
   apTrans_company                 ApTrans[]              @relation("ApTrans_company")
   bankAccount_company             BankAccount[]          @relation("BankAccount_company")
+  bankAccountMethod_company       BankAccountMethod[]    @relation("BankAccountMethod_company")
   bankStatement_company           BankStatement[]        @relation("BankStatement_company")
   bankStatementLine_company       BankStatementLine[]    @relation("BankStatementLine_company")
   bankPaymentMethod_company       BankPaymentMethod[]    @relation("BankPaymentMethod_company")
@@ -2458,6 +2459,7 @@ model BankAccount {
   glJournalName_offsetBankAccount GlJournalName[]     @relation("GlJournalName_offsetBankAccount")
   glJournalLine_bankAccount       GlJournalLine[]     @relation("GlJournalLine_bankAccount")
   glJournalLine_offsetBankAccount GlJournalLine[]     @relation("GlJournalLine_offsetBankAccount")
+  bankAccountMethod_bankAccount   BankAccountMethod[] @relation("BankAccountMethod_bankAccount")
   bankStatement_bankAccount       BankStatement[]     @relation("BankStatement_bankAccount")
   bankPaymentMethod_bankAccount   BankPaymentMethod[] @relation("BankPaymentMethod_bankAccount")
   bankPaymentOrder_bankAccount    BankPaymentOrder[]  @relation("BankPaymentOrder_bankAccount")
@@ -2467,6 +2469,32 @@ model BankAccount {
   @@index([currencyId])
   @@index([glAccountId])
   @@map("bank_account")
+}
+
+/// bank.accountMethod — generováno z definice objektu
+model BankAccountMethod {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  bankAccountId   String   @map("bank_account_id") @db.Uuid
+  paymentMethodId String   @map("payment_method_id") @db.Uuid
+  isDefault       Boolean  @default(false) @map("is_default")
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  company       SysCompany        @relation("BankAccountMethod_company", fields: [companyId], references: [id], onDelete: Restrict)
+  bankAccount   BankAccount       @relation("BankAccountMethod_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  paymentMethod BankPaymentMethod @relation("BankAccountMethod_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, bankAccountId, paymentMethodId])
+  @@index([tenantId, companyId])
+  @@index([bankAccountId])
+  @@index([paymentMethodId])
+  @@map("bank_account_method")
 }
 
 /// bank.statement — generováno z definice objektu
@@ -2569,12 +2597,13 @@ model BankPaymentMethod {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company                        SysCompany         @relation("BankPaymentMethod_company", fields: [companyId], references: [id], onDelete: Restrict)
-  bankAccount                    BankAccount?       @relation("BankPaymentMethod_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
-  transformation                 SysTransformation? @relation("BankPaymentMethod_transformation", fields: [transformationId], references: [id], onDelete: Restrict)
-  arCustomer_paymentMethod       ArCustomer[]       @relation("ArCustomer_paymentMethod")
-  apVendor_paymentMethod         ApVendor[]         @relation("ApVendor_paymentMethod")
-  bankPaymentOrder_paymentMethod BankPaymentOrder[] @relation("BankPaymentOrder_paymentMethod")
+  company                         SysCompany          @relation("BankPaymentMethod_company", fields: [companyId], references: [id], onDelete: Restrict)
+  bankAccount                     BankAccount?        @relation("BankPaymentMethod_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  transformation                  SysTransformation?  @relation("BankPaymentMethod_transformation", fields: [transformationId], references: [id], onDelete: Restrict)
+  arCustomer_paymentMethod        ArCustomer[]        @relation("ArCustomer_paymentMethod")
+  apVendor_paymentMethod          ApVendor[]          @relation("ApVendor_paymentMethod")
+  bankAccountMethod_paymentMethod BankAccountMethod[] @relation("BankAccountMethod_paymentMethod")
+  bankPaymentOrder_paymentMethod  BankPaymentOrder[]  @relation("BankPaymentOrder_paymentMethod")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])

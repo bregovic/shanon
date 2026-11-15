@@ -92,7 +92,7 @@ async function exportOrder(data: DataApi, o: RecordData, companyId: string | nul
   const tr = method?.transformationId ? await data.get("sys.transformation", String(method.transformationId)) : null;
   const def = transformByCode(tr?.code);
   if (!def || def.purpose !== "paymentOrder" || tr?.active === false) throw new UserError("@BANK:NoTransform");
-  const acc = await data.get("bank.account", String(o.bankAccountId ?? method?.bankAccountId ?? ""));
+  const acc = await data.get("bank.account", String(o.bankAccountId ?? ""));
   if (!acc || (!acc.accountNum && !acc.iban)) throw new UserError("@BANK:NoPayerAccount");
   const lines = await data.find("bank.paymentOrderLine", { paymentOrderId: o.id }, { take: 5000 });
   if (!lines.length) throw new UserError("@BANK:EmptyOrder");
@@ -212,11 +212,30 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
 }
 
 export const paymentHandlers: Record<string, ObjectHandlers> = {
+  "bank.accountMethod": {
+    // jedna výchozí metoda na účet
+    async afterSave(ctx, d) {
+      if (!d.isDefault) return;
+      for (const o of await ctx.data.find("bank.accountMethod", { bankAccountId: d.bankAccountId, isDefault: true }, { take: 20 }))
+        if (o.id !== d.id) await ctx.data.update("bank.accountMethod", String(o.id), { isDefault: false });
+    },
+  },
   "bank.paymentOrder": {
     async beforeSave(ctx, d) {
+      // metody patří bankovnímu účtu: výchozí metoda účtu / účet, ke kterému je metoda přiřazená
+      if (d.bankAccountId && !d.paymentMethodId) {
+        const ms = await ctx.data.find("bank.accountMethod", { bankAccountId: d.bankAccountId }, { take: 20 });
+        d.paymentMethodId = (ms.find((m) => m.isDefault) ?? ms[0])?.paymentMethodId ?? null;
+      }
       if (d.paymentMethodId && !d.bankAccountId) {
-        const m = await ctx.data.get("bank.paymentMethod", String(d.paymentMethodId));
-        d.bankAccountId = m?.bankAccountId ?? null;
+        const [am] = await ctx.data.find("bank.accountMethod", { paymentMethodId: d.paymentMethodId, isDefault: true }, { take: 1 });
+        const [any] = am ? [am] : await ctx.data.find("bank.accountMethod", { paymentMethodId: d.paymentMethodId }, { take: 1 });
+        d.bankAccountId = any?.bankAccountId ?? null;
+      }
+      if (!d.paymentMethodId) return { paymentMethodId: "@SYS:Required" };
+      if (d.bankAccountId && d.paymentMethodId) {
+        const assigned = await ctx.data.find("bank.accountMethod", { bankAccountId: d.bankAccountId }, { take: 20 });
+        if (assigned.length && !assigned.some((m) => m.paymentMethodId === d.paymentMethodId)) return { paymentMethodId: "@BANK:MethodNotOnAccount" };
       }
     },
     actions: {

@@ -98,6 +98,11 @@ export async function createBankAccounts(api: DataApi, published: { accountNum: 
     if (!gl) break;
     const code = `BU${String(existing.length + n + 1).padStart(2, "0")}`;
     const created = await api.create("bank.account", { code, name: `Běžný účet ${a.accountNum ?? iban ?? ""}`.slice(0, 120), accountNum: a.accountNum, iban, glAccountId: gl });
+    // platební metody účtu: české číslo → ABO výchozí, k tomu SEPA
+    for (const [mcode, def] of [["PREVOD", !!a.accountNum], ["SEPA", !a.accountNum]] as const) {
+      const [m] = await api.find("bank.paymentMethod", { code: mcode }, { take: 1 });
+      if (m) await api.create("bank.accountMethod", { bankAccountId: created.id, paymentMethodId: m.id, isDefault: def });
+    }
     existing.push(created);
     have.add(norm(a.accountNum));
     have.add(norm(iban));

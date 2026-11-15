@@ -99,7 +99,10 @@ export const account = defineObject({
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
-  lines: [{ object: "bank.statement", field: "bankAccountId", label: "@BANK:Statements", owned: false }],
+  lines: [
+    { object: "bank.accountMethod", field: "bankAccountId", label: "@BANK:PaymentMethods" },
+    { object: "bank.statement", field: "bankAccountId", label: "@BANK:Statements", owned: false },
+  ],
   actions: [{ id: "import", label: "@BANK:Import", upload: ".gpc,.txt,.abo" }],
 });
 
@@ -191,13 +194,31 @@ export const paymentMethod = defineObject({
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "code",
-  list: ["code", "name", "kind", "bankAccountId", "transformationId", "blocked"],
-  form: [{ label: "@SYS:General", fields: ["code", "name", "kind", "bankAccountId", "transformationId", "blocked"] }],
+  list: ["code", "name", "kind", "transformationId", "blocked"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "kind", "transformationId", "blocked"] }],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
 });
 
 /** Platební příkaz (deník plateb závazků): návrh úhrad, kontrola, export souboru pro banku. */
+/** Platební metody bankovního účtu (ABO, SEPA…) — jedna výchozí pro platební příkazy z účtu. */
+export const accountMethod = defineObject({
+  id: "bank.accountMethod",
+  table: "bank_account_method",
+  label: "@BANK:PaymentMethod",
+  labelPlural: "@BANK:PaymentMethods",
+  scope: "company",
+  fields: {
+    bankAccountId: { edt: refEdt("bank.account", "@BANK:Account"), mandatory: true },
+    paymentMethodId: { edt: refEdt("bank.paymentMethod", "@BANK:PaymentMethod"), mandatory: true },
+    isDefault: { edt: Edts.NoYes, label: "@BANK:DefaultMethod" },
+  },
+  titleField: "paymentMethodId",
+  list: ["paymentMethodId", "isDefault"],
+  form: [{ label: "@SYS:General", fields: ["bankAccountId", "paymentMethodId", "isDefault"] }],
+  unique: [["bankAccountId", "paymentMethodId"]],
+});
+
 export const paymentOrder = defineObject({
   id: "bank.paymentOrder",
   table: "bank_payment_order",
@@ -206,7 +227,7 @@ export const paymentOrder = defineObject({
   scope: "company",
   fields: {
     orderNum: { edt: Edts.Code, label: "@BANK:OrderNum", mandatory: true, readOnly: true },
-    paymentMethodId: { edt: refEdt("bank.paymentMethod", "@BANK:PaymentMethod"), mandatory: true },
+    paymentMethodId: { edt: refEdt("bank.paymentMethod", "@BANK:PaymentMethod") }, // povinné: doplní se z bankovního účtu, kontroluje obsluha
     bankAccountId: { edt: refEdt("bank.account", "@BANK:Account") },
     paymentDate: { edt: Edts.TransDate, label: "@BANK:PaymentDate", mandatory: true, default: "$today" },
     dueTo: { edt: Edts.TransDate, label: "@BANK:DueTo" },
@@ -216,8 +237,8 @@ export const paymentOrder = defineObject({
     exportedAt: { edt: Edts.TransDate, label: "@BANK:ExportedAt", readOnly: true },
   },
   titleField: "orderNum",
-  list: ["orderNum", "paymentMethodId", "bankAccountId", "paymentDate", "total", "status", "exportedAt"],
-  form: [{ label: "@SYS:General", fields: ["orderNum", "paymentMethodId", "bankAccountId", "paymentDate", "dueTo", "description", "total", "status", "exportedAt"] }],
+  list: ["orderNum", "bankAccountId", "paymentMethodId", "paymentDate", "total", "status", "exportedAt"],
+  form: [{ label: "@SYS:General", fields: ["orderNum", "bankAccountId", "paymentMethodId", "paymentDate", "dueTo", "description", "total", "status", "exportedAt"] }],
   numberSeq: { field: "orderNum", seq: "BANKPO" },
   defaultSort: { field: "paymentDate", dir: "desc" },
   compactHeader: true,
@@ -303,7 +324,7 @@ export default defineModule({
   icon: "BuildingBank",
   dependsOn: ["gl", "ar", "ap"],
   enums: [MatchKind, PaymentKind, PayOrderStatus, CheckStatus, ImportStatus],
-  objects: [account, statement, statementLine, paymentMethod, paymentOrder, paymentOrderLine, importLog],
+  objects: [account, accountMethod, statement, statementLine, paymentMethod, paymentOrder, paymentOrderLine, importLog],
   numberSeqs: [{ code: "BANKPO", name: "@BANK:PaymentOrders", format: "PP{YY}{#####}", usedFor: "bank.paymentOrder" }],
   setup: bankSetup,
   menu: [
@@ -313,6 +334,8 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      DefaultMethod: "Výchozí",
+      MethodNotOnAccount: "Platební metoda není přiřazená k tomuto bankovnímu účtu (Banka → Bankovní účty → Platební metody).",
       PaymentKind: "Druh platby",
       PkTransfer: "Převodem",
       PkCash: "Hotově",
@@ -424,6 +447,8 @@ export default defineModule({
       TransClosed: "Faktura {doc} už je uhrazená.",
     },
     en: {
+      DefaultMethod: "Default",
+      MethodNotOnAccount: "The payment method is not assigned to this bank account (Bank → Bank accounts → Payment methods).",
       PaymentKind: "Payment type",
       PkTransfer: "Transfer",
       PkCash: "Cash",

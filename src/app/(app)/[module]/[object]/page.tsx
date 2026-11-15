@@ -39,7 +39,8 @@ export default async function ObjectListPage({ params, searchParams }: { params:
   }
   const meta = fieldsMeta(s.ctx, def, t);
   const mod = registry.modules.get(module)!;
-  const initial = await listRecords(s.ctx, def.id, { lang: s.lang, totals: true });
+  // filtr z odkazu (?filter.pole=) už v první stránce — jinak by seznam probliknul celý a filtroval se až v prohlížeči
+  const initial = await listRecords(s.ctx, def.id, { lang: s.lang, totals: true, filters: Object.keys(initialFilters).length ? initialFilters : undefined });
   // proklik z odkazu: vybraný záznam musí být v seznamu, i když není na první stránce
   if (focus && !initial.rows.some((r) => r.id === focus)) {
     const rec = await getRecord(s.ctx, def.id, focus).catch(() => null);
