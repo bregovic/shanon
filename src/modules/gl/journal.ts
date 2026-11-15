@@ -340,12 +340,24 @@ async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher:
  */
 export const journalHandlers: Record<string, ObjectHandlers> = {
   "gl.journal": {
-    async beforeSave(ctx, data) {
+    async beforeSave(ctx, data, isNew) {
       // deník z nabídky banky / pokladny… dostane název svého druhu
       const jn = await resolveJournalName(ctx.data, data.journalNameId, data.journalType);
       if (jn.blocked) return { journalNameId: "@GL:JournalNameBlocked" };
+      const before = !isNew && data.id ? await ctx.data.get("gl.journal", String(data.id)) : null;
+      const nameChanged = !!before && before.journalNameId !== jn.id;
       data.journalNameId = jn.id;
       data.journalType = jn.journalType;
+      // výchozí protiúčet a dimenze řádků z názvu deníku (nový deník / jiný název; jinak drží změny uživatele)
+      const DEF = ["offsetType", "offsetAccountId", "offsetBankAccountId", "offsetCashDeskId", "dim1", "dim2", "dim3", "dim4", "dim5", "dim6"];
+      if (isNew || nameChanged) {
+        for (const f of DEF) if (nameChanged || data[f] === undefined || data[f] === null || data[f] === "") data[f] = jn[f] ?? null;
+        if (!data.offsetType && jn.offsetAccountId) data.offsetType = "ledger";
+        if (nameChanged) data.offsetCustomerId = data.offsetVendorId = null;
+      }
+      // jen odkaz protiúčtu odpovídající druhu
+      const refs: Record<string, string> = { ledger: "offsetAccountId", customer: "offsetCustomerId", vendor: "offsetVendorId", bank: "offsetBankAccountId", cash: "offsetCashDeskId" };
+      for (const [kind, f] of Object.entries(refs)) if (data.offsetType !== kind) data[f] = null;
     },
     actions: {
       /** Ověřit: rozdělení na doklady, vyrovnanost, účty, období, dimenze — bez účtování */

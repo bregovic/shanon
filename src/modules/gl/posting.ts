@@ -6,7 +6,7 @@
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type ValidationErrors, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents, rateFor } from "@/modules/sys/currency";
-import { activeDimensions, dimsOf, requirementsFor, resolveDims, type Dims } from "./dimensions";
+import { activeDimensions, defaultDimsOf, dimsOf, LINE_REF_FIELDS, requirementsFor, resolveDims, type Dims } from "./dimensions";
 
 export interface PostingLine {
   accountId: string;
@@ -286,14 +286,53 @@ export function checkText(ctx: EventContext, r: { vouchers: number; debit: strin
   return (r.errors.length ? ctx.t("@GL:CheckErrors", { n: String(r.errors.length), list: r.errors.slice(0, 5).join(" | ") }) : ctx.t("@GL:CheckOk", { n: String(r.vouchers), debit: r.debit, credit: r.credit })).slice(0, 255);
 }
 
-/** pole odkazu účtu a protiúčtu podle druhu */
-const LINE_REFS: Record<string, { main: string; offset: string }> = {
-  ledger: { main: "accountId", offset: "offsetAccountId" },
-  customer: { main: "customerId", offset: "offsetCustomerId" },
-  vendor: { main: "vendorId", offset: "offsetVendorId" },
-  bank: { main: "bankAccountId", offset: "offsetBankAccountId" },
-  cash: { main: "cashDeskId", offset: "offsetCashDeskId" },
-};
+const LINE_REFS = LINE_REF_FIELDS;
+
+/**
+ * Výchozí dimenze řádku deníku (prázdná pole, nebo ta, která měla výchozí hodnotu předchozího účtu):
+ * účet = řádek → účet / partner → hlavička deníku; protiúčet = řádek → protiúčet / partner → dimenze účtu.
+ */
+async function applyDefaultDims(data: DataApi, line: RecordData, journal: RecordData | null, isNew: boolean) {
+  const ref = (r: RecordData, side: "main" | "offset") => {
+    const t = String((side === "main" ? r.accountType : r.offsetType) ?? "");
+    const f = LINE_REFS[t]?.[side];
+    return { t, id: f ? (r[f] as string | null) : null };
+  };
+  const old = !isNew && line.id ? await data.get("gl.journalLine", String(line.id)) : null;
+  const m = ref(line, "main");
+  const o = ref(line, "offset");
+  const om = old ? ref(old, "main") : null;
+  const oo = old ? ref(old, "offset") : null;
+  const mainChanged = !!om && (om.t !== m.t || om.id !== m.id);
+  const offChanged = !!oo && (oo.t !== o.t || oo.id !== o.id);
+  const def = await defaultDimsOf(data, m.t, m.id);
+  const oldDef = mainChanged && om ? await defaultDimsOf(data, om.t, om.id) : null;
+  const head = journal ? dimsOf(journal) : {};
+  for (const n of [1, 2, 3, 4, 5, 6]) {
+    const f = `dim${n}`;
+    const cur = (line[f] as string) || null;
+    // změna účtu: hodnota, kterou dal předchozí účet, nahradí výchozí nového
+    const stale = !!cur && !!oldDef && cur === oldDef.dims[f];
+    // účet dimenzi zakazuje: výchozí hodnotu nedávat (ručně zadanou odmítne kontrola dimenzí)
+    if (def.notAllowed.has(f)) {
+      if (stale) line[f] = null;
+    } else if (!cur || stale) line[f] = def.dims[f] ?? head[f] ?? (stale ? null : cur);
+  }
+  if (!o.id) return;
+  const odef = await defaultDimsOf(data, o.t, o.id);
+  const oldOdef = offChanged && oo ? await defaultDimsOf(data, oo.t, oo.id) : null;
+  for (const n of [1, 2, 3, 4, 5, 6]) {
+    const f = `offsetDim${n}`;
+    const mf = `dim${n}`;
+    const cur = (line[f] as string) || null;
+    // protiúčet drží dimenzi účtu, dokud ji uživatel nezmění; změna protiúčtu = jeho výchozí
+    const followsMain = !!cur && !!old && cur === ((old[mf] as string) || null) && line[mf] !== old[mf];
+    const stale = !!cur && ((!!oldOdef && cur === oldOdef.dims[mf]) || followsMain);
+    if (odef.notAllowed.has(mf)) {
+      if (!cur || stale) line[f] = null;
+    } else if (!cur || stale) line[f] = odef.dims[mf] ?? ((line[mf] as string) || null);
+  }
+}
 
 export const glHandlers: Record<string, ObjectHandlers> = {
   "gl.fiscalYear": {
@@ -363,25 +402,35 @@ export const glHandlers: Record<string, ObjectHandlers> = {
         const jn = journal?.journalNameId ? await ctx.data.get("gl.journalName", String(journal.journalNameId)) : null;
         // číslo dokladu hned (vidět, co k čemu patří a jestli je doklad vyrovnaný)
         if (journal && jn && !data.voucherNum) data.voucherNum = await allocateVoucher(ctx.data, journal, jn, data);
-        const defType = (jn?.offsetType as string) || (jn?.offsetAccountId ? "ledger" : null);
-        // výchozí protiúčet z názvu deníku (druh Hlavní kniha je jen výchozí hodnota, účet prázdný)
-        if (defType && (!data.offsetType || !OFFSET_REFS.some((f) => data[f]))) {
+        // výchozí protiúčet z hlavičky deníku (ta ho má z názvu deníku); starší deníky přímo z názvu
+        const src = journal?.offsetType ? journal : jn;
+        const defType = (src?.offsetType as string) || (src?.offsetAccountId ? "ledger" : null);
+        // ne stejného druhu jako účet řádku (řádek výpisu = banka, protiúčet banka nedává smysl)
+        if (defType && !((defType === "bank" || defType === "cash") && defType === data.accountType) && (!data.offsetType || !OFFSET_REFS.some((f) => data[f]))) {
           data.offsetType = defType;
-          data.offsetAccountId ??= jn?.offsetAccountId ?? null;
-          data.offsetBankAccountId ??= jn?.offsetBankAccountId ?? null;
-          data.offsetCashDeskId ??= jn?.offsetCashDeskId ?? null;
+          const f = LINE_REFS[defType]?.offset;
+          if (f) data[f] ??= src?.[f] ?? null;
+          // jediný bankovní účet / pokladna firmy = protiúčet sám
+          if ((defType === "bank" || defType === "cash") && f && !data[f]) {
+            const obj = defType === "bank" ? "bank.account" : "cash.desk";
+            try {
+              const all = await ctx.data.find(obj, { blocked: false }, { take: 2 });
+              if (all.length === 1) data[f] = all[0].id;
+            } catch {
+              // modul vypnutý
+            }
+          }
         }
       }
       data.accountType ||= "ledger";
       // jen odkaz odpovídající druhu (ostatní vyčistit)
       for (const [kind, f] of Object.entries(LINE_REFS)) if (data.accountType !== kind) data[f.main] = null;
       for (const [kind, f] of Object.entries(LINE_REFS)) if (data.offsetType !== kind) data[f.offset] = null;
+      await applyDefaultDims(ctx.data, data, journal, isNew);
       // účet hlavní knihy: kontrola ručního zápisu a dimenzí hned při zadání
       if (data.accountType === "ledger" && data.accountId) {
         const acc = await assertPostable(ctx.data, String(data.accountId), true);
-        const dims = dimsOf(data);
-        for (const n of [1, 2, 3, 4, 5, 6]) if (!dims[`dim${n}`] && acc[`dim${n}`] && acc[`dim${n}Req`] !== "notAllowed") dims[`dim${n}`] = String(acc[`dim${n}`]);
-        Object.assign(data, await resolveDims(ctx.data, acc, dims, { manual: true }));
+        Object.assign(data, await resolveDims(ctx.data, acc, dimsOf(data), { manual: true }));
       }
       if (data.offsetType === "ledger" && data.offsetAccountId) await assertPostable(ctx.data, String(data.offsetAccountId), true);
     },

@@ -413,6 +413,8 @@ export const journalName = defineObject({
     offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount", visibleWhen: when("offsetType", "ledger") },
     offsetBankAccountId: { edt: refEdt("bank.account", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "bank") },
     offsetCashDeskId: { edt: refEdt("cash.desk", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "cash") },
+    // výchozí dimenze řádků (účet / partner mají přednost)
+    ...dimFields(),
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "code",
@@ -420,6 +422,7 @@ export const journalName = defineObject({
   form: [
     { label: "@SYS:General", fields: ["code", "name", "journalType", "blocked"] },
     { label: "@GL:Posting", fields: ["voucherAllocation", "voucherSeqId", "offsetType", "offsetAccountId", "offsetBankAccountId", "offsetCashDeskId"] },
+    { label: "@GL:LineDefaultDims", fields: DIM_NAMES },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -472,6 +475,14 @@ export const journal = defineObject({
     voucherId: { edt: VoucherRef, readOnly: true },
     // výsledek Ověřit (počet dokladů, chyby)
     checkResult: { edt: Edts.Description, label: "@GL:CheckResult", readOnly: true },
+    // výchozí hodnoty nových řádků — převezmou se z názvu deníku, lze je změnit
+    offsetType: { edt: enumEdt(LedgerAccountType, "@GL:OffsetKind") },
+    offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount", visibleWhen: when("offsetType", "ledger") },
+    offsetCustomerId: { edt: refEdt("ar.customer", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "customer") },
+    offsetVendorId: { edt: refEdt("ap.vendor", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "vendor") },
+    offsetBankAccountId: { edt: refEdt("bank.account", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "bank") },
+    offsetCashDeskId: { edt: refEdt("cash.desk", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "cash") },
+    ...dimFields(),
   },
   titleField: "journalNum",
   list: ["journalNum", "journalNameId", "journalType", "date", "description", "status", "checkResult"],
@@ -479,6 +490,8 @@ export const journal = defineObject({
   compactHeader: true,
   form: [
     { label: "@SYS:General", fields: ["journalNum", "date", "journalNameId", "description"] },
+    { label: "@GL:LineDefaults", fields: ["offsetType", "offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
+    { label: "@GL:LineDefaultDims", fields: DIM_NAMES },
     { label: "@GL:Status", fields: ["status", "voucherId", "checkResult"] },
   ],
   numberSeq: { field: "journalNum", seq: "GLJOURNAL" },
@@ -635,6 +648,8 @@ export default defineModule({
       VaManual: "Ručně",
       AccountKind: "Druh účtu",
       OffsetKind: "Druh protiúčtu",
+      LineDefaults: "Výchozí protiúčet řádků",
+      LineDefaultDims: "Výchozí dimenze řádků",
       AkLedger: "Hlavní kniha",
       AkCustomer: "Odběratel",
       AkVendor: "Dodavatel",
@@ -835,6 +850,8 @@ export default defineModule({
       VaManual: "Manual",
       AccountKind: "Account type",
       OffsetKind: "Offset account type",
+      LineDefaults: "Default line offset account",
+      LineDefaultDims: "Default line dimensions",
       AkLedger: "Ledger",
       AkCustomer: "Customer",
       AkVendor: "Vendor",

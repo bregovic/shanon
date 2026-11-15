@@ -4,6 +4,7 @@
  * Detail záznamu na celé stránce — pro doklady s řádky a akcemi (deník,
  * účetní doklad). Hlavička je formulář, řádky jsou grid + šuplík.
  */
+import { toast } from "./toast";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -319,7 +320,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
         return;
       }
       setErrors({});
-      setMessage({ intent: "success", text: p.labels.actions.saved });
+      setMessage(undefined);
+      toast(p.labels.actions.saved);
       if (!p.id) router.replace(objectHref(p.objectId, String(res.data.id)));
       else router.refresh();
     });
@@ -375,7 +377,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       const res = await runUploadAction(fd);
       if (!res.ok) setMessage({ intent: "error", text: res.message });
       else {
-        setMessage({ intent: "success", text: p.labels.actions.saved });
+        setMessage(undefined);
+        toast(p.labels.actions.saved);
         router.refresh();
       }
     });

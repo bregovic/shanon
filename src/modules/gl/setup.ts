@@ -194,14 +194,19 @@ export async function glSetup(data: DataApi): Promise<void> {
     if (!taken.length && !(await data.find("gl.dimension", { code }, { take: 1 })).length) await data.create("gl.dimension", { code, name, position, source, active: true });
   }
   // názvy deníků podle druhu (jen chybějící kód; tenant si je pak upraví)
-  for (const [code, name, journalType, voucherAllocation] of [
-    ["GEN", "Obecný deník", "daily", "balance"],
-    ["PLDOD", "Platby dodavatelům", "vendorPayment", "line"],
-    ["PLODB", "Platby odběratelů", "customerPayment", "line"],
-    ["POKL", "Pokladní deník", "cash", "line"],
-    ["BANKA", "Bankovní deník", "bank", "line"],
+  // výchozí protiúčet: platby a banka → bankovní účet, pokladna → pokladna (konkrétní účet doplní
+  // řádek sám, má-li firma jediný; jinak se nastaví na názvu deníku)
+  for (const [code, name, journalType, voucherAllocation, offsetType] of [
+    ["GEN", "Obecný deník", "daily", "balance", null],
+    ["PLDOD", "Platby dodavatelům", "vendorPayment", "line", "bank"],
+    ["PLODB", "Platby odběratelů", "customerPayment", "line", "bank"],
+    ["POKL", "Pokladní deník", "cash", "line", "cash"],
+    ["BANKA", "Bankovní deník", "bank", "line", "bank"],
   ] as const) {
-    if (!(await data.find("gl.journalName", { code }, { take: 1 })).length) await data.create("gl.journalName", { code, name, journalType, voucherAllocation });
+    const [have] = await data.find("gl.journalName", { code }, { take: 1 });
+    if (!have) await data.create("gl.journalName", { code, name, journalType, voucherAllocation, offsetType });
+    // dřív založený název bez protiúčtu (jen náš výchozí druh, nastavený protiúčet nepřepisovat)
+    else if (offsetType && !have.offsetType && !have.offsetAccountId && have.journalType === journalType) await data.update("gl.journalName", String(have.id), { offsetType });
   }
 }
 

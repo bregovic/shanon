@@ -468,7 +468,6 @@ export function InlineLines({
   };
 
   const diffs = useMemo(() => groupDiffs(rows, balance), [rows, balance]);
-  const openGroups = [...diffs].filter(([, d]) => d !== 0);
 
   const cell = (row: EditRow, c: Column, colIdx: number) => {
     const f = c.fields.find((x) => visible(x, row.values)) ?? null;
@@ -502,7 +501,7 @@ export function InlineLines({
       case "ref":
         return (
           <div onKeyDown={common.onKeyDown}>
-            <RefCombobox compact f={f} value={String(v ?? "")} title={row.titles[f.name] ?? ""} disabled={false} openLabel={labels.open} onChange={(_, value, title) => set(value, title)} />
+            <RefCombobox compact f={f} value={String(v ?? "")} title={row.titles[f.name] ?? ""} disabled={false} openLabel={labels.open} onBeforeOpen={() => (row.dirty ? save(row.key) : undefined)} onChange={(_, value, title) => set(value, title)} />
           </div>
         );
       case "bool":
@@ -694,12 +693,8 @@ export function InlineLines({
       )}
       {balance && rows.some((r) => r.id) && (
         <div className={s.hint}>
-          {openGroups.length ? (
-            <span className={s.warn}>
-              {(labels.unbalanced ?? "{list}").replace("{list}", openGroups.map(([g, d]) => `${g} (${nf.format(d / 100)})`).join(", "))}
-            </span>
-          ) : null}
-          {!readOnly && labels.keys ? <span> · {labels.keys}</span> : null}
+          {/* vyrovnanost hlídá Ověřit a Zaúčtovat; dole jen nápověda kláves */}
+          {!readOnly && labels.keys ? <span>{labels.keys}</span> : null}
         </div>
       )}
       {!readOnly && rows.some((r) => r.id) && !rows.some((r) => !r.id) && (

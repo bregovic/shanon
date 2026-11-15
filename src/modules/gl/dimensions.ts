@@ -38,6 +38,45 @@ export async function activeDimensions(data: DataApi): Promise<DimDef[]> {
 
 /** Dimenze řádku (dim1…dim6) jako prosté hodnoty. */
 export const dimsOf = (r: RecordData): Dims => Object.fromEntries(DIM_SLOTS.map((n) => [dimField(n), (r[dimField(n)] as string) || null]));
+/** odkaz účtu / protiúčtu řádku deníku podle druhu */
+export const LINE_REF_FIELDS: Record<string, { main: string; offset: string }> = {
+  ledger: { main: "accountId", offset: "offsetAccountId" },
+  customer: { main: "customerId", offset: "offsetCustomerId" },
+  vendor: { main: "vendorId", offset: "offsetVendorId" },
+  bank: { main: "bankAccountId", offset: "offsetBankAccountId" },
+  cash: { main: "cashDeskId", offset: "offsetCashDeskId" },
+};
+
+/**
+ * Výchozí dimenze účtu řádku podle druhu: účet hlavní knihy, odběratel / dodavatel (dimenze partnera),
+ * bankovní účet a pokladna (dimenze jejich účtu hlavní knihy). `notAllowed` = účet dimenzi zakazuje.
+ */
+export async function defaultDimsOf(data: DataApi, type: unknown, refId: unknown): Promise<{ dims: Dims; notAllowed: Set<string> }> {
+  const out = { dims: {} as Dims, notAllowed: new Set<string>() };
+  if (!type || !refId) return out;
+  const get = async (obj: string, id: unknown) => {
+    try {
+      return id ? await data.get(obj, String(id)) : null;
+    } catch {
+      return null; // modul vypnutý
+    }
+  };
+  const t = String(type);
+  let src: RecordData | null = null;
+  let acc: RecordData | null = null;
+  if (t === "ledger") acc = src = await get("gl.account", refId);
+  else if (t === "customer") src = await get("ar.customer", refId);
+  else if (t === "vendor") src = await get("ap.vendor", refId);
+  else if (t === "bank") acc = src = await get("gl.account", (await get("bank.account", refId))?.glAccountId);
+  else if (t === "cash") acc = src = await get("gl.account", (await get("cash.desk", refId))?.accountId);
+  for (const n of DIM_SLOTS) {
+    const f = dimField(n);
+    if (acc?.[`dim${n}Req`] === "notAllowed") out.notAllowed.add(f);
+    else if (src?.[f]) out.dims[f] = String(src[f]);
+  }
+  return out;
+}
+
 /** dimenze protiúčtu řádku deníku (offsetDim1…6); prázdné = jako účet */
 export const offsetDimsOf = (r: RecordData): Dims => {
   const own = Object.fromEntries(DIM_SLOTS.map((n) => [dimField(n), (r[`offsetDim${n}`] as string) || null])) as Dims;

@@ -244,6 +244,7 @@ export function RefCombobox({
   onChange,
   openLabel,
   compact = false,
+  onBeforeOpen,
 }: {
   f: FieldMeta;
   /** omezení výběru (lookupFilter) */
@@ -255,7 +256,16 @@ export function RefCombobox({
   openLabel: string;
   /** mřížka řádků: malá velikost, bez tlačítka Otevřít */
   compact?: boolean;
+  /** před proskokem na odkazovaný záznam (mřížka uloží rozepsaný řádek) */
+  onBeforeOpen?: () => Promise<unknown> | unknown;
 }) {
+  const router = useRouter();
+  // Ctrl+Enter / Ctrl+klik = karta odkazovaného záznamu (Esc tam vrátí zpět)
+  const openRef = async () => {
+    if (!value) return;
+    await onBeforeOpen?.();
+    router.push(refLink(f, value));
+  };
   const [query, setQuery] = useState(title);
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<{ id: string; title: string; subtitle: string; nameOnly?: boolean }[]>([]);
@@ -301,6 +311,20 @@ export function RefCombobox({
           setOpen(true);
           if (!e.target.value) onChange(f.name, null, "");
         }}
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && value) {
+            e.preventDefault();
+            e.stopPropagation();
+            void openRef();
+          }
+        }}
+        onClick={(e) => {
+          if ((e.ctrlKey || e.metaKey) && value) {
+            e.preventDefault();
+            void openRef();
+          }
+        }}
+        title={value ? openLabel : undefined}
         onOptionSelect={(_, d) => {
           if (!d.optionValue) return;
           const o = options.find((x) => x.id === d.optionValue);

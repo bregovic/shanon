@@ -32,6 +32,15 @@ Každý modul má své deníky: [Obecné deníky](/gl/journal?filter.journalType
 - Text a druh účtu se přebírají z předchozího řádku. Záporná částka v MD se přesune do D (a naopak).
 - Pod mřížkou je vidět, které doklady nejsou vyrovnané a o kolik; řádky takového dokladu mají oranžový proužek.
 
+## Výchozí dimenze a protiúčet
+
+- **Dimenze účtu** se doplní samy: z účtu hlavní knihy, u odběratele a dodavatele z jeho karty, u banky a pokladny z jejich účtu hlavní knihy. Co účet nemá, doplní deník.
+- **Dimenze protiúčtu**: vlastní výchozí dimenze protiúčtu, jinak stejné jako u účtu.
+- Změníte-li účet, výchozí dimenze předchozího účtu se nahradí novými. Ručně zadané hodnoty zůstanou.
+- **Název deníku** (Hlavní kniha → Názvy deníků) může mít výchozí protiúčet a výchozí dimenze řádků. Nový deník je převezme a v jeho hlavičce (Další ▾ → Hlavička) je lze pro konkrétní deník změnit.
+- Bankovní deník a platby mají výchozí protiúčet **Banka**. Pokud má firma jediný bankovní účet, doplní se sám. Pokladní deník má protiúčet Pokladna.
+- Na kartu účtu, dodavatele nebo odběratele z řádku skočíte přes **Ctrl+Enter** nebo **Ctrl+klik** v poli. **Esc** vás vrátí zpět do deníku.
+
 > Doporučení: pro opakované zápisy (bankovní poplatky, nájem) si založte **název deníku s výchozím protiúčtem** – každý řádek je pak vyrovnaný sám a stačí účet, text a částka. Velké množství řádků (výpis, mzdy) nahrajte **Importem** z Excelu; čísla dokladů se doplní při Ověřit.
 
 ## Účtový rozvrh

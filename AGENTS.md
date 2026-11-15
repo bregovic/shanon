@@ -209,7 +209,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   (prázdný řádek se sám nepřidává), podrobnosti vybraného řádku pod mřížkou (`lines[].details`), dimenze účtu
   a protiúčtu v dialogu Ctrl+Shift+D i v záložce Dimenze (jeden `DimsEditor`; `lines[].dims`; protiúčet `offsetDim1…6`,
   prázdné = jako účet). Po otevření dokladu kurzor do posledního řádku na první pole, které se neplní samo.
-  Pod mřížkou jen upozornění na nevyrovnaný doklad. Přehled zkratek pro uživatele = `docs/help/ovladani.md` (při nové zkratce doplnit).
+  Pod mřížkou jen nápověda kláves (nevyrovnaný doklad = zvýrazněné řádky, kontrola Ověřit). Výchozí dimenze řádku
+  `applyDefaultDims` (posting.ts): účet = účet HK / partner / účet HK banky či pokladny (`defaultDimsOf`) → hlavička
+  deníku; protiúčet = jeho výchozí → dimenze účtu; změna účtu nahradí jen hodnoty, které dal předchozí účet.
+  Výchozí protiúčet a dimenze: název deníku → hlavička deníku (lze změnit) → nový řádek; protiúčet banka/pokladna
+  ne u řádku stejného druhu, jediný účet firmy se doplní. Proskok na odkazovaný záznam: Ctrl+Enter / Ctrl+klik
+  v `RefCombobox` (mřížka napřed uloží řádek), Esc = `goBack`. Potvrzení Uloženo = `toast()` (`ToastHost` v AppShell). Přehled zkratek pro uživatele = `docs/help/ovladani.md` (při nové zkratce doplnit).
 - Lišta formuláře (standard): Uložit + akce zpracování jako tlačítka; ostatní ve skupinách
   `Tisk ▾` (tisk, PDF, soubory, e-mail), `Zobrazit ▾` (související doklady, Náhled dokladu), `Další ▾`
   (Duplikovat). Skupina = `actions[].group` (výchozí: download → print, jinak process). Náhled dokladu =

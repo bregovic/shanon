@@ -4,6 +4,7 @@
  * Hlavička aplikace — převzatá ze staré verze: logo, výběr modulu,
  * přepínač firmy, nastavení, uživatel, odhlášení.
  */
+import { ToastHost } from "./toast";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
@@ -92,6 +93,7 @@ export function AppShell({ modules, companies, companyId, user, labels, menu, ch
 
   return (
     <div className={s.root}>
+      <ToastHost />
       <header className={s.header}>
         <Link href={current?.href ?? "/"} className={s.logo} aria-label="Shanon">
           {/* eslint-disable-next-line @next/next/no-img-element */}

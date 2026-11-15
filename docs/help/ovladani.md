@@ -45,7 +45,7 @@ Nový záznam dá kurzor do prvního povinného nevyplněného pole. Co uložen�
 | `Ctrl+Shift+D` | Dialog dimenzí účtu a protiúčtu |
 | `Shift`+klik na zaškrtnutí | Vybrat rozsah řádků (pak Smazat vybrané) |
 
-V deníku se po otevření kurzor postaví do **Druhu účtu**. Nový řádek přebírá datum, číslo dokladu a text z předchozího a u nevyrovnaného dokladu nabídne dorovnávací částku. Pod mřížkou se ukáže upozornění jen u **nevyrovnaného** dokladu.
+V deníku se po otevření kurzor postaví do **Druhu účtu**. Nový řádek přebírá datum, číslo dokladu a text z předchozího a u nevyrovnaného dokladu nabídne dorovnávací částku. Řádky nevyrovnaného dokladu jsou zvýrazněné, vyrovnanost zkontroluje **Ověřit**. Dimenze a protiúčet se doplní výchozí (účet, dodavatel, název deníku).
 
 Záložky nad řádky: **Obecné** a **Dimenze** ukazují podrobnosti vybraného řádku místo mřížky. Tam platí `↑` / `↓` = předchozí / další řádek, `Enter` / `Shift+Enter` = další / předchozí pole, `Esc` = zpět na řádky. V záložce Dimenze `Enter` za poslední dimenzí přejde na další řádek.
 
@@ -56,6 +56,7 @@ Záložky nad řádky: **Obecné** a **Dimenze** ukazují podrobnosti vybraného
 | psaní | Hledá podle kódu i názvu (u odběratelů a dodavatelů podle jména) |
 | `*` + číslo | Hledá podle čísla (např. `*1002`) |
 | `Alt+↓` | Rozbalit nabídku |
+| `Ctrl+Enter` nebo `Ctrl`+klik | Otevřít kartu vybrané hodnoty (dodavatel, účet…); `Esc` vrátí zpět |
 | `↑` / `↓`, `Enter` | Vybrat v nabídce a potvrdit |
 
 Nabídka ukazuje jen hodnoty, které se do pole hodí (např. jen názvy deníků daného druhu). Hodnota, kterou jste naposledy vybrali, se u nového záznamu nabídne znovu (název deníku).
