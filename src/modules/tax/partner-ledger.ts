@@ -158,7 +158,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   });
 
   const invoiceFields: ObjectDef["fields"] = {
-    invoiceNum: { edt: Edts.Code, label: "@TAX:InvoiceNum", mandatory: true, readOnly: true },
+    // vydaná: číslo jde přepsat (koncept; navazuje na jiný systém), přijatá: interní číslo z řady
+    invoiceNum: { edt: Edts.Code, label: "@TAX:InvoiceNum", mandatory: true, readOnly: sp.side !== 1 },
     // povinné až při zaúčtování (faktura z objednávky ho ještě nezná)
     ...(sp.externalNum ? { externalNum: { edt: Edts.Code, label: L("ExternalNum") } } : {}),
     [partnerId]: { edt: refEdt(id(sp.partner), L("Partner")), mandatory: true },

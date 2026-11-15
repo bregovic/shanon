@@ -36,6 +36,13 @@ describe("data faktury", () => {
     r = (await getRecord(T, "ar.invoice", String(inv.id), client))!;
     expect([d(r.taxDate), d(r.dueDate)]).toEqual(["2026-11-05", "2026-12-31"]);
 
+    // vydaná faktura: číslo jde změnit, VS z čísla se posune
+    r = (await getRecord(T, "ar.invoice", String(inv.id), client))!;
+    expect(r.vs).toBe(String(r.invoiceNum).replace(/\D/g, ""));
+    await saveRecord(T, "ar.invoice", String(inv.id), { ...r, invoiceNum: "FV2026-0777" }, undefined, client);
+    r = (await getRecord(T, "ar.invoice", String(inv.id), client))!;
+    expect([r.invoiceNum, r.vs]).toEqual(["FV2026-0777", "20260777"]);
+
     // splatnost z odběratele
     const inv2 = await saveRecord(T, "ar.invoice", null, { customerId: c2.id, invoiceDate: "2026-11-01" }, undefined, client);
     r = (await getRecord(T, "ar.invoice", String(inv2.id), client))!;

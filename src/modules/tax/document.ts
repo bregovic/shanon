@@ -118,7 +118,9 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         }
         if (!data.taxDate) data.taxDate = data.invoiceDate;
         if (isNew && !data.currencyId) data.currencyId = partner.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
-        // VS = číslice z čísla faktury (vydaná) / z čísla dodavatele (přijatá), nejvýš 10
+        // VS = číslice z čísla faktury (vydaná) / z čísla dodavatele (přijatá), nejvýš 10; změna čísla posune i VS z něj
+        const vsOf = (v: unknown) => String(v ?? "").replace(/\D/g, "").slice(-10);
+        if (before && data.vs && before[cfg.vsSourceField] !== data[cfg.vsSourceField] && String(data.vs) === vsOf(before[cfg.vsSourceField])) data.vs = null;
         if (!data.vs && data[cfg.vsSourceField]) {
           const digits = String(data[cfg.vsSourceField]).replace(/\D/g, "").slice(-10);
           if (digits) data.vs = digits;
