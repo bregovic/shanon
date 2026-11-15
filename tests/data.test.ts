@@ -21,7 +21,7 @@ import { withTenant } from "@/server/db";
 import { addFile, addNote, listDocuRefs, readFile } from "@/server/docuref";
 import { recordHistory } from "@/server/history";
 import { setupCompany } from "@/server/setup";
-import { convertCents, parseCnb } from "@/modules/sys/currency";
+import { convertCents, parseCnb, parseCnbYear } from "@/modules/sys/currency";
 import { checkStatement, gpcHeader, gpcLine, parseGpc } from "@/modules/bank/gpc";
 import { gpcAccountKey } from "@/modules/bank/handlers";
 import { fromCents } from "@/core/money";
@@ -285,6 +285,10 @@ describe("účetní období a měny", () => {
     const sheet = parseCnb("12.11.2026 #219\nzemě|měna|množství|kód|kurz\nEMU|euro|1|EUR|24,335\nJaponsko|jen|100|JPY|15,402\n");
     expect(sheet.date).toBe("2026-11-12");
     expect(sheet.rates).toContainEqual({ code: "JPY", amount: 100, rate: "15.402" });
+    // roční lístek: hlavička s množstvím a kódem, řádek za den
+    const year = parseCnbYear("Datum|1 EUR|100 JPY\n02.01.2026|25,175|15,539\n05.01.2026|25,155|15,545\n");
+    expect([...year.keys()]).toEqual(["2026-01-02", "2026-01-05"]);
+    expect(year.get("2026-01-05")).toEqual([{ code: "EUR", amount: 1, rate: "25.155" }, { code: "JPY", amount: 100, rate: "15.545" }]);
     expect(fromCents(convertCents("1000", "15.402", 100))).toBe("154.02");
     expect(fromCents(convertCents("19.99", "24.335", 1))).toBe("486.46");
   });

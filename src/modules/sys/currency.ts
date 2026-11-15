@@ -54,6 +54,69 @@ export async function loadCnbRates(data: DataApi, date: string): Promise<number>
   return n;
 }
 
+/** Roční kurzovní lístek ČNB (všechny dny roku): „Datum|1 EUR|100 JPY…“ → datum → kurzy. */
+export function parseCnbYear(text: string): Map<string, CnbRate[]> {
+  const out = new Map<string, CnbRate[]>();
+  let cols: { code: string; amount: number }[] = [];
+  for (const l of text.trim().split(/\r?\n/)) {
+    const parts = l.split("|");
+    // hlavička (opakuje se při změně seznamu měn během roku)
+    if (parts[0] === "Datum") {
+      cols = parts.slice(1).map((h) => {
+        const [amount, code] = h.trim().split(" ");
+        return { code: code ?? "", amount: Number(amount) };
+      });
+      continue;
+    }
+    const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(parts[0] ?? "");
+    if (!m) continue;
+    const rates = cols
+      .map((c, i) => ({ code: c.code, amount: c.amount, rate: (parts[i + 1] ?? "").trim().replace(",", ".") }))
+      .filter((r) => r.code && r.rate && !Number.isNaN(Number(r.rate)));
+    out.set(`${m[3]}-${m[2]}-${m[1]}`, rates);
+  }
+  return out;
+}
+
+const CNB_YEAR_URL = "https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/rok.txt";
+
+/** Doplní chybějící kurzy ČNB za celý rok (měny tenanta, jen dny, které chybí). Vrací počet nových kurzů. */
+export async function loadCnbYear(data: DataApi, year: number): Promise<number> {
+  let sheet: Map<string, CnbRate[]>;
+  try {
+    sheet = await withService(
+      data,
+      "cnb",
+      "rates.cnbYear",
+      async () => {
+        const res = await fetch(`${CNB_YEAR_URL}?rok=${year}`, { signal: AbortSignal.timeout(15_000) });
+        if (!res.ok) throw new UserError("@SYS:CnbFailed");
+        return parseCnbYear(await res.text());
+      },
+      (r) => `${year}: ${r.size}`,
+    );
+  } catch (e) {
+    if (e instanceof UserError) throw e;
+    throw new UserError("@SYS:CnbFailed");
+  }
+  let n = 0;
+  for (const cur of await data.find("sys.currency", {})) {
+    if (cur.code === "CZK") continue;
+    const have = new Set(
+      (await data.find("sys.exchangeRate", { currencyId: cur.id, base: "CZK", source: "cnb", date: { gte: `${year}-01-01`, lte: `${year}-12-31` } }, { take: 400 })).map((r) =>
+        (r.date instanceof Date ? r.date.toISOString() : String(r.date)).slice(0, 10),
+      ),
+    );
+    for (const [date, rates] of sheet) {
+      const r = rates.find((x) => x.code === cur.code);
+      if (!r || have.has(date)) continue;
+      await data.create("sys.exchangeRate", { currencyId: cur.id, date, amount: r.amount, rate: r.rate, base: "CZK", source: "cnb" });
+      n++;
+    }
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // ECB — referenční kurzy vůči EUR (eurofxref); kurz vůči jiné měně přepočtem
 // ---------------------------------------------------------------------------
@@ -183,7 +246,10 @@ export const rateJobs: JobDef[] = [
     label: "@SYS:JobRatesCnb",
     default: { recurrence: "days", every: 1, at: "14:45" },
     async run(ctx) {
-      return ctx.t("@SYS:RatesLoaded", { n: String(await loadCnbRates(ctx.data, todayPrague())) });
+      // dnešní lístek + chybějící dny letošního roku (první běh doplní celý rok zpětně, další už jen mezery)
+      const today = todayPrague();
+      const n = (await loadCnbRates(ctx.data, today)) + (await loadCnbYear(ctx.data, Number(today.slice(0, 4))));
+      return ctx.t("@SYS:RatesLoaded", { n: String(n) });
     },
   },
   {
