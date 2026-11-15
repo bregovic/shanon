@@ -9,6 +9,7 @@
  * nebo proti zadanému účtu; úhrada se zapíše do salda (položka „Úhrada“)
  * a u faktury se navýší Uhrazeno, při plné úhradě se položka vyrovná.
  */
+import { czIban } from "@/core/print";
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { convertLines, postVoucher, type PostingLine } from "@/modules/gl/posting";
@@ -217,6 +218,10 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
 
 export const bankHandlers: Record<string, ObjectHandlers> = {
   "bank.account": {
+    beforeSave(_ctx, d) {
+      // české číslo účtu → IBAN (dopočítá se sám)
+      if (!d.iban && d.accountNum) d.iban = czIban(String(d.accountNum));
+    },
     actions: {
       async import(ctx, account, file) {
         if (!file) throw new UserError("@SYS:Required");

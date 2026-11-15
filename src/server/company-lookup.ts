@@ -4,6 +4,8 @@ import { lookupRegistry } from "@/modules/gab/registry-lookup";
 import { inTenant, Session, type Ctx } from "./data";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
+import { czIban } from "@/core/print";
+import type { DataApi } from "@/core/module";
 
 export function createCompanyFromRegistry(
   ctx: Ctx,
@@ -54,17 +56,52 @@ export function createCompanyFromRegistry(
           zipCode: hit.zipCode,
           country: hit.country,
         };
-        // bankovní účet: první zveřejněný v registru plátců DPH (když v organizaci chybí)
-        let bankAccount: string | null = (org?.bankAccount as string) ?? null;
-        if (!bankAccount && hit.vatId && /^CZ\d+$/i.test(String(hit.vatId))) {
-          const st = await vatRegistryStatus([String(hit.vatId).slice(2)]).catch(() => null);
-          bankAccount = st?.get(String(hit.vatId).slice(2))?.accounts.find((a) => a.accountNum)?.accountNum ?? null;
-        }
+        // bankovní účty zveřejněné v registru plátců DPH
+        const published =
+          hit.vatId && /^CZ\d+$/i.test(String(hit.vatId))
+            ? ((await vatRegistryStatus([String(hit.vatId).slice(2)]).catch(() => null))?.get(String(hit.vatId).slice(2))?.accounts ?? [])
+            : [];
+        // do organizace první z nich (když tam účet ještě není)
+        const bankAccount: string | null = (org?.bankAccount as string) ?? published.find((a) => a.accountNum)?.accountNum ?? null;
         if (org) await api.update("org.entity", String(org.id), { ...values, bankAccount });
         else await api.create("org.entity", { ...values, bankAccount });
+        // a všechny do modulu Banka (chybějící; každý svůj účet hlavní knihy 221xxx)
+        if (ctx.modules.has("bank")) await createBankAccounts(api, published);
       }
       return String(company.id);
     },
     client,
   );
+}
+
+/**
+ * Bankovní účty firmy z registru plátců DPH do modulu Banka: jen chybějící (podle čísla účtu
+ * nebo IBAN), IBAN dopočítaný; první účet na 221000, další na vlastní analytiku 221001, 221002…
+ */
+export async function createBankAccounts(api: DataApi, published: { accountNum: string | null; iban: string | null }[]): Promise<number> {
+  const norm = (v: unknown) => String(v ?? "").replace(/\s/g, "").toUpperCase();
+  const existing = await api.find("bank.account", {}, { take: 500 });
+  const have = new Set(existing.flatMap((b) => [norm(b.accountNum), norm(b.iban)]).filter(Boolean));
+  let n = 0;
+  for (const a of published) {
+    const iban = a.iban ?? czIban(a.accountNum);
+    if (have.has(norm(a.accountNum)) || have.has(norm(iban))) continue;
+    // účet hlavní knihy: 221000 pro první bankovní účet, další analytiky
+    const used = new Set(existing.map((b) => String(b.glAccountId ?? "")));
+    let gl: string | null = null;
+    for (let i = 0; i < 100 && !gl; i++) {
+      const num = `221${String(i).padStart(3, "0")}`;
+      let [acc] = await api.find("gl.account", { accountNum: num }, { take: 1 });
+      if (!acc) acc = await api.create("gl.account", { accountNum: num, name: `Bankovní účet ${a.accountNum ?? iban ?? ""}`.slice(0, 120), type: "asset", postingType: "bank", noManualEntry: true });
+      if (!used.has(String(acc.id))) gl = String(acc.id);
+    }
+    if (!gl) break;
+    const code = `BU${String(existing.length + n + 1).padStart(2, "0")}`;
+    const created = await api.create("bank.account", { code, name: `Běžný účet ${a.accountNum ?? iban ?? ""}`.slice(0, 120), accountNum: a.accountNum, iban, glAccountId: gl });
+    existing.push(created);
+    have.add(norm(a.accountNum));
+    have.add(norm(iban));
+    n++;
+  }
+  return n;
 }

@@ -7,6 +7,7 @@ import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@
 import { withService } from "@/modules/int/services";
 import { aresByIco, fillFromAres } from "./ares";
 import { checkSubjectVat } from "./vat-registry";
+import { czIban } from "@/core/print";
 
 export interface RegistryHit {
   source: "ares" | "vies";
@@ -155,6 +156,8 @@ export const aresHandlers: Record<string, ObjectHandlers> = {
   "gab.bankAccount": {
     beforeSave(_ctx, d) {
       if (!d.accountNum && !d.iban) return { accountNum: "@GAB:AccountRequired" };
+      // české číslo účtu → IBAN (dopočítá se sám)
+      if (!d.iban && d.accountNum) d.iban = czIban(String(d.accountNum));
     },
   },
   "gab.subject": {

@@ -1064,3 +1064,31 @@ describe("objednávky a zálohy", () => {
     expect((await getRecord(T, "ap.invoice", String(inv2.id), client))!.status).toBe("posted");
   });
 });
+
+describe("založení firmy z rejstříku: bankovní účty", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("účty z registru DPH s IBAN do modulu Banka (221000, 221001), opakované načtení nezdvojí; IBAN v adresáři", async () => {
+    const { createCompanyFromRegistry } = await import("@/server/company-lookup");
+    const T = (await provisionTenant(client, { code: `t-cba-${run}`, name: "Cba", adminEmail: `cba-${run}@test.local`, adminPassword: "heslo-12345", modules: ["org", "bank"], company: { code: "A", name: "A" } })).ctx;
+    const dph = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><StatusNespolehlivyPlatceRozsirenyResponse><status statusCode="0"/><statusPlatceDPH dic="27079864" nespolehlivyPlatce="NE" cisloFu="451"><zverejneneUcty><ucet datumZverejneni="2020-01-01"><standardniUcet predcisli="19" cislo="2000145399" kodBanky="0800"/></ucet><ucet datumZverejneni="2021-01-01"><standardniUcet cislo="2401234567" kodBanky="2010"/></ucet></zverejneneUcty></statusPlatceDPH></StatusNespolehlivyPlatceRozsirenyResponse></soapenv:Body></soapenv:Envelope>`;
+    vi.stubGlobal("fetch", async (url: string) =>
+      String(url).includes("adisrws")
+        ? new Response(dph, { status: 200 })
+        : new Response(JSON.stringify({ ico: "27079864", obchodniJmeno: "Uzenářství s.r.o.", dic: "CZ27079864", pravniForma: "112", sidlo: { kodStatu: "CZ", nazevObce: "Davle", psc: 25206 } }), { status: 200 }),
+    );
+    const id = await createCompanyFromRegistry(T, "27079864", client);
+    const C = { ...T, companyId: id };
+    const banks = (await listRecords(C, "bank.account", { sort: "code" }, client)).rows;
+    expect(banks.map((b) => [b.accountNum, b.iban, String((b._titles as Record<string, string>).glAccountId).slice(0, 6)])).toEqual([
+      ["19-2000145399/0800", "CZ6508000000192000145399", "221000"],
+      ["2401234567/2010", "CZ2920100000002401234567", "221001"],
+    ]);
+    // znovu: nic nového
+    await createCompanyFromRegistry(T, "27079864", client);
+    expect((await listRecords(C, "bank.account", {}, client)).total).toBe(2);
+    // IBAN se dopočítá i u účtu v adresáři
+    const subj = await saveRecord(C, "gab.subject", null, { name: "Dodavatel" }, undefined, client);
+    const ba = await saveRecord(C, "gab.bankAccount", null, { subjectId: subj.id, accountNum: "2401234567/2010" }, undefined, client);
+    expect(ba.iban).toBe("CZ2920100000002401234567");
+  });
+});
