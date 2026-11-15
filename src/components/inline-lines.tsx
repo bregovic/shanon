@@ -17,6 +17,7 @@ import { Button, Checkbox, Input, makeStyles, Select, Text, Tooltip, tokens } fr
 import { Delete20Regular } from "@fluentui/react-icons";
 import { deleteRecordsAction, listAction, saveRecordAction } from "@/app/actions";
 import type { FieldMeta } from "@/lib/meta";
+import { formatDateInput } from "@/lib/date-input";
 import { DateInput } from "./date-input";
 import { RefCombobox, type Values } from "./record-form";
 
@@ -275,7 +276,7 @@ export function InlineLines({
     const set = (value: unknown, title?: string) =>
       update(row.key, { values: { ...row.values, [f.name]: value }, titles: title !== undefined ? { ...row.titles, [f.name]: title } : row.titles, dirty: true, error: undefined });
     if (readOnly || f.readOnly) {
-      const shown = f.kind === "ref" ? row.titles[f.name] : f.kind === "enum" ? f.options?.find((o) => o.value === v)?.label : f.kind === "decimal" && v !== null && v !== undefined && v !== "" ? nf.format(Number(v)) : v;
+      const shown = f.kind === "ref" ? row.titles[f.name] : f.kind === "date" ? formatDateInput(v, lang) : f.kind === "enum" ? f.options?.find((o) => o.value === v)?.label : f.kind === "decimal" && v !== null && v !== undefined && v !== "" ? nf.format(Number(v)) : v;
       return <div className={`${s.ro} ${f.kind === "decimal" ? s.num : ""}`}>{String(shown ?? "")}</div>;
     }
     const skip = autoCols.has(c.key) ? { tabIndex: -1 } : {};

@@ -286,6 +286,28 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       }
     });
 
+  // stažení souboru (XML pro úřad, ISDOC…): chyba se ukáže v aplikaci, ne jako holá textová stránka
+  const download = (actionId: string) =>
+    start(async () => {
+      const res = await fetch(`/api/download/${p.objectId}/${p.id}/${actionId}`);
+      if (!res.ok) {
+        setMessage({ intent: "error", text: (await res.text()).slice(0, 500) || res.statusText });
+        return;
+      }
+      setMessage(undefined);
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const name = decodeURIComponent(/filename\*=UTF-8''([^;]+)/i.exec(cd)?.[1] ?? /filename="?([^";]+)"?/i.exec(cd)?.[1] ?? actionId);
+      const url = URL.createObjectURL(await res.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      router.refresh();
+    });
+
   const upload = (actionId: string, file: File) =>
     start(async () => {
       const fd = new FormData();
@@ -338,7 +360,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
               key={a.id}
               icon={<ArrowDownload24Regular />}
               disabled={busy || a.disabled}
-              onClick={() => (window.location.href = `/api/download/${p.objectId}/${p.id}/${a.id}`)}
+              onClick={() => download(a.id)}
             >
               {a.label}
             </Button>
