@@ -236,6 +236,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   výčtu `DupCheck` (přijmout / varovat / odmítnout / odmítnout ve stejném roce): číslo faktury (`ar.parameters` / `ap.parameters`,
   přijatá u téhož dodavatele), ručně zadané číslo dokladu v HK (`gl.parameters.voucherDupCheck`; `gl.voucher.voucherNum`
   není jedinečné kvůli opravným deníkům). Účtenka na přijaté faktuře (`receipt`) = zjednodušený doklad, `tax.trans.simplified`.
+- Platba DPH (`src/modules/tax/vat-payment.ts`, druh `vatPayment` přiznání, akce `postPayment`, obsluha `vatPaymentHandlers` zvlášť
+  kvůli importům): zúčtování účtů DPH z `tax.trans` období proti dodavateli FÚ (`tax.parameters.taxOfficeVendorId`), položka
+  `ap.trans` (VS = DIČ, splatnost 25. den) → uhrazení párováním výpisu. Tisk `vatPaymentPrintable` (QR). Druh `incomeTax` zatím
+  bez výpočtu. Faktura v cizí měně: kurz k DUZP, DPH v Kč ze základu v Kč (§ 37), tisk přepočtu (`doc.fx*`); zaokrouhlení
+  vydaných faktur `sys.currency.invoiceRoundingUnit` (CZK = 1) → `roundingAmount`, systémové účty roundingGain/Loss.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

@@ -405,6 +405,7 @@ export const vatReturnHandlers: Record<string, ObjectHandlers> = {
     },
     actions: {
       async calculate(ctx, ret) {
+        if (ret.kind === "incomeTax") throw new UserError("@TAX:IncomeTaxSoon");
         const c = await computeVat(ctx.data, ret, ctx.t);
         const taxOut = c.taxOut;
         const deduction = c.deduction;
@@ -444,6 +445,7 @@ export const vatReturnHandlers: Record<string, ObjectHandlers> = {
     },
     downloads: {
       async xml(ctx, ret): Promise<DownloadFile> {
+        if (ret.kind !== "dp3" && ret.kind !== "kh") throw new UserError("@TAX:NoXmlForKind");
         const c = await computeVat(ctx.data, ret);
         const subj = await subject(ctx.data, ctx.companyId);
         const dp3 = ret.kind === "dp3";

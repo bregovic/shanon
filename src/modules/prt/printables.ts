@@ -1033,3 +1033,80 @@ export const receiptPrintable: PrintableDef = {
   defaultLayout: receiptLayout,
   legacyLayouts: [legacyReceiptLayout(), receiptLayoutV1()],
 };
+
+// ---------------------------------------------------------------------------
+// Platba DPH (Přiznání a podání → Platba DPH): částka, účet finančního úřadu, VS = DIČ, QR platba
+// ---------------------------------------------------------------------------
+
+async function vatPaymentDataset(data: DataApi, companyId: string | null, id: string) {
+  const ret = await data.get("tax.return", id);
+  if (!ret) throw new Error("not found");
+  const company = await companyData(data, companyId);
+  const [params] = await data.find("tax.parameters", {}, { take: 1 });
+  const vendor = params?.taxOfficeVendorId ? await data.get("ap.vendor", String(params.taxOfficeVendorId)).catch(() => null) : null;
+  const subj = vendor ? await data.get("gab.subject", String(vendor.subjectId)) : null;
+  const bank = vendor?.bankAccountId ? await data.get("gab.bankAccount", String(vendor.bankAccountId)) : null;
+  const accountNum = String(bank?.accountNum ?? "");
+  const iban = String(bank?.iban ?? "") || czIban(accountNum) || "";
+  // částka: zaúčtovaný závazek, jinak spočítaný výsledek přiznání
+  const amount = String(ret.paymentAmount ?? ret.result ?? "0");
+  const vs = String(ret.paymentVs ?? String(company.vatId ?? "").replace(/\D/g, "").slice(-10));
+  const period = String(ret.period ?? "");
+  return {
+    company,
+    doc: { number: `DPH ${period}`, period, amount, dueDate: ret.dueDate ?? "", vs, currency: "CZK" },
+    partner: { name: subj?.name ?? "", bankAccount: accountNum, iban },
+    lines: [],
+    vat: [],
+    qr: iban && toCents(amount) > zero ? await paymentQr(data, { iban, amount, currency: "CZK", vs, date: (ret.dueDate as string) ?? null, message: `DPH ${period}` }) : "",
+  };
+}
+
+function vatPaymentLayout(): PrintLayout {
+  const H = (id: string, x: number, y: number, w: number, text: string) => T(id, x, y, w, 5, text, { size: 7, bold: true, color: MUTED });
+  return {
+    paper: "a4",
+    fontSize: 10,
+    elements: [
+      { id: "band", type: "rect", x: 0, y: 0, w: 210, h: 3, style: { fill: ACCENT, color: ACCENT } },
+      T("title", 15, 14, 180, 6, "PLATBA DPH", { size: 8, bold: true, color: MUTED }),
+      T("num", 15, 20, 180, 10, "Období {doc.period}", { size: 18, bold: true, color: INK }),
+      T("co", 15, 31, 180, 10, "{company.name}\nDIČ {company.vatId}", { size: 9, color: INK }),
+      { id: "box", type: "rect", x: 15, y: 46, w: 180, h: 46, style: { fill: PANEL, color: PANEL } },
+      H("rcvH", 20, 49, 100, "PŘÍJEMCE"),
+      T("rcv", 20, 54, 100, 6, "{partner.name}", { size: 11, bold: true, color: INK }),
+      H("accH", 20, 62, 100, "ČÍSLO ÚČTU"),
+      T("acc", 20, 67, 100, 6, "{partner.bankAccount}", { size: 13, bold: true, color: INK }),
+      T("iban", 20, 74, 100, 4, "IBAN {partner.iban}", { size: 7, color: MUTED }),
+      H("vsH", 20, 80, 50, "VARIABILNÍ SYMBOL"),
+      T("vs", 20, 85, 50, 6, "{doc.vs}", { size: 13, bold: true, color: INK }),
+      H("dueH", 75, 80, 45, "SPLATNOST"),
+      T("due", 75, 85, 45, 6, "{doc.dueDate:date}", { size: 13, bold: true, color: ACCENT }),
+      { id: "totBox", type: "rect", x: 125, y: 49, w: 66, h: 22, style: { fill: ACCENT, color: ACCENT } },
+      T("totH", 128, 51, 60, 5, "K ÚHRADĚ", { size: 7.5, bold: true, color: "#dbe7f3", align: "right" }),
+      T("tot", 128, 57, 60, 9, "{doc.amount:money} Kč", { size: 16, bold: true, color: "#ffffff", align: "right" }),
+      { id: "qr", type: "qr", x: 140, y: 100, w: 50, h: 50, field: "qr" },
+      { ...T("qrT", 15, 120, 120, 12, "QR platba — naskenujte v bankovní aplikaci", { size: 9, bold: true, color: MUTED, align: "right" }), showIf: "qr" },
+    ],
+  };
+}
+
+export const vatPaymentPrintable: PrintableDef = {
+  id: "tax.return",
+  label: "@PRT:DocVatPayment",
+  defaultPaper: "a4",
+  numberField: "period",
+  fields: [
+    ...COMPANY_FIELDS,
+    { path: "doc.period", label: "@PRT:Period" },
+    { path: "doc.amount", label: "@PRT:Due", format: "money" },
+    { path: "doc.dueDate", label: "@PRT:DueDate", format: "date" },
+    { path: "doc.vs", label: "@PRT:Vs" },
+    { path: "partner.name", label: "@PRT:Recipient" },
+    { path: "partner.bankAccount", label: "@PRT:BankAccount" },
+    { path: "partner.iban", label: "@PRT:Iban" },
+  ],
+  lineFields: [],
+  dataset: vatPaymentDataset,
+  defaultLayout: vatPaymentLayout,
+};

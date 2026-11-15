@@ -559,8 +559,12 @@ async function bankSetup(data: DataApi) {
   await formatSetup(data);
   await ruleSetup(data);
   await stepSetup(data);
-  if ((await data.find("bank.paymentMethod", {}, { take: 1 })).length) return;
   const tr = async (code: string) => (await data.find("sys.transformation", { code }, { take: 1 }))[0]?.id ?? null;
+  // QR platba (i ve stávajících firmách): platba podle QR kódu (SPAYD) — faktury, platba DPH
+  if (!(await data.find("bank.paymentMethod", { code: "QR" }, { take: 1 })).length)
+    await data.create("bank.paymentMethod", { code: "QR", name: "QR platba", kind: "transfer", transformationId: await tr("SPAYD") });
+  // ostatní výchozí metody jen firmě, která žádné vlastní nemá
+  if ((await data.find("bank.paymentMethod", {}, { take: 10 })).some((m) => m.code !== "QR")) return;
   await data.create("bank.paymentMethod", { code: "PREVOD", name: "Převodem (ABO)", kind: "transfer", transformationId: await tr("ABO") });
   await data.create("bank.paymentMethod", { code: "SEPA", name: "Převodem (SEPA)", kind: "transfer", transformationId: await tr("SEPA") });
   await data.create("bank.paymentMethod", { code: "HOTOVE", name: "Hotově", kind: "cash" });

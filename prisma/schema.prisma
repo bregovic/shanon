@@ -1209,6 +1209,7 @@ model GlVoucher {
   glTrans_voucher       GlTrans[]       @relation("GlTrans_voucher")
   glJournal_voucher     GlJournal[]     @relation("GlJournal_voucher")
   taxTrans_voucher      TaxTrans[]      @relation("TaxTrans_voucher")
+  taxReturn_voucher     TaxReturn[]     @relation("TaxReturn_voucher")
   arInvoice_voucher     ArInvoice[]     @relation("ArInvoice_voucher")
   arTrans_voucher       ArTrans[]       @relation("ArTrans_voucher")
   apInvoice_voucher     ApInvoice[]     @relation("ApInvoice_voucher")
@@ -1645,6 +1646,7 @@ model TaxParameters {
   companyId         String   @map("company_id") @db.Uuid
   taxOfficeCode     String   @map("tax_office_code") @db.VarChar(4)
   taxOfficeBranch   String?  @map("tax_office_branch") @db.VarChar(5)
+  taxOfficeVendorId String?  @map("tax_office_vendor_id") @db.Uuid
   subjectType       String   @default("P") @map("subject_type") @db.VarChar(40)
   filingPeriod      String   @default("month") @map("filing_period") @db.VarChar(40)
   firstName         String?  @map("first_name") @db.VarChar(40)
@@ -1666,50 +1668,58 @@ model TaxParameters {
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy         String?  @map("updated_by") @db.Uuid
 
-  company SysCompany @relation("TaxParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  company         SysCompany @relation("TaxParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  taxOfficeVendor ApVendor?  @relation("TaxParameters_taxOfficeVendor", fields: [taxOfficeVendorId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
+  @@index([taxOfficeVendorId])
   @@map("tax_parameters")
 }
 
 /// tax.return — generováno z definice objektu
 model TaxReturn {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  tenantId    String    @map("tenant_id") @db.Uuid
-  companyId   String    @map("company_id") @db.Uuid
-  period      String?   @db.VarChar(7)
-  kind        String    @default("dp3") @db.VarChar(40)
-  year        Int
-  month       Int?
-  quarter     Int?
-  status      String    @default("draft") @db.VarChar(40)
-  computedAt  DateTime? @map("computed_at") @db.Date
-  out21Base   Decimal?  @map("out21_base") @db.Decimal(18, 2)
-  out21Tax    Decimal?  @map("out21_tax") @db.Decimal(18, 2)
-  out12Base   Decimal?  @map("out12_base") @db.Decimal(18, 2)
-  out12Tax    Decimal?  @map("out12_tax") @db.Decimal(18, 2)
-  in21Base    Decimal?  @map("in21_base") @db.Decimal(18, 2)
-  in21Tax     Decimal?  @map("in21_tax") @db.Decimal(18, 2)
-  in12Base    Decimal?  @map("in12_base") @db.Decimal(18, 2)
-  in12Tax     Decimal?  @map("in12_tax") @db.Decimal(18, 2)
-  taxOut      Decimal?  @map("tax_out") @db.Decimal(18, 2)
-  deduction   Decimal?  @db.Decimal(18, 2)
-  result      Decimal?  @db.Decimal(18, 2)
-  a4Count     Int?      @map("a4_count")
-  b2Count     Int?      @map("b2_count")
-  warnings    String?
-  lineSummary String?   @map("line_summary")
-  ext         Json      @default("{}")
-  version     Int       @default(1)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  createdBy   String?   @map("created_by") @db.Uuid
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?   @map("updated_by") @db.Uuid
+  id            String    @id @default(uuid(7)) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  period        String?   @db.VarChar(7)
+  kind          String    @default("dp3") @db.VarChar(40)
+  year          Int
+  month         Int?
+  quarter       Int?
+  status        String    @default("draft") @db.VarChar(40)
+  computedAt    DateTime? @map("computed_at") @db.Date
+  paymentAmount Decimal?  @map("payment_amount") @db.Decimal(18, 2)
+  dueDate       DateTime? @map("due_date") @db.Date
+  paymentVs     String?   @map("payment_vs") @db.VarChar(10)
+  voucherId     String?   @map("voucher_id") @db.Uuid
+  out21Base     Decimal?  @map("out21_base") @db.Decimal(18, 2)
+  out21Tax      Decimal?  @map("out21_tax") @db.Decimal(18, 2)
+  out12Base     Decimal?  @map("out12_base") @db.Decimal(18, 2)
+  out12Tax      Decimal?  @map("out12_tax") @db.Decimal(18, 2)
+  in21Base      Decimal?  @map("in21_base") @db.Decimal(18, 2)
+  in21Tax       Decimal?  @map("in21_tax") @db.Decimal(18, 2)
+  in12Base      Decimal?  @map("in12_base") @db.Decimal(18, 2)
+  in12Tax       Decimal?  @map("in12_tax") @db.Decimal(18, 2)
+  taxOut        Decimal?  @map("tax_out") @db.Decimal(18, 2)
+  deduction     Decimal?  @db.Decimal(18, 2)
+  result        Decimal?  @db.Decimal(18, 2)
+  a4Count       Int?      @map("a4_count")
+  b2Count       Int?      @map("b2_count")
+  warnings      String?
+  lineSummary   String?   @map("line_summary")
+  ext           Json      @default("{}")
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     String?   @map("created_by") @db.Uuid
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?   @map("updated_by") @db.Uuid
 
   company SysCompany @relation("TaxReturn_company", fields: [companyId], references: [id], onDelete: Restrict)
+  voucher GlVoucher? @relation("TaxReturn_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, companyId, kind, period])
   @@index([tenantId, companyId])
+  @@index([voucherId])
   @@map("tax_return")
 }
 
@@ -2399,24 +2409,25 @@ model ApVendor {
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy       String?  @map("updated_by") @db.Uuid
 
-  company                     SysCompany             @relation("ApVendor_company", fields: [companyId], references: [id], onDelete: Restrict)
-  subject                     GabSubject?            @relation("ApVendor_subject", fields: [subjectId], references: [id], onDelete: Restrict)
-  group                       ApGroup?               @relation("ApVendor_group", fields: [groupId], references: [id], onDelete: Restrict)
-  taxGroup                    TaxGroup?              @relation("ApVendor_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  currency                    SysCurrency?           @relation("ApVendor_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  bankAccount                 GabBankAccount?        @relation("ApVendor_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
-  paymentMethod               BankPaymentMethod?     @relation("ApVendor_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
-  glJournal_offsetVendor      GlJournal[]            @relation("GlJournal_offsetVendor")
-  glJournalLine_vendor        GlJournalLine[]        @relation("GlJournalLine_vendor")
-  glJournalLine_offsetVendor  GlJournalLine[]        @relation("GlJournalLine_offsetVendor")
-  invItem_vendor              InvItem[]              @relation("InvItem_vendor")
-  apOrder_vendor              ApOrder[]              @relation("ApOrder_vendor")
-  apInvoice_vendor            ApInvoice[]            @relation("ApInvoice_vendor")
-  apAdvance_vendor            ApAdvance[]            @relation("ApAdvance_vendor")
-  apTrans_vendor              ApTrans[]              @relation("ApTrans_vendor")
-  bankStatementLine_vendor    BankStatementLine[]    @relation("BankStatementLine_vendor")
-  bankPaymentOrderLine_vendor BankPaymentOrderLine[] @relation("BankPaymentOrderLine_vendor")
-  intDocument_vendor          IntDocument[]          @relation("IntDocument_vendor")
+  company                       SysCompany             @relation("ApVendor_company", fields: [companyId], references: [id], onDelete: Restrict)
+  subject                       GabSubject?            @relation("ApVendor_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+  group                         ApGroup?               @relation("ApVendor_group", fields: [groupId], references: [id], onDelete: Restrict)
+  taxGroup                      TaxGroup?              @relation("ApVendor_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  currency                      SysCurrency?           @relation("ApVendor_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  bankAccount                   GabBankAccount?        @relation("ApVendor_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  paymentMethod                 BankPaymentMethod?     @relation("ApVendor_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  glJournal_offsetVendor        GlJournal[]            @relation("GlJournal_offsetVendor")
+  glJournalLine_vendor          GlJournalLine[]        @relation("GlJournalLine_vendor")
+  glJournalLine_offsetVendor    GlJournalLine[]        @relation("GlJournalLine_offsetVendor")
+  taxParameters_taxOfficeVendor TaxParameters[]        @relation("TaxParameters_taxOfficeVendor")
+  invItem_vendor                InvItem[]              @relation("InvItem_vendor")
+  apOrder_vendor                ApOrder[]              @relation("ApOrder_vendor")
+  apInvoice_vendor              ApInvoice[]            @relation("ApInvoice_vendor")
+  apAdvance_vendor              ApAdvance[]            @relation("ApAdvance_vendor")
+  apTrans_vendor                ApTrans[]              @relation("ApTrans_vendor")
+  bankStatementLine_vendor      BankStatementLine[]    @relation("BankStatementLine_vendor")
+  bankPaymentOrderLine_vendor   BankPaymentOrderLine[] @relation("BankPaymentOrderLine_vendor")
+  intDocument_vendor            IntDocument[]          @relation("IntDocument_vendor")
 
   @@unique([tenantId, companyId, accountNum])
   @@unique([tenantId, companyId, subjectId])

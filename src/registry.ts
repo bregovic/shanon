@@ -21,7 +21,7 @@ import { invHandlers } from "@/modules/inv/handlers";
 import pos from "@/modules/pos";
 import cash from "@/modules/cash";
 import prt, { PrintDocType, prtHandlers } from "@/modules/prt";
-import { advancePrintable, invoicePrintable, receiptPrintable } from "@/modules/prt/printables";
+import { advancePrintable, invoicePrintable, receiptPrintable, vatPaymentPrintable } from "@/modules/prt/printables";
 import { isdocHandlers } from "@/modules/prt/isdoc";
 import { cashHandlers } from "@/modules/cash/handlers";
 import { posHandlers } from "@/modules/pos/sale";
@@ -36,6 +36,7 @@ import qa, { qaHandlers } from "@/modules/qa";
 import { bankHandlers } from "@/modules/bank/handlers";
 import { paymentHandlers } from "@/modules/bank/payments";
 import { vatReturnHandlers } from "@/modules/tax/vat-return";
+import { vatPaymentHandlers } from "@/modules/tax/vat-payment";
 import { journalTaxHandlers } from "@/modules/tax/journal-tax";
 import { portalHandlers } from "@/modules/int/portal";
 import subjectRating from "@/extensions/subject-rating";
@@ -50,6 +51,7 @@ int.jobs = intJobs;
 // tisknutelné doklady (definice v Tiskových sestavách, data z modulu dokladu)
 ar.printables = [invoicePrintable, advancePrintable];
 pos.printables = [receiptPrintable];
+tax.printables = [vatPaymentPrintable];
 PrintDocType.values = modules.flatMap((m) => (m.printables ?? []).map((p) => ({ value: p.id, label: p.label })));
 BatchClass.values = modules.flatMap((m) => (m.jobs ?? []).map((j) => ({ value: j.id, label: j.label })));
 
@@ -67,7 +69,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, vatPaymentHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

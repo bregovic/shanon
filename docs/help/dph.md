@@ -59,3 +59,16 @@ Kód jde vždy zadat i ručně – ručně zadaný kód se při změně skupin n
 - Po výpočtu ještě můžete opravit doklady a **Vypočítat** znovu.
 - Zálohy: daň z přijaté platby se přizná v období platby, na konečné faktuře se odečte (záporné transakce).
 - Údaje o plátci (FÚ, kontakt) jsou v [Parametrech DPH](/tax/parameters).
+
+## Platba DPH
+
+1. Finanční úřad založte jako **dodavatele** s bankovním účtem pro DPH (předčíslí 705, kód banky 0710) a vyplňte ho v **Daňových parametrech** (pole Finanční úřad (dodavatel)).
+2. V **Přiznání a podání** založte záznam druhu **Platba DPH** za období a dejte **Spočítat**.
+3. **Zaúčtovat závazek** zúčtuje účty DPH proti dodavateli Finanční úřad a založí otevřenou položku jeho salda: částka v celých Kč jako v přiznání, VS = DIČ (číslice), splatnost 25. den po skončení období. Nadměrný odpočet vznikne jako pohledávka.
+4. **Tisk ▾** ukáže částku, účet finančního úřadu, VS, splatnost a **QR platbu**.
+
+Závazek je uhrazený, jakmile platbu z bankovního výpisu spáruje banka (VS = DIČ) na tuto položku salda — stejně jako úhradu faktury.
+
+## Daň z příjmů
+
+Druh **Daň z příjmů** je připravený; výpočet a podání doplníme.
