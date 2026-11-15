@@ -47,18 +47,18 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 | 5 | **Šablony záznamů** (record templates — výchozí hodnoty při založení per firma/uživatel) | Rychlé zakládání podobných záznamů; doplní „výchozí hodnoty kdekoli“ | P2 |
 | 6 | **Uložená zobrazení** (saved views: sloupce, filtry, řazení, sdílení s rolí) | Personalizace gridů bez programování | P2 |
 | 7 | **Data management** (datové entity, import/export balíčků, šablony, opakovaný import) | Migrace z jiných systémů, hromadné importy | P2 |
-| 8 | **Dávkové úlohy** (batch jobs, plánování, opakování, historie běhů) | Přecenění, uzávěrky, importy z banky, upomínky | P2 |
-| 9 | **Upozornění** (alerts: při změně pole / termínu, e-mail, centrum oznámení) | Hlídání splatností, změn | P2 |
-| 10 | **Tiskové sestavy a správa tisku** (print management: kam a jak tisknout doklady per odběratel) | Faktury, upomínky, objednávky v PDF/e-mailem | P1 |
-| 11 | **Electronic reporting** (konfigurovatelné formáty souborů: DPH přiznání, KH, SH, bankovní formáty) | Výkazy pro FÚ bez programování formátu | P1 (DPH) |
-| 12 | **Finanční dimenze a účetní struktury** (víc dimenzí, pravidla povinnosti per účet) | Zakázky, projekty, střediska povinně u nákladů | P2 |
+| 8 | ~~Dávkové úlohy~~ — hotovo 13. 11. 2026 (plán, opakování, historie, upozornění při chybě) | | ✓ |
+| 9 | ~~Upozornění~~ — zvoneček hotov 14. 11. 2026 (chyby dávek, doklady ke kontrole, registr DPH, EET); zbývá upozornění na změnu pole a e-mailem | Hlídání splatností, změn | P2 |
+| 10 | ~~Tiskové sestavy~~ — návrhář, PDF, QR platba, ISDOC, odeslání e-mailem (14. 11. 2026); zbývá print management per odběratel | | ✓ |
+| 11 | **Electronic reporting** — částečně: Transformace (ABO, SEPA, GPC, SPAYD, EAN), DP3/KH v kódu | Výkazy pro FÚ bez programování formátu | P2 |
+| 12 | ~~Finanční dimenze~~ — hotovo (6 dimenzí, pravidla povinnosti, výchozí z partnera a účtu) | | ✓ |
 | 13 | **Zabezpečení na úrovni polí a záznamů** (field-level security, XDS — např. jen vlastní odběratelé obchodníka) | Citlivé údaje (mzdy, marže) | P2 |
 | 14 | **Segregace povinností** (SoD pravidla, konflikty rolí) | Audit u větších firem | P3 |
-| 15 | **Kontextová nápověda a průvodci** (F1, task guides / Task recorder) | Zaučení uživatelů | P2 |
-| 16 | **Globální vyhledávání a navigační hledání** („Hledat stránku“ i data) | Rychlá orientace | P2 |
+| 15 | ~~Kontextová nápověda~~ — návody k agendám, „?“ u formulářů, Ctrl+K (14. 11. 2026); zbývá Task recorder / videa | Zaučení uživatelů | ✓ |
+| 16 | ~~Navigační hledání~~ — Ctrl+K (menu i návody); zbývá hledání v datech | Rychlá orientace | P3 |
 | 17 | **Office integrace** (úprava dat v Excelu a zpět — Excel add-in) | Hromadné úpravy číselníků | P3 |
 | 18 | **Datová platnost** (date-effective tabulky: ceny, adresy platné od–do) | Ceníky, historie adres | P2 |
-| 19 | **Sdílení dat mezi firmami** (shared tables / virtual companies, mezipodnikové účtování) | Skupina firem: společné produkty, mezifiremní faktury | P3 |
+| 19 | ~~Sdílení dat mezi firmami~~ — virtuální společnosti hotovo 13. 11. 2026; zbývá mezipodnikové účtování | | ✓ |
 | 20 | **Organizační hierarchie** (provozovny, divize, rozpočtová hierarchie) | Reporting po provozovnách | P3 |
 | 21 | **Správa funkcí** (feature management — postupné zapínání novinek) | Bezpečné nasazování změn tenantům | P3 |
 | 22 | **Kopie firmy / šablona firmy** | Rychlé založení nové firmy z existující | P2 |
@@ -68,25 +68,24 @@ ostré nasazení malé firmy, **P2** = brzy, **P3** = později / podle poptávky
 
 | # | Funkce | Priorita |
 |---|---|---|
-| 24 | Odběratelé (AR): ~~odběratelé, skupiny, vydané faktury, saldo~~ hotovo; zbývá **úhrady a párování**, dobropisy, upomínky, úroky z prodlení | P1 |
-| 25 | Dodavatelé (AP): ~~dodavatelé, přijaté faktury, saldo~~ hotovo; zbývá **úhrady, příkazy k úhradě**, schválení faktur | P1 |
-| 26 | Banka: ~~účty, import GPC, párování, úhrady~~ hotovo; zbývá **camt.053**, **příkazy k úhradě** (ABO/SEPA), kurzové rozdíly, pokladna | P1 |
+| 24 | Odběratelé (AR): ~~faktury, saldo, úhrady a párování, objednávky, zálohy, daňový doklad k platbě, e-mail~~ hotovo; zbývá dobropis jako druh, upomínky, úroky z prodlení | P1 |
+| 25 | Dodavatelé (AP): ~~faktury, saldo, úhrady, příkazy k úhradě (ABO/SEPA), vytěžování a ISDOC~~ hotovo; zbývá schválení faktur | P1 |
+| 26 | Banka: ~~účty, hromadný import GPC, návaznost, párování, deníky z výpisů, příkazy~~ hotovo; zbývá **camt.053**, kurzové rozdíly | P1 |
 | 27 | ~~DPH na řádcích, daňové transakce, přiznání DP3, KH (XML EPO)~~ hotovo; zbývá **souhrnné hlášení**, přenesená povinnost, pořízení z EU, zaúčtování vyrovnání DPH, podání datovkou | P1 |
 | 28 | Uzávěrka: přecenění měn, zavření období, převod výsledku | P2 |
-| 29 | Výkazy: obratová předvaha, rozvaha, výsledovka, hlavní kniha, saldokonto (Financial reporting) | P1 |
+| 29 | ~~Výkazy: obratová předvaha, rozvaha, výsledovka~~ hotovo; zbývá kniha analytických účtů, saldokonto k datu | P2 |
 | 30 | Dlouhodobý majetek: karty, odpisové plány (účetní/daňové), vyřazení | P2 |
 | 31 | Rozpočty a porovnání skutečnosti | P3 |
-| 32 | Periodické deníky / šablony deníků, opravné (storno) doklady | P2 |
+| 32 | Periodické deníky / šablony deníků, opravné (storno) doklady — deník má rychlé pořizování (15. 11. 2026), šablony chybí | P2 |
 | 33 | Konsolidace skupiny | P3 |
 
-## Doporučené pořadí
+## Doporučené pořadí (aktualizováno 15. 11. 2026)
 
-1. ~~Období + měny + účtovací profily~~, ~~faktury AR/AP se saldem a DPH~~ (hotovo).
-2. ~~Banka a úhrady~~, ~~přiznání a KH~~ (hotovo). Zbývá **tisk faktur** (#10) a **výkazy** (#29)
-   → první ostré nasazení; dál příkazy k úhradě, camt.053, souhrnné hlášení, přenesená povinnost.
-3. **Šablony záznamů a uložená zobrazení** (#5, #6) — „výchozí hodnoty kdekoli“ a personalizace.
-4. **Workflow schvalování** (#4) — propojit se Schvaleem.
-5. **Import dat, dávky, upozornění** (#7–9).
+1. ~~Období, měny, účtovací profily, faktury AR/AP, banka, DPH, tisk, výkazy, dávky, upozornění, nápověda~~ (hotovo).
+2. **Ostré nasazení první firmy** — chybí jen provozní kroky (profil, počáteční stavy, produkční prostředí).
+3. **Workflow schvalování** (#4) — úkoly do zvonečku.
+4. Uzávěrky (#28), storno a periodické deníky (#32), souhrnné hlášení a přenesená povinnost (#27).
+5. **Uložená zobrazení a šablony záznamů** (#5, #6).
 6. Zbytek podle poptávky zákazníků.
 
 Výhoda Shanonu oproti D365 pro malé firmy: multi-tenant SaaS (jedna

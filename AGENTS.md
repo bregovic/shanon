@@ -307,7 +307,12 @@ ta používá stejné komponenty a akce.
 
 - GitHub Issues se štítky Analysis → Development → Testing → Done.
 - Commity: `feat(gl): … [#123]`, `fix(gab): …`, `docs: …`.
-- Před pushem: `npm run lint && npm run typecheck && npm test && npm run schema:check`.
+- Před pushem: `npm run lint && npm run typecheck && npm test && npm run schema:check`
+  a `npx madge --circular --extensions ts src/modules` (musí být bez kruhů).
+- Výkon: `npx tsx --conditions=react-server scripts/perf.ts` (lokální DB) — porovnat s minulým
+  během; transakce má limit 20 s, dlouhé operace (zaúčtování stovek dokladů) čtou číselníky
+  jednou za běh (`cachedReads`) a nedělají zbytečné zápisy. Měřítko 15. 11. 2026 (PGlite):
+  řádek deníku 16 ms, faktura se 3 řádky 52 ms, zaúčtování faktury 63 ms, 500 dokladů deníku 6 s.
 - Před dokončením úkolu (dřívější SOP): build projde, nové texty jsou labely
   v cs i en, nový objekt má test v `tests/`, změna je ověřená v prohlížeči
   (desktop i mobil), žádné tajné údaje ani ladicí výpisy.

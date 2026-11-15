@@ -2,9 +2,26 @@
  * Výchozí nastavení hlavní knihy pro novou firmu (nebo po zapnutí modulu).
  * Zakládá jen to, co chybí — účtový rozvrh, jen když je úplně prázdný.
  */
-import { SYSTEM_DEFAULTS } from "./index";
 import type { DataApi, RecordData } from "@/core/module";
 import { createPeriods } from "./posting";
+
+/** Výchozí účty podle české osnovy (syntetika → první účet / xxx000). */
+export const SYSTEM_DEFAULTS: Record<string, string> = {
+  roundingGain: "648",
+  roundingLoss: "548",
+  pennyGain: "648",
+  pennyLoss: "548",
+  realizedGain: "663",
+  realizedLoss: "563",
+  unrealizedGain: "663",
+  unrealizedLoss: "563",
+  error: "395",
+  profitLoss: "431",
+  retainedEarnings: "428",
+  opening: "701",
+  closing: "702",
+};
+
 
 type Acc = [num: string, name: string, type: string, postingType?: string, noManualEntry?: boolean];
 

@@ -31,7 +31,7 @@ import whs from "@/modules/whs";
 import { whsHandlers } from "@/modules/whs/stock";
 import { intHandlers, intJobs } from "@/modules/int/drivers";
 import org, { orgHandlers } from "@/modules/org";
-import { aresHandlers } from "@/modules/gab/ares";
+import { aresHandlers } from "@/modules/gab/registry-lookup";
 import qa, { qaHandlers } from "@/modules/qa";
 import { bankHandlers } from "@/modules/bank/handlers";
 import { paymentHandlers } from "@/modules/bank/payments";

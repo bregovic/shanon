@@ -4,9 +4,8 @@
  * názvu) a doplní obchodní jméno, DIČ, právní formu a adresu sídla.
  */
 import { checkSubjectVat, czDic } from "./vat-registry";
-import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { UserError, type DataApi, type RecordData } from "@/core/module";
 import { withService } from "@/modules/int/services";
-import { createPartner } from "./registry-lookup";
 
 const API = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty";
 
@@ -111,28 +110,3 @@ export async function fillFromAres(data: DataApi, subjectId: string) {
   if (czDic(a.vatId)) await checkSubjectVat(data, subjectId).catch(() => null);
   return a;
 }
-
-/** Vytvořit dodavatele / odběratele ze záznamu adresáře. */
-const partnerActions: ObjectHandlers["actions"] = {
-  createVendor: async (ctx, s) => void (await createPartner(ctx.data, String(s.id), "ap.vendor")),
-  createCustomer: async (ctx, s) => void (await createPartner(ctx.data, String(s.id), "ar.customer")),
-};
-
-export const aresHandlers: Record<string, ObjectHandlers> = {
-  "gab.bankAccount": {
-    beforeSave(_ctx, d) {
-      if (!d.accountNum && !d.iban) return { accountNum: "@GAB:AccountRequired" };
-    },
-  },
-  "gab.subject": {
-    actions: {
-      async ares(ctx, subj) {
-        await fillFromAres(ctx.data, String(subj.id));
-      },
-      async vatCheck(ctx, subj) {
-        await checkSubjectVat(ctx.data, String(subj.id));
-      },
-      ...partnerActions,
-    },
-  },
-};

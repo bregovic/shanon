@@ -93,18 +93,23 @@ Tenant si v *Nastavení → Moduly* zapne jen to, co potřebuje. Závislosti se
 zapnou s ním; modul, na kterém závisí jiný zapnutý, nejde vypnout. Vypnutí
 data nemaže, jen skryje menu a zablokuje API.
 
-| Modul | Obsah | Stav |
+| Modul | Obsah | Stav (15. 11. 2026) |
 |---|---|---|
-| `sys` | firmy, číselné řady, moduly | hotovo |
-| `gab` | adresář subjektů, adresy, kontakty | hotovo |
-| `gl` | účtový rozvrh, střediska, deníky, doklady, zápisy | hotovo (základ) |
-| `tax` | daňové kódy, sazby, řádek přiznání, oddíl KH | číselník hotov |
-| `ar` | odběratelé, vydané faktury, saldo | plán |
-| `ap` | dodavatelé, přijaté faktury, saldo | plán |
-| `cash` | pokladna a banka, párování plateb | plán |
+| `sys` | firmy, virtuální společnosti, číselné řady (i souvislé), měny a kurzy, role, dávkové úlohy, transformace (formáty), upozornění | hotovo |
+| `org` | organizace firmy, provozovny, logo | hotovo |
+| `gab` | adresář subjektů, adresy, kontakty, bankovní účty subjektů, ARES / VIES, registr plátců DPH | hotovo |
+| `gl` | účtový rozvrh, období, finanční dimenze, systémové účty, deníky (obecné, banka, pokladna, platby), doklady, předvaha, rozvaha, výsledovka | hotovo |
+| `tax` | daňové kódy, DPH na dokladech, přiznání DP3 a KH (XML pro EPO), objednávky a zálohy s daňovým dokladem k platbě (továrna AR/AP) | hotovo; chybí SH, přenesená povinnost |
+| `ar` / `ap` | odběratelé a dodavatelé, objednávky, zálohy, faktury, saldo; AP platební příkazy | hotovo; chybí dobropisy jako druh, upomínky |
+| `bank` | účty, import GPC (hromadně, kontrola návaznosti), párování, deníky z výpisů, platební metody, příkazy ABO / SEPA | hotovo; chybí camt.053 |
+| `cash` | pokladní kniha (PPD/VPD), uzávěrka | hotovo |
+| `inv` | položky (měna ceny), skupiny, jednotky, slevy | hotovo |
+| `whs` | sklady, lokace (6 úrovní), deníky, rezervace, příjemka, ocenění průměrnou cenou (způsob A) | hotovo |
+| `pos` | dotyková pokladna, směny, EET 2.0, terminál, odložené nákupy, PIN | hotovo |
+| `prt` | tiskové sestavy (návrhář), PDF, QR platba, ISDOC | hotovo |
+| `int` | napojení (EET, tiskárny, terminál, REST API, datové služby, vytěžování dokladů, pošta SMTP), doklady ke zpracování, testovací prostředí | hotovo |
+| `qa` | evidence testování (funkce, UAT, požadavky) | hotovo |
 | `fa` | dlouhodobý majetek, odpisy | plán |
-| `inv` | produkty, sklad | plán |
-| `sales` | objednávky — zdroj pro e-shop a pokladnu | plán |
 
 ## 6. Hlavní kniha a pomocné knihy
 
@@ -190,12 +195,16 @@ definuje role a zapíná moduly. Srovnání s D365/AX: `docs/D365-SROVNANI.md`.
 
 ## 11. Další kroky (pořadí)
 
-1. ~~Uživatelé, role a oprávnění, přílohy, historie, oblíbené, export~~ (hotovo)
-2. Kontextová nápověda (F1), oprávnění na pole
-3. `ar` + `ap`: faktury s DPH → účtování přes účtovací profily
-4. `cash`: banka (GPC/ABO import), pokladna, párování
-5. Uzávěrky období, výkazy (rozvaha, výsledovka, obratová předvaha)
-6. DPH: přiznání, KH, SH → XML pro EPO
-7. `inv` + `sales` → první kanál (pokladna nebo e-shop)
-8. Úložiště souborů tenanta (R2/S3 — ovladač do `src/server/storage.ts`), export dat
-9. Rozšíření od tenantů v izolovaném běhu, katalog
+Hotovo do 15. 11. 2026: uživatelé a oprávnění, AR/AP/banka/pokladna/DPH, sklad, pokladna,
+tisk a PDF, výkazy HK, dávky, upozornění, nápověda, pošta, ISDOC, vytěžování dokladů.
+
+1. **Ostré nasazení první firmy** (Uzeniny Hynek Cibulka, #26): profil firmy, ceník, počáteční stavy,
+   produkční prostředí (CR-037), rotace tajných klíčů.
+2. **Workflow schvalování** (faktury dodavatelů, deníky) — úkoly do zvonečku; propojit se Schvaleem.
+3. Uzávěrky: zavření období, převod výsledku, přecenění měn, storno a periodické deníky.
+4. DPH: souhrnné hlášení, přenesená povinnost, pořízení z EU, zaúčtování vyrovnání DPH.
+5. Banka camt.053, dobropisy jako druh dokladu, upomínky (e-mailem), hromadné odeslání faktur.
+6. Uložená zobrazení gridu, šablony záznamů, oprávnění na pole.
+7. Dlouhodobý majetek, rozpočty.
+8. Úložiště souborů tenanta (R2/S3 — ovladač do `src/server/storage.ts`), export dat, e-shop.
+9. Rozšíření od tenantů v izolovaném běhu, katalog.

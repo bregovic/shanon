@@ -255,23 +255,6 @@ export const SystemPosting = defineEnum({
   ],
 });
 
-/** Výchozí účty podle české osnovy (syntetika → první účet / xxx000). */
-export const SYSTEM_DEFAULTS: Record<string, string> = {
-  roundingGain: "648",
-  roundingLoss: "548",
-  pennyGain: "648",
-  pennyLoss: "548",
-  realizedGain: "663",
-  realizedLoss: "563",
-  unrealizedGain: "663",
-  unrealizedLoss: "563",
-  error: "395",
-  profitLoss: "431",
-  retainedEarnings: "428",
-  opening: "701",
-  closing: "702",
-};
-
 export const systemAccount = defineObject({
   id: "gl.systemAccount",
   table: "gl_system_account",
