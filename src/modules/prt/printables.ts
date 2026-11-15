@@ -2,12 +2,14 @@
  * Tisknutelné doklady: faktura vydaná (s QR platbou) a účtenka. Data pro
  * šablonu a výchozí rozvržení. Společná pole firmy pro všechny doklady.
  */
-import { fromCents, toCents } from "@/core/money";
+import { fromCents, percentOf, toCents } from "@/core/money";
 import type { DataApi, RecordData } from "@/core/module";
 import { czIban, spayd, type PrintField, type PrintLayout, type PrintableDef } from "@/core/print";
 import { paymentQrText } from "@/core/transform";
 import { invoiceIsdoc } from "./isdoc";
 import { addressLine, orgOf } from "@/modules/org";
+import { accountingCurrencyId, ledgerRate } from "@/modules/gl/posting";
+import { convertCents } from "@/modules/sys/currency";
 import { receiptPrint } from "@/modules/pos/sale";
 import { receiptData } from "@/lib/receipt-data";
 
@@ -22,22 +24,50 @@ export const COMPANY_FIELDS: PrintField[] = [
   { path: "company.registration", label: "@PRT:Registration" },
   { path: "company.bankAccount", label: "@PRT:BankAccount" },
   { path: "company.iban", label: "@PRT:Iban" },
+  { path: "company.swift", label: "@PRT:Swift" },
   { path: "company.email", label: "@PRT:Email" },
   { path: "company.phone", label: "@PRT:Phone" },
   { path: "company.web", label: "@PRT:Web" },
 ];
 
-/** Bankovní účet firmy pro platbu: z Organizace, jinak první účet v Bance (v měně dokladu). */
+/** SWIFT/BIC hlavních českých bank podle kódu banky (pro platby ze zahraničí). */
+const BIC: Record<string, string> = {
+  "0100": "KOMBCZPPXXX",
+  "0300": "CEKOCZPPXXX",
+  "0600": "AGBACZPPXXX",
+  "0800": "GIBACZPXXXX",
+  "2010": "FIOBCZPPXXX",
+  "2250": "CTASCZ22XXX",
+  "2700": "BACXCZPPXXX",
+  "3030": "AIRACZPPXXX",
+  "5500": "RZBCCZPPXXX",
+  "6210": "BREXCZPPXXX",
+};
+const bicOf = (iban: string, accountNum: string) => {
+  const code = /^CZ\d{2}(\d{4})/.exec(iban.replace(/\s/g, ""))?.[1] ?? /\/(\d{4})$/.exec(accountNum)?.[1] ?? "";
+  return BIC[code] ?? "";
+};
+
+/**
+ * Bankovní účet firmy pro platbu: účet v měně dokladu z Banky (faktura v EUR → eurový účet), jinak účet
+ * z Organizace, jinak první účet v Bance bez měny.
+ */
 async function paymentAccount(data: DataApi, org: RecordData | null, currencyId?: string | null) {
-  if (org?.bankAccount || org?.iban) return { bankAccount: (org.bankAccount as string) ?? "", iban: (org.iban as string) || czIban(org.bankAccount as string) || "" };
+  const out = (accountNum: string, iban: string) => ({ bankAccount: accountNum, iban, swift: bicOf(iban, accountNum) });
+  let accs: RecordData[] = [];
   try {
-    const accs = (await data.find("bank.account", { blocked: false }, { take: 20, orderBy: { code: "asc" } })) as RecordData[];
-    const a = accs.find((x) => (x.accountNum || x.iban) && (!currencyId || !x.currencyId || x.currencyId === currencyId)) ?? null;
-    if (a) return { bankAccount: (a.accountNum as string) ?? "", iban: (a.iban as string) || czIban(a.accountNum as string) || "" };
+    accs = (await data.find("bank.account", { blocked: false }, { take: 20, orderBy: { code: "asc" } })) as RecordData[];
   } catch {
-    // Banka není zapnutá
+    accs = []; // Banka není zapnutá
   }
-  return { bankAccount: "", iban: "" };
+  const base = await accountingCurrencyId(data, data.companyId ?? null);
+  const foreign = !!currencyId && currencyId !== base;
+  const same = accs.find((x) => (x.accountNum || x.iban) && currencyId && x.currencyId === currencyId);
+  if (same && foreign) return out((same.accountNum as string) ?? "", (same.iban as string) || czIban(same.accountNum as string) || "");
+  if (org?.bankAccount || org?.iban) return out((org.bankAccount as string) ?? "", (org.iban as string) || czIban(org.bankAccount as string) || "");
+  const a = same ?? accs.find((x) => (x.accountNum || x.iban) && (!x.currencyId || x.currencyId === base)) ?? null;
+  if (a) return out((a.accountNum as string) ?? "", (a.iban as string) || czIban(a.accountNum as string) || "");
+  return { bankAccount: "", iban: "", swift: "" };
 }
 
 async function companyData(data: DataApi, companyId: string | null, currencyId?: string | null) {
@@ -57,6 +87,7 @@ async function companyData(data: DataApi, companyId: string | null, currencyId?:
     logoId: (org?.logo ?? "") as string,
     logo: "",
     iban: iban ?? "",
+    swift: pay.swift,
     email: (org?.email ?? "") as string,
     phone: (org?.phone ?? "") as string,
     web: (org?.web ?? "") as string,
@@ -110,6 +141,32 @@ async function invoiceDataset(data: DataApi, companyId: string | null, id: strin
     out.push({ description: l.description ?? "", qty: l.qty, unit: unit?.code ?? "", unitPrice: l.unitPrice, rate, net: fromCents(net), tax: fromCents(tax), gross: fromCents(net + tax) });
   }
   const due = toCents(inv.amountGross ?? 0) - toCents(inv.paidAmount ?? 0);
+  // faktura v cizí měně: DPH a celkem v Kč kurzem ČNB k DUZP (§ 29 ZDPH), jako při zaúčtování
+  const baseCur = await accountingCurrencyId(data, companyId);
+  let fx: { rate: string; tax: string; gross: string; vat: string } | null = null;
+  if (inv.currencyId && inv.currencyId !== baseCur) {
+    try {
+      const r = await ledgerRate(data, companyId, String(inv.currencyId), String(inv.taxDate ?? inv.invoiceDate));
+      const conv = (c: bigint) => convertCents(fromCents(c), r.rate, r.amount);
+      const nf = (c: bigint) => new Intl.NumberFormat("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(fromCents(c)));
+      const rateTxt = new Intl.NumberFormat("cs-CZ", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(Number(r.rate));
+      // daň v Kč ze základu přepočteného kurzem (§ 37 ZDPH) — stejně jako zaúčtování
+      const rows = [...vat].map(([rate, v]) => {
+        const baseAcc = conv(v.base);
+        return { rate, baseAcc, taxAcc: v.tax === zero ? zero : percentOf(baseAcc, rate) };
+      });
+      const taxAcc = rows.reduce((a, x) => a + x.taxAcc, zero);
+      const grossAcc = rows.reduce((a, x) => a + x.baseAcc, zero) + taxAcc + conv(toCents(inv.roundingAmount ?? 0));
+      fx = {
+        rate: `${rateTxt} CZK / ${r.amount} ${currency}`,
+        tax: nf(taxAcc),
+        gross: nf(grossAcc),
+        vat: rows.filter((x) => x.taxAcc !== zero).map((x) => `DPH ${x.rate} % v CZK: ${nf(x.taxAcc)} (základ ${nf(x.baseAcc)})`).join("\n"),
+      };
+    } catch {
+      fx = null; // kurz chybí — přepočet se nevytiskne
+    }
+  }
   const vs = String(inv.vs ?? String(inv.invoiceNum).replace(/\D/g, ""));
   return {
     company,
@@ -123,6 +180,13 @@ async function invoiceDataset(data: DataApi, companyId: string | null, id: strin
       currency,
       /** označení měny pro tisk (CZK → Kč) */
       currencySymbol: currency === "CZK" ? "Kč" : currency,
+      rounding: inv.roundingAmount ?? "0.00",
+      /** cizí měna: kurz ČNB k DUZP, DPH a celkem v Kč */
+      fx: fx ? "1" : "",
+      fxRate: fx?.rate ?? "",
+      fxTax: fx?.tax ?? "",
+      fxVat: fx?.vat ?? "",
+      fxGross: fx?.gross ?? "",
       net: inv.amountNet,
       tax: inv.taxAmount,
       gross: inv.amountGross,
@@ -152,10 +216,105 @@ const MUTED = "#6b7280";
 const PANEL = "#f3f5f8";
 
 /**
- * Výchozí faktura (v4): číslo dokladu výrazně, nadpis střídmě; účet a VS seskupené a zvýrazněné; vzdušná tabulka
+ * Výchozí faktura (v5): číslo dokladu výrazně, nadpis střídmě; účet a VS seskupené a zvýrazněné; vzdušná tabulka
  * (Bez DPH / S DPH); rekapitulace a částka k úhradě hned pod tabulkou (delší tabulka je posune); větší QR.
  */
 function invoiceLayout(): PrintLayout {
+  const H = (id: string, x: number, y: number, w: number, text: string, color = MUTED) => T(id, x, y, w, 5, text, { size: 7, bold: true, color });
+  return {
+    paper: "a4",
+    fontSize: 9,
+    elements: [
+      { id: "band", type: "rect", x: 0, y: 0, w: 210, h: 3, style: { fill: ACCENT, color: ACCENT } },
+      { id: "logo", type: "image", x: 15, y: 11, w: 55, h: 20, field: "company.logo" },
+      T("title", 105, 12, 90, 5, "FAKTURA – DAŇOVÝ DOKLAD", { size: 8, bold: true, align: "right", color: MUTED }),
+      T("num", 105, 17, 90, 10, "{doc.number}", { size: 18, bold: true, align: "right", color: INK }),
+      // dodavatel
+      H("supH", 15, 37, 85, "DODAVATEL"),
+      T("supN", 15, 42, 85, 5, "{company.name}", { size: 10, bold: true, color: INK }),
+      T("supA", 15, 47, 85, 9, "{company.address}", { size: 9, color: INK }),
+      T("supL", 15, 56, 12, 9, "IČO:\nDIČ:", { size: 9, color: MUTED }),
+      T("supV", 27, 56, 73, 9, "{company.regNo}\n{company.vatId}", { size: 9, color: INK }),
+      T("supR", 15, 65, 85, 5, "{company.registration}", { size: 7.5, color: MUTED }),
+      // odběratel
+      { id: "custBox", type: "rect", x: 106, y: 35, w: 89, h: 35, style: { fill: PANEL, color: PANEL } },
+      H("custH", 110, 37, 82, "ODBĚRATEL"),
+      T("custN", 110, 42, 82, 5, "{partner.name}", { size: 10, bold: true, color: INK }),
+      T("custA", 110, 47, 82, 9, "{partner.address}", { size: 9, color: INK }),
+      T("custL", 110, 56, 12, 9, "IČO:\nDIČ:", { size: 9, color: MUTED }),
+      T("custV", 122, 56, 70, 9, "{partner.regNo}\n{partner.vatId}", { size: 9, color: INK }),
+      // data dokladu
+      H("k1h", 15, 76, 42, "DATUM VYSTAVENÍ"),
+      T("k1", 15, 81, 42, 6, "{doc.date:date}", { size: 10, color: INK }),
+      H("k2h", 60, 76, 42, "DATUM ZDAN. PLNĚNÍ"),
+      T("k2", 60, 81, 42, 6, "{doc.taxDate:date}", { size: 10, color: INK }),
+      H("k3h", 106, 76, 42, "DATUM SPLATNOSTI"),
+      T("k3", 106, 81, 42, 6, "{doc.dueDate:date}", { size: 10, bold: true, color: ACCENT }),
+      H("k4h", 152, 76, 43, "ZPŮSOB ÚHRADY"),
+      T("k4", 152, 81, 43, 6, "převodem", { size: 10, color: INK }),
+      // platební údaje pohromadě a výrazně (ruční platba)
+      { id: "payBox", type: "rect", x: 15, y: 90, w: 180, h: 17, style: { fill: PANEL, color: PANEL } },
+      H("payH", 19, 92, 80, "BANKOVNÍ ÚČET"),
+      T("pay", 19, 97, 80, 6, "{company.bankAccount}", { size: 12, bold: true, color: INK }),
+      T("iban", 19, 103, 85, 4, "IBAN {company.iban}   SWIFT {company.swift}", { size: 7, color: MUTED }),
+      H("vsH", 106, 92, 45, "VARIABILNÍ SYMBOL"),
+      T("vs", 106, 97, 45, 6, "{doc.vs}", { size: 12, bold: true, color: INK }),
+      T("desc", 15, 111, 180, 6, "{doc.description}", { italic: true, color: INK }),
+      {
+        id: "lines",
+        type: "table",
+        x: 15,
+        y: 118,
+        w: 180,
+        // tabulka do 44 mm; delší posune rekapitulaci a souhrn níž (případně na další stranu)
+        h: 44,
+        style: { fill: ACCENT, color: "#ffffff", size: 9, rowPad: 1.8 },
+        columns: [
+          { field: "description", label: "Položka", width: 62 },
+          { field: "qty", label: "Množství", width: 22, align: "right", format: "qty" },
+          { field: "unit", label: "MJ", width: 12 },
+          { field: "unitPrice", label: "Cena za MJ", width: 22, align: "right", format: "money" },
+          { field: "rate", label: "DPH", width: 12, align: "right", format: "percent" },
+          { field: "net", label: "Bez DPH", width: 25, align: "right", format: "money" },
+          { field: "gross", label: "S DPH", width: 25, align: "right", format: "money" },
+        ],
+      },
+      // souhrn hned pod tabulkou
+      H("vatH", 15, 168, 90, "REKAPITULACE DPH"),
+      {
+        id: "vat",
+        type: "vat",
+        x: 15,
+        y: 173,
+        w: 90,
+        h: 20,
+        style: { fill: PANEL, size: 8, rowPad: 1 },
+        columns: [
+          { field: "rate", label: "Sazba", width: 18, align: "right", format: "percent" },
+          { field: "base", label: "Bez DPH", width: 24, align: "right", format: "money" },
+          { field: "tax", label: "DPH", width: 22, align: "right", format: "money" },
+          { field: "gross", label: "S DPH", width: 26, align: "right", format: "money" },
+        ],
+      },
+      { id: "totBox", type: "rect", x: 118, y: 168, w: 77, h: 21, style: { fill: ACCENT, color: ACCENT } },
+      T("totH", 121, 170, 71, 5, "K ÚHRADĚ", { size: 7.5, bold: true, color: "#dbe7f3", align: "right" }),
+      T("tot", 121, 175, 71, 9, "{doc.due:money} {doc.currencySymbol}", { size: 17, bold: true, color: "#ffffff", align: "right" }),
+      T("totS", 121, 183, 71, 5, "včetně DPH", { size: 7.5, color: "#dbe7f3", align: "right" }),
+      // zaokrouhlení (Kč na celé koruny) a u cizí měny přepočet do Kč kurzem ČNB k DUZP (§ 29 ZDPH)
+      { ...T("rnd", 15, 196, 90, 5, "Zaokrouhlení: {doc.rounding:money} {doc.currencySymbol}", { size: 8, color: MUTED }), showIf: "doc.rounding" },
+      { ...T("fxH", 15, 202, 90, 5, "PŘEPOČET DO CZK", { size: 7, bold: true, color: MUTED }), showIf: "doc.fx" },
+      { ...T("fx", 15, 207, 90, 14, "Kurz ČNB k DUZP: {doc.fxRate}\n{doc.fxVat}\nCelkem s DPH: {doc.fxGross} CZK", { size: 8, color: INK }), showIf: "doc.fx" },
+      { id: "qr", type: "qr", x: 159, y: 194, w: 36, h: 36, field: "qr" },
+      // popisek jen s QR kódem (transformace QR platba zapnutá, účet, nezaplaceno)
+      { ...T("qrT", 118, 208, 38, 8, "QR platba", { size: 8, bold: true, align: "right", color: MUTED }), showIf: "qr" },
+      { id: "footLine", type: "line", x: 15, y: 284, w: 180, h: 1, style: { color: "#d1d5db" } },
+      T("foot", 15, 286, 180, 5, "{company.email}   {company.phone}   {company.web}", { size: 7.5, color: MUTED, align: "center" }),
+    ],
+  };
+}
+
+/** Rozvržení v4 (15. 11. 2026, podle zpětné vazby, bez přepočtu do Kč). */
+export function invoiceLayoutV4(): PrintLayout {
   const H = (id: string, x: number, y: number, w: number, text: string, color = MUTED) => T(id, x, y, w, 5, text, { size: 7, bold: true, color });
   return {
     paper: "a4",
@@ -244,6 +403,7 @@ function invoiceLayout(): PrintLayout {
     ],
   };
 }
+
 
 /** Rozvržení v3 (15. 11. 2026, před úpravou podle zpětné vazby). */
 export function invoiceLayoutV3(): PrintLayout {
@@ -561,6 +721,10 @@ export const invoicePrintable: PrintableDef = {
     { path: "doc.description", label: "@PRT:Description" },
     { path: "doc.currency", label: "@PRT:Currency" },
     { path: "doc.currencySymbol", label: "@PRT:CurrencySymbol" },
+    { path: "doc.rounding", label: "@PRT:Rounding" },
+    { path: "doc.fxRate", label: "@PRT:FxRate" },
+    { path: "doc.fxVat", label: "@PRT:FxVat" },
+    { path: "doc.fxGross", label: "@PRT:FxGross" },
     { path: "doc.net", label: "@PRT:Net", format: "money" },
     { path: "doc.tax", label: "@PRT:Tax", format: "money" },
     { path: "doc.gross", label: "@PRT:Gross", format: "money" },
@@ -589,7 +753,7 @@ export const invoicePrintable: PrintableDef = {
     return [{ name: x.name, mime: "application/xml", data: x.xml }];
   },
   defaultLayout: invoiceLayout,
-  legacyLayouts: [legacyInvoiceLayout(), invoiceLayoutV1(), invoiceLayoutV2(), invoiceLayoutV3()],
+  legacyLayouts: [legacyInvoiceLayout(), invoiceLayoutV1(), invoiceLayoutV2(), invoiceLayoutV3(), invoiceLayoutV4()],
 };
 
 // ---------------------------------------------------------------------------

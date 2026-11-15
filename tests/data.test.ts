@@ -310,7 +310,8 @@ describe("odběratelé a dodavatelé", () => {
     const l2 = await saveRecord(A, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Doprava", qty: "1", unitPrice: "99.99" }, undefined, client);
     expect(l2.taxAmount).toBe("21.00"); // 99,99 × 21 % = 20,9979
     let h = (await getRecord(A, "ar.invoice", String(inv.id), client))!;
-    expect([h.amountNet, h.taxAmount, h.amountGross]).toEqual(["2599.99", "546.00", "3145.99"]);
+    // CZK: faktura na celé koruny (Zaokrouhlení faktur), rozdíl mimo DPH
+    expect([h.amountNet, h.taxAmount, h.roundingAmount, h.amountGross]).toEqual(["2599.99", "546.00", "0.01", "3146.00"]);
     await deleteRecord(A, "ar.invoiceLine", String(l2.id), client);
     h = (await getRecord(A, "ar.invoice", String(inv.id), client))!;
     expect([h.amountNet, h.taxAmount, h.amountGross]).toEqual(["2500.00", "525.00", "3025.00"]);
@@ -324,6 +325,14 @@ describe("odběratelé a dodavatelé", () => {
     expect(open.totals!.amount).toBe("3025.00");
     const tx = (await listRecords(A, "tax.trans", { filter: { sourceId: String(inv.id) } }, client)).rows;
     expect(tx.map((t) => [titles(t).taxCodeId, t.base, t.tax, t.vatId, t.direction])).toEqual([["V21", "2500.00", "525.00", "CZ11122233", "output"]]);
+    // zaokrouhlení se zaúčtuje na systémový účet (zisk), pohledávka v zaokrouhlené částce
+    const inv2 = await saveRecord(A, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-12" }, undefined, client);
+    await saveRecord(A, "ar.invoiceLine", null, { invoiceId: inv2.id, description: "Doprava", qty: "1", unitPrice: "99.99" }, undefined, client);
+    await runAction(A, "ar.invoice", String(inv2.id), "post", client);
+    const h2 = (await getRecord(A, "ar.invoice", String(inv2.id), client))!;
+    expect([h2.roundingAmount, h2.amountGross]).toEqual(["0.01", "121.00"]);
+    const tr2 = (await listRecords(A, "gl.trans", { filter: { voucherId: h2.voucherId } }, client)).rows;
+    expect(tr2.map((t) => t.amount).sort()).toEqual(["-0.01", "-21.00", "-99.99", "121.00"]);
     // zaúčtovaná faktura ani její řádky nejdou měnit
     await expectUserError(saveRecord(A, "ar.invoice", String(inv.id), { description: "x" }, undefined, client), "@SYS:Locked");
     const [line] = (await listRecords(A, "ar.invoiceLine", { filter: { invoiceId: inv.id } }, client)).rows;
@@ -528,7 +537,8 @@ describe("přiznání k DPH a kontrolní hlášení", () => {
 
     const xml = String((await downloadFile(V, "tax.return", String(dp3.id), "xml", client)).data);
     expect(xml).toContain('<DPHDP3 verzePis="01.02">');
-    expect(xml).toContain('k_uladb="B"');
+    expect(xml).toContain('k_uladis="DPH"');
+    expect(xml).not.toContain("k_uladb");
     expect(xml).toContain('mesic="11"');
     expect(xml).toContain('c_ufo="451"');
     expect(xml).toContain('dic="27082440"');

@@ -470,6 +470,7 @@ export async function currencyRounding(data: DataApi, currencyId: string | null)
   return {
     unit: String(cur?.roundingUnit ?? "0.01"),
     cashUnit: String(cur?.cashRoundingUnit ?? "0.01"),
+    invoiceUnit: String(cur?.invoiceRoundingUnit ?? "0.01"),
     cashMethod: (String(cur?.cashRoundingMethod ?? "nearest") as "nearest" | "up" | "down"),
   };
 }

@@ -6,7 +6,8 @@
  * (`reportLine`) a sazba; nic není napsané natvrdo podle kódu.
  *
  * Pasti formátu EPO (ověřené v DMS na validátoru portálu):
- *  - `k_uladb` je atribut věty D PŘIZNÁNÍ, v hlášení (DPHKH1) neexistuje.
+ *  - Věta D přiznání: druh daně `k_uladis="DPH"` (ne `k_uladb` — EPO ho odmítne fatální chybou);
+ *    věta D hlášení (DPHKH1) má jiné atributy (`khdph_forma`).
  *  - `pomer` (krácení nároku) patří jen k přijatým plněním (B.2), ne k A.4.
  *  - Jednotlivě (A.4 / B.2) jen doklady od 10 000 Kč včetně DPH s DIČ
  *    partnera; zbytek souhrnně v A.5 / B.3 bez DIČ a čísla dokladu.
@@ -309,7 +310,7 @@ export function dp3Xml(c: VatComputation, subj: Subject): string {
   const result = taxOut - deduction;
   return wrap("DPHDP3", "01.02", [
     `<VetaD ${attr({
-      k_uladb: "B",
+      k_uladis: "DPH",
       dapdph_forma: "B",
       dokument: "DP3",
       mesic: period.month,

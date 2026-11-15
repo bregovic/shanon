@@ -361,20 +361,21 @@ model SysNumberSeq {
 
 /// sys.currency — generováno z definice objektu
 model SysCurrency {
-  id                 String   @id @default(uuid(7)) @db.Uuid
-  tenantId           String   @map("tenant_id") @db.Uuid
-  code               String   @db.VarChar(3)
-  name               String   @db.VarChar(120)
-  symbol             String?  @db.VarChar(5)
-  roundingUnit       Decimal  @default(0.01) @map("rounding_unit") @db.Decimal(10, 4)
-  cashRoundingUnit   Decimal  @default(0.01) @map("cash_rounding_unit") @db.Decimal(10, 4)
-  cashRoundingMethod String   @default("nearest") @map("cash_rounding_method") @db.VarChar(40)
-  ext                Json     @default("{}")
-  version            Int      @default(1)
-  createdAt          DateTime @default(now()) @map("created_at")
-  createdBy          String?  @map("created_by") @db.Uuid
-  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy          String?  @map("updated_by") @db.Uuid
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  code                String   @db.VarChar(3)
+  name                String   @db.VarChar(120)
+  symbol              String?  @db.VarChar(5)
+  roundingUnit        Decimal  @default(0.01) @map("rounding_unit") @db.Decimal(10, 4)
+  cashRoundingUnit    Decimal  @default(0.01) @map("cash_rounding_unit") @db.Decimal(10, 4)
+  invoiceRoundingUnit Decimal  @default(0.01) @map("invoice_rounding_unit") @db.Decimal(10, 4)
+  cashRoundingMethod  String   @default("nearest") @map("cash_rounding_method") @db.VarChar(40)
+  ext                 Json     @default("{}")
+  version             Int      @default(1)
+  createdAt           DateTime @default(now()) @map("created_at")
+  createdBy           String?  @map("created_by") @db.Uuid
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy           String?  @map("updated_by") @db.Uuid
 
   sysExchangeRate_currency        SysExchangeRate[]      @relation("SysExchangeRate_currency")
   gabBankAccount_currency         GabBankAccount[]       @relation("GabBankAccount_currency")
@@ -2122,34 +2123,35 @@ model ArOrderLine {
 
 /// ar.invoice — generováno z definice objektu
 model ArInvoice {
-  id            String    @id @default(uuid(7)) @db.Uuid
-  tenantId      String    @map("tenant_id") @db.Uuid
-  companyId     String    @map("company_id") @db.Uuid
-  invoiceNum    String    @map("invoice_num") @db.VarChar(20)
-  customerId    String    @map("customer_id") @db.Uuid
-  invoiceDate   DateTime  @default(now()) @map("invoice_date") @db.Date
-  taxDate       DateTime? @map("tax_date") @db.Date
-  dueDate       DateTime? @map("due_date") @db.Date
-  currencyId    String?   @map("currency_id") @db.Uuid
-  taxGroupId    String?   @map("tax_group_id") @db.Uuid
-  vs            String?   @db.VarChar(10)
-  description   String?   @db.VarChar(255)
-  amountNet     Decimal?  @map("amount_net") @db.Decimal(18, 2)
-  taxAmount     Decimal?  @map("tax_amount") @db.Decimal(18, 2)
-  amountGross   Decimal?  @map("amount_gross") @db.Decimal(18, 2)
-  paidAmount    Decimal?  @map("paid_amount") @db.Decimal(18, 2)
-  status        String    @default("draft") @db.VarChar(40)
-  voucherId     String?   @map("voucher_id") @db.Uuid
-  orderId       String?   @map("order_id") @db.Uuid
-  advanceId     String?   @map("advance_id") @db.Uuid
-  advanceAmount Decimal?  @map("advance_amount") @db.Decimal(18, 2)
-  emailedAt     DateTime? @map("emailed_at")
-  ext           Json      @default("{}")
-  version       Int       @default(1)
-  createdAt     DateTime  @default(now()) @map("created_at")
-  createdBy     String?   @map("created_by") @db.Uuid
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy     String?   @map("updated_by") @db.Uuid
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  invoiceNum     String    @map("invoice_num") @db.VarChar(20)
+  customerId     String    @map("customer_id") @db.Uuid
+  invoiceDate    DateTime  @default(now()) @map("invoice_date") @db.Date
+  taxDate        DateTime? @map("tax_date") @db.Date
+  dueDate        DateTime? @map("due_date") @db.Date
+  currencyId     String?   @map("currency_id") @db.Uuid
+  taxGroupId     String?   @map("tax_group_id") @db.Uuid
+  vs             String?   @db.VarChar(10)
+  description    String?   @db.VarChar(255)
+  amountNet      Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount      Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  roundingAmount Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
+  amountGross    Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  paidAmount     Decimal?  @map("paid_amount") @db.Decimal(18, 2)
+  status         String    @default("draft") @db.VarChar(40)
+  voucherId      String?   @map("voucher_id") @db.Uuid
+  orderId        String?   @map("order_id") @db.Uuid
+  advanceId      String?   @map("advance_id") @db.Uuid
+  advanceAmount  Decimal?  @map("advance_amount") @db.Decimal(18, 2)
+  emailedAt      DateTime? @map("emailed_at")
+  ext            Json      @default("{}")
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?   @map("updated_by") @db.Uuid
 
   company               SysCompany      @relation("ArInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
   customer              ArCustomer      @relation("ArInvoice_customer", fields: [customerId], references: [id], onDelete: Restrict)
@@ -2529,36 +2531,37 @@ model ApOrderLine {
 
 /// ap.invoice — generováno z definice objektu
 model ApInvoice {
-  id            String    @id @default(uuid(7)) @db.Uuid
-  tenantId      String    @map("tenant_id") @db.Uuid
-  companyId     String    @map("company_id") @db.Uuid
-  invoiceNum    String    @map("invoice_num") @db.VarChar(20)
-  externalNum   String?   @map("external_num") @db.VarChar(20)
-  receipt       Boolean   @default(false)
-  vendorId      String    @map("vendor_id") @db.Uuid
-  invoiceDate   DateTime  @default(now()) @map("invoice_date") @db.Date
-  taxDate       DateTime? @map("tax_date") @db.Date
-  dueDate       DateTime? @map("due_date") @db.Date
-  currencyId    String?   @map("currency_id") @db.Uuid
-  taxGroupId    String?   @map("tax_group_id") @db.Uuid
-  vs            String?   @db.VarChar(10)
-  description   String?   @db.VarChar(255)
-  amountNet     Decimal?  @map("amount_net") @db.Decimal(18, 2)
-  taxAmount     Decimal?  @map("tax_amount") @db.Decimal(18, 2)
-  amountGross   Decimal?  @map("amount_gross") @db.Decimal(18, 2)
-  paidAmount    Decimal?  @map("paid_amount") @db.Decimal(18, 2)
-  status        String    @default("draft") @db.VarChar(40)
-  voucherId     String?   @map("voucher_id") @db.Uuid
-  orderId       String?   @map("order_id") @db.Uuid
-  advanceId     String?   @map("advance_id") @db.Uuid
-  advanceAmount Decimal?  @map("advance_amount") @db.Decimal(18, 2)
-  emailedAt     DateTime? @map("emailed_at")
-  ext           Json      @default("{}")
-  version       Int       @default(1)
-  createdAt     DateTime  @default(now()) @map("created_at")
-  createdBy     String?   @map("created_by") @db.Uuid
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy     String?   @map("updated_by") @db.Uuid
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  invoiceNum     String    @map("invoice_num") @db.VarChar(20)
+  externalNum    String?   @map("external_num") @db.VarChar(20)
+  receipt        Boolean   @default(false)
+  vendorId       String    @map("vendor_id") @db.Uuid
+  invoiceDate    DateTime  @default(now()) @map("invoice_date") @db.Date
+  taxDate        DateTime? @map("tax_date") @db.Date
+  dueDate        DateTime? @map("due_date") @db.Date
+  currencyId     String?   @map("currency_id") @db.Uuid
+  taxGroupId     String?   @map("tax_group_id") @db.Uuid
+  vs             String?   @db.VarChar(10)
+  description    String?   @db.VarChar(255)
+  amountNet      Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount      Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  roundingAmount Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
+  amountGross    Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  paidAmount     Decimal?  @map("paid_amount") @db.Decimal(18, 2)
+  status         String    @default("draft") @db.VarChar(40)
+  voucherId      String?   @map("voucher_id") @db.Uuid
+  orderId        String?   @map("order_id") @db.Uuid
+  advanceId      String?   @map("advance_id") @db.Uuid
+  advanceAmount  Decimal?  @map("advance_amount") @db.Decimal(18, 2)
+  emailedAt      DateTime? @map("emailed_at")
+  ext            Json      @default("{}")
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?   @map("updated_by") @db.Uuid
 
   company               SysCompany      @relation("ApInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
   vendor                ApVendor        @relation("ApInvoice_vendor", fields: [vendorId], references: [id], onDelete: Restrict)

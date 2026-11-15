@@ -258,13 +258,15 @@ export const currency = defineObject({
     // zaokrouhlení: obecné (částky dokladů) a hotovosti (platba v hotovosti, CZK na koruny)
     roundingUnit: { edt: RoundingUnit, label: "@SYS:GeneralRounding", mandatory: true, default: "0.01" },
     cashRoundingUnit: { edt: RoundingUnit, label: "@SYS:CashRounding", mandatory: true, default: "0.01" },
+    /** celková částka faktury (CZK = celé koruny, rozdíl mimo základ DPH na systémový účet zaokrouhlení) */
+    invoiceRoundingUnit: { edt: RoundingUnit, label: "@SYS:InvoiceRounding", mandatory: true, default: "0.01" },
     cashRoundingMethod: { edt: enumEdt(RoundingMethod), mandatory: true, default: "nearest" },
   },
   titleField: "code",
   list: ["code", "name", "symbol", "roundingUnit", "cashRoundingUnit", "cashRoundingMethod"],
   form: [
     { label: "@SYS:General", fields: ["code", "name", "symbol"] },
-    { label: "@SYS:Rounding", fields: ["roundingUnit", "cashRoundingUnit", "cashRoundingMethod"] },
+    { label: "@SYS:Rounding", fields: ["roundingUnit", "invoiceRoundingUnit", "cashRoundingUnit", "cashRoundingMethod"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -503,7 +505,7 @@ async function sysSetup(data: DataApi) {
     ["USD", "Americký dolar", "$"],
   ]) {
     // hotovost v CZK se zaokrouhluje na koruny (zákon o oběhu bankovek a mincí)
-    await data.create("sys.currency", { code, name, symbol, cashRoundingUnit: code === "CZK" ? "1" : "0.01" });
+    await data.create("sys.currency", { code, name, symbol, cashRoundingUnit: code === "CZK" ? "1" : "0.01", invoiceRoundingUnit: code === "CZK" ? "1" : "0.01" });
   }
 }
 
@@ -641,6 +643,7 @@ export default defineModule({
       RoundingUnit: "Zaokrouhlení",
       GeneralRounding: "Zaokrouhlení obecné",
       CashRounding: "Zaokrouhlení hotovosti",
+      InvoiceRounding: "Zaokrouhlení faktur",
       Rounding: "Zaokrouhlení",
       BatchClass: "Úloha",
       DuplicateRecord: "Duplikovat",
@@ -1033,6 +1036,7 @@ export default defineModule({
       RoundingUnit: "Rounding",
       GeneralRounding: "General rounding",
       CashRounding: "Cash rounding",
+      InvoiceRounding: "Invoice rounding",
       Rounding: "Rounding",
       BatchClass: "Job",
       DuplicateRecord: "Duplicate",

@@ -5,10 +5,10 @@
  *
  * Moduly AR/AP jen popíšou své objekty a předají konfiguraci (InvoiceConfig).
  */
-import { fromCents, mulCents, percentOf, sumCents, toCents } from "@/core/money";
+import { fromCents, mulCents, percentOf, roundCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents } from "@/modules/sys/currency";
-import { accountingCurrencyId, assertOpenPeriod, checkDuplicate, convertPrice, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { accountingCurrencyId, assertOpenPeriod, checkDuplicate, convertPrice, currencyRounding, ledgerRate, postVoucher, systemAccount, type PostingLine } from "@/modules/gl/posting";
 import { dimsOf } from "@/modules/gl/dimensions";
 import { postingAccount } from "@/modules/gl/setup";
 import { partnerTaxGroup, resolveLineCode, taxTransParts } from "./tax-groups";
@@ -78,10 +78,21 @@ export async function recalcHeader(data: DataApi, cfg: InvoiceConfig, headerId: 
   const lines = await data.find(cfg.line, { [cfg.lineHeaderField]: headerId });
   const net = sumCents(lines.map((l) => toCents(l.amountNet)));
   const tax = sumCents(lines.map((l) => toCents(l.taxAmount)));
+  // zaokrouhlení celkové částky podle měny dokladu — jen vydané faktury (přijatá musí sedět na doklad dodavatele)
+  const h = cfg.side === 1 ? await data.get(cfg.header, headerId) : null;
+  let gross = net + tax;
+  let rounding = BigInt(0);
+  if (h && "roundingAmount" in h && lines.length) {
+    const r = await currencyRounding(data, (h.currencyId as string) ?? (await accountingCurrencyId(data, data.companyId ?? null)));
+    const rounded = roundCents(gross, r.invoiceUnit, "nearest");
+    rounding = rounded - gross;
+    gross = rounded;
+  }
   await data.update(cfg.header, headerId, {
     amountNet: fromCents(net),
     taxAmount: fromCents(tax),
-    amountGross: fromCents(net + tax),
+    amountGross: fromCents(gross),
+    ...(h && "roundingAmount" in h ? { roundingAmount: fromCents(rounding) } : {}),
   });
 }
 
@@ -281,7 +292,8 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
   // kurz k datu účtování (účetní měna = 1)
   const base = await accountingCurrencyId(data, companyId);
   const curId = (header.currencyId as string) ?? base;
-  const rate = curId && curId !== base ? await ledgerRate(data, companyId, curId, date) : null;
+  // kurz ČNB k DUZP (§ 38 ZDPH: DPH v Kč kurzem ke dni zdanitelného plnění)
+  const rate = curId && curId !== base ? await ledgerRate(data, companyId, curId, taxDate) : null;
   const conv = (cents: bigint) => (rate ? convertCents(fromCents(cents), rate.rate, rate.amount) : cents);
 
   const s = BigInt(cfg.side);
@@ -327,8 +339,24 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
       posting.push({ accountId: String(code.outputAccountId ?? code.accountId), amount: fromCents(s * t.tax), amountCur: fromCents(s * t.taxCur), currencyId: curId, text: String(code.code) });
       continue;
     }
+    // cizí měna: daň v Kč ze základu přepočteného kurzem (§ 37 ZDPH), ne přepočtená daň v cizí měně
+    if (rate && t.taxCur !== BigInt(0)) {
+      const taxAcc = percentOf(t.base, code.rate);
+      grossAcc += taxAcc - t.tax;
+      t.tax = taxAcc;
+    }
     if (t.tax === BigInt(0)) continue;
     posting.push({ accountId: String(code.accountId), amount: fromCents(-s * t.tax), amountCur: fromCents(-s * t.taxCur), currencyId: curId });
+  }
+  // zaokrouhlení celkové částky (mimo DPH): výnos / náklad na systémový účet zaokrouhlení
+  const roundCur = toCents(header.roundingAmount ?? "0");
+  if (roundCur !== BigInt(0)) {
+    const roundAcc = conv(roundCur);
+    grossCur += roundCur;
+    grossAcc += roundAcc;
+    // vydaná: kladné zaokrouhlení = výnos (zisk), přijatá: kladné = náklad (ztráta)
+    const gain = (s > 0) === (roundCur > 0);
+    posting.push({ accountId: await systemAccount(data, gain ? "roundingGain" : "roundingLoss"), amount: fromCents(-s * roundAcc), amountCur: fromCents(-s * roundCur), currencyId: curId, text: null });
   }
   // pohledávka MD / závazek D — celkem s DPH
   posting.push({
