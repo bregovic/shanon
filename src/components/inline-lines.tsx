@@ -15,7 +15,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Checkbox, Input, makeStyles, Select, Text, Tooltip, tokens } from "@fluentui/react-components";
 import { Delete20Regular } from "@fluentui/react-icons";
-import { deleteRecordsAction, listAction, saveRecordAction } from "@/app/actions";
+import { deleteRecordsAction, listAction, previewRecordAction, saveRecordAction } from "@/app/actions";
+import { triggersPreview } from "./use-preview";
 import type { FieldMeta } from "@/lib/meta";
 import { formatDateInput } from "@/lib/date-input";
 import { DateInput } from "./date-input";
@@ -66,6 +67,7 @@ const useStyles = makeStyles({
   warn: { color: tokens.colorPaletteDarkOrangeForeground1, fontWeight: tokens.fontWeightRegular },
   ok: { color: tokens.colorPaletteGreenForeground1, fontWeight: tokens.fontWeightRegular },
   hint: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase100, padding: "4px 8px" },
+  picked: { backgroundColor: tokens.colorNeutralBackground1Selected },
 });
 
 interface Column {
@@ -119,7 +121,7 @@ export function InlineLines({
   sortField?: string;
   readOnly: boolean;
   lang: string;
-  labels: { open: string; remove: string; total: string; empty: string; unbalanced?: string; balanced?: string; keys?: string };
+  labels: { open: string; remove: string; total: string; empty: string; unbalanced?: string; balanced?: string; keys?: string; select?: string; selectAll?: string; removeSelected?: string; clearSelection?: string };
   onChanged?: () => void;
   carry?: string[];
   balance?: LineBalance;
@@ -200,11 +202,62 @@ export function InlineLines({
 
   const update = (key: string, patch: Partial<EditRow>) => setRows((cur) => cur.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
+  // náhled po řádcích: co uložení doplní (číslo dokladu, datum, protiúčet…) — vidět hned
+  const fieldNames = useMemo(() => columns.flatMap((c) => c.fields.map((f) => f.name)), [columns]);
+  const pre = useRef(new Map<string, { auto: Set<string>; prov: Set<string>; timer?: ReturnType<typeof setTimeout>; seq: number }>());
+  const preOf = (key: string) => {
+    let x = pre.current.get(key);
+    if (!x) pre.current.set(key, (x = { auto: new Set(), prov: new Set(), seq: 0 }));
+    return x;
+  };
+  const previewRow = useCallback(
+    (key: string, delay = 200) => {
+      if (readOnly) return;
+      const st = preOf(key);
+      if (st.timer) clearTimeout(st.timer);
+      st.timer = setTimeout(async () => {
+        const row = rowsRef.current.find((r) => r.key === key);
+        if (!row) return;
+        const my = ++st.seq;
+        const input: Values = { [parentField]: parentId };
+        for (const k of fieldNames) if (!st.auto.has(k)) input[k] = typeof row.values[k] === "string" && /^-?[\d\s]+,\d+$/.test(String(row.values[k])) ? String(row.values[k]).replace(/\s/g, "").replace(",", ".") : (row.values[k] ?? null);
+        const r = await previewRecordAction(objectId, row.id, input);
+        if (!r.ok || my !== st.seq) return;
+        setRows((cur) =>
+          cur.map((x) => {
+            if (x.key !== key) return x;
+            const values = { ...x.values };
+            const titles = { ...x.titles };
+            for (const k of fieldNames) {
+              const v = r.data.values[k];
+              const empty = values[k] === null || values[k] === undefined || values[k] === "";
+              if (!empty && !st.auto.has(k)) continue;
+              if (v === null || v === undefined || v === "") continue;
+              values[k] = v;
+              st.auto.add(k);
+              if (r.data.titles[k]) titles[k] = r.data.titles[k];
+            }
+            st.prov = new Set(r.data.provisional.filter((k) => st.auto.has(k)));
+            return { ...x, values, titles };
+          }),
+        );
+      }, delay);
+    },
+    [objectId, parentField, parentId, fieldNames, readOnly],
+  );
+  // nový prázdný řádek: hned ukázat číslo dokladu a doplněné hodnoty
+  const blankKey = rows.find((r) => !r.id && !r.dirty)?.key;
+  useEffect(() => {
+    if (blankKey) previewRow(blankKey, 0);
+  }, [blankKey, previewRow]);
+
   const save = async (key: string) => {
     const row = rowsRef.current.find((r) => r.key === key);
     if (!row || !row.dirty || readOnly) return true;
     const values: Values = {};
     for (const c of columns) for (const f of c.fields) if (!f.readOnly) values[f.name] = typeof row.values[f.name] === "string" && f.kind === "decimal" ? String(row.values[f.name]).replace(/\s/g, "").replace(",", ".") || null : (row.values[f.name] ?? null);
+    // předběžné číslo dokladu z náhledu neposílat — přidělí ho uložení (posune řadu)
+    for (const k of pre.current.get(row.key)?.prov ?? []) delete values[k];
     values[parentField] = parentId;
     const res = await saveRecordAction(objectId, row.id, values, row.version);
     if (!res.ok) {
@@ -229,7 +282,8 @@ export function InlineLines({
     requestAnimationFrame(() => {
       const trs = [...(tbody.current?.querySelectorAll("tr[data-row]") ?? [])];
       const tr = trs[Math.max(0, Math.min(rowIdx, trs.length - 1))];
-      const el = tr?.querySelectorAll("td")[colIdx]?.querySelector<HTMLElement>("input, select, button");
+      // první sloupec je zaškrtnutí řádku
+      const el = tr?.querySelectorAll("td")[colIdx + (readOnly ? 0 : 1)]?.querySelector<HTMLElement>("input:not([type=checkbox]), select, button");
       el?.focus();
       if (el instanceof HTMLInputElement) el.select();
     });
@@ -249,7 +303,8 @@ export function InlineLines({
       focusCell(idx + 1, entryCol);
       return;
     }
-    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !expanded && (t.tagName !== "SELECT" || e.ctrlKey)) {
+    // Alt+šipka nechat výběru (rozbalí nabídku), jinak šipky = o řádek výš / níž
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !e.altKey && !expanded && (t.tagName !== "SELECT" || e.ctrlKey)) {
       e.preventDefault();
       // opuštěním řádku se uloží (onBlur řádku)
       focusCell(rowIndex(row.key) + (e.key === "ArrowDown" ? 1 : -1), colIdx);
@@ -266,6 +321,36 @@ export function InlineLines({
     return t;
   }, [rows, columns]);
 
+  // výběr řádků (zaškrtnutí na začátku řádku, Shift = rozsah) a hromadné mazání
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkError, setBulkError] = useState<string>();
+  const lastPick = useRef<string | null>(null);
+  const savedIds = rows.filter((r) => r.id).map((r) => r.id!);
+  const pick = (id: string, on: boolean, range: boolean) => {
+    const a = lastPick.current ? savedIds.indexOf(lastPick.current) : -1;
+    const b = savedIds.indexOf(id);
+    const ids = range && a >= 0 ? savedIds.slice(Math.min(a, b), Math.max(a, b) + 1) : [id];
+    lastPick.current = id;
+    setSelected((cur) => {
+      const n = new Set(cur);
+      for (const x of ids) {
+        if (on) n.add(x);
+        else n.delete(x);
+      }
+      return n;
+    });
+  };
+  const removeSelected = async () => {
+    const ids = savedIds.filter((x) => selected.has(x));
+    if (!ids.length) return;
+    const res = await deleteRecordsAction(objectId, ids);
+    if (!res.ok) return setBulkError(res.message);
+    setBulkError(undefined);
+    setSelected(new Set());
+    await reload();
+    onChanged?.();
+  };
+
   const diffs = useMemo(() => groupDiffs(rows, balance), [rows, balance]);
   const openGroups = [...diffs].filter(([, d]) => d !== 0);
 
@@ -273,8 +358,13 @@ export function InlineLines({
     const f = c.fields.find((x) => visible(x, row.values)) ?? null;
     if (!f) return null;
     const v = row.values[f.name];
-    const set = (value: unknown, title?: string) =>
+    const set = (value: unknown, title?: string) => {
+      const st = preOf(row.key);
+      st.auto.delete(f.name);
+      st.prov.delete(f.name);
       update(row.key, { values: { ...row.values, [f.name]: value }, titles: title !== undefined ? { ...row.titles, [f.name]: title } : row.titles, dirty: true, error: undefined });
+      if (triggersPreview(f.kind)) previewRow(row.key);
+    };
     if (readOnly || f.readOnly) {
       const shown = f.kind === "ref" ? row.titles[f.name] : f.kind === "date" ? formatDateInput(v, lang) : f.kind === "enum" ? f.options?.find((o) => o.value === v)?.label : f.kind === "decimal" && v !== null && v !== undefined && v !== "" ? nf.format(Number(v)) : v;
       return <div className={`${s.ro} ${f.kind === "decimal" ? s.num : ""}`}>{String(shown ?? "")}</div>;
@@ -319,6 +409,16 @@ export function InlineLines({
         <table className={s.table} style={{ minWidth: columns.reduce((a, c) => a + c.width, 60) }}>
           <thead>
             <tr>
+              {!readOnly && (
+                <th className={s.th} style={{ width: 32 }}>
+                  <Checkbox
+                    aria-label={labels.selectAll ?? "Vybrat vše"}
+                    checked={savedIds.length > 0 && savedIds.every((x) => selected.has(x)) ? true : selected.size ? "mixed" : false}
+                    onChange={(_, d) => setSelected(d.checked === true ? new Set(savedIds) : new Set())}
+                    tabIndex={-1}
+                  />
+                </th>
+              )}
               {columns.map((c) => (
                 <th key={c.key} className={`${s.th} ${c.fields[0].kind === "decimal" ? s.num : ""}`} style={{ width: c.width }}>
                   {c.label}
@@ -329,7 +429,22 @@ export function InlineLines({
           </thead>
           <tbody ref={tbody}>
             {rows.map((r) => (
-              <RowView key={r.key} row={r} s={s} open={groupOpen(r)} onLeave={() => void save(r.key)}>
+              <RowView key={r.key} row={r} s={s} open={groupOpen(r)} picked={!!r.id && selected.has(r.id)} onLeave={() => void save(r.key)}>
+                {!readOnly && (
+                  <td className={s.td} style={{ textAlign: "center" }}>
+                    {r.id && (
+                      <Checkbox
+                        aria-label={labels.select ?? "Vybrat"}
+                        checked={selected.has(r.id)}
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          pick(r.id!, !selected.has(r.id!), e.shiftKey);
+                        }}
+                      />
+                    )}
+                  </td>
+                )}
                 {columns.map((c, i) => (
                   <td key={c.key} className={s.td}>
                     {cell(r, c, i)}
@@ -352,6 +467,7 @@ export function InlineLines({
               </tr>
             )}
             <tr className={s.total}>
+              {!readOnly && <td className={s.td} />}
               {columns.map((c, i) => (
                 <td key={c.key} className={`${s.td} ${s.num}`}>
                   {i === 0 ? <span style={{ float: "left" }}>{labels.total}</span> : c.key in totals ? nf.format(totals[c.key]) : ""}
@@ -362,6 +478,17 @@ export function InlineLines({
           </tbody>
         </table>
       </div>
+      {!readOnly && selected.size > 0 && (
+        <div className={s.hint} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Button size="small" icon={<Delete20Regular />} onClick={() => void removeSelected()}>
+            {(labels.removeSelected ?? "Smazat vybrané ({n})").replace("{n}", String(selected.size))}
+          </Button>
+          <Button size="small" appearance="subtle" onClick={() => setSelected(new Set())}>
+            {labels.clearSelection ?? "Zrušit výběr"}
+          </Button>
+          {bulkError && <span className={s.warn}>{bulkError}</span>}
+        </div>
+      )}
       {balance && rows.some((r) => r.id) && (
         <div className={s.hint}>
           {openGroups.length ? (
@@ -379,12 +506,12 @@ export function InlineLines({
 }
 
 /** Řádek: uloží se, když z něj odejde fokus (klik jinam, Tab za poslední pole, šipka). */
-function RowView({ row, s, open, onLeave, children }: { row: EditRow; s: ReturnType<typeof useStyles>; open: boolean; onLeave: () => void; children: React.ReactNode }) {
+function RowView({ row, s, open, picked, onLeave, children }: { row: EditRow; s: ReturnType<typeof useStyles>; open: boolean; picked?: boolean; onLeave: () => void; children: React.ReactNode }) {
   return (
     <>
       <tr
         data-row={row.key}
-        className={[row.error ? s.bad : row.dirty ? s.dirty : !row.id ? s.newRow : "", open ? s.open : ""].join(" ").trim() || undefined}
+        className={[row.error ? s.bad : row.dirty ? s.dirty : !row.id ? s.newRow : "", open ? s.open : "", picked ? s.picked : ""].join(" ").trim() || undefined}
         onBlur={(e) => {
           const to = e.relatedTarget as Node | null;
           // přechod do vyskakovacího výběru (combobox) není opuštění řádku

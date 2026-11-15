@@ -89,6 +89,7 @@ export function RecordForm({
                 ) : (
                 <FieldInput
                   f={f}
+                  where={lookupWhere(f, values)}
                   value={values[f.name]}
                   title={titles[f.name]}
                   error={errors[f.name]}
@@ -106,8 +107,17 @@ export function RecordForm({
   );
 }
 
+/** omezení výběru hodnotami jiných polí formuláře (prázdné = bez omezení) */
+export function lookupWhere(f: FieldMeta, values: Values): Record<string, string> | undefined {
+  if (!f.lookupFilter) return undefined;
+  const w: Record<string, string> = {};
+  for (const [target, src] of Object.entries(f.lookupFilter)) if (values[src] !== null && values[src] !== undefined && values[src] !== "") w[target] = String(values[src]);
+  return Object.keys(w).length ? w : undefined;
+}
+
 function FieldInput({
   f,
+  where,
   value,
   title,
   error,
@@ -116,6 +126,7 @@ function FieldInput({
   openLabel,
 }: {
   f: FieldMeta;
+  where?: Record<string, string>;
   value: unknown;
   title?: string;
   error?: string;
@@ -180,7 +191,7 @@ function FieldInput({
         );
         break;
       }
-      control = <RefCombobox f={f} value={v} title={title ?? ""} disabled={disabled} onChange={onChange} openLabel={openLabel} />;
+      control = <RefCombobox f={f} where={where} value={v} title={title ?? ""} disabled={disabled} onChange={onChange} openLabel={openLabel} />;
       break;
     default:
       control = (
@@ -208,7 +219,8 @@ function OpenRef({ href, label }: { href: string; label: string }) {
   const router = useRouter();
   return (
     <Tooltip content={label} relationship="label">
-      <Button appearance="subtle" icon={<Open24Regular />} onClick={() => router.push(href)} />
+      {/* mimo pořadí Tabu: Tab z výběru jde rovnou na další pole */}
+      <Button appearance="subtle" tabIndex={-1} icon={<Open24Regular />} onClick={() => router.push(href)} />
     </Tooltip>
   );
 }
@@ -216,6 +228,7 @@ function OpenRef({ href, label }: { href: string; label: string }) {
 /** Výběr odkazovaného záznamu s hledáním na serveru. */
 export function RefCombobox({
   f,
+  where,
   value,
   title,
   disabled,
@@ -224,6 +237,8 @@ export function RefCombobox({
   compact = false,
 }: {
   f: FieldMeta;
+  /** omezení výběru (lookupFilter) */
+  where?: Record<string, string>;
   value: string;
   title: string;
   disabled: boolean;
@@ -234,7 +249,7 @@ export function RefCombobox({
 }) {
   const [query, setQuery] = useState(title);
   const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState<{ id: string; title: string; subtitle: string }[]>([]);
+  const [options, setOptions] = useState<{ id: string; title: string; subtitle: string; nameOnly?: boolean }[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // nový titulek zvenčí (výběr, načtení záznamu) přepíše text v poli
@@ -248,10 +263,12 @@ export function RefCombobox({
     if (!open) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      searchRefs(f.refObject!, query === title ? "" : query).then(setOptions);
+      searchRefs(f.refObject!, query === title ? "" : query, where).then(setOptions);
     }, 150);
     return () => clearTimeout(timer.current);
-  }, [query, open, f.refObject, title]);
+    // where jako text, ať nový objekt se stejným obsahem nespouští hledání znovu
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, open, f.refObject, title, JSON.stringify(where ?? {})]);
 
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -285,9 +302,16 @@ export function RefCombobox({
         }}
       >
         {options.map((o) => (
-          <Option key={o.id} value={o.id} text={o.title}>
-            <span style={{ fontWeight: 600 }}>{o.title}</span>
-            {o.subtitle && <span style={{ marginLeft: 8, color: tokens.colorNeutralForeground3 }}>{o.subtitle}</span>}
+          <Option key={o.id} value={o.id} text={o.nameOnly && o.subtitle ? o.subtitle : o.title}>
+            {o.nameOnly && o.subtitle ? (
+              // odběratel / dodavatel: jen jméno (číslo je interní; hledá se hvězdičkou)
+              <span style={{ fontWeight: 600 }}>{o.subtitle}</span>
+            ) : (
+              <>
+                <span style={{ fontWeight: 600 }}>{o.title}</span>
+                {o.subtitle && <span style={{ marginLeft: 8, color: tokens.colorNeutralForeground3 }}>{o.subtitle}</span>}
+              </>
+            )}
           </Option>
         ))}
       </Combobox>

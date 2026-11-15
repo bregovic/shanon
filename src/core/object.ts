@@ -35,6 +35,11 @@ export interface FieldDef {
    */
   optionalRef?: boolean;
   /**
+   * výběr v odkazu omezený hodnotou jiného pole formuláře: { pole cíle: pole formuláře }
+   * (název deníku jen druhu deníku; prázdná hodnota = bez omezení)
+   */
+  lookupFilter?: Record<string, string>;
+  /**
    * tajný údaj (heslo, API klíč, certifikát): v databázi šifrovaně, uživateli
    * se nevrací (jen maska), logika modulu ho čte přes revealSecret()
    */

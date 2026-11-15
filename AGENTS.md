@@ -197,6 +197,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `src/server/mail.ts`): Odeslat e-mailem (akce `outside`) založí koncept `int.mail` s PDF dokladu
   v přílohách a otevře ho (akce smí vrátit `ActionOutcome.open`); Odeslat pošle napojením druhu
   „mail“, zapíše `int.log` a u faktury `emailedAt`. Příjemce = `docEmail` partnera, jinak e-mail subjektu.
+- Náhled před uložením (`previewRecord`, `usePreview`): formulář, šuplík i mřížka se po výběru
+  (odkaz, výčet, číslo, datum) zeptají serveru, co uložení doplní — `save(…, { preview: true })` projde
+  výchozí hodnoty, číselnou řadu a `beforeSave` obsluh, transakce se vrátí. Doplňování tedy patří do
+  `beforeSave` (jeden zdroj pravdy). Čísla z řady jsou v náhledu jen předběžná (`_provisional`) a
+  formulář je při uložení neposílá. Výběr omezený jiným polem: `FieldDef.lookupFilter`; u partnerů
+  (`titleRef`) nabídka ukazuje jen jméno, `*` v hledání = podle čísla.
 - Pořizování v mřížce (`InlineLines`, `ObjectDef.lines[]`): `inherit` (pole řádku ← hlavička), `carry`
   (z předchozího řádku), `balance` (vyrovnanost skupin, dorovnání nového řádku). Klávesy: Enter = uložit
   a další řádek, ↑/↓ = řádek, Tab přeskočí samočinná pole. Datum všude přes `DateInput` (zkratky AX

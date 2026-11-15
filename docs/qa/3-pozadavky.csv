@@ -61,3 +61,4 @@ CR-059;change;Nápověda: návody k agendám, „?“ u modulů a formulářů, 
 CR-060;change;Odesílání dokladů e-mailem (SMTP v Integraci, Odeslaná pošta);INT-MAIL;high;uat;60;Faktura a záloha s PDF (faktura s ISDOC); hromadné odeslání a upomínky později.
 CR-061;change;Zvoneček interních upozornění (chyby, čekající doklady, registr DPH, EET);SYS-NOTICES;medium;uat;61;Workflow schvalování později.
 CR-062;change;Deník: číslo dokladu hned, datum z hlavičky, zkratky data, druhy deníků po modulech, klávesnice;GL-JOURNAL-ENTRY;high;uat;62;Podnět z testování 15.11.2026; zrychlení zaúčtování velkých deníků (500 dokladů 17 s → 6 s).
+CR-063;change;Náhled hodnot před uložením (položka, čísla deníku a dokladu), výběr řádků deníku, Alt+↓, lookup partnerů jen jménem (* = číslo), názvy deníků podle druhu;GL-JOURNAL-ENTRY;high;uat;63;Podněty z testování 15.11.2026.

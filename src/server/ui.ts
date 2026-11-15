@@ -35,6 +35,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
     image: f.image,
     visibleWhen: f.visibleWhen,
     gridColumn: f.gridColumn,
+    lookupFilter: f.lookupFilter,
   };
 }
 
@@ -93,6 +94,10 @@ export function uiLabels(t: T) {
       linesUnbalanced: t("@SYS:LinesUnbalanced"),
       linesBalanced: t("@SYS:LinesBalanced"),
       linesKeys: t("@SYS:LinesKeys"),
+      select: t("@SYS:Select"),
+      selectAll: t("@SYS:SelectAll"),
+      removeSelected: t("@SYS:RemoveSelected"),
+      clearSelection: t("@SYS:ClearSelection"),
       help: FILTER_HELP.map(([code, label]) => [code, t(label)] as [string, string]),
     },
     drawer: {

@@ -458,7 +458,8 @@ export const journal = defineObject({
   fields: {
     journalNum: { edt: VoucherNum, label: "@GL:JournalNum", mandatory: true, readOnly: true },
     /** prázdné = výchozí název deníku (GEN, jinak první) — doplní se při uložení */
-    journalNameId: { edt: JournalNameRef },
+    // nabídka jen názvů deníku stejného druhu (obecný deník nenabízí bankovní a pokladní)
+    journalNameId: { edt: JournalNameRef, lookupFilter: { journalType: "journalType" } },
     /** druh z názvu deníku (deníky banky v Bance, pokladny v Pokladně…) */
     journalType: { edt: enumEdt(JournalType) },
     date: { edt: Edts.TransDate, mandatory: true, default: "$today" },

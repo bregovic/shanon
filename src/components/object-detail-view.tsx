@@ -4,7 +4,7 @@
  * Detail záznamu na celé stránce — pro doklady s řádky a akcemi (deník,
  * účetní doklad). Hlavička je formulář, řádky jsou grid + šuplík.
  */
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -22,7 +22,6 @@ import {
   Text,
 } from "@fluentui/react-components";
 import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
-import { useRef } from "react";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
@@ -35,6 +34,7 @@ import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
 import { useShortcuts } from "./shortcuts";
 import { goBack } from "@/lib/nav-back";
+import { triggersPreview, usePreview } from "./use-preview";
 import { SmartGrid } from "./smart-grid";
 
 type Row = Record<string, unknown>;
@@ -178,7 +178,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           carry={spec.carry}
           balance={spec.balance}
           lang={lang}
-          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys }}
+          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys, select: labels.grid.select, selectAll: labels.grid.selectAll, removeSelected: labels.grid.removeSelected, clearSelection: labels.grid.clearSelection }}
           onChanged={() => router.refresh()}
         />
       ) : (
@@ -249,13 +249,25 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   const [message, setMessage] = useState<{ intent: "error" | "success"; text: string }>();
   const [busy, start] = useTransition();
   const [confirm, setConfirm] = useState(false);
+  // náhled: číslo nového dokladu a hodnoty, které uložení doplní — vidět hned
+  const allFields = useMemo(() => p.groups.flatMap((g) => g.fields), [p.groups]);
+  const pv = usePreview(p.objectId, p.id, { fields: useMemo(() => allFields.map((f) => f.name), [allFields]), disabled: p.readOnly });
+  const applyPreview = useCallback((vals: Values, t: Record<string, string>) => {
+    setValues((v) => ({ ...v, ...vals }));
+    setTitles((x) => ({ ...x, ...t }));
+  }, []);
+  useEffect(() => {
+    if (!p.id && !p.readOnly) pv.run(p.values, applyPreview, 0);
+    // jen pro nový záznam při otevření
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const save = (current: Values = values) =>
     start(async () => {
       const editable = p.groups.flatMap((g) => g.fields).filter((f) => !f.readOnly);
       const v: Values = {};
       for (const f of editable) v[f.name] = current[f.name] ?? null;
-      const res = await saveRecordAction(p.objectId, p.id, v, p.version);
+      const res = await saveRecordAction(p.objectId, p.id, pv.strip(v), p.version);
       if (!res.ok) {
         setErrors(res.errors ?? {});
         setMessage({ intent: "error", text: res.message });
@@ -429,7 +441,9 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             record={{ objectId: p.objectId, id: p.id, labels: p.labels.drawer.image }}
             onChange={(name, value, t) => {
               const next = { ...values, [name]: value };
+              pv.touch(name);
               setValues(next);
+              if (triggersPreview(allFields.find((f) => f.name === name)?.kind)) pv.run(next, applyPreview);
               if (t !== undefined) setTitles((x) => ({ ...x, [name]: t }));
               setErrors((e) => ({ ...e, [name]: "" }));
               // nový doklad: výběrem v odkazu (odběratel) se hlavička uloží, když je vše povinné vyplněné

@@ -29,6 +29,8 @@ export interface FieldMeta {
   visibleWhen?: { field: string; in: unknown[] };
   /** mřížka řádků: sdílený sloupec vzájemně se vylučujících polí */
   gridColumn?: string;
+  /** výběr omezený hodnotou jiného pole: { pole cíle: pole formuláře } */
+  lookupFilter?: Record<string, string>;
 }
 
 export const objectHref = (objectId: string, id?: string) =>

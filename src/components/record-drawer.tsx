@@ -4,7 +4,7 @@
  * Šuplík zprava pro založení / úpravu záznamu (standard formulářů staré verze:
  * Drawer position="end", nahoře název a zavření, dole [Zpět] … [Uložit]).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
   Drawer,
@@ -18,6 +18,7 @@ import {
 } from "@fluentui/react-components";
 import { Dismiss24Regular } from "@fluentui/react-icons";
 import { duplicateRecordAction, getRecordAction, saveRecordAction } from "@/app/actions";
+import { triggersPreview, usePreview } from "./use-preview";
 import { RecordForm, type FormGroup, type ImageLabels, type Values } from "./record-form";
 import { useShortcuts } from "./shortcuts";
 
@@ -75,6 +76,15 @@ function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles
   const [state, setState] = useState<EditorState>({ values: defaults, titles: defaultTitles ?? {}, errors: {} });
   const [loading, setLoading] = useState(!!id);
   const [saving, setSaving] = useState(false);
+  // náhled: co uložení doplní (cena z položky, číslo z řady) — ukázat hned
+  const allFields = useMemo(() => groups.flatMap((g) => g.fields), [groups]);
+  const pv = usePreview(objectId, id, { fields: useMemo(() => allFields.map((f) => f.name), [allFields]), fixed, disabled: !!readOnly });
+  const applyPreview = useCallback((vals: Values, t: Record<string, string>) => setState((s) => ({ ...s, values: { ...s.values, ...vals }, titles: { ...s.titles, ...t } })), []);
+  useEffect(() => {
+    if (!id && !readOnly) pv.run(defaults, applyPreview, 0);
+    // jen při otevření nového záznamu
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -104,7 +114,7 @@ function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles
     const values: Values = {};
     for (const f of editable) values[f.name] = state.values[f.name] ?? null;
     Object.assign(values, fixed ?? {});
-    const res = await saveRecordAction(objectId, id, values, state.version);
+    const res = await saveRecordAction(objectId, id, pv.strip(values), state.version);
     setSaving(false);
     if (!res.ok) {
       // chyby u polí, která formulář neukazuje, musí být vidět aspoň v hlášce
@@ -156,14 +166,16 @@ function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles
             columns={1}
             openLabel={labels.open}
             record={{ objectId, id, labels: labels.image }}
-            onChange={(name, value, t) =>
+            onChange={(name, value, t) => {
+              pv.touch(name);
               setState((s) => ({
                 ...s,
                 values: { ...s.values, [name]: value },
                 titles: t !== undefined ? { ...s.titles, [name]: t } : s.titles,
                 errors: { ...s.errors, [name]: "" },
-              }))
-            }
+              }));
+              if (triggersPreview(allFields.find((f) => f.name === name)?.kind)) pv.run({ ...state.values, [name]: value }, applyPreview);
+            }}
           />
         )}
       </DrawerBody>

@@ -400,7 +400,20 @@ export class Session {
    * Další číslo řady. Pořadí hledání: konkrétní řada (id) → řada určená pro
    * objekt (Použití) → řada podle kódu (výchozí z definice objektu/modulu).
    */
+  /** čísla přidělená v této transakci (i systémovou session obsluh) — náhled je označí jako předběžná */
+  get issuedNumbers(): string[] {
+    let a = ISSUED.get(this.tx);
+    if (!a) ISSUED.set(this.tx, (a = []));
+    return a;
+  }
+
   async nextNumber(seq: string | { id?: string; usedFor?: string; code?: string }, date = new Date()): Promise<string> {
+    const n = await this.nextNumberRaw(seq, date);
+    this.issuedNumbers.push(n);
+    return n;
+  }
+
+  private async nextNumberRaw(seq: string | { id?: string; usedFor?: string; code?: string }, date = new Date()): Promise<string> {
     if (!this.ctx.companyId) throw new UserError("@SYS:NoCompany");
     const by = typeof seq === "string" ? { code: seq } : seq;
     const scope = Prisma.sql`tenant_id = ${this.ctx.tenantId}::uuid AND company_id = ${this.ctx.companyId}::uuid`;
@@ -431,7 +444,7 @@ export class Session {
     objectId: string,
     id: string | null,
     input: RecordData,
-    opts: { system?: boolean; version?: number } = {},
+    opts: { system?: boolean; version?: number; preview?: boolean } = {},
   ): Promise<RecordData> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system || !!opts.system);
@@ -485,6 +498,28 @@ export class Session {
       if (f.edt.kind !== "ref" || !(name in data) || !merged[name] || errors[name]) continue;
       const target = await this.sys().get(f.edt.refObject!, String(merged[name]));
       if (!target) errors[name] = "@SYS:InvalidValue";
+    }
+
+    // náhled: doplněné hodnoty (výchozí, z položky, čísla) bez zápisu — chyby a neúplnost nevadí
+    if (opts.preview) {
+      const pctx = this.eventCtx(objectId);
+      for (const h of handlersFor(this.ctx, objectId)) {
+        try {
+          await h.beforeSave?.(pctx, merged, isNew);
+        } catch {
+          // neúplný záznam (chybí účet, partner…) — náhled ukáže, co jde
+        }
+      }
+      // hodnoty v podobě pro formulář (desetinná čísla jako text s řádem měny/ceny)
+      const out: RecordData = { ...merged, id: id ?? null };
+      for (const [k, f] of Object.entries(def.fields)) {
+        const v = out[k];
+        if (f.edt.kind === "decimal" && v !== null && v !== undefined && v !== "") out[k] = typeof v === "number" ? v.toFixed(f.edt.scale ?? 2) : String(v);
+      }
+      await this.attachRefTitles(def, [out]);
+      const nums = new Set(this.issuedNumbers);
+      out._provisional = Object.keys(def.fields).filter((k) => typeof merged[k] === "string" && nums.has(merged[k] as string));
+      return out;
     }
 
     // virtuální společnosti (jádro: nosná firma, pravidla sdílení)
@@ -678,6 +713,29 @@ export const getRecord = (ctx: Ctx, objectId: string, id: string, client?: Prism
     client,
   );
 
+const ISSUED = new WeakMap<object, string[]>();
+
+class PreviewRollback {
+  constructor(readonly value: RecordData) {}
+}
+
+/**
+ * Náhled uložení: výchozí hodnoty, číselná řada a obsluhy modulů (cena z položky, číslo
+ * dokladu deníku) nanečisto — transakce se vrátí, nic se nezapíše ani nespotřebuje.
+ * `_provisional` = pole s čísly z řady (jen předběžná, při uložení se neposílají).
+ */
+export async function previewRecord(ctx: Ctx, objectId: string, id: string | null, input: RecordData, client?: PrismaClient): Promise<RecordData> {
+  try {
+    await inTenant(ctx, async (s) => {
+      throw new PreviewRollback(await s.save(objectId, id, input, { preview: true }));
+    }, client);
+  } catch (e) {
+    if (e instanceof PreviewRollback) return e.value;
+    throw e;
+  }
+  return {};
+}
+
 export const saveRecord = (
   ctx: Ctx,
   objectId: string,
@@ -704,18 +762,23 @@ export async function runAction(ctx: Ctx, objectId: string, id: string, actionId
 }
 
 /** Možnosti pro výběr odkazu (combobox ve formuláři). */
-export const refOptions = (ctx: Ctx, objectId: string, q: string, client?: PrismaClient) =>
+export const refOptions = (ctx: Ctx, objectId: string, q: string, client?: PrismaClient, where?: Record<string, string>) =>
   inTenant(
     ctx,
     async (s) => {
       const def = getObject(objectId);
-      const res = await s.list(objectId, { q, pageSize: 30 });
+      // hvězdička = hledání podle čísla / kódu (DOD*, *0001), jinak podle textu (u partnerů jméno)
+      // omezení z formuláře (lookupFilter): jen existující pole cíle, přesná shoda
+      const filter = Object.fromEntries(Object.entries(where ?? {}).filter(([k, v]) => k in def.fields && typeof v === "string"));
+      const res = q.includes("*") ? await s.list(objectId, { filters: { [def.titleField]: q.trim() }, filter, pageSize: 30 }) : await s.list(objectId, { q, filter, pageSize: 30 });
       // upřesnění: název (položka, účet…), u odběratele název subjektu (titleRef), jinak druhý textový sloupec
       const sub = nameFieldOf(def) ?? def.list.find((f) => f !== def.titleField && def.fields[f].edt.kind === "string");
       return res.rows.map((r) => ({
         id: String(r.id),
         title: String(r[def.titleField] ?? ""),
         subtitle: def.titleRef ? String((r._titles as RecordData | undefined)?.[def.titleRef] ?? "") : sub ? String(r[sub] ?? "") : "",
+        // odběratel / dodavatel: v nabídce jen jméno
+        nameOnly: !!def.titleRef,
       }));
     },
     client,

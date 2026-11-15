@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
 import { isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
-import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, refOptions, runAction, saveRecord } from "@/server/data";
+import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, previewRecord, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
@@ -124,10 +124,10 @@ export async function recordAction(_: FormState, form: FormData): Promise<FormSt
   return { ok: true };
 }
 
-export async function searchRefs(objectId: string, q: string) {
+export async function searchRefs(objectId: string, q: string, where?: Record<string, string>) {
   const s = await requireSession();
   getObject(objectId);
-  return refOptions(s.ctx, objectId, q);
+  return refOptions(s.ctx, objectId, q, undefined, where);
 }
 
 // ---------------------------------------------------------------------------
@@ -1003,4 +1003,20 @@ export async function noticesAction(): Promise<{ items: NoticeView[]; unread: nu
 export async function markNoticesReadAction(ids: string[]): Promise<void> {
   const s = await requireSession();
   await markNoticesRead(s.ctx, Array.isArray(ids) ? ids.map(String) : []);
+}
+
+/** Náhled hodnot před uložením (doplnění z položky, čísla z řady) — nic se nezapíše. */
+export async function previewRecordAction(
+  objectId: string,
+  id: string | null,
+  values: Record<string, unknown>,
+): Promise<ActionResult<{ values: Record<string, unknown>; titles: Record<string, string>; provisional: string[] }>> {
+  const s = await requireSession();
+  try {
+    const r = await previewRecord(s.ctx, objectId, id, values as RecordData);
+    const { _titles, _provisional, ...vals } = r as RecordData & { _titles?: Record<string, string>; _provisional?: string[] };
+    return { ok: true, data: { values: vals, titles: _titles ?? {}, provisional: _provisional ?? [] } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
 }
