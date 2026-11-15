@@ -276,6 +276,18 @@ export const systemAccount = defineObject({
   defaultSort: { field: "postingType", dir: "asc" },
 });
 
+/** Kontrola duplicitního čísla (faktura dodavatele, doklad v účetnictví). */
+export const DupCheck = defineEnum({
+  id: "DupCheck",
+  label: "@GL:DupCheck",
+  values: [
+    { value: "accept", label: "@GL:DupAccept" },
+    { value: "warn", label: "@GL:DupWarn" },
+    { value: "reject", label: "@GL:DupReject" },
+    { value: "rejectYear", label: "@GL:DupRejectYear" },
+  ],
+});
+
 export const parameters = defineObject({
   id: "gl.parameters",
   table: "gl_parameters",
@@ -287,11 +299,14 @@ export const parameters = defineObject({
     reportingCurrencyId: { edt: refEdt("sys.currency", "@GL:ReportingCurrency") },
     rateSource: { edt: enumEdt(LedgerRateSource), mandatory: true, default: "cnb" },
     rateMaxAgeDays: { edt: Edts.Int, label: "@GL:RateMaxAge", mandatory: true, default: 7 },
+    /** ručně zadané číslo dokladu, které už v účetnictví je (opravné deníky = přijmout / varovat) */
+    voucherDupCheck: { edt: enumEdt(DupCheck), label: "@GL:VoucherDupCheck", mandatory: true, default: "reject" },
   },
   titleField: "accountingCurrencyId",
   list: ["accountingCurrencyId", "reportingCurrencyId", "rateSource", "rateMaxAgeDays"],
   form: [
     { label: "@GL:Currencies", fields: ["accountingCurrencyId", "reportingCurrencyId", "rateSource", "rateMaxAgeDays"] },
+    { label: "@GL:Checks", fields: ["voucherDupCheck"] },
   ],
 });
 
@@ -350,7 +365,7 @@ export const voucher = defineObject({
   titleField: "voucherNum",
   list: ["voucherNum", "date", "description", "sourceObject"],
   form: [{ label: "@SYS:General", fields: ["voucherNum", "date", "description", "sourceObject"] }],
-  unique: [["voucherNum"]],
+  // číslo dokladu není jedinečné: opravný deník smí použít číslo původního dokladu (Parametry HK → Kontroly)
   numberSeq: { field: "voucherNum", seq: "GLVOUCHER" },
   defaultSort: { field: "date", dir: "desc" },
   lines: [{ object: "gl.trans", field: "voucherId", label: "@GL:Transactions" }],
@@ -614,7 +629,7 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus, SystemPosting, JournalType, VoucherAllocation, LedgerAccountType],
+  enums: [DupCheck, DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus, SystemPosting, JournalType, VoucherAllocation, LedgerAccountType],
   objects: [parameters, systemAccount, dimension, dimensionValue, dimensionRule, account, fiscalYear, period, voucher, trans, journalName, journal, journalLine],
   reports: glReports,
   menu: [
@@ -772,6 +787,15 @@ export default defineModule({
       AccountingCurrency: "Účetní měna",
       ReportingCurrency: "Vykazovací měna",
       RateMaxAge: "Nejstarší použitelný kurz (dní)",
+      Checks: "Kontroly",
+      DupCheck: "Kontrola duplicity",
+      DupAccept: "Přijmout",
+      DupWarn: "Varovat",
+      DupReject: "Odmítnout",
+      DupRejectYear: "Odmítnout ve stejném roce",
+      VoucherDupCheck: "Ručně zadané číslo dokladu, které už v účetnictví je",
+      VoucherDuplicate: "Doklad {num} už v účetnictví je — zadejte jiné číslo (opravné deníky povolíte v Parametrech hlavní knihy).",
+      VoucherDuplicateWarn: "Doklad {num} už v účetnictví je — zaúčtováno pod stejným číslem.",
       Currencies: "Měny a kurzy",
       ExchangeDiffs: "Kurzové rozdíly a zaokrouhlení",
       RealizedGain: "Kurzové zisky",
@@ -976,6 +1000,15 @@ export default defineModule({
       AccountingCurrency: "Accounting currency",
       ReportingCurrency: "Reporting currency",
       RateMaxAge: "Oldest usable rate (days)",
+      Checks: "Checks",
+      DupCheck: "Duplicate check",
+      DupAccept: "Accept",
+      DupWarn: "Warn",
+      DupReject: "Reject",
+      DupRejectYear: "Reject within the same year",
+      VoucherDupCheck: "Manually entered voucher number that already exists in the ledger",
+      VoucherDuplicate: "Voucher {num} already exists in the ledger — enter another number (allow correction journals in General ledger parameters).",
+      VoucherDuplicateWarn: "Voucher {num} already exists in the ledger — posted under the same number.",
       Currencies: "Currencies and rates",
       ExchangeDiffs: "Exchange differences and rounding",
       RealizedGain: "Realized exchange gain",

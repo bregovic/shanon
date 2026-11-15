@@ -8,7 +8,7 @@
 import { fromCents, mulCents, percentOf, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents } from "@/modules/sys/currency";
-import { accountingCurrencyId, assertOpenPeriod, convertPrice, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { accountingCurrencyId, assertOpenPeriod, checkDuplicate, convertPrice, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { dimsOf } from "@/modules/gl/dimensions";
 import { postingAccount } from "@/modules/gl/setup";
 import { partnerTaxGroup, resolveLineCode, taxTransParts } from "./tax-groups";
@@ -40,6 +40,8 @@ export interface InvoiceConfig {
   side: 1 | -1;
   /** stavy hlavičky, ve kterých se řádky nemění (výchozí: zaúčtováno) */
   lockedStatuses?: string[];
+  /** parametry pomocné knihy (kontrola čísla faktury) */
+  parameters?: string;
   /** zálohy partnera: objekt zálohy a pole účtu záloh ve skupině */
   advance?: { object: string; groupAccountField: string; defaultAccount: string };
 }
@@ -126,6 +128,19 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
           if (digits) data.vs = digits;
         }
         if (!data.dueDate) data.dueDate = addDays(day(data.invoiceDate)!, days);
+        // číslo faktury už existuje (přijatá: u téhož dodavatele) — podle parametrů přijmout / varovat / odmítnout
+        const num = data[cfg.docNumField];
+        if (cfg.parameters && num && (!before || before[cfg.docNumField] !== num || day(before.invoiceDate) !== day(data.invoiceDate))) {
+          const [p] = await ctx.data.find(cfg.parameters, {}, { take: 1 });
+          const where: RecordData = { [cfg.docNumField]: num, ...(cfg.docNumField === "externalNum" ? { [cfg.partnerField]: data[cfg.partnerField] } : {}) };
+          const found = (await ctx.data.find(cfg.header, where, { take: 20 })).filter((r) => r.id !== data.id);
+          try {
+            await checkDuplicate(ctx.data, p?.invoiceNumCheck, found, day(data.invoiceDate), "invoiceDate", "@TAX:InvoiceNumDuplicate", { num: String(num) });
+          } catch (e) {
+            if (e instanceof UserError) return { [cfg.docNumField]: e.label };
+            throw e;
+          }
+        }
       },
       async afterSave(ctx, data) {
         const key = String(data.id);

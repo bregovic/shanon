@@ -5,9 +5,9 @@
  * účtování. Modul dodá parametry a labely, objekty a logika jsou společné.
  */
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
-import type { DataApi, EventContext, ObjectHandlers, RecordData } from "@/core/module";
+import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { defineObject, type ObjectDef } from "@/core/object";
-import { DIM_NAMES, JournalStatus, dimFields } from "@/modules/gl";
+import { DIM_NAMES, DupCheck, JournalStatus, dimFields } from "@/modules/gl";
 import { documentLineHandlers, invoiceHandlers, type InvoiceConfig } from "./document";
 import { orderHandlers, releaseOrder } from "./orders";
 import { postingAccount } from "@/modules/gl/setup";
@@ -105,6 +105,22 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     ],
     unique: [["code"]],
     defaultSort: { field: "code", dir: "asc" },
+  });
+
+  // parametry odběratelů / dodavatelů (jeden záznam za firmu)
+  const params = defineObject({
+    id: id("parameters"),
+    table: `${m}_parameters`,
+    label: L("Parameters"),
+    labelPlural: L("Parameters"),
+    scope: "company",
+    fields: {
+      /** číslo faktury (dodavatele / naše), které už existuje: přijmout / varovat / odmítnout / odmítnout ve stejném roce */
+      invoiceNumCheck: { edt: enumEdt(DupCheck), label: L("InvoiceNumCheck"), mandatory: true, default: "reject" },
+    },
+    titleField: "invoiceNumCheck",
+    list: ["invoiceNumCheck"],
+    form: [{ label: "@GL:Checks", fields: ["invoiceNumCheck"] }],
   });
 
   const partner = defineObject({
@@ -431,6 +447,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       ? { price: "priceNet", tax: "taxCodeId", groupAccount: "revenueAccountId" }
       : { price: "purchasePrice", tax: "purchaseTaxCodeId", groupAccount: "costAccountId" },
     partnerTrans: trans.id,
+    parameters: params.id,
     docNumField: sp.externalNum ? "externalNum" : "invoiceNum",
     side: sp.side,
     advance: { object: advance.id, groupAccountField: "advanceAccountId", defaultAccount: sp.advanceAccount },
@@ -441,13 +458,18 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
 
   return {
     enums: [TransKind, OrderStatus, AdvanceStatus],
-    objects: [group, partner, order, orderLine, invoice, invoiceLine, advance, trans],
+    objects: [params, group, partner, order, orderLine, invoice, invoiceLine, advance, trans],
     handlers: {
       ...inv,
       ...documentLineHandlers(orderCfg),
       ...orderHandlers(docs),
       // faktura z objednávky: smazáním konceptu se objednávka vrátí k fakturaci
       [invoice.id]: { ...inv[invoice.id], beforeDelete: (ctx: EventContext, d: RecordData) => releaseOrder(ctx.data, docs, d) },
+      [params.id]: {
+        async beforeSave(ctx: EventContext, _d: RecordData, isNew: boolean) {
+          if (isNew && (await ctx.data.find(params.id, {}, { take: 1 })).length) throw new UserError("@GL:OneParameters");
+        },
+      } as ObjectHandlers,
       // údaje partnera = údaje jeho subjektu v adresáři
       [partner.id]: {
         // výchozí účet musí patřit subjektu partnera; bez zadání první zveřejněný / výchozí
@@ -480,7 +502,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }, { object: "gl.journal", href: `/gl/journal?filter.journalType=${sp.side === 1 ? "customerPayment" : "vendorPayment"}`, label: "@GL:JournalsPayment", module: "gl" }, ...(sp.side === -1 ? [{ object: "bank.paymentOrder", module: "bank" }] : [])] },
       // nahrání dokladů k vytěžení (Integrace), cíl předvolený podle agendy
       { label: L("Module"), kind: "functions" as const, items: [{ href: `/int/doc-import?target=${m}Invoice`, label: "@INT:DocImport", module: "int" }] },
-      { label: "@SYS:Setup", items: [{ object: group.id }] },
+      { label: "@SYS:Setup", items: [{ object: params.id }, { object: group.id }] },
     ],
     /** výchozí skupina partnerů (účtovací profil) podle čísel účtů */
     setup: (groupDefaults: { code: string; name: string; summary: string; line: string; taxCode: string }) =>

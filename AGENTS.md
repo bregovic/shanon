@@ -231,6 +231,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   období a pohyb skladu. Hlavička faktury: DUZP a splatnost následují datum vystavení, změna skupiny DPH / měny přepočte
   řádky (afterSave, mapy `groupChanged` / `currencyChanged`). Import vydaných faktur z ISDOC: `src/server/isdoc-import.ts`
   (větev v `importAction` pro `ar.invoice`), číslo faktury z ISDOC.
+- Varování (nezávazné): `data.warn(label, params)` → `Ctx.warnings` → akce `saveRecordAction` / `runRecordAction` je vrátí
+  (`_warnings` / `warnings`) a UI je ukáže jako `toast(…, "warning")`. Kontrola duplicit `checkDuplicate` (gl/posting.ts) podle
+  výčtu `DupCheck` (přijmout / varovat / odmítnout / odmítnout ve stejném roce): číslo faktury (`ar.parameters` / `ap.parameters`,
+  přijatá u téhož dodavatele), ručně zadané číslo dokladu v HK (`gl.parameters.voucherDupCheck`; `gl.voucher.voucherNum`
+  není jedinečné kvůli opravným deníkům). Účtenka na přijaté faktuře (`receipt`) = zjednodušený doklad, `tax.trans.simplified`.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

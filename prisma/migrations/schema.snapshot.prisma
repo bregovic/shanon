@@ -269,6 +269,7 @@ model SysCompany {
   invCategory_company              InvCategory[]              @relation("InvCategory_company")
   invItem_company                  InvItem[]                  @relation("InvItem_company")
   invDiscount_company              InvDiscount[]              @relation("InvDiscount_company")
+  arParameters_company             ArParameters[]             @relation("ArParameters_company")
   arGroup_company                  ArGroup[]                  @relation("ArGroup_company")
   arCustomer_company               ArCustomer[]               @relation("ArCustomer_company")
   arOrder_company                  ArOrder[]                  @relation("ArOrder_company")
@@ -277,6 +278,7 @@ model SysCompany {
   arInvoiceLine_company            ArInvoiceLine[]            @relation("ArInvoiceLine_company")
   arAdvance_company                ArAdvance[]                @relation("ArAdvance_company")
   arTrans_company                  ArTrans[]                  @relation("ArTrans_company")
+  apParameters_company             ApParameters[]             @relation("ApParameters_company")
   apGroup_company                  ApGroup[]                  @relation("ApGroup_company")
   apVendor_company                 ApVendor[]                 @relation("ApVendor_company")
   apOrder_company                  ApOrder[]                  @relation("ApOrder_company")
@@ -937,6 +939,7 @@ model GlParameters {
   reportingCurrencyId  String?  @map("reporting_currency_id") @db.Uuid
   rateSource           String   @default("cnb") @map("rate_source") @db.VarChar(40)
   rateMaxAgeDays       Int      @default(7) @map("rate_max_age_days")
+  voucherDupCheck      String   @default("reject") @map("voucher_dup_check") @db.VarChar(40)
   ext                  Json     @default("{}")
   version              Int      @default(1)
   createdAt            DateTime @default(now()) @map("created_at")
@@ -1214,7 +1217,6 @@ model GlVoucher {
   posShift_voucher      PosShift[]      @relation("PosShift_voucher")
   whsTrans_voucher      WhsTrans[]      @relation("WhsTrans_voucher")
 
-  @@unique([tenantId, companyId, voucherNum])
   @@index([tenantId, companyId])
   @@map("gl_voucher")
 }
@@ -1906,6 +1908,25 @@ model InvDiscount {
   @@map("inv_discount")
 }
 
+/// ar.parameters — generováno z definice objektu
+model ArParameters {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  invoiceNumCheck String   @default("reject") @map("invoice_num_check") @db.VarChar(40)
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("ArParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@map("ar_parameters")
+}
+
 /// ar.group — generováno z definice objektu
 model ArGroup {
   id                  String   @id @default(uuid(7)) @db.Uuid
@@ -2288,6 +2309,25 @@ model ArTrans {
   @@index([voucherId])
   @@index([currencyId])
   @@map("ar_trans")
+}
+
+/// ap.parameters — generováno z definice objektu
+model ApParameters {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  invoiceNumCheck String   @default("reject") @map("invoice_num_check") @db.VarChar(40)
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("ApParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@map("ap_parameters")
 }
 
 /// ap.group — generováno z definice objektu

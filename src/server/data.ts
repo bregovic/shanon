@@ -55,6 +55,8 @@ export interface Ctx {
    * společnost). Doplní inTenant; prázdné = vše vlastní.
    */
   shared?: Record<string, string>;
+  /** varování z obsluh během požadavku (DataApi.warn) — přeložené texty pro UI */
+  warnings?: string[];
   /** aktivní finanční dimenze (pořadí → název) — popisky a viditelnost polí dim1…dim6 */
   dims?: { slot: number; name: string }[];
 }
@@ -264,6 +266,10 @@ export class Session {
       remove: (o, id) => s.remove(o, id),
       nextNumber: (seq, date) => s.nextNumber(seq, date),
       claimGlobalKey: (ns, key, ownerId) => s.claimGlobalKey(ns, key, ownerId),
+      warn: (ref, params) => {
+        const text = fillLabel(resolveLabel(labelTable, ref, this.ctx.lang ?? "cs"), params);
+        if (this.ctx.warnings && !this.ctx.warnings.includes(text)) this.ctx.warnings.push(text);
+      },
     };
   }
 

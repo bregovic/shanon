@@ -262,9 +262,10 @@ export async function saveRecordAction(
 ): Promise<ActionResult<RecordData>> {
   const s = await requireSession();
   try {
-    const saved = await saveRecord(s.ctx, objectId, id, values, version);
+    const ctx = { ...s.ctx, warnings: [] as string[] };
+    const saved = await saveRecord(ctx, objectId, id, values, version);
     revalidatePath(objectHref(objectId));
-    return { ok: true, data: saved };
+    return { ok: true, data: ctx.warnings.length ? { ...saved, _warnings: ctx.warnings } : saved };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
@@ -284,10 +285,12 @@ export async function deleteRecordsAction(objectId: string, ids: string[]): Prom
   }
 }
 
-export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult<{ open?: string } | undefined>> {
+export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult<{ open?: string; warnings?: string[] } | undefined>> {
   const s = await requireSession();
   try {
-    const out = await runAction(s.ctx, objectId, id, actionId);
+    const wctx = { ...s.ctx, warnings: [] as string[] };
+    const out = await runAction(wctx, objectId, id, actionId);
+    const warnings = wctx.warnings.length ? wctx.warnings : undefined;
     revalidatePath(objectHref(objectId, id));
     // fronta (doklady ke zpracování): další záznam, který čeká; žádný = seznam
     const def = registry.objects.get(objectId);
@@ -295,10 +298,10 @@ export async function runRecordAction(objectId: string, id: string, actionId: st
     if (next) {
       const sortField = def!.numberSeq?.field ?? def!.defaultSort?.field ?? "createdAt";
       const n = (await inTenant(s.ctx, (x) => x.api().find(objectId, { [next.field]: { in: next.in } }, { take: 2, orderBy: { [sortField]: "asc" } }))).find((r) => r.id !== id);
-      return { ok: true, data: { open: n ? objectHref(objectId, String(n.id)) : objectHref(objectId) } };
+      return { ok: true, data: { open: n ? objectHref(objectId, String(n.id)) : objectHref(objectId), warnings } };
     }
     // akce může otevřít vzniklý záznam (koncept e-mailu…)
-    return { ok: true, data: out?.open ? { open: objectHref(out.open.object, out.open.id) } : undefined };
+    return { ok: true, data: out?.open ? { open: objectHref(out.open.object, out.open.id), warnings } : warnings ? { warnings } : undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
@@ -954,7 +957,9 @@ export async function bulkRecordAction(objectId: string, ids: string[], actionId
   const errors: string[] = [];
   for (const id of ids.slice(0, 500)) {
     try {
-      await runAction(s.ctx, objectId, id, actionId);
+      const wctx = { ...s.ctx, warnings: [] as string[] };
+      await runAction(wctx, objectId, id, actionId);
+      errors.push(...wctx.warnings);
       ok++;
     } catch (e) {
       errors.push(e instanceof UserError ? t(e.label, e.params) : e instanceof Error ? e.message : String(e));

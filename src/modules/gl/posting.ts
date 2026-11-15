@@ -133,6 +133,23 @@ export async function convertLines(data: DataApi, companyId: string | null, date
   return out;
 }
 
+/** Kontrola duplicitního čísla podle nastavení (přijmout / varovat / odmítnout / odmítnout ve stejném roce). */
+export async function checkDuplicate(data: DataApi, mode: unknown, found: RecordData[], date: string | null, dateField: string, label: string, params: Record<string, string>): Promise<void> {
+  const m = String(mode ?? "reject");
+  if (m === "accept" || !found.length) return;
+  const year = (v: unknown) => (v instanceof Date ? v.toISOString() : String(v ?? "")).slice(0, 4);
+  const hits = m === "rejectYear" && date ? found.filter((r) => year(r[dateField]) === date.slice(0, 4)) : found;
+  if (!hits.length) return;
+  if (m === "warn") data.warn?.(`${label}Warn`, params);
+  else throw new UserError(label, params);
+}
+
+async function checkVoucherDuplicate(data: DataApi, voucherNum: string, date: string) {
+  const p = await ledgerParameters(data);
+  const found = await data.find("gl.voucher", { voucherNum }, { take: 20 });
+  await checkDuplicate(data, p?.voucherDupCheck, found, date, "date", "@GL:VoucherDuplicate", { num: voucherNum });
+}
+
 /** Datum musí patřit do otevřeného účetního období. */
 export async function assertOpenPeriod(data: DataApi, date: string): Promise<void> {
   const [p] = await data.find("gl.period", { startDate: { lte: date }, endDate: { gte: date } }, { take: 1 });
@@ -203,6 +220,8 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
     return out;
   };
   const dims = await Promise.all(req.lines.map((l) => resolveDims(data, accounts.get(l.accountId)!, withDefaults(l), { manual, partner: req.partner, defs })));
+  // ručně zadané číslo dokladu, které už v účetnictví je (Parametry HK → Kontroly; opravné deníky)
+  if (req.voucherNum) await checkVoucherDuplicate(data, String(req.voucherNum), req.date);
   if (req.dryRun) return {} as RecordData;
   const voucher = await data.create("gl.voucher", {
     // ruční číslo, jinak řada deníku, jinak datová služba podle Použití (gl.voucher)

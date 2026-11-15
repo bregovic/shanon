@@ -4,6 +4,7 @@
  * Šuplík zprava pro založení / úpravu záznamu (standard formulářů staré verze:
  * Drawer position="end", nahoře název a zavření, dole [Zpět] … [Uložit]).
  */
+import { toast } from "./toast";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -123,6 +124,8 @@ function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles
       setState((s) => ({ ...s, errors: res.errors ?? {}, message: [res.message, ...hidden].join(" ") }));
       return;
     }
+    const warns = (res.data as { _warnings?: string[] })._warnings;
+    if (warns?.length) toast(warns.join(" · "), "warning");
     onSaved(res.data);
   };
 

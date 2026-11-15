@@ -343,7 +343,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       }
       setErrors({});
       setMessage(undefined);
-      toast(p.labels.actions.saved);
+      const warns = (res.data as { _warnings?: string[] })._warnings;
+      toast(warns?.length ? warns.join(" · ") : p.labels.actions.saved, warns?.length ? "warning" : "success");
       if (!p.id) router.replace(objectHref(p.objectId, String(res.data.id)));
       else router.refresh();
     });
@@ -364,6 +365,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
     setTyped(null);
     return start(async () => {
       const res = await runRecordAction(p.objectId, p.id!, actionId);
+      if (res.ok && res.data?.warnings?.length) toast(res.data.warnings.join(" · "), "warning");
       if (!res.ok) setMessage({ intent: "error", text: res.message });
       else if (res.data?.open) router.push(res.data.open);
       else if (a?.confirm) router.push(objectHref(p.objectId));

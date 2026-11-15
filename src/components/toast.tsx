@@ -6,14 +6,14 @@
  * přechod na jinou stránku (nový záznam → jeho stránka po uložení).
  */
 import { makeStyles, tokens } from "@fluentui/react-components";
-import { Checkmark16Filled } from "@fluentui/react-icons";
+import { Checkmark16Filled, Warning16Filled } from "@fluentui/react-icons";
 import { useEffect, useState } from "react";
 
 const EVENT = "shanon:toast";
 
-/** Ukázat potvrzení (jen úspěch — chyby zůstávají u formuláře). */
-export function toast(text: string) {
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENT, { detail: text }));
+/** Ukázat potvrzení (úspěch) nebo nezávazné varování (`warning`) — chyby zůstávají u formuláře. */
+export function toast(text: string, kind: "success" | "warning" = "success") {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENT, { detail: { text, kind } }));
 }
 
 const useStyles = makeStyles({
@@ -32,19 +32,24 @@ const useStyles = makeStyles({
     boxShadow: tokens.shadow8,
     fontSize: tokens.fontSizeBase200,
     pointerEvents: "none",
+    maxWidth: "460px",
     transitionProperty: "opacity, transform",
     transitionTimingFunction: "ease",
   },
   icon: { color: tokens.colorPaletteGreenForeground1 },
+  warn: { color: tokens.colorPaletteDarkOrangeForeground1, flexShrink: 0 },
 });
 
 export function ToastHost() {
   const s = useStyles();
-  const [msg, setMsg] = useState<{ text: string; n: number } | null>(null);
+  const [msg, setMsg] = useState<{ text: string; kind: string; n: number } | null>(null);
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
-    const on = (e: Event) => setMsg((m) => ({ text: String((e as CustomEvent).detail), n: (m?.n ?? 0) + 1 }));
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail as { text: string; kind: string };
+      setMsg((m) => ({ text: d.text, kind: d.kind, n: (m?.n ?? 0) + 1 }));
+    };
     window.addEventListener(EVENT, on);
     return () => window.removeEventListener(EVENT, on);
   }, []);
@@ -53,15 +58,17 @@ export function ToastHost() {
   useEffect(() => {
     if (!msg) return;
     const a = setTimeout(() => setShown(true), 20);
-    const b = setTimeout(() => setShown(false), 2500);
-    const c = setTimeout(() => setMsg(null), 3200);
+    // varování déle (je potřeba ho přečíst)
+    const hold = msg.kind === "warning" ? 7000 : 2500;
+    const b = setTimeout(() => setShown(false), hold);
+    const c = setTimeout(() => setMsg(null), hold + 700);
     return () => [a, b, c].forEach(clearTimeout);
   }, [msg]);
 
   if (!msg) return null;
   return (
     <div className={s.box} role="status" aria-live="polite" style={{ opacity: shown ? 1 : 0, transform: shown ? "none" : "translateY(-4px)", transitionDuration: shown ? "200ms" : "600ms" }}>
-      <Checkmark16Filled className={s.icon} />
+      {msg.kind === "warning" ? <Warning16Filled className={s.warn} /> : <Checkmark16Filled className={s.icon} />}
       {msg.text}
     </div>
   );

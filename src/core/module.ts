@@ -122,6 +122,8 @@ export interface DataApi {
    * `key` null = jen uvolnit klíč záznamu.
    */
   claimGlobalKey?(namespace: string, key: string | null, ownerId: string): Promise<boolean>;
+  /** nezávazné varování uživateli (uložení / akce proběhne, hláška se ukáže po ní) */
+  warn?(ref: string, params?: Record<string, string>): void;
 }
 
 export interface EventContext {
