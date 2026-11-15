@@ -2807,6 +2807,7 @@ model BankAccount {
   currencyId        String?  @map("currency_id") @db.Uuid
   glAccountId       String   @map("gl_account_id") @db.Uuid
   statementFormatId String?  @map("statement_format_id") @db.Uuid
+  isDefault         Boolean  @default(false) @map("is_default")
   blocked           Boolean  @default(false)
   ext               Json     @default("{}")
   version           Int      @default(1)

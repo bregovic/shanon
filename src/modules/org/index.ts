@@ -4,7 +4,7 @@
  * v rejstříku — a její provozovny. Jeden zdroj pravdy pro doklady, účtenky,
  * přiznání a e-shop. Název, IČO a DIČ se propisují do firmy (sys.company).
  */
-import { aresByIco } from "@/modules/gab/ares";
+import { aresByIco, splitPersonName } from "@/modules/gab/ares";
 import { Edts, defineEdt, defineEnum, enumEdt } from "@/core/edt";
 import { UserError, defineModule, type DataApi, type ObjectHandlers } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -158,12 +158,12 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
         if (!rec.regNo) throw new UserError("@ORG:RegNoFirst");
         const a = await aresByIco(String(rec.regNo), ctx.data);
         if (!a) throw new UserError("@ORG:AresNotFound");
-        const [first, ...rest] = a.name.split(/\s+/);
+        const { firstName: first, lastName: last } = splitPersonName(a.name);
         await ctx.data.update("org.entity", String(rec.id), {
           legalName: a.name,
           legalForm: a.person ? "natural" : "legal",
           firstName: a.person ? (rec.firstName ?? first) : rec.firstName,
-          lastName: a.person ? (rec.lastName ?? (rest.join(" ") || null)) : rec.lastName,
+          lastName: a.person ? (rec.lastName ?? last) : rec.lastName,
           regNo: a.ico,
           vatId: a.vatId ?? rec.vatId ?? null,
           vatPayer: a.vatId ? true : rec.vatPayer,

@@ -13,7 +13,7 @@ import { csvMatchesAccount, decodeText, parseCsvStatement, toCsvFormat } from ".
 import { czIban } from "@/core/print";
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
-import { convertLines, postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { accountingCurrencyId, convertLines, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { checkStatement, decodeGpc, parseGpc } from "./gpc";
 import type { GpcStatement } from "./gpc";
 import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
@@ -337,9 +337,16 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
     },
   },
   "bank.account": {
-    beforeSave(_ctx, d) {
+    async beforeSave(ctx, d) {
       // české číslo účtu → IBAN (dopočítá se sám)
       if (!d.iban && d.accountNum) d.iban = czIban(String(d.accountNum));
+      // výchozí jen jeden na měnu (prázdná měna = účetní měna)
+      if (d.isDefault) {
+        const base = await accountingCurrencyId(ctx.data, ctx.companyId);
+        const cur = (d.currencyId as string) || base;
+        for (const o of await ctx.data.find("bank.account", { isDefault: true }, { take: 50 }))
+          if (o.id !== d.id && ((o.currencyId as string) || base) === cur) await ctx.data.update("bank.account", String(o.id), { isDefault: false });
+      }
     },
     actions: {
       async import(ctx, account, file) {

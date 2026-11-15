@@ -62,7 +62,12 @@ async function paymentAccount(data: DataApi, org: RecordData | null, currencyId?
   }
   const base = await accountingCurrencyId(data, data.companyId ?? null);
   const foreign = !!currencyId && currencyId !== base;
-  const same = accs.find((x) => (x.accountNum || x.iban) && currencyId && x.currencyId === currencyId);
+  const cur = currencyId || base;
+  const inCur = accs.filter((x) => (x.accountNum || x.iban) && ((x.currencyId as string) || base) === cur);
+  // výchozí účet měny dokladu (Banka → Bankovní účty → Výchozí) má přednost
+  const def = inCur.find((x) => x.isDefault);
+  if (def) return out((def.accountNum as string) ?? "", (def.iban as string) || czIban(def.accountNum as string) || "");
+  const same = inCur.find((x) => x.currencyId === currencyId);
   if (same && foreign) return out((same.accountNum as string) ?? "", (same.iban as string) || czIban(same.accountNum as string) || "");
   if (org?.bankAccount || org?.iban) return out((org.bankAccount as string) ?? "", (org.iban as string) || czIban(org.bankAccount as string) || "");
   const a = same ?? accs.find((x) => (x.accountNum || x.iban) && (!x.currencyId || x.currencyId === base)) ?? null;

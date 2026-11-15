@@ -200,12 +200,14 @@ export const account = defineObject({
     glAccountId: { edt: refEdt("gl.account", "@BANK:GlAccount"), mandatory: true },
     /** specifikace výpisu (CSV): podle ní se načítají výpisy účtu */
     statementFormatId: { edt: refEdt("bank.statementFormat", "@BANK:StatementFormat") },
+    /** výchozí účet pro svou měnu (faktura v EUR → výchozí eurový účet); jeden výchozí na měnu */
+    isDefault: { edt: Edts.NoYes, label: "@BANK:IsDefault" },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "code",
-  list: ["code", "name", "accountNum", "iban", "currencyId", "glAccountId", "statementFormatId", "blocked"],
+  list: ["code", "name", "accountNum", "iban", "currencyId", "isDefault", "glAccountId", "statementFormatId", "blocked"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "accountNum", "iban", "currencyId", "statementFormatId"] },
+    { label: "@SYS:General", fields: ["code", "name", "accountNum", "iban", "currencyId", "isDefault", "statementFormatId"] },
     { label: "@GL:Posting", fields: ["glAccountId", "blocked"] },
   ],
   unique: [["code"]],
@@ -613,6 +615,7 @@ export default defineModule({
       TgNote: "Poznámka",
       TgType: "Typ transakce",
       StatementFormat: "Specifikace výpisu",
+      IsDefault: "Výchozí pro měnu",
       StatementFormats: "Specifikace výpisů",
       FormatField: "Údaj výpisu",
       FormatFields: "Údaje výpisu",
@@ -794,6 +797,7 @@ export default defineModule({
       TgNote: "Note",
       TgType: "Transaction type",
       StatementFormat: "Statement specification",
+      IsDefault: "Default for currency",
       StatementFormats: "Statement specifications",
       FormatField: "Statement value",
       FormatFields: "Statement values",

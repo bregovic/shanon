@@ -110,3 +110,12 @@ export async function fillFromAres(data: DataApi, subjectId: string) {
   if (czDic(a.vatId)) await checkSubjectVat(data, subjectId).catch(() => null);
   return a;
 }
+
+/** Tituly před a za jménem (Bc., Ing., Ph.D., MBA…) — nepatří do jména ani příjmení. */
+const TITLE = /^(bc|bca|ing|ing\. arch|mgr|mga|judr|mudr|mvdr|mddr|phdr|rndr|paeddr|thdr|thlic|doc|prof|dr|ph\.?d|csc|drsc|dis|mba|msc|bsc|ma|ba|llm|dba)\.?,?$/i;
+
+/** Jméno fyzické osoby z rejstříku („Bc. Václav Král, MBA“) → jméno a příjmení bez titulů. */
+export function splitPersonName(full: string): { firstName: string | null; lastName: string | null } {
+  const words = full.split(/\s+/).map((w) => w.replace(/,$/, "")).filter((w) => w && !TITLE.test(w));
+  return { firstName: words[0] ?? null, lastName: words.slice(1).join(" ") || null };
+}

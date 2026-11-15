@@ -1,6 +1,7 @@
 /** Nová účtovaná firma z ARES / VIES: firma (výchozí nastavení se spustí samo) a údaje organizace se sídlem. */
 import { UserError } from "@/core/module";
 import { lookupRegistry } from "@/modules/gab/registry-lookup";
+import { splitPersonName } from "@/modules/gab/ares";
 import { inTenant, Session, type Ctx } from "./data";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
@@ -39,12 +40,12 @@ export function createCompanyFromRegistry(
       const companyApi = new Session(sess.tx, { ...ctx, companyId: String(company.id) }, true).api();
       // daňové parametry pro přiznání: finanční úřad z registru, typ subjektu, jméno a sídlo (perioda a územní pracoviště ručně)
       if (ctx.modules.has("tax") && vatStatus?.taxOffice) {
-        const [first, ...rest] = hit.name.split(/\s+/);
+        const nm = splitPersonName(hit.name);
         const tp = {
           taxOfficeCode: vatStatus.taxOffice,
           subjectType: hit.person ? "F" : "P",
-          firstName: hit.person ? first : null,
-          lastName: hit.person ? rest.join(" ") || null : null,
+          firstName: hit.person ? nm.firstName : null,
+          lastName: hit.person ? nm.lastName : null,
           street: hit.streetName ?? hit.street ?? null,
           houseNo: hit.houseNo ?? null,
           orientNo: hit.orientNo ?? null,
@@ -62,10 +63,8 @@ export function createCompanyFromRegistry(
         const values = {
           legalName: hit.name.slice(0, 120),
           legalForm: hit.person ? "natural" : "legal",
-          firstName: hit.person ? hit.name.split(/\s+/)[0] : null,
-          lastName: hit.person
-            ? hit.name.split(/\s+/).slice(1).join(" ") || null
-            : null,
+          firstName: hit.person ? splitPersonName(hit.name).firstName : null,
+          lastName: hit.person ? splitPersonName(hit.name).lastName : null,
           regNo: hit.regNo,
           vatId: hit.vatId,
           vatPayer,
