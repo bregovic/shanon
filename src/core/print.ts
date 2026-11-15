@@ -45,7 +45,7 @@ export interface PrintElement {
   /** prvek se vytiskne jen, když pole (cesta) má hodnotu — např. kód EET */
   showIf?: string;
   columns?: PrintColumn[];
-  style?: { size?: number; bold?: boolean; italic?: boolean; align?: "left" | "center" | "right"; color?: string; border?: boolean; fill?: string };
+  style?: { size?: number; bold?: boolean; italic?: boolean; align?: "left" | "center" | "right"; color?: string; border?: boolean; fill?: string; /** tabulka: svislý okraj buňky v mm (výchozí 0,6) */ rowPad?: number };
 }
 
 export interface PrintLayout {

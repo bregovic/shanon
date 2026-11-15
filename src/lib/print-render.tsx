@@ -63,7 +63,7 @@ function Table({ el, rows, locale, fontSize }: { el: PrintElement; rows: Record<
       <thead style={{ display: "table-header-group" }}>
         <tr>
           {cols.map((c, i) => (
-            <th key={i} style={{ textAlign: c.align ?? "left", borderBottom: "0.3mm solid #000", padding: "0.8mm 1mm", fontWeight: 700, background: el.style?.fill, color: el.style?.color }}>
+            <th key={i} style={{ textAlign: c.align ?? "left", borderBottom: "0.3mm solid #000", padding: `${(el.style?.rowPad ?? 0.6) + 0.2}mm 1mm`, fontWeight: 700, background: el.style?.fill, color: el.style?.color }}>
               {c.label}
             </th>
           ))}
@@ -73,7 +73,7 @@ function Table({ el, rows, locale, fontSize }: { el: PrintElement; rows: Record<
         {rows.map((r, ri) => (
           <tr key={ri} style={{ breakInside: "avoid" }}>
             {cols.map((c, i) => (
-              <td key={i} style={{ textAlign: c.align ?? "left", padding: "0.6mm 1mm", borderBottom: "0.1mm solid #ccc", verticalAlign: "top", overflowWrap: "anywhere" }}>
+              <td key={i} style={{ textAlign: c.align ?? "left", padding: `${el.style?.rowPad ?? 0.6}mm 1mm`, borderBottom: "0.1mm solid #ccc", verticalAlign: "top", overflowWrap: "anywhere" }}>
                 {formatValue(r[c.field], c.format, locale)}
               </td>
             ))}

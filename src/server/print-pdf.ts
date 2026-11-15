@@ -94,12 +94,13 @@ function drawTable(doc: Doc, el: PrintElement, rows: Record<string, unknown>[], 
   const size = el.style?.size ?? fontSize - 1;
   const x0 = el.x * MM;
   const pad = 1 * MM;
+  const vpad = (el.style?.rowPad ?? 0.6) * MM;
   const headFill = el.style?.fill;
   let y = y0;
   const cellText = (c: (typeof cols)[number], r: Record<string, unknown>) => formatValue(r[c.field], c.format, locale);
   const rowHeight = (texts: string[], bold: boolean) => {
     doc.font(bold ? "B" : "R").fontSize(size);
-    return Math.max(...cols.map((c, i) => doc.heightOfString(texts[i] || " ", { width: c.width * MM - 2 * pad }))) + 1.4 * MM;
+    return Math.max(...cols.map((c, i) => doc.heightOfString(texts[i] || " ", { width: c.width * MM - 2 * pad }))) + 2 * vpad + 0.2 * MM;
   };
   const header = () => {
     const texts = cols.map((c) => c.label);
@@ -108,7 +109,7 @@ function drawTable(doc: Doc, el: PrintElement, rows: Record<string, unknown>[], 
     let x = x0;
     doc.font("B").fontSize(size).fillColor(color(el.style?.color));
     cols.forEach((c, i) => {
-      doc.text(texts[i], x + pad, y + 0.7 * MM, { width: c.width * MM - 2 * pad, align: c.align ?? "left" });
+      doc.text(texts[i], x + pad, y + vpad + 0.1 * MM, { width: c.width * MM - 2 * pad, align: c.align ?? "left" });
       x += c.width * MM;
     });
     y += hh;
@@ -125,7 +126,7 @@ function drawTable(doc: Doc, el: PrintElement, rows: Record<string, unknown>[], 
     let x = x0;
     doc.font("R").fontSize(size).fillColor("#000");
     cols.forEach((c, i) => {
-      doc.text(texts[i], x + pad, y + 0.6 * MM, { width: c.width * MM - 2 * pad, align: c.align ?? "left" });
+      doc.text(texts[i], x + pad, y + vpad, { width: c.width * MM - 2 * pad, align: c.align ?? "left" });
       x += c.width * MM;
     });
     y += rh;
