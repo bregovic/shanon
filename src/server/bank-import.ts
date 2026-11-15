@@ -10,6 +10,7 @@ import { UserError, type RecordData } from "@/core/module";
 import { can } from "@/core/security";
 import { autoMatch, gpcAccountKey, recalcStatement } from "@/modules/bank/handlers";
 import { checkStatement, decodeGpc, parseGpc, type GpcStatement } from "@/modules/bank/gpc";
+import { accountFromFileName, csvMatchesAccount, decodeText, matchesFormat, parseCsvStatement, toCsvFormat, type CsvStatement } from "@/modules/bank/csv-statement";
 import { checkStatementChain } from "@/modules/bank/payments";
 import type { AppSession } from "./auth";
 import { inTenant } from "./data";
@@ -39,8 +40,41 @@ export async function importStatementsBulk(s: AppSession, file: { name: string; 
   } catch {
     statements = [];
   }
+  // CSV: specifikace výpisu (začátek souboru / maska názvu) a účet podle IBAN, čísla nebo názvu souboru
+  const csvHits = new Map<GpcStatement, { companyId: string; companyCode: string; acc: RecordData }>();
+  let csvError: string | null = null;
   if (!statements.length) {
-    const msg = await inTenant(s.ctx, async (sess) => t(sess)("@BANK:ImportNoStatement"));
+    for (const c of companies) {
+      const found = await inTenant(ctxOf(c.id), async (sess) => {
+        const api = sess.sys().api();
+        const formats = (await api.find("bank.statementFormat", { blocked: false }, { take: 100 })).filter(Boolean);
+        const accs = await api.find("bank.account", {}, { take: 500 });
+        for (const fmt of formats) {
+          const def = toCsvFormat(fmt, await api.find("bank.statementFormatField", { formatId: fmt.id }, { take: 200 }));
+          const text = decodeText(file.data, def.encoding);
+          const byName = accountFromFileName(file.name, def.fileNamePattern);
+          if (!matchesFormat(text, def) && !(byName && accs.some((a) => a.statementFormatId === fmt.id))) continue;
+          try {
+            const st = parseCsvStatement(text, def, file.name, sess.sys().eventCtx("bank.statement").t);
+            const acc = accs.find((a) => a.statementFormatId === fmt.id && csvMatchesAccount(st, a)) ?? accs.find((a) => csvMatchesAccount(st, a));
+            return { st, acc: acc ?? null };
+          } catch (e) {
+            csvError = e instanceof UserError ? sess.sys().eventCtx("bank.statement").t(e.label, e.params) : String(e);
+            return null;
+          }
+        }
+        return null;
+      });
+      if (found?.acc) {
+        statements = [found.st];
+        csvHits.set(found.st, { companyId: c.id, companyCode: c.code, acc: found.acc });
+        break;
+      }
+      if (found && !statements.length) statements = [found.st];
+    }
+  }
+  if (!statements.length) {
+    const msg = csvError ?? (await inTenant(s.ctx, async (sess) => t(sess)("@BANK:ImportNoStatement")));
     const r: BulkRow = { company: "", account: "", statementNum: "", status: "error", message: msg, statementId: null };
     if (s.ctx.companyId) await log(s.ctx.companyId, r, null);
     return [r];
@@ -55,7 +89,7 @@ export async function importStatementsBulk(s: AppSession, file: { name: string; 
 
   const out: BulkRow[] = [];
   for (const st of statements) {
-    const hit = accounts.find((x) => gpcAccountKey(String(x.acc.accountNum)) === st.account);
+    const hit = csvHits.get(st) ?? accounts.find((x) => gpcAccountKey(String(x.acc.accountNum)) === st.account);
     if (!hit) {
       const msg = await inTenant(s.ctx, async (sess) => t(sess)("@BANK:NoAccountForStatement", { account: st.account }));
       const r: BulkRow = { company: "", account: st.account, statementNum: st.statementNum, status: "error", message: msg, statementId: null };
@@ -67,7 +101,7 @@ export async function importStatementsBulk(s: AppSession, file: { name: string; 
       const api = sess.sys().api();
       const tr = t(sess);
       const base = { company: hit.companyCode, account: String(hit.acc.accountNum), statementNum: st.statementNum };
-      const problem = checkStatement(st);
+      const problem = (st as CsvStatement).fileAccount !== undefined ? csvCheck(st) : checkStatement(st);
       if (problem) return { ...base, status: "error" as const, message: tr("@BANK:ImportCheck", { num: st.statementNum, detail: problem }), statementId: null };
       const [dup] = await api.find("bank.statement", { bankAccountId: hit.acc.id, statementNum: st.statementNum }, { take: 1 });
       if (dup) return { ...base, status: "duplicate" as const, message: tr("@BANK:ImportDuplicate", { num: st.statementNum }), statementId: String(dup.id) };
@@ -79,7 +113,7 @@ export async function importStatementsBulk(s: AppSession, file: { name: string; 
           date: l.date,
           amount: fromCents(l.cents),
           vs: l.vs && /^\d{1,10}$/.test(l.vs) ? l.vs : null,
-          counterAccount: l.counterAccount,
+          counterAccount: l.counterAccount?.slice(0, 60) ?? null,
           message: l.message,
         });
       }
@@ -94,4 +128,10 @@ export async function importStatementsBulk(s: AppSession, file: { name: string; 
     out.push(row);
   }
   return out;
+}
+
+/** Kontrola CSV výpisu: počáteční zůstatek + obraty = konečný zůstatek. */
+function csvCheck(st: GpcStatement): string | null {
+  const sum = st.opening + st.credit - st.debit;
+  return sum === st.closing ? null : `${fromCents(st.opening)} + ${fromCents(st.credit)} − ${fromCents(st.debit)} ≠ ${fromCents(st.closing)}`;
 }

@@ -76,6 +76,111 @@ const BankAccountNum = defineEdt({
 const Iban = defineEdt({ id: "Iban", kind: "string", label: "@BANK:Iban", maxLength: 34, pattern: /^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/, transform: "upper" });
 const Text100 = defineEdt({ id: "BankText", kind: "string", label: "@BANK:Message", maxLength: 140 });
 
+/** Kódování textového výpisu. */
+export const TextEncoding = defineEnum({
+  id: "BankTextEncoding",
+  label: "@BANK:Encoding",
+  values: [
+    { value: "cp1250", label: "@BANK:EncCp1250" },
+    { value: "utf-8", label: "@BANK:EncUtf8" },
+  ],
+});
+
+/** Část výpisu: hlavička (řádky „popisek;hodnota“) nebo transakce (sloupce). */
+export const FormatSection = defineEnum({
+  id: "BankFormatSection",
+  label: "@BANK:FormatSection",
+  values: [
+    { value: "header", label: "@BANK:SecHeader" },
+    { value: "line", label: "@BANK:SecLine" },
+  ],
+});
+
+/** Údaje výpisu, které specifikace umí načíst. */
+export const FormatTarget = defineEnum({
+  id: "BankFormatTarget",
+  label: "@BANK:FormatTarget",
+  values: [
+    { value: "accountNum", label: "@BANK:TgAccountNum" },
+    { value: "iban", label: "@BANK:TgIban" },
+    { value: "statementNum", label: "@BANK:TgStatementNum" },
+    { value: "dateFrom", label: "@BANK:TgDateFrom" },
+    { value: "dateTo", label: "@BANK:TgDateTo" },
+    { value: "opening", label: "@BANK:TgOpening" },
+    { value: "closing", label: "@BANK:TgClosing" },
+    { value: "date", label: "@BANK:TgDate" },
+    { value: "amount", label: "@BANK:TgAmount" },
+    { value: "counterAccount", label: "@BANK:TgCounterAccount" },
+    { value: "counterName", label: "@BANK:TgCounterName" },
+    { value: "vs", label: "@BANK:TgVs" },
+    { value: "ks", label: "@BANK:TgKs" },
+    { value: "ss", label: "@BANK:TgSs" },
+    { value: "reference", label: "@BANK:TgReference" },
+    { value: "message", label: "@BANK:TgMessage" },
+    { value: "note", label: "@BANK:TgNote" },
+    { value: "type", label: "@BANK:TgType" },
+  ],
+});
+
+const FmtText = (id: string, label: string, max: number) => defineEdt({ id, kind: "string", label, maxLength: max });
+
+/**
+ * Specifikace bankovního výpisu (CSV): jak soubor poznat (začátek souboru, maska názvu
+ * s číslem účtu), technika (kódování, oddělovač, desetinná čárka, formát data) a kde začínají
+ * transakce. Údaje = řádky specifikace (údaj ← prefix řádku hlavičky / název sloupce).
+ */
+export const statementFormat = defineObject({
+  id: "bank.statementFormat",
+  table: "bank_statement_format",
+  label: "@BANK:StatementFormat",
+  labelPlural: "@BANK:StatementFormats",
+  scope: "company",
+  shareable: true,
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    transformationId: { edt: refEdt("sys.transformation", "@BANK:Format"), mandatory: true },
+    detect: { edt: FmtText("BankFmtDetect", "@BANK:Detect", 120) },
+    fileNamePattern: { edt: FmtText("BankFmtFileName", "@BANK:FileNamePattern", 200) },
+    encoding: { edt: enumEdt(TextEncoding), mandatory: true, default: "cp1250" },
+    delimiter: { edt: FmtText("BankFmtDelimiter", "@BANK:Delimiter", 3), mandatory: true, default: ";" },
+    decimalSeparator: { edt: FmtText("BankFmtDecimal", "@BANK:DecimalSeparator", 1), mandatory: true, default: "," },
+    dateFormat: { edt: FmtText("BankFmtDate", "@BANK:DateFormat", 20), mandatory: true, default: "dd.MM.yyyy" },
+    linesStart: { edt: FmtText("BankFmtLinesStart", "@BANK:LinesStart", 120) },
+    blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+  },
+  titleField: "code",
+  list: ["code", "name", "transformationId", "detect", "fileNamePattern", "encoding", "blocked"],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "transformationId", "blocked"] },
+    { label: "@BANK:Recognition", fields: ["detect", "fileNamePattern", "linesStart"] },
+    { label: "@BANK:Technical", fields: ["encoding", "delimiter", "decimalSeparator", "dateFormat"] },
+  ],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+  lines: [{ object: "bank.statementFormatField", field: "formatId", label: "@BANK:FormatFields" }],
+});
+
+export const statementFormatField = defineObject({
+  id: "bank.statementFormatField",
+  table: "bank_statement_format_field",
+  label: "@BANK:FormatField",
+  labelPlural: "@BANK:FormatFields",
+  scope: "company",
+  shareable: true,
+  fields: {
+    formatId: { edt: refEdt("bank.statementFormat", "@BANK:StatementFormat"), mandatory: true },
+    section: { edt: enumEdt(FormatSection), mandatory: true, default: "line" },
+    target: { edt: enumEdt(FormatTarget), mandatory: true },
+    source: { edt: FmtText("BankFmtSource", "@BANK:Source", 120), mandatory: true },
+  },
+  titleField: "source",
+  list: ["section", "target", "source"],
+  form: [{ label: "@SYS:General", fields: ["formatId", "section", "target", "source"] }],
+  unique: [["formatId", "section", "target"]],
+  defaultSort: { field: "section", dir: "asc" },
+});
+
 export const account = defineObject({
   id: "bank.account",
   table: "bank_account",
@@ -89,12 +194,14 @@ export const account = defineObject({
     iban: { edt: Iban },
     currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
     glAccountId: { edt: refEdt("gl.account", "@BANK:GlAccount"), mandatory: true },
+    /** specifikace výpisu (CSV): podle ní se načítají výpisy účtu */
+    statementFormatId: { edt: refEdt("bank.statementFormat", "@BANK:StatementFormat") },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
   },
   titleField: "code",
-  list: ["code", "name", "accountNum", "iban", "currencyId", "glAccountId", "blocked"],
+  list: ["code", "name", "accountNum", "iban", "currencyId", "glAccountId", "statementFormatId", "blocked"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "accountNum", "iban", "currencyId"] },
+    { label: "@SYS:General", fields: ["code", "name", "accountNum", "iban", "currencyId", "statementFormatId"] },
     { label: "@GL:Posting", fields: ["glAccountId", "blocked"] },
   ],
   unique: [["code"]],
@@ -103,7 +210,7 @@ export const account = defineObject({
     { object: "bank.accountMethod", field: "bankAccountId", label: "@BANK:PaymentMethods" },
     { object: "bank.statement", field: "bankAccountId", label: "@BANK:Statements", owned: false },
   ],
-  actions: [{ id: "import", label: "@BANK:Import", upload: ".gpc,.txt,.abo" }],
+  actions: [{ id: "import", label: "@BANK:Import", upload: ".gpc,.txt,.abo,.csv" }],
 });
 
 export const statement = defineObject({
@@ -309,7 +416,32 @@ export const importLog = defineObject({
 });
 
 /** Výchozí platební metody: převod (ABO), převod SEPA, hotovost. */
+/** Výchozí specifikace výpisů (veřejné popisy formátů bank) — jen chybějící. */
+const FORMATS: { code: string; name: string; detect: string; fileNamePattern: string; linesStart: string; header: [string, string][]; line: [string, string][] }[] = [
+  {
+    code: "KB",
+    name: "Komerční banka – výpis v CSV (KB+)",
+    detect: "KB+, vypis v csv",
+    fileNamePattern: "^Vypis_(\\d+)_",
+    linesStart: "Datum zauctovani",
+    header: [["accountNum", "Cislo uctu"], ["iban", "IBAN"], ["statementNum", "Cislo vypisu"], ["dateFrom", "Vypis od"], ["dateTo", "Vypis do"], ["opening", "Pocatecni zustatek"], ["closing", "Konecny zustatek"]],
+    line: [["date", "Datum zauctovani"], ["counterAccount", "Protistrana"], ["counterName", "Nazev protiuctu"], ["amount", "Castka"], ["vs", "VS"], ["ks", "KS"], ["ss", "SS"], ["reference", "Identifikace transakce"], ["type", "Typ transakce"], ["note", "Popis pro me"], ["message", "Zprava pro prijemce"]],
+  },
+];
+
+async function formatSetup(data: DataApi) {
+  const [csv] = await data.find("sys.transformation", { code: "CSV" }, { take: 1 });
+  if (!csv) return;
+  for (const f of FORMATS) {
+    if ((await data.find("bank.statementFormat", { code: f.code }, { take: 1 })).length) continue;
+    const fmt = await data.create("bank.statementFormat", { code: f.code, name: f.name, transformationId: csv.id, detect: f.detect, fileNamePattern: f.fileNamePattern, linesStart: f.linesStart, encoding: "cp1250", delimiter: ";", decimalSeparator: ",", dateFormat: "dd.MM.yyyy" });
+    for (const [target, source] of f.header) await data.create("bank.statementFormatField", { formatId: fmt.id, section: "header", target, source });
+    for (const [target, source] of f.line) await data.create("bank.statementFormatField", { formatId: fmt.id, section: "line", target, source });
+  }
+}
+
 async function bankSetup(data: DataApi) {
+  await formatSetup(data);
   if ((await data.find("bank.paymentMethod", {}, { take: 1 })).length) return;
   const tr = async (code: string) => (await data.find("sys.transformation", { code }, { take: 1 }))[0]?.id ?? null;
   await data.create("bank.paymentMethod", { code: "PREVOD", name: "Převodem (ABO)", kind: "transfer", transformationId: await tr("ABO") });
@@ -323,17 +455,58 @@ export default defineModule({
   description: "@BANK:ModuleDesc",
   icon: "BuildingBank",
   dependsOn: ["gl", "ar", "ap"],
-  enums: [MatchKind, PaymentKind, PayOrderStatus, CheckStatus, ImportStatus],
-  objects: [account, accountMethod, statement, statementLine, paymentMethod, paymentOrder, paymentOrderLine, importLog],
+  enums: [MatchKind, PaymentKind, PayOrderStatus, CheckStatus, ImportStatus, TextEncoding, FormatSection, FormatTarget],
+  objects: [statementFormat, statementFormatField, account, accountMethod, statement, statementLine, paymentMethod, paymentOrder, paymentOrderLine, importLog],
   numberSeqs: [{ code: "BANKPO", name: "@BANK:PaymentOrders", format: "PP{YY}{#####}", usedFor: "bank.paymentOrder" }],
   setup: bankSetup,
   menu: [
     { label: "@BANK:Module", items: [{ object: "bank.statement" }, { object: "gl.journal", href: "/gl/journal?filter.journalType=bank", label: "@GL:JournalsBank", module: "gl" }, { object: "bank.importLog" }, { object: "bank.paymentOrder" }] },
     { label: "@BANK:Module", kind: "functions", items: [{ href: "/bank/import", label: "@BANK:BulkImport" }] },
-    { label: "@SYS:Setup", items: [{ object: "bank.account" }, { object: "bank.paymentMethod" }] },
+    { label: "@SYS:Setup", items: [{ object: "bank.account" }, { object: "bank.paymentMethod" }, { object: "bank.statementFormat" }] },
   ],
   labels: {
     cs: {
+      Encoding: "Kódování",
+      EncCp1250: "Windows-1250 (čeština)",
+      EncUtf8: "UTF-8",
+      FormatSection: "Část výpisu",
+      SecHeader: "Hlavička",
+      SecLine: "Transakce",
+      FormatTarget: "Údaj",
+      TgAccountNum: "Číslo účtu",
+      TgIban: "IBAN",
+      TgStatementNum: "Číslo výpisu",
+      TgDateFrom: "Výpis od",
+      TgDateTo: "Výpis do",
+      TgOpening: "Počáteční zůstatek",
+      TgClosing: "Konečný zůstatek",
+      TgDate: "Datum",
+      TgAmount: "Částka",
+      TgCounterAccount: "Protiúčet",
+      TgCounterName: "Název protiúčtu",
+      TgVs: "VS",
+      TgKs: "KS",
+      TgSs: "SS",
+      TgReference: "Identifikace transakce",
+      TgMessage: "Zpráva pro příjemce",
+      TgNote: "Poznámka",
+      TgType: "Typ transakce",
+      StatementFormat: "Specifikace výpisu",
+      StatementFormats: "Specifikace výpisů",
+      FormatField: "Údaj výpisu",
+      FormatFields: "Údaje výpisu",
+      Detect: "Začátek souboru",
+      FileNamePattern: "Maska názvu souboru (číslo účtu)",
+      LinesStart: "Transakce začínají řádkem",
+      Delimiter: "Oddělovač",
+      DecimalSeparator: "Desetinná čárka",
+      DateFormat: "Formát data",
+      Recognition: "Rozpoznání souboru",
+      Technical: "Technika",
+      Source: "Prefix / sloupec",
+      CsvNoLines: "Ve výpisu {file} chybí řádek se záhlavím transakcí „{marker}“.",
+      CsvBadValue: "Řádek {line}: nečitelná hodnota „{value}“ ({field}).",
+      CsvNoFormat: "Soubor {file} neodpovídá žádné specifikaci výpisu (Banka → Specifikace výpisů).",
       DefaultMethod: "Výchozí",
       MethodNotOnAccount: "Platební metoda není přiřazená k tomuto bankovnímu účtu (Banka → Bankovní účty → Platební metody).",
       PaymentKind: "Druh platby",
@@ -447,6 +620,47 @@ export default defineModule({
       TransClosed: "Faktura {doc} už je uhrazená.",
     },
     en: {
+      Encoding: "Encoding",
+      EncCp1250: "Windows-1250 (Czech)",
+      EncUtf8: "UTF-8",
+      FormatSection: "Statement part",
+      SecHeader: "Header",
+      SecLine: "Transactions",
+      FormatTarget: "Value",
+      TgAccountNum: "Account number",
+      TgIban: "IBAN",
+      TgStatementNum: "Statement number",
+      TgDateFrom: "Statement from",
+      TgDateTo: "Statement to",
+      TgOpening: "Opening balance",
+      TgClosing: "Closing balance",
+      TgDate: "Date",
+      TgAmount: "Amount",
+      TgCounterAccount: "Counter account",
+      TgCounterName: "Counter account name",
+      TgVs: "Variable symbol",
+      TgKs: "Constant symbol",
+      TgSs: "Specific symbol",
+      TgReference: "Transaction ID",
+      TgMessage: "Message for payee",
+      TgNote: "Note",
+      TgType: "Transaction type",
+      StatementFormat: "Statement specification",
+      StatementFormats: "Statement specifications",
+      FormatField: "Statement value",
+      FormatFields: "Statement values",
+      Detect: "File starts with",
+      FileNamePattern: "File name mask (account number)",
+      LinesStart: "Transactions start with row",
+      Delimiter: "Delimiter",
+      DecimalSeparator: "Decimal separator",
+      DateFormat: "Date format",
+      Recognition: "File recognition",
+      Technical: "Technical",
+      Source: "Prefix / column",
+      CsvNoLines: "Statement {file} has no transaction header row „{marker}“.",
+      CsvBadValue: "Line {line}: unreadable value „{value}“ ({field}).",
+      CsvNoFormat: "File {file} matches no statement specification (Bank → Statement specifications).",
       DefaultMethod: "Default",
       MethodNotOnAccount: "The payment method is not assigned to this bank account (Bank → Bank accounts → Payment methods).",
       PaymentKind: "Payment type",

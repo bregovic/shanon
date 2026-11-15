@@ -24,6 +24,7 @@ export const TRANSFORMS: TransformDef[] = [
   { code: "ABO", name: "ABO / KPC – tuzemský platební příkaz", direction: "export", purpose: "paymentOrder", ext: "kpc", mime: "text/plain; charset=windows-1250", description: "Hromadný příkaz k úhradě ve formátu ABO (KPC) pro české banky (KB, ČSOB, Fio, Raiffeisen…)." },
   { code: "SEPA", name: "SEPA – pain.001.001.03", direction: "export", purpose: "paymentOrder", ext: "xml", mime: "application/xml", description: "Platební příkaz SEPA (ISO 20022 pain.001.001.03) — EUR platby v SEPA i tuzemské platby bank, které XML podporují." },
   { code: "GPC", name: "GPC – bankovní výpis", direction: "import", purpose: "bankStatement", ext: "gpc", description: "Výpis z účtu ve formátu GPC/ABO (záznamy 074/075)." },
+  { code: "CSV", name: "CSV – bankovní výpis podle specifikace", direction: "import", purpose: "bankStatement", ext: "csv", description: "Výpis v CSV; údaje hlavičky podle prefixu řádku, transakce podle názvů sloupců (Banka → Specifikace výpisů)." },
   { code: "SPAYD", name: "QR platba (SPAYD)", direction: "print", purpose: "paymentQr", description: "Short Payment Descriptor pro QR kód na faktuře — bankovní aplikace načte účet, částku a VS." },
   { code: "EAN13", name: "EAN-13", direction: "print", purpose: "barcode", description: "Čárový kód zboží (13 číslic s kontrolní číslicí)." },
 ];

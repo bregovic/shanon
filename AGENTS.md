@@ -135,6 +135,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   (ABO, SEPA, GPC, SPAYD, EAN13); platební metoda (`bank.paymentMethod`) určuje formát příkazu.
   Platební příkaz (`bank.paymentOrder`, menu Dodavatelé): Navrhnout úhrady, výhrady z registru DPH
   (nespolehlivý plátce, nezveřejněný účet → jen s Odsouhlaseno), soubor `payment-formats.ts`.
+- Výpisy v CSV: nic napevno pro banku — specifikace `bank.statementFormat` (+ `bank.statementFormatField`:
+  údaj ← prefix řádku hlavičky / název sloupce, rozpoznání podle začátku souboru a masky názvu s číslem účtu),
+  parser `src/modules/bank/csv-statement.ts` (výsledek ve tvaru GPC), specifikace na `bank.account`.
+  Výchozí specifikace (KB) v `FORMATS` v `bank/index.ts`. Výpis za období: číslo `RRRRMMDD-RRRRMMDD`,
+  návaznost podle data. Skutečné výpisy zákazníků nikdy do repa ani testů — test má vymyšlený výpis.
 - Hromadný import výpisů `src/server/bank-import.ts` (firma podle čísla účtu, protokol
   `bank.importLog`, kontrola návaznosti `checkStatementChain`); z výpisu deník HK
   (`journalFromStatement`). Hromadné akce v seznamu: `actions[].bulk`.

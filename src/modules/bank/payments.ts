@@ -149,8 +149,12 @@ async function exportOrder(data: DataApi, o: RecordData, companyId: string | nul
 /** Návaznost na předchozí výpis účtu (zůstatek) a chybějící čísla výpisů. */
 export async function checkStatementChain(data: DataApi, st: RecordData, t: (r: string, p?: Record<string, string>) => string) {
   const all = (await data.find("bank.statement", { bankAccountId: st.bankAccountId }, { take: 5000 })) as RecordData[];
-  const num = (x: RecordData) => Number(String(x.statementNum).replace(/\D/g, "")) || 0;
-  const prev = all.filter((x) => x.id !== st.id && num(x) < num(st)).sort((a, b) => num(b) - num(a))[0];
+  // výpis za období (CSV z bankovnictví): pořadí podle data, čísla se nekontrolují
+  const period = (x: RecordData) => /^\d{8}-\d{8}$/.test(String(x.statementNum));
+  const num = (x: RecordData) => (period(x) ? Number(String(x.statementNum).slice(0, 8)) : Number(String(x.statementNum).replace(/\D/g, "")) || 0);
+  const prev = period(st)
+    ? all.filter((x) => x.id !== st.id && String(x.date) < String(st.date)).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]
+    : all.filter((x) => x.id !== st.id && num(x) < num(st)).sort((a, b) => num(b) - num(a))[0];
   const msgs: string[] = [];
   let status = "ok";
   if (prev) {
@@ -159,7 +163,7 @@ export async function checkStatementChain(data: DataApi, st: RecordData, t: (r: 
       status = "error";
     }
     const gap: number[] = [];
-    for (let n = num(prev) + 1; n < num(st) && gap.length < 20; n++) gap.push(n);
+    if (!period(st) && !period(prev)) for (let n = num(prev) + 1; n < num(st) && gap.length < 20; n++) gap.push(n);
     if (gap.length) {
       msgs.push(t("@BANK:MissingStatements", { nums: gap.join(", ") }));
       if (status === "ok") status = "warning";

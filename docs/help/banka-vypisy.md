@@ -9,9 +9,21 @@ summary: Hromadný import GPC, kontrola návaznosti, párování plateb a deník
 
 - V [Bankovní účty](/bank/account) založte účet s **číslem účtu** (např. `19-123456789/0100`) a účtem hlavní knihy (221…). Podle čísla účtu se výpisy samy přiřadí správné firmě.
 
+## Výpisy v CSV (specifikace)
+
+CSV výpis každá banka skládá jinak, proto ho popisuje **specifikace** ([Specifikace výpisů](/bank/statementFormat)) – nic není napevno v programu:
+
+- **Začátek souboru** – podle něj se soubor pozná (KB: `KB+, vypis v csv`),
+- **Maska názvu souboru** – číslo účtu z názvu (KB: `^Vypis_(\d+)_`),
+- **Transakce začínají řádkem** – text buňky, kterým začíná tabulka (KB: `Datum zauctovani`),
+- kódování, oddělovač, desetinná čárka a formát data,
+- **Údaje výpisu**: u hlavičky *údaj ← začátek řádku* (Počáteční zůstatek ← `Pocatecni zustatek`), u transakcí *údaj ← název sloupce* (Částka ← `Castka`, VS ← `VS`).
+
+Specifikace KB je připravená. Pro jinou banku založte novou podle jejího vzoru. U [bankovního účtu](/bank/account) vyberte **Specifikaci výpisu**. Hromadný import pak pozná soubor i účet sám (IBAN nebo číslo účtu v hlavičce, případně číslo v názvu souboru). Výpis za období bez čísla dostane číslo z období (`20260101-20261114`) a návaznost se kontroluje podle data.
+
 ## Každý měsíc
 
-1. Stáhněte z internetového bankovnictví výpisy ve formátu **GPC** (ABO).
+1. Stáhněte z internetového bankovnictví výpisy ve formátu **GPC** (ABO), nebo v **CSV** – např. Komerční banka „KB+, výpis v CSV“.
 2. [Hromadný import výpisů](/bank/import) – vyberte nebo přetáhněte všechny soubory najednou a dejte **Načíst**.
 3. Prohlédněte výsledek (nebo později [Importované výpisy](/bank/importLog)):
    - **Načteno** – v pořádku,

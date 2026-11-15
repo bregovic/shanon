@@ -9,11 +9,13 @@
  * nebo proti zadanému účtu; úhrada se zapíše do salda (položka „Úhrada“)
  * a u faktury se navýší Uhrazeno, při plné úhradě se položka vyrovná.
  */
+import { csvMatchesAccount, decodeText, parseCsvStatement, toCsvFormat } from "./csv-statement";
 import { czIban } from "@/core/print";
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { convertLines, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { checkStatement, decodeGpc, parseGpc } from "./gpc";
+import type { GpcStatement } from "./gpc";
 import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
 import { checkStatementChain, journalFromStatement } from "./payments";
 
@@ -88,14 +90,31 @@ export async function autoMatch(data: DataApi, statementId: string): Promise<num
 }
 
 /** Import GPC: kontrola součtů, kontrola účtu, výpis s řádky, automatické párování. */
-export async function importStatement(data: DataApi, account: RecordData, file: Buffer): Promise<string[]> {
-  const statements = parseGpc(decodeGpc(file));
+export async function importStatement(data: DataApi, account: RecordData, file: Buffer, fileName = ""): Promise<string[]> {
+  let statements: GpcStatement[] = [];
+  try {
+    statements = parseGpc(decodeGpc(file));
+  } catch {
+    statements = [];
+  }
+  // CSV podle specifikace výpisu na účtu
+  if (!statements.length && account.statementFormatId) {
+    const fmt = await data.get("bank.statementFormat", String(account.statementFormatId));
+    if (fmt) {
+      const def = toCsvFormat(fmt, await data.find("bank.statementFormatField", { formatId: fmt.id }, { take: 200 }));
+      const st = parseCsvStatement(decodeText(file, def.encoding), def, fileName);
+      if (!csvMatchesAccount(st, account) && (st.account || st.iban)) throw new UserError("@BANK:ImportOtherAccount", { file: st.iban ?? st.account, account: String(account.accountNum ?? account.iban ?? "") });
+      if (st.opening + st.credit - st.debit !== st.closing) throw new UserError("@BANK:ImportCheck", { num: st.statementNum, detail: "≠" });
+      statements = [st];
+    }
+  }
   if (!statements.length) throw new UserError("@BANK:ImportNoStatement");
   // nejdřív zkontrolovat všechny — vadný soubor se neuloží ani zčásti
   for (const s of statements) {
-    const problem = checkStatement(s);
+    const csv = "fileAccount" in s;
+    const problem = csv ? null : checkStatement(s);
     if (problem) throw new UserError("@BANK:ImportCheck", { num: s.statementNum, detail: problem });
-    if (account.accountNum && gpcAccountKey(String(account.accountNum)) !== s.account) {
+    if (!csv && account.accountNum && gpcAccountKey(String(account.accountNum)) !== s.account) {
       throw new UserError("@BANK:ImportOtherAccount", { file: s.account, account: String(account.accountNum) });
     }
     if ((await data.find("bank.statement", { bankAccountId: account.id, statementNum: s.statementNum }, { take: 1 })).length) {
@@ -117,7 +136,7 @@ export async function importStatement(data: DataApi, account: RecordData, file: 
         date: l.date,
         amount: fromCents(l.cents),
         vs: l.vs && /^\d{1,10}$/.test(l.vs) ? l.vs : null,
-        counterAccount: l.counterAccount,
+        counterAccount: l.counterAccount?.slice(0, 60) ?? null,
         message: l.message,
       });
     }
@@ -225,7 +244,7 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
     actions: {
       async import(ctx, account, file) {
         if (!file) throw new UserError("@SYS:Required");
-        await importStatement(ctx.data, account, file.data);
+        await importStatement(ctx.data, account, file.data, file.name);
       },
     },
   },

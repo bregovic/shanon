@@ -84,7 +84,7 @@ export function BankImportView(p: {
               ref={input}
               type="file"
               multiple
-              accept=".gpc,.txt,.abo"
+              accept=".gpc,.txt,.abo,.csv"
               hidden
               onChange={(e) => {
                 const picked = Array.from(e.target.files ?? []);

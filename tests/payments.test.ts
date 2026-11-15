@@ -38,7 +38,7 @@ describe("platební příkazy", () => {
   it("návrh úhrad, výhrady z registru DPH, ABO a SEPA soubor", async () => {
     const { T, bank } = await setup("pay");
     // transformace a platební metody z výchozího nastavení
-    expect((await rows(T, "sys.transformation")).map((t) => t.code).sort()).toEqual(["ABO", "EAN13", "GPC", "SEPA", "SPAYD"]);
+    expect((await rows(T, "sys.transformation")).map((t) => t.code).sort()).toEqual(["ABO", "CSV", "EAN13", "GPC", "SEPA", "SPAYD"]);
     const methods = await rows(T, "bank.paymentMethod");
     const abo = methods.find((m) => m.code === "PREVOD")!;
     const sepa = methods.find((m) => m.code === "SEPA")!;
@@ -128,5 +128,61 @@ describe("hromadný import výpisů", () => {
     const jl = await rows(T, "gl.journalLine", { journalId: j });
     expect(jl.map((l) => [l.accountType, l.bankAccountId, l.debit, l.offsetType])).toEqual([["bank", bank.id, "1000.00", "ledger"]]);
     await expect(runAction(T, "bank.statement", String(st1.id), "createJournal", client)).rejects.toMatchObject({ label: "@BANK:JournalExists" });
+  });
+});
+
+describe("výpis v CSV podle specifikace", () => {
+  // vymyšlený výpis ve formátu „KB+, výpis v CSV“ (bez diakritiky = stejné bajty v cp1250)
+  const kb = (from: string, to: string, opening: string, closing: string, lines: string[]) =>
+    Buffer.from(
+      [
+        "KB+, vypis v csv. formatu;;;",
+        "Datum vytvoreni souboru;15.11.2026;;",
+        ";;;",
+        "Cislo uctu;123-456789;;",
+        "IBAN;CZ6501000000000123456789;;",
+        `Vypis od;${from};;`,
+        `Vypis do;${to};;`,
+        "Cislo vypisu;;;",
+        `Pocatecni zustatek;${opening};;`,
+        `Konecny zustatek;${closing};;`,
+        ";;;",
+        "Datum zauctovani;Datum provedeni;Protistrana;Nazev protiuctu;Castka;Mena;VS;KS;SS;Identifikace transakce;Typ transakce;Popis pro me;Zprava pro prijemce",
+        ...lines,
+      ].join("\r\n"),
+    );
+
+  it("specifikace KB z výchozího nastavení; import na účtu i hromadně (pozná soubor i účet), návaznost za období", async () => {
+    const { T, bank } = await setup("csv");
+    const [fmt] = await rows(T, "bank.statementFormat", { code: "KB" });
+    expect(fmt.detect).toBe("KB+, vypis v csv");
+    expect(fmt.fileNamePattern).toBe(String.raw`^Vypis_(\d+)_`);
+    expect((await rows(T, "bank.statementFormatField", { formatId: fmt.id })).length).toBeGreaterThan(10);
+    await save(T, "bank.account", { statementFormatId: fmt.id }, String(bank.id));
+
+    // akce Importovat výpis na účtu
+    const f1 = kb("01.11.2026", "14.11.2026", "1000,00", "1950,5", [
+      "02.11.2026;02.11.2026;19-2000145399/0800;Masna;1000;CZK;2600001;0000000000;;ID1;Prichozi uhrada;;Faktura",
+      "05.11.2026;05.11.2026;;;-49,5;CZK;;;;ID2;Poplatek;;",
+    ]);
+    await runAction(T, "bank.account", String(bank.id), "import", client, { name: "Vypis_123456789_20261101_20261114.csv", data: f1 });
+    const [st] = await rows(T, "bank.statement", { bankAccountId: bank.id });
+    expect([st.statementNum, st.date, st.openingBalance, st.closingBalance]).toEqual(["20261101-20261114", "2026-11-14", "1000.00", "1950.50"]);
+    const lines = await rows(T, "bank.statementLine", { statementId: st.id });
+    expect(lines.map((l) => [l.amount, l.vs, l.counterAccount])).toEqual([["1000.00", "2600001", "19-2000145399/0800"], ["-49.50", null, null]]);
+    expect(String(lines[0].message)).toContain("Faktura · Masna");
+
+    // hromadný import: soubor pozná podle začátku, účet podle IBAN; navazuje za obdobím
+    const session = { ctx: T, lang: "cs", companies: [{ id: T.companyId!, code: "B", name: "Banka" }], superUser: true, adminCompanyIds: [T.companyId!] } as unknown as AppSession;
+    const f2 = kb("15.11.2026", "20.11.2026", "1950,5", "2000,5", ["16.11.2026;16.11.2026;;;50;CZK;;;;ID3;Prichozi uhrada;;"]);
+    const [r2] = await importStatementsBulk(session, { name: "export.csv", data: f2 });
+    expect([r2.status, r2.statementNum, r2.message]).toEqual(["imported", "20261115-20261120", null]);
+    // nenavazující zůstatek = upozornění; stejný výpis znovu = duplicita
+    const f3 = kb("21.11.2026", "22.11.2026", "9999", "9999", []);
+    expect((await importStatementsBulk(session, { name: "x.csv", data: f3 }))[0].status).toBe("warning");
+    expect((await importStatementsBulk(session, { name: "export.csv", data: f2 }))[0].status).toBe("duplicate");
+    // nesedí součty → chyba, nic se neuloží
+    const bad = kb("23.11.2026", "24.11.2026", "9999", "1", ["23.11.2026;;;;5;CZK;;;;;;;"]);
+    expect((await importStatementsBulk(session, { name: "y.csv", data: bad }))[0].status).toBe("error");
   });
 });
