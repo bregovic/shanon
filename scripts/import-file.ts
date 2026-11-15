@@ -36,7 +36,8 @@ async function main() {
   } else {
     const imgDir = process.argv.find((a) => a.startsWith("--images="))?.slice(9) ?? dirname(file);
     const images = (p: string) => {
-      const full = isAbsolute(p) ? p : join(imgDir, p);
+      // absolutní cesta z jiného počítače / jiné složky: stejný soubor ve složce obrázků
+      const full = isAbsolute(p) && existsSync(p) ? p : join(imgDir, isAbsolute(p) ? basename(p.replace(/\\/g, "/")) : p);
       return existsSync(full) ? { name: basename(full), data: readFileSync(full) } : null;
     };
     const r = await importRecords(ctx, objectId, await readTable(basename(file), readFileSync(file)), { dryRun: process.argv.includes("--check"), lang: "cs", images }, client);

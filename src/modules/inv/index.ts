@@ -137,6 +137,8 @@ export const item = defineObject({
     /** marže z prodejní ceny bez DPH: (prodej − nákup) / prodej */
     marginPct: { edt: Edts.Percent, label: "@INV:Margin", readOnly: true },
     vendorId: { edt: refEdt("ap.vendor", "@INV:Vendor"), optionalRef: true, aliases: ["dodavatel", "firma", "vendor", "supplier"] },
+    /** značka / výrobce (není dodavatel — dodavatel je partner s IČO) */
+    brand: { edt: defineEdt({ id: "InvBrand", kind: "string", label: "@INV:Brand", maxLength: 60, transform: "trim" }), aliases: ["značka", "znacka", "výrobce", "brand"] },
     vendorItemName: { edt: Edts.Description, label: "@INV:VendorItemName" },
     weighed: { edt: Edts.NoYes, label: "@INV:Weighed", aliases: ["vazene", "vážené", "na vahu", "na váhu"] },
     description: { edt: Edts.Notes, label: "@INV:Description", aliases: ["popis", "description"] },
@@ -144,11 +146,11 @@ export const item = defineObject({
     image: { edt: defineEdt({ id: "ImageRef", kind: "string", label: "@SYS:Image", maxLength: 36 }), image: true, readOnly: true, aliases: ["obrazek", "obrázek", "foto", "fotka", "image", "picture"] },
   },
   titleField: "itemNum",
-  list: ["image", "itemNum", "name", "categoryId", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "vendorId", "weighed", "blocked"],
+  list: ["image", "itemNum", "name", "categoryId", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "brand", "vendorId", "weighed", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["itemNum", "name", "itemType", "categoryId", "groupId", "unitId", "ean", "weighed", "blocked"] },
     { label: "@INV:Prices", fields: ["salesPrice", "currencyId", "priceInclTax", "itemTaxGroupId", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
-    { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName"] },
+    { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName", "brand"] },
     { label: "@SYS:Image", fields: ["image"] },
     { label: "@INV:Description", fields: ["description"] },
   ],
@@ -289,6 +291,7 @@ export default defineModule({
       SortOrder: "Pořadí",
       CategoryLoop: "Kategorie nemůže být sama sobě nadřazená.",
       Vendor: "Hlavní dodavatel",
+      Brand: "Značka",
       VendorItemName: "Název u dodavatele",
       Discount: "Sleva",
       Discounts: "Slevy a akce",
@@ -343,6 +346,7 @@ export default defineModule({
       SortOrder: "Order",
       CategoryLoop: "A category cannot be its own parent.",
       Vendor: "Main vendor",
+      Brand: "Brand",
       VendorItemName: "Vendor item name",
       Discount: "Discount",
       Discounts: "Discounts and promotions",

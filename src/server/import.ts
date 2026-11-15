@@ -265,6 +265,9 @@ export function imagesFromUploads(files: { path: string; data: Buffer }[]): Imag
   };
 }
 
+/** Řádků v jedné transakci zápisu (obrázky a události se do limitu transakce 20 s vejdou). */
+export const IMPORT_BATCH = 200;
+
 export async function importRecords(
   ctx: Ctx,
   objectId: string,
@@ -297,116 +300,131 @@ export async function importRecords(
   // první datový řádek = řádek 2 souboru (pod hlavičkou)
   const lineNo = (i: number) => table.rows.indexOf(rows[i]) + 2;
 
-  try {
-    await inTenant(
+  // průchod řádků [from, to) v jedné transakci; write = uložit (jinak jen kontrola, transakce se vrátí)
+  const pass = (from: number, to: number, write: boolean) =>
+    inTenant(
       ctx,
       async (s) => {
-        // odkazy: kód / název cílového záznamu → id (načte se jednou na objekt)
-        const lookups = new Map<string, Map<string, string | null>>();
-        const lookup = async (target: string) => {
-          if (lookups.has(target)) return lookups.get(target)!;
-          const tdef = getObject(target);
-          const m = new Map<string, string | null>();
-          const put = (k: unknown, id: string) => {
-            const n = norm(String(k ?? ""));
-            if (!n) return;
-            m.set(n, m.has(n) && m.get(n) !== id ? null : id); // null = nejednoznačné
+          // odkazy: kód / název cílového záznamu → id (načte se jednou na objekt)
+          const lookups = new Map<string, Map<string, string | null>>();
+          const lookup = async (target: string) => {
+            if (lookups.has(target)) return lookups.get(target)!;
+            const tdef = getObject(target);
+            const m = new Map<string, string | null>();
+            const put = (k: unknown, id: string) => {
+              const n = norm(String(k ?? ""));
+              if (!n) return;
+              m.set(n, m.has(n) && m.get(n) !== id ? null : id); // null = nejednoznačné
+            };
+            const rows = await s.sys().find(target, {}, 20000);
+            // záznam bez vlastního názvu (dodavatel, odběratel) i podle názvu odkazu (subjektu)
+            const refField = tdef.list.find((f) => tdef.fields[f]?.edt.kind === "ref");
+            if (refField && !("name" in tdef.fields)) await s.attachRefTitles(tdef, rows);
+            for (const r of rows) {
+              put(r[tdef.titleField], String(r.id));
+              if ("name" in tdef.fields && tdef.titleField !== "name") put(r.name, String(r.id));
+              else if (refField) put((r._titles as Record<string, string> | undefined)?.[refField], String(r.id));
+            }
+            lookups.set(target, m);
+            return m;
           };
-          const rows = await s.sys().find(target, {}, 20000);
-          // záznam bez vlastního názvu (dodavatel, odběratel) i podle názvu odkazu (subjektu)
-          const refField = tdef.list.find((f) => tdef.fields[f]?.edt.kind === "ref");
-          if (refField && !("name" in tdef.fields)) await s.attachRefTitles(tdef, rows);
-          for (const r of rows) {
-            put(r[tdef.titleField], String(r.id));
-            if ("name" in tdef.fields && tdef.titleField !== "name") put(r.name, String(r.id));
-            else if (refField) put((r._titles as Record<string, string> | undefined)?.[refField], String(r.id));
-          }
-          lookups.set(target, m);
-          return m;
-        };
 
-        for (let i = 0; i < rows.length; i++) {
-          const cells = rows[i];
-          const values: RecordData = {};
-          const images: { field: string; file: { name: string; data: Buffer } }[] = [];
-          let bad = false;
-          for (const c of mapped) {
-            const raw = (cells[c.i] ?? "").trim();
-            if (raw === "") continue;
-            const f = def.fields[c.field!];
-            if (f.image) {
-              // chybějící nebo vadný obrázek záznam neblokuje — uloží se bez něj
-              const file = opts.images?.(raw) ?? null;
-              const mime = file ? imageMime(file.data) : null;
-              const warn = (message: string) => report.warnings.length < 200 && report.warnings.push({ row: lineNo(i), column: c.header, message });
-              if (!file) warn(t("@SYS:ImageNotFound", { path: raw }));
-              else if (!mime) warn(`${t("@SYS:ImageInvalid")} (${raw})`);
-              else images.push({ field: c.field!, file });
-              continue;
-            }
-            if (f.edt.kind === "ref") {
-              const map = await lookup(f.edt.refObject!);
-              // účet zadaný syntetikou (604) = 604000
-              // export dává „kód · název“ — stačí kód
-              const code = raw.includes(" · ") ? raw.split(" · ")[0].trim() : raw;
-              const id = map.get(norm(raw)) ?? map.get(norm(code)) ?? (f.edt.refObject === "gl.account" && /^\d{3}$/.test(code) ? map.get(`${code}000`) : undefined);
-              if (!id) {
-                err(lineNo(i), c.header, t(id === null ? "@SYS:ImportAmbiguous" : "@SYS:ImportNotFound", { value: raw }));
+          for (let i = from; i < to; i++) {
+            const cells = rows[i];
+            const values: RecordData = {};
+            const images: { field: string; file: { name: string; data: Buffer } }[] = [];
+            let bad = false;
+            for (const c of mapped) {
+              const raw = (cells[c.i] ?? "").trim();
+              if (raw === "") continue;
+              const f = def.fields[c.field!];
+              if (f.image) {
+                // chybějící nebo vadný obrázek záznam neblokuje — uloží se bez něj
+                const file = opts.images?.(raw) ?? null;
+                const mime = file ? imageMime(file.data) : null;
+                const warn = (message: string) => report.warnings.length < 200 && report.warnings.push({ row: lineNo(i), column: c.header, message });
+                if (!file) warn(t("@SYS:ImageNotFound", { path: raw }));
+                else if (!mime) warn(`${t("@SYS:ImageInvalid")} (${raw})`);
+                else images.push({ field: c.field!, file });
+                continue;
+              }
+              if (f.edt.kind === "ref") {
+                const map = await lookup(f.edt.refObject!);
+                // účet zadaný syntetikou (604) = 604000
+                // export dává „kód · název“ — stačí kód
+                const code = raw.includes(" · ") ? raw.split(" · ")[0].trim() : raw;
+                const id = map.get(norm(raw)) ?? map.get(norm(code)) ?? (f.edt.refObject === "gl.account" && /^\d{3}$/.test(code) ? map.get(`${code}000`) : undefined);
+                if (!id) {
+                  err(lineNo(i), c.header, t(id === null ? "@SYS:ImportAmbiguous" : "@SYS:ImportNotFound", { value: raw }));
+                  bad = true;
+                } else values[c.field!] = id;
+                continue;
+              }
+              const [v, e] = cellValue(f, raw, opts.lang);
+              if (e) {
+                err(lineNo(i), c.header, `${t(e)} (${raw})`);
                 bad = true;
-              } else values[c.field!] = id;
-              continue;
+              } else values[c.field!] = v;
             }
-            const [v, e] = cellValue(f, raw, opts.lang);
-            if (e) {
-              err(lineNo(i), c.header, `${t(e)} (${raw})`);
-              bad = true;
-            } else values[c.field!] = v;
-          }
-          if (bad) continue;
+            if (bad) continue;
 
-          let existingId: string | null = null;
-          if (key && key.every((k) => values[k] !== undefined)) {
-            const where: RecordData = {};
-            for (const k of key) where[k] = coerce(def.fields[k].edt, values[k], registry)[0];
-            existingId = ((await s.sys().find(objectId, where, 1))[0]?.id as string) ?? null;
-          }
-          await s.tx.$executeRawUnsafe("SAVEPOINT shanon_import_row");
-          try {
-            Object.assign(values, fixed);
-            const saved = await s.save(objectId, existingId, values);
-            // odkaz na záznam téhož souboru (strom kategorií): přidat do vyhledávání
-            const self = lookups.get(objectId);
-            if (self) {
-              for (const k of [saved[def.titleField], "name" in def.fields ? saved.name : null]) {
-                const n = norm(String(k ?? ""));
-                if (n) self.set(n, String(saved.id));
+            let existingId: string | null = null;
+            if (key && key.every((k) => values[k] !== undefined)) {
+              const where: RecordData = {};
+              for (const k of key) where[k] = coerce(def.fields[k].edt, values[k], registry)[0];
+              existingId = ((await s.sys().find(objectId, where, 1))[0]?.id as string) ?? null;
+            }
+            await s.tx.$executeRawUnsafe("SAVEPOINT shanon_import_row");
+            try {
+              Object.assign(values, fixed);
+              const saved = await s.save(objectId, existingId, values);
+              // odkaz na záznam téhož souboru (strom kategorií): přidat do vyhledávání
+              const self = lookups.get(objectId);
+              if (self) {
+                for (const k of [saved[def.titleField], "name" in def.fields ? saved.name : null]) {
+                  const n = norm(String(k ?? ""));
+                  if (n) self.set(n, String(saved.id));
+                }
+              }
+              // obrázky jen při zápisu (kontrola nanečisto je jen ověří)
+              if (write) for (const im of images) await storeImage(s, objectId, String(saved.id), im.field, saved[im.field] as string | null, im.file);
+              await s.tx.$executeRawUnsafe("RELEASE SAVEPOINT shanon_import_row");
+              if (existingId) report.updated++;
+              else report.created++;
+            } catch (e) {
+              await s.tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT shanon_import_row");
+              if (!(e instanceof UserError)) throw e;
+              const fields = Object.entries(e.fields ?? {});
+              if (!fields.length) err(lineNo(i), null, t(e.label, e.params));
+              for (const [name, msg] of fields) {
+                const col = columns.find((c) => c.field === name)?.header ?? (def.fields[name] ? fieldLabel(def.fields[name], opts.lang) : name);
+                err(lineNo(i), col, t(msg));
               }
             }
-            for (const im of images) await storeImage(s, objectId, String(saved.id), im.field, saved[im.field] as string | null, im.file);
-            await s.tx.$executeRawUnsafe("RELEASE SAVEPOINT shanon_import_row");
-            if (existingId) report.updated++;
-            else report.created++;
-          } catch (e) {
-            await s.tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT shanon_import_row");
-            if (!(e instanceof UserError)) throw e;
-            const fields = Object.entries(e.fields ?? {});
-            if (!fields.length) err(lineNo(i), null, t(e.label, e.params));
-            for (const [name, msg] of fields) {
-              const col = columns.find((c) => c.field === name)?.header ?? (def.fields[name] ? fieldLabel(def.fields[name], opts.lang) : name);
-              err(lineNo(i), col, t(msg));
-            }
           }
-        }
-        if (report.errors.length || opts.dryRun) throw new Rollback(report);
+        if (report.errors.length || !write) throw new Rollback(report);
       },
       client,
-    );
-    report.applied = true;
+    ).catch((e) => {
+      if (!(e instanceof Rollback)) throw e;
+    });
+
+  // 1) kontrola celého souboru nanečisto (vše nebo nic: chyba kdekoli = nic se neuloží)
+  await pass(0, rows.length, false);
+  if (report.errors.length || opts.dryRun) {
     return report;
-  } catch (e) {
-    if (e instanceof Rollback) return e.report;
-    throw e;
   }
+  // 2) zápis: malý soubor najednou, velký po dávkách (transakce má limit 20 s — obrázky jsou pomalé);
+  //    počty a varování spočítá zápis znovu
+  report.created = 0;
+  report.updated = 0;
+  report.warnings = [];
+  for (let from = 0; from < rows.length; from += IMPORT_BATCH) {
+    await pass(from, Math.min(rows.length, from + IMPORT_BATCH), true);
+    if (report.errors.length) return report; // dávka s chybou se vrátila, předchozí zůstaly (opakovaný import je aktualizuje)
+  }
+  report.applied = true;
+  return report;
 }
 
 /**

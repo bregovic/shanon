@@ -287,6 +287,35 @@ describe("položky: marže, slevy, ARES", () => {
     expect([line.unitPrice, line.originalPrice, line.amountGross]).toEqual(["199.00", "229.00", "99.50"]);
   });
 
+  it("import dodavatelů jen podle IČO: subjekt a sídlo z ARES, výchozí skupina, opakovaný import nezdvojí", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", async (url: string) => {
+      // registr plátců DPH (kontrola spolehlivosti) — tady není potřeba
+      if (!String(url).includes("ekonomicke-subjekty")) return new Response("", { status: 503 });
+      calls++;
+      expect(String(url)).toContain("/ekonomicke-subjekty/11677619");
+      return new Response(
+        JSON.stringify({ ico: "11677619", obchodniJmeno: "BK Concept s.r.o.", dic: "CZ11677619", pravniForma: "112", sidlo: { kodStatu: "CZ", nazevObce: "Praha", nazevUlice: "Dobronická", cisloDomovni: 45, cisloOrientacni: 8, psc: 14200 } }),
+        { status: 200 },
+      );
+    });
+    const { importRecords, parseCsv } = await import("@/server/import");
+    const csv = ["IČO;Splatnost (dní)", "11677619;21", ""].join("\n");
+    const r1 = await importRecords(D, "ap.vendor", parseCsv(csv), { dryRun: false, lang: "cs" }, client);
+    expect(r1.errors).toEqual([]);
+    const [v] = (await listRecords(D, "ap.vendor", { filter: { regNo: "11677619" } }, client)).rows;
+    expect([v.regNo, v.paymentDays, (v._titles as Record<string, string>).subjectId?.includes("BK Concept")]).toEqual(["11677619", 21, true]);
+    expect(v.groupId).toBeTruthy();
+    // opakovaný import podle IČO upraví, nezaloží druhého dodavatele (a ARES už nevolá — subjekt je v adresáři)
+    const callsBefore = calls;
+    const r2 = await importRecords(D, "ap.vendor", parseCsv(["IČO;Splatnost (dní)", "11677619;30", ""].join("\n")), { dryRun: false, lang: "cs" }, client);
+    expect(r2.errors).toEqual([]);
+    const all = (await listRecords(D, "ap.vendor", { filter: { regNo: "11677619" } }, client)).rows;
+    expect([all.length, all[0].paymentDays]).toEqual([1, 30]);
+    expect(calls).toBe(callsBefore);
+    vi.unstubAllGlobals();
+  });
+
   it("ARES: doplní subjekt a sídlo podle IČO, partner přes svůj subjekt", async () => {
     vi.stubGlobal("fetch", async (url: string) => {
       expect(String(url)).toContain("/ekonomicke-subjekty/27079864");

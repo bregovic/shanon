@@ -152,6 +152,8 @@ export const company = defineObject({
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
+  // zkušební a předváděcí firmy: smazat i se všemi daty (jen superuživatel, potvrzení opsáním kódu)
+  actions: [{ id: "deleteWithData", label: "@SYS:DeleteCompanyData", outside: true, group: "more", confirm: { field: "code", text: "@SYS:DeleteCompanyConfirm" } }],
 });
 
 export const numberSeq = defineObject({
@@ -587,6 +589,11 @@ export default defineModule({
       NotifyBatchFailed: "Dávková úloha {job} skončila chybou",
       Help: "Nápověda",
       HelpGeneral: "Obecně",
+      DeleteCompanyData: "Smazat firmu s daty",
+      DeleteCompanyConfirm: "Smaže firmu a všechna její data — doklady, zápisy hlavní knihy, DPH, číselníky, přílohy i soubory. Nejde to vrátit. Pro potvrzení opište kód firmy: {value}",
+      DeleteCompanyCurrent: "Firmu, ve které jste přihlášeni, smazat nejde — přepněte se do jiné.",
+      DeleteCompanyVirtual: "Nosnou firmu virtuální společnosti smazat nejde — nejdřív zrušte sdílení.",
+      DeleteCompanyBlocked: "Firmu se nepodařilo smazat (vazby v: {tables}).",
       CopyLink: "Kopírovat",
       SendLink: "E-mailem",
       OpenLink: "Otevřít odkaz",
@@ -974,6 +981,11 @@ export default defineModule({
       NotifyBatchFailed: "Batch job {job} failed",
       Help: "Help",
       HelpGeneral: "General",
+      DeleteCompanyData: "Delete company with data",
+      DeleteCompanyConfirm: "Deletes the company and all its data — documents, ledger entries, VAT, master data, attachments and files. This cannot be undone. To confirm, type the company code: {value}",
+      DeleteCompanyCurrent: "You cannot delete the company you are signed in to — switch to another one.",
+      DeleteCompanyVirtual: "A virtual company carrier cannot be deleted — remove the sharing first.",
+      DeleteCompanyBlocked: "The company could not be deleted (references in: {tables}).",
       CopyLink: "Copy",
       SendLink: "By e-mail",
       OpenLink: "Open link",

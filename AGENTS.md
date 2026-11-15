@@ -217,6 +217,15 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   šablona `prt.template` (JSON rozvržení v mm), návrhář `/print/designer`, tisk
   `/print/<objekt>/<id>`; jeden vykreslovač pro náhled, tisk i kasu. Moduly, které
   tisknou, mají `prt` v `dependsOn`. QR platba: `spayd()`, IBAN z čísla účtu `czIban()`.
+- Import velkých souborů: nejdřív kontrola celého souboru nanečisto (jedna transakce, vrátí se; obrázky se jen ověří),
+  pak zápis po dávkách `IMPORT_BATCH` (200 řádků = transakce, limit 20 s); chyba v dávce = předchozí dávky zůstanou,
+  opakovaný import je aktualizuje podle klíče. Dodavatel / odběratel jde importovat jen s IČO (`regNo` na partnerovi,
+  jedinečný klíč): subjekt z adresáře, jinak z registru (`createFromRegistry`, ARES); prázdná skupina = první skupina.
+  Položka má `brand` (značka ≠ dodavatel).
+- Smazání firmy s daty (`src/server/company-delete.ts`, akce `sys.company:deleteWithData` mimo transakci, superuživatel,
+  potvrzení opsáním kódu = `actions[].confirm`): všechny tabulky objektů firmy (nepovinné odkazy vynulovat, mazat v kolech
+  se savepointy), přílohy a soubory, sys vazby (po `RESET ROLE`), záznam do `sys_audit`. Nová tabulka firmy s odkazem
+  na sys tabulku mimo objekty = doplnit sem.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

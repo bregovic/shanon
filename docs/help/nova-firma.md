@@ -13,6 +13,24 @@ summary: Založení účtované firmy z IČO, výchozí nastavení, uživatelé 
 4. V [Organizaci](/org/entity) doplňte bankovní účet, kontakty a **logo** (tiskne se na fakturách a účtenkách).
 5. V [Uživatelé](/system/users) přidělte firmu uživatelům (role, správce firmy).
 
+## Dodavatelé a položky importem
+
+Pořadí, které funguje (každý soubor nejdřív **Zkontrolovat**, pak **Importovat**):
+
+1. **[Adresář](/gab/subject)** – zahraniční subjekty bez IČO: sloupce *Název*, *Typ* (organization), *Země* (DE, JP…), *Poznámka* (zahraniční identifikátor).
+2. **[Dodavatelé](/ap/vendor)** – stačí sloupec **IČO**: subjekt i sídlo se doplní z ARES (plátce DPH i se spolehlivostí a účty z registru DPH); zahraniční dodavatel sloupcem *Subjekt* (název z adresáře). Prázdná skupina = první skupina dodavatelů. Opakovaný import podle IČO dodavatele upraví, nezaloží znovu.
+3. **Skupiny položek**, **kategorie**, nakonec **položky** se sloupcem *Obrázek* – při importu vyberte i složku s obrázky (páruje se podle názvu souboru). Značka výrobce patří do sloupce **Značka**, sloupec *Dodavatel* je skutečný dodavatel.
+
+Velký soubor (stovky položek s obrázky) se po kontrole uloží po dávkách; kdyby se zápis přerušil, stačí import spustit znovu – položky se aktualizují podle čísla.
+
+## Smazání zkušební firmy
+
+Po zkoušce nebo předvedení jde firmu smazat i se všemi daty: **Správa systému → Firmy** → firma → **Další ▾ → Smazat firmu s daty**. Smaže se vše, co firmě patří – i zaúčtované doklady, zápisy hlavní knihy, DPH, saldo, číselníky, přílohy a soubory, číselné řady a přiřazení uživatelů. **Nejde to vrátit.**
+
+- Smí jen superuživatel a musí opsat **kód firmy**.
+- Firmu, ve které je právě přihlášený, smazat nejde – nejdřív se přepněte do jiné.
+- Záznam o smazání (kdo, kdy, kolik záznamů) zůstane v historii.
+
 ## Virtuální společnost
 
 Když jeden provozovatel vede víc firem a chce sdílet číselníky (adresář, dodavatele, účtový rozvrh, položky…):

@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import {
   Button,
   Dialog,
+  Input,
   DialogActions,
   DialogBody,
   DialogContent,
@@ -101,7 +102,7 @@ export interface ObjectDetailProps {
   autoCreate?: boolean;
   /** text místo řádků u nového dokladu */
   newLinesHint?: string;
-  actions: { id: string; label: string; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more" }[];
+  actions: { id: string; label: string; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more"; confirm?: { value: string; text: string } }[];
   /** Náhled dokladu (zaúčtování nanečisto) — dokud jde zaúčtovat */
   postingPreview?: boolean;
   /** pole s číslem / kódem záznamu (souhrn sbalené hlavičky, klik = uložit nový doklad) */
@@ -355,16 +356,23 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       router.push("id" in r.data ? objectHref(p.objectId, r.data.id) : `${objectHref(p.objectId, "new")}?copy=${p.id}`);
     });
 
-  const act = (actionId: string) =>
-    start(async () => {
+  // nevratná akce s potvrzením opsáním hodnoty (Smazat firmu s daty)
+  const [typed, setTyped] = useState<{ id: string; label: string; value: string; text: string; input: string } | null>(null);
+  const act = (actionId: string) => {
+    const a = p.actions.find((x) => x.id === actionId);
+    if (a?.confirm && typed?.id !== actionId) return setTyped({ id: a.id, label: a.label, value: a.confirm.value, text: a.confirm.text, input: "" });
+    setTyped(null);
+    return start(async () => {
       const res = await runRecordAction(p.objectId, p.id!, actionId);
       if (!res.ok) setMessage({ intent: "error", text: res.message });
       else if (res.data?.open) router.push(res.data.open);
+      else if (a?.confirm) router.push(objectHref(p.objectId));
       else {
         setMessage(undefined);
         router.refresh();
       }
     });
+  };
 
   // stažení souboru (XML pro úřad, ISDOC…): chyba se ukáže v aplikaci, ne jako holá textová stránka
   const download = (actionId: string) =>
@@ -596,6 +604,25 @@ export function ObjectDetailView(p: ObjectDetailProps) {
 
       {p.postingPreview && p.id && <PostingPreviewDrawer objectId={p.objectId} id={p.id} open={posting} onClose={() => setPosting(false)} labels={p.labels.posting} lang={p.lang} />}
 
+      <Dialog open={!!typed} onOpenChange={(_, d) => !d.open && setTyped(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{typed?.label}</DialogTitle>
+            <DialogContent>
+              <Text block style={{ marginBottom: 12 }}>
+                {typed?.text.replace("{value}", typed.value)}
+              </Text>
+              <Input autoFocus value={typed?.input ?? ""} onChange={(_, d) => setTyped((x) => (x ? { ...x, input: d.value } : x))} placeholder={typed?.value} />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setTyped(null)}>{p.labels.actions.cancel ?? "Zpět"}</Button>
+              <Button appearance="primary" disabled={!typed || typed.input.trim() !== typed.value || busy} onClick={() => typed && act(typed.id)}>
+                {typed?.label}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
       <Dialog open={confirm} onOpenChange={(_, d) => setConfirm(d.open)}>
         <DialogSurface>
           <DialogBody>

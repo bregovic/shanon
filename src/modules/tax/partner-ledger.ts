@@ -12,6 +12,7 @@ import { documentLineHandlers, invoiceHandlers, type InvoiceConfig } from "./doc
 import { orderHandlers, releaseOrder } from "./orders";
 import { postingAccount } from "@/modules/gl/setup";
 import { fillFromAres } from "@/modules/gab/ares";
+import { createFromRegistry } from "@/modules/gab/registry-lookup";
 
 /** Variabilní symbol — jen číslice, do 10 znaků (jako v příkazu k úhradě). */
 export const Vs = defineEdt({ id: "Vs", kind: "string", label: "@TAX:Vs", maxLength: 10, pattern: /^\d{1,10}$/, patternMessage: "@TAX:VsHelp" });
@@ -115,10 +116,14 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     shareable: true,
     fields: {
       accountNum: { edt: Edts.Code, label: L("AccountNum"), mandatory: true, readOnly: true },
-      subjectId: { edt: refEdt("gab.subject", "@GAB:Subject"), mandatory: true },
+      // subjekt povinný (hlídá událost): bez něj se založí z registru podle IČO (import dodavatelů)
+      subjectId: { edt: refEdt("gab.subject", "@GAB:Subject") },
+      /** IČO subjektu (kopie pro hledání a import: jen IČO → subjekt z ARES) */
+      regNo: { edt: Edts.RegNo, aliases: ["ičo", "ico", "ic", "identifikační číslo"] },
       // výchozí dimenze dokladů partnera (z adresáře se doplní samy)
       ...dimFields(),
-      groupId: { edt: refEdt(id("group"), L("Group")), mandatory: true },
+      // prázdná skupina = první skupina partnerů (hlídá událost)
+      groupId: { edt: refEdt(id("group"), L("Group")) },
       /** prázdné = skupina DPH ze skupiny partnerů */
       taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
@@ -131,13 +136,14 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
     },
     titleField: "accountNum",
-    list: ["accountNum", "subjectId", "groupId", "currencyId", "paymentDays", "blocked"],
+    list: ["accountNum", "subjectId", "regNo", "groupId", "currencyId", "paymentDays", "blocked"],
     form: [
-      { label: "@SYS:General", fields: ["accountNum", "subjectId", "groupId", "taxGroupId", "blocked"] },
+      { label: "@SYS:General", fields: ["accountNum", "subjectId", "regNo", "groupId", "taxGroupId", "blocked"] },
       { label: L("Terms"), fields: ["currencyId", "paymentDays", "paymentMethodId", "bankAccountId", "docEmail"] },
       { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
-    unique: [["accountNum"], ["subjectId"]],
+    // import: podle čísla, subjektu, nebo jen podle IČO (opakovaný import partnera nezdvojí)
+    unique: [["accountNum"], ["subjectId"], ["regNo"]],
     numberSeq: { field: "accountNum", seq: sp.partnerSeq },
     // v odkazech a výběru „číslo · název subjektu“, hledání i podle názvu
     titleRef: "subjectId",
@@ -441,6 +447,18 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       [partner.id]: {
         // výchozí účet musí patřit subjektu partnera; bez zadání první zveřejněný / výchozí
         async beforeSave(ctx: EventContext, d: RecordData) {
+          // jen IČO (import, rychlé založení): subjekt z adresáře, jinak z registru (ARES / VIES)
+          const ico = String(d.regNo ?? "").replace(/\s/g, "");
+          if (!d.subjectId && ico) {
+            const [have] = await ctx.data.find("gab.subject", { regNo: ico }, { take: 1 });
+            d.subjectId = have?.id ?? (await createFromRegistry(ctx.data, ico, {}));
+          }
+          if (!d.subjectId) return { subjectId: "@SYS:Required" };
+          if (!d.groupId) d.groupId = (await ctx.data.find(group.id, {}, { take: 1, orderBy: { code: "asc" } }))[0]?.id ?? null;
+          if (!d.groupId) return { groupId: "@SYS:Required" };
+          // IČO na partnerovi = IČO subjektu
+          const subj = await ctx.data.get("gab.subject", String(d.subjectId));
+          d.regNo = subj?.regNo ?? null;
           if (d.bankAccountId) {
             const acc = await ctx.data.get("gab.bankAccount", String(d.bankAccountId));
             if (!acc || acc.subjectId !== d.subjectId) return { bankAccountId: "@GAB:AccountOtherSubject" };
