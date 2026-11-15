@@ -5,6 +5,7 @@
  * účetní doklad). Hlavička je formulář, řádky jsou grid + šuplík.
  */
 import { toast } from "./toast";
+import { useUnsavedGuard } from "./unsaved-guard";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -330,24 +331,30 @@ export function ObjectDetailView(p: ObjectDetailProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const save = (current: Values = values) =>
-    start(async () => {
-      const editable = p.groups.flatMap((g) => g.fields).filter((f) => !f.readOnly);
-      const v: Values = {};
-      for (const f of editable) v[f.name] = current[f.name] ?? null;
-      const res = await saveRecordAction(p.objectId, p.id, pv.strip(v), p.version);
-      if (!res.ok) {
-        setErrors(res.errors ?? {});
-        setMessage({ intent: "error", text: res.message });
-        return;
-      }
-      setErrors({});
-      setMessage(undefined);
-      const warns = (res.data as { _warnings?: string[] })._warnings;
-      toast(warns?.length ? warns.join(" · ") : p.labels.actions.saved, warns?.length ? "warning" : "success");
-      if (!p.id) router.replace(objectHref(p.objectId, String(res.data.id)));
-      else router.refresh();
-    });
+  // neuložené změny (změna pole uživatelem) — při odchodu dotaz Uložit / Neukládat / Zpět
+  const dirtyRef = useRef(false);
+  const doSave = async (current: Values = values, stay = true): Promise<boolean> => {
+    const editable = p.groups.flatMap((g) => g.fields).filter((f) => !f.readOnly);
+    const v: Values = {};
+    for (const f of editable) v[f.name] = current[f.name] ?? null;
+    const res = await saveRecordAction(p.objectId, p.id, pv.strip(v), p.version);
+    if (!res.ok) {
+      setErrors(res.errors ?? {});
+      setMessage({ intent: "error", text: res.message });
+      return false;
+    }
+    dirtyRef.current = false;
+    setErrors({});
+    setMessage(undefined);
+    const warns = (res.data as { _warnings?: string[] })._warnings;
+    toast(warns?.length ? warns.join(" · ") : p.labels.actions.saved, warns?.length ? "warning" : "success");
+    if (!stay) return true;
+    if (!p.id) router.replace(objectHref(p.objectId, String(res.data.id)));
+    else router.refresh();
+    return true;
+  };
+  const save = (current: Values = values) => start(async () => void (await doSave(current)));
+  const unsaved = useUnsavedGuard(() => dirtyRef.current && !p.readOnly, () => doSave(values, false));
 
   // Duplikovat: doklad s řadou se zkopíruje i s řádky, jinak nový záznam s předvyplněnými hodnotami
   const duplicate = () =>
@@ -430,7 +437,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       save: !p.readOnly ? () => !drawerOpen() && save() : undefined,
       delete: p.canDelete ? () => !drawerOpen() && setConfirm(true) : undefined,
       // Esc = zpět tam, odkud uživatel přišel (třeba z faktury na dodavatele), jinak na seznam
-      escape: () => goBack(router, p.crumbs[p.crumbs.length - 1]?.href),
+      escape: () => unsaved.guard(() => goBack(router, p.crumbs[p.crumbs.length - 1]?.href)),
     },
     !confirm,
   );
@@ -584,6 +591,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             fieldAction={!p.id && p.titleField && p.lines.length === 0 && p.newLinesHint && allFields.find((f) => f.name === p.titleField)?.readOnly ? { name: p.titleField, hint: p.labels.header.saveOpen, onClick: () => save() } : undefined}
             onChange={(name, value, t) => {
               const next = { ...values, [name]: value };
+              dirtyRef.current = true;
               pv.touch(name);
               setValues(next);
               if (triggersPreview(allFields.find((f) => f.name === name)?.kind)) pv.run(next, applyPreview);
@@ -607,6 +615,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
 
       {p.postingPreview && p.id && <PostingPreviewDrawer objectId={p.objectId} id={p.id} open={posting} onClose={() => setPosting(false)} labels={p.labels.posting} lang={p.lang} />}
 
+      {unsaved.dialog(p.labels.drawer.unsaved)}
       <Dialog open={!!typed} onOpenChange={(_, d) => !d.open && setTyped(null)}>
         <DialogSurface>
           <DialogBody>

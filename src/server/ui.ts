@@ -140,6 +140,7 @@ export function uiLabels(t: T) {
       newTitle: t("@SYS:New"),
       open: t("@SYS:Open"),
       duplicate: t("@SYS:DuplicateRecord"),
+      unsaved: { title: t("@SYS:UnsavedTitle"), text: t("@SYS:UnsavedText"), save: t("@SYS:Save"), discard: t("@SYS:UnsavedDiscard"), back: t("@SYS:Cancel") },
       image: { upload: t("@SYS:ImageUpload"), remove: t("@SYS:ImageRemove"), drop: t("@SYS:ImageDrop"), afterSave: t("@SYS:ImageAfterSave") },
     },
     history: {

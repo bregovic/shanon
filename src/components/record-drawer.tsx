@@ -5,7 +5,8 @@
  * Drawer position="end", nahoře název a zavření, dole [Zpět] … [Uložit]).
  */
 import { toast } from "./toast";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useUnsavedGuard, type UnsavedLabels } from "./unsaved-guard";
 import {
   Button,
   Drawer,
@@ -31,6 +32,7 @@ export interface DrawerLabels {
   newTitle: string;
   open: string;
   duplicate: string;
+  unsaved: UnsavedLabels;
 }
 
 export interface EditorState {
@@ -63,15 +65,26 @@ type DrawerProps = {
 };
 
 export function RecordDrawer(p: DrawerProps) {
+  // neuložené změny: zavření šuplíku (Esc, klik vedle, Zpět, křížek) se zeptá Uložit / Neukládat / Zpět
+  const dirtyRef = useRef(false);
+  const saveRef = useRef<() => Promise<boolean>>(async () => true);
+  const unsaved = useUnsavedGuard(() => p.open && dirtyRef.current, () => saveRef.current(), { links: false });
+  const close = () => unsaved.guard(() => {
+    dirtyRef.current = false;
+    p.onClose();
+  });
   return (
-    <Drawer type="overlay" position="end" size="medium" open={p.open} onOpenChange={(_, d) => !d.open && p.onClose()}>
-      {/* nový klíč při každém otevření = čistý stav formuláře */}
-      {p.open && <Editor key={p.id ?? "new"} {...p} />}
-    </Drawer>
+    <>
+      <Drawer type="overlay" position="end" size="medium" open={p.open} onOpenChange={(_, d) => !d.open && close()}>
+        {/* nový klíč při každém otevření = čistý stav formuláře */}
+        {p.open && <Editor key={p.id ?? "new"} {...p} onClose={close} dirtyRef={dirtyRef} saveRef={saveRef} />}
+      </Drawer>
+      {unsaved.dialog(p.labels.unsaved)}
+    </>
   );
 }
 
-function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles, readOnly, fixed, labels, onClose, onSaved }: DrawerProps) {
+function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles, readOnly, fixed, labels, onClose, onSaved, dirtyRef, saveRef }: DrawerProps & { dirtyRef: { current: boolean }; saveRef: { current: () => Promise<boolean> } }) {
   // Duplikovat přepne formulář na nový záznam s předvyplněnými hodnotami
   const [id, setId] = useState(openedId);
   const [state, setState] = useState<EditorState>({ values: defaults, titles: defaultTitles ?? {}, errors: {} });
@@ -109,7 +122,7 @@ function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles
     };
   }, [id, objectId]);
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     setSaving(true);
     const editable = groups.flatMap((g) => g.fields).filter((f) => !f.readOnly);
     const values: Values = {};
@@ -122,12 +135,17 @@ function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles
       const shown = new Set(groups.flatMap((g) => g.fields.map((f) => f.name)));
       const hidden = Object.entries(res.errors ?? {}).filter(([k, v]) => v && !shown.has(k)).map(([, v]) => v);
       setState((s) => ({ ...s, errors: res.errors ?? {}, message: [res.message, ...hidden].join(" ") }));
-      return;
+      return false;
     }
+    dirtyRef.current = false;
     const warns = (res.data as { _warnings?: string[] })._warnings;
     if (warns?.length) toast(warns.join(" · "), "warning");
     onSaved(res.data);
+    return true;
   };
+  useEffect(() => {
+    saveRef.current = save;
+  });
 
   const duplicate = async () => {
     if (!id) return;
@@ -170,6 +188,7 @@ function Editor({ objectId, id: openedId, title, groups, defaults, defaultTitles
             openLabel={labels.open}
             record={{ objectId, id, labels: labels.image }}
             onChange={(name, value, t) => {
+              dirtyRef.current = true;
               pv.touch(name);
               setState((s) => ({
                 ...s,
