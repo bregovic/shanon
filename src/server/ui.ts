@@ -127,6 +127,9 @@ export function uiLabels(t: T) {
       removeSelected: t("@SYS:RemoveSelected"),
       clearSelection: t("@SYS:ClearSelection"),
       newLine: t("@SYS:NewLine"),
+      linesTab: t("@SYS:LinesTab"),
+      lineOf: t("@SYS:LineOf"),
+      detailKeys: t("@SYS:DetailKeys"),
       help: FILTER_HELP.map(([code, label]) => [code, t(label)] as [string, string]),
     },
     drawer: {

@@ -119,7 +119,8 @@ export interface ObjectDef {
     /** nový řádek v mřížce převezme tato pole z předchozího řádku (jako v AX) */
     carry?: string[];
     /** vyrovnanost skupin řádků (doklad deníku): rozdíl MD − D po skupinách, dorovnání nového řádku */
-    balance?: { group: string; debit: string; credit: string; selfBalanced?: string };
+    /** selfBalanced = pole, jejichž vyplnění dělá řádek vyrovnaným samo (protiúčet) */
+    balance?: { group: string; debit: string; credit: string; selfBalanced?: string | string[] };
     /** podrobnosti vybraného řádku pod mřížkou (záložky s poli, která se do mřížky nevejdou) */
     details?: { label: LabelRef; fields: string[] }[];
     /**

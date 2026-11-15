@@ -39,7 +39,7 @@ export interface LineBalance {
   group: string;
   debit: string;
   credit: string;
-  selfBalanced?: string;
+  selfBalanced?: string | string[];
 }
 
 const useStyles = makeStyles({
@@ -94,7 +94,8 @@ function groupDiffs(rows: EditRow[], b?: LineBalance): Map<string, number> {
     if (!r.id) continue;
     const g = String(r.values[b.group] ?? "");
     if (!g) continue;
-    const d = b.selfBalanced && r.values[b.selfBalanced] ? 0 : cents(r.values[b.debit]) - cents(r.values[b.credit]);
+    const self = b.selfBalanced ? (Array.isArray(b.selfBalanced) ? b.selfBalanced : [b.selfBalanced]).some((f) => r.values[f]) : false;
+    const d = self ? 0 : cents(r.values[b.debit]) - cents(r.values[b.credit]);
     out.set(g, (out.get(g) ?? 0) + d);
   }
   return out;
@@ -116,6 +117,7 @@ export function InlineLines({
   balance,
   details,
   dims,
+  toolbar,
 }: {
   objectId: string;
   parentField: string;
@@ -139,6 +141,9 @@ export function InlineLines({
     removeSelected?: string;
     clearSelection?: string;
     newLine?: string;
+    linesTab?: string;
+    lineOf?: string;
+    detailKeys?: string;
     dims?: { title: string; account: string; offset: string; ok: string; cancel: string; hint: string; button: string; tab: string; none: string };
   };
   onChanged?: () => void;
@@ -148,6 +153,8 @@ export function InlineLines({
   details?: { label: string; fields: FieldMeta[] }[];
   /** dimenze účtu / protiúčtu a jejich dialog (Ctrl+Shift+D) */
   dims?: LineDims;
+  /** tlačítka vpravo v liště záložek (import, export) */
+  toolbar?: React.ReactNode;
 }) {
   const s = useStyles();
   const nf = useMemo(() => new Intl.NumberFormat(lang === "en" ? "en-GB" : "cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), [lang]);
@@ -369,7 +376,27 @@ export function InlineLines({
   // vybraný (aktivní) řádek: podrobnosti pod mřížkou
   const [active, setActive] = useState<string | null>(null);
   const activeRow = rows.find((r) => r.key === active) ?? null;
-  const [tab, setTab] = useState("0");
+  const [tab, setTab] = useState("lines");
+  const detailRef = useRef<HTMLDivElement>(null);
+  const savedRows = rows.filter((r) => r.id);
+  // vybraný uložený řádek, jinak poslední uložený (prázdný nový řádek podrobnosti nemá)
+  const current = (activeRow?.id ? activeRow : null) ?? savedRows[savedRows.length - 1] ?? null;
+  // záložka podrobností: kurzor do prvního pole vybraného řádku
+  const openTab = (v: string) => {
+    if (v !== "lines" && current && activeRow?.key !== current.key) setActive(current.key);
+    setTab(v);
+    if (v !== "lines") setTimeout(() => detailRef.current?.querySelector<HTMLElement>("input, select, button")?.focus(), 60);
+  };
+  // šipky ↑/↓ v podrobnostech = předchozí / další řádek (rozpracovaný se uloží)
+  const stepRow = async (dir: 1 | -1) => {
+    if (!current) return;
+    const i = savedRows.findIndex((r) => r.key === current.key);
+    const next = savedRows[i + dir];
+    if (!next) return;
+    if (current.dirty) await save(current.key);
+    setActive(next.key);
+    setTimeout(() => detailRef.current?.querySelector<HTMLElement>("input, select, button")?.focus(), 30);
+  };
   const [dimRow, setDimRow] = useState<string | null>(null);
   const dimTarget = rows.find((r) => r.key === dimRow) ?? null;
   const patchRow = (key: string, patch: Values) =>
@@ -478,8 +505,95 @@ export function InlineLines({
 
   const groupOpen = (r: EditRow) => !!balance && !!r.id && (diffs.get(String(r.values[balance.group] ?? "")) ?? 0) !== 0;
 
+  const tabsBar = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+      <TabList selectedValue={tab} onTabSelect={(_, d) => openTab(String(d.value))}>
+        <Tab value="lines">{labels.linesTab ?? "Řádky"}</Tab>
+        {(details ?? []).map((d, i) => (
+          <Tab key={i} value={String(i)} disabled={!current}>
+            {d.label}
+          </Tab>
+        ))}
+        {dims && labels.dims && (
+          <Tab value="dims" disabled={!current}>
+            {labels.dims.tab}
+          </Tab>
+        )}
+      </TabList>
+      <span style={{ flex: 1 }} />
+      {toolbar}
+    </div>
+  );
+
+  if (tab !== "lines" && current)
+    return (
+      <div>
+        {tabsBar}
+        <div
+          ref={detailRef}
+          className={s.details}
+          onKeyDown={(e) => {
+            const t = e.target as HTMLElement;
+            const expanded = t.getAttribute("aria-expanded") === "true";
+            if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !e.altKey && !expanded && t.tagName !== "SELECT") {
+              e.preventDefault();
+              void stepRow(e.key === "ArrowDown" ? 1 : -1);
+            }
+            if (e.key === "Escape") openTab("lines");
+          }}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node) && current.dirty) void save(current.key);
+          }}
+        >
+          <Text weight="semibold" block style={{ padding: "8px 0" }}>
+            {(labels.lineOf ?? "Řádek {n} z {count}").replace("{n}", String(savedRows.findIndex((r) => r.key === current.key) + 1)).replace("{count}", String(savedRows.length))}
+            {" · "}
+            {[current.values[balance?.group ?? ""], ...columns.flatMap((c) => c.fields.filter((f) => f.kind === "ref" && visible(f, current.values)).map((f) => current.titles[f.name])).slice(0, 1), current.values.text]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+          {tab !== "dims" && details?.[Number(tab)] && (
+            <RecordForm
+              groups={[{ label: "", fields: details[Number(tab)].fields }]}
+              columns={4}
+              values={current.values}
+              titles={current.titles}
+              errors={{}}
+              readOnly={readOnly}
+              openLabel={labels.open}
+              onChange={(name, value, title) =>
+                update(current.key, { values: { ...current.values, [name]: value }, titles: title !== undefined ? { ...current.titles, [name]: title } : current.titles, dirty: true, error: undefined })
+              }
+            />
+          )}
+          {tab === "dims" && dims && labels.dims && (
+            <div style={{ display: "flex", gap: 24, alignItems: "center", paddingTop: 4, flexWrap: "wrap" }}>
+              <Text>
+                <b>{labels.dims.account}:</b> {dimSummary(current, dims.main) || labels.dims.none}
+              </Text>
+              <Text>
+                <b>{labels.dims.offset}:</b> {dimSummary(current, dims.offset) || labels.dims.none}
+              </Text>
+              {!readOnly && (
+                <Button size="small" icon={<Tag20Regular />} onClick={() => setDimRow(current.key)}>
+                  {labels.dims.button} (Ctrl+Shift+D)
+                </Button>
+              )}
+            </div>
+          )}
+          <Text block className={s.hint} style={{ paddingTop: 8 }}>
+            {labels.detailKeys ?? "↑/↓ = předchozí / další řádek · Esc = zpět na řádky"}
+          </Text>
+        </div>
+        {dims && labels.dims && dimTarget && (
+          <DimsDialog open dims={dims} values={dimTarget.values} labels={labels.dims} onOk={(patch) => void applyDims(dimTarget.key, patch)} onCancel={() => setDimRow(null)} />
+        )}
+      </div>
+    );
+
   return (
     <div>
+      {tabsBar}
       <div className={s.wrap} style={{ maxHeight: "calc(100vh - 260px)" }}>
         <table className={s.table} style={{ minWidth: columns.reduce((a, c) => a + c.width, 60) }}>
           <thead>
@@ -586,53 +700,6 @@ export function InlineLines({
           <Button size="small" appearance="subtle" icon={<Add20Regular />} onClick={() => void addRow()}>
             {labels.newLine ?? "Nový řádek"} (↓)
           </Button>
-        </div>
-      )}
-      {(details?.length || dims) && activeRow && (
-        <div
-          className={s.details}
-          onBlur={(e) => {
-            // odchod z podrobností = uložit řádek
-            if (!e.currentTarget.contains(e.relatedTarget as Node) && activeRow.dirty) void save(activeRow.key);
-          }}
-        >
-          <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(String(d.value))}>
-            {(details ?? []).map((d, i) => (
-              <Tab key={i} value={String(i)}>
-                {d.label}
-              </Tab>
-            ))}
-            {dims && labels.dims && <Tab value="dims">{labels.dims.tab}</Tab>}
-          </TabList>
-          {tab !== "dims" && details?.[Number(tab)] && (
-            <RecordForm
-              groups={[{ label: "", fields: details[Number(tab)].fields }]}
-              columns={4}
-              values={activeRow.values}
-              titles={activeRow.titles}
-              errors={{}}
-              readOnly={readOnly}
-              openLabel={labels.open}
-              onChange={(name, value, title) =>
-                update(activeRow.key, { values: { ...activeRow.values, [name]: value }, titles: title !== undefined ? { ...activeRow.titles, [name]: title } : activeRow.titles, dirty: true, error: undefined })
-              }
-            />
-          )}
-          {tab === "dims" && dims && labels.dims && (
-            <div style={{ display: "flex", gap: 24, alignItems: "center", paddingTop: 8, flexWrap: "wrap" }}>
-              <Text>
-                <b>{labels.dims.account}:</b> {dimSummary(activeRow, dims.main) || labels.dims.none}
-              </Text>
-              <Text>
-                <b>{labels.dims.offset}:</b> {dimSummary(activeRow, dims.offset) || labels.dims.none}
-              </Text>
-              {!readOnly && (
-                <Button size="small" icon={<Tag20Regular />} onClick={() => setDimRow(activeRow.key)}>
-                  {labels.dims.button} (Ctrl+Shift+D)
-                </Button>
-              )}
-            </div>
-          )}
         </div>
       )}
       {dims && labels.dims && dimTarget && (

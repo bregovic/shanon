@@ -529,6 +529,9 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      LinesTab: "Řádky",
+      LineOf: "Řádek {n} z {count}",
+      DetailKeys: "↑/↓ = předchozí / další řádek · Esc = zpět na řádky",
       NewLine: "Nový řádek",
       DimsTitle: "Finanční dimenze řádku",
       DimsAccount: "Účet",
@@ -908,6 +911,9 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      LinesTab: "Lines",
+      LineOf: "Line {n} of {count}",
+      DetailKeys: "↑/↓ = previous / next line · Esc = back to lines",
       NewLine: "New line",
       DimsTitle: "Line financial dimensions",
       DimsAccount: "Account",

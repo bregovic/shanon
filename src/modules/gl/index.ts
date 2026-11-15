@@ -490,8 +490,8 @@ export const journal = defineObject({
       label: "@SYS:Lines",
       inline: true,
       inherit: { date: "date" },
-      carry: ["date", "text", "accountType", "offsetType"],
-      balance: { group: "voucherNum", debit: "debit", credit: "credit", selfBalanced: "offsetType" },
+      carry: ["date", "text", "accountType"],
+      balance: { group: "voucherNum", debit: "debit", credit: "credit", selfBalanced: ["offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
       // podrobnosti vybraného řádku pod mřížkou (záložky) a dialog dimenzí účtu / protiúčtu
       details: [{ label: "@SYS:General", fields: ["vs", "currencyId"] }],
       dims: { main: "dim", offset: "offsetDim", account: "accountId", offsetAccount: "offsetAccountId", offsetType: "offsetType" },
@@ -528,7 +528,8 @@ export const journalLine = defineObject({
     text: { edt: Edts.Description, label: "@GL:Text" },
     debit: { edt: Edts.Amount, label: "@GL:Debit", aliases: ["má dáti", "ma dati", "debet", "debit"] },
     credit: { edt: Edts.Amount, label: "@GL:Credit", aliases: ["dal", "kredit", "credit"] },
-    offsetType: { edt: enumEdt(LedgerAccountType, "@GL:OffsetKind") },
+    // výchozí Hlavní kniha; bez vyplněného protiúčtu se neúčtuje
+    offsetType: { edt: enumEdt(LedgerAccountType, "@GL:OffsetKind"), default: "ledger" },
     offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount", visibleWhen: when("offsetType", "ledger"), gridColumn: "offset" },
     offsetCustomerId: { edt: refEdt("ar.customer", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "customer"), gridColumn: "offset" },
     offsetVendorId: { edt: refEdt("ap.vendor", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "vendor"), gridColumn: "offset" },

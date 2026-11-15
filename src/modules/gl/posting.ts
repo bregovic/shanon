@@ -245,7 +245,9 @@ export async function resolveJournalName(data: DataApi, id: unknown, journalType
 }
 
 const voucherSeq = (jn: RecordData) => ({ id: (jn.voucherSeqId as string) || undefined, usedFor: "gl.voucher", code: "GLVOUCHER" });
-const lineDiff = (l: RecordData) => (l.offsetType ? BigInt(0) : toCents(l.debit ?? 0) - toCents(l.credit ?? 0));
+const OFFSET_REFS = ["offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"];
+// řádek s vyplněným protiúčtem je vyrovnaný sám
+const lineDiff = (l: RecordData) => (OFFSET_REFS.some((f) => l[f]) ? BigInt(0) : toCents(l.debit ?? 0) - toCents(l.credit ?? 0));
 
 /**
  * Číslo dokladu pro nový řádek deníku podle číslování názvu deníku (jako v AX):
@@ -362,7 +364,8 @@ export const glHandlers: Record<string, ObjectHandlers> = {
         // číslo dokladu hned (vidět, co k čemu patří a jestli je doklad vyrovnaný)
         if (journal && jn && !data.voucherNum) data.voucherNum = await allocateVoucher(ctx.data, journal, jn, data);
         const defType = (jn?.offsetType as string) || (jn?.offsetAccountId ? "ledger" : null);
-        if (!data.offsetType && defType) {
+        // výchozí protiúčet z názvu deníku (druh Hlavní kniha je jen výchozí hodnota, účet prázdný)
+        if (defType && (!data.offsetType || !OFFSET_REFS.some((f) => data[f]))) {
           data.offsetType = defType;
           data.offsetAccountId ??= jn?.offsetAccountId ?? null;
           data.offsetBankAccountId ??= jn?.offsetBankAccountId ?? null;

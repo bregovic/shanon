@@ -122,7 +122,8 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
       continue;
     }
     const legs: Leg[] = [{ ...main, line: l, lineNo: n, amount, currencyId, amountCur }];
-    if (l.offsetType) {
+    // protiúčet jen když je vyplněný (druh má výchozí Hlavní kniha)
+    if (l.offsetType && l[REF[String(l.offsetType) as Kind]?.offset]) {
       const ok = String(l.offsetType) as Kind;
       const off = await resolveLeg(data, ok, (l[REF[ok]?.offset] as string) ?? null);
       if (!off) errors.push({ ref: "@GL:LineAccountMissing", params: { line: String(n) } });

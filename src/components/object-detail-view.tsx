@@ -62,7 +62,7 @@ export interface LineSpec {
   /** úprava přímo v mřížce (deník) */
   inline?: boolean;
   carry?: string[];
-  balance?: { group: string; debit: string; credit: string; selfBalanced?: string };
+  balance?: { group: string; debit: string; credit: string; selfBalanced?: string | string[] };
   details?: { label: string; fields: FieldMeta[] }[];
   dims?: LineDims;
   /** řádek má akce — dvojklik otevře jeho stránku */
@@ -138,6 +138,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
 
   return (
     <section>
+      {!spec.inline && (
       <div className={s.linesHead}>
         <div className={s.linesTitle}>{spec.label}</div>
         {/* export řádků dokladu; import do vlastních řádků (rodič je pevný) */}
@@ -175,6 +176,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           </>
         )}
       </div>
+      )}
       {error && (
         <MessageBar intent="error" style={{ marginBottom: 8 }}>
           <MessageBarBody>{error}</MessageBarBody>
@@ -182,6 +184,18 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
       )}
       {spec.inline ? (
         <InlineLines
+          toolbar={
+            <>
+              {spec.editable && <ImportButton objectId={spec.objectId} labels={labels.importer} fixed={{ [spec.field]: parentId }} onDone={() => (setReload((n) => n + 1), router.refresh())} />}
+              <Button
+                appearance="subtle"
+                icon={<ArrowDownload24Regular />}
+                title={labels.export}
+                aria-label={labels.export}
+                onClick={() => (window.location.href = `/api/export/${spec.objectId}?filter=${encodeURIComponent(JSON.stringify({ [spec.field]: parentId }))}`)}
+              />
+            </>
+          }
           objectId={spec.objectId}
           parentField={spec.field}
           parentId={parentId}
@@ -195,7 +209,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           details={spec.details}
           dims={spec.dims}
           lang={lang}
-          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys, select: labels.grid.select, selectAll: labels.grid.selectAll, removeSelected: labels.grid.removeSelected, clearSelection: labels.grid.clearSelection, newLine: labels.grid.newLine, dims: labels.dims }}
+          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys, select: labels.grid.select, selectAll: labels.grid.selectAll, removeSelected: labels.grid.removeSelected, clearSelection: labels.grid.clearSelection, newLine: labels.grid.newLine, linesTab: labels.grid.linesTab, lineOf: labels.grid.lineOf, detailKeys: labels.grid.detailKeys, dims: labels.dims }}
           onChanged={() => router.refresh()}
         />
       ) : (
@@ -270,23 +284,6 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   // uložený doklad s mřížkou řádků (deník): hlavička sbalená do souhrnu, rozbalí se tlačítkem
   const collapsible = !!p.compactHeader && !!p.id && p.lines.some((l) => l.inline);
   const [headerOpen, setHeaderOpen] = useState(!collapsible);
-  const summary = useMemo(
-    () =>
-      p.groups
-        .flatMap((g) => g.fields)
-        .filter((f) => f.name !== p.titleField)
-        .map((f) => {
-          const v = values[f.name];
-          if (v === null || v === undefined || v === "") return null;
-          if (f.kind === "ref") return titles[f.name] || null;
-          if (f.kind === "enum") return f.options?.find((o) => o.value === v)?.label ?? String(v);
-          if (f.kind === "date") return String(v).split("-").reverse().map((x, i) => (i < 2 ? String(Number(x)) : x)).join(". ");
-          return String(v);
-        })
-        .filter(Boolean)
-        .join(" · "),
-    [p.groups, p.titleField, values, titles],
-  );
   // náhled: číslo nového dokladu a hodnoty, které uložení doplní — vidět hned
   const allFields = useMemo(() => p.groups.flatMap((g) => g.fields), [p.groups]);
   const pv = usePreview(p.objectId, p.id, { fields: useMemo(() => allFields.map((f) => f.name), [allFields]), disabled: p.readOnly });
@@ -471,6 +468,13 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             ...p.actions.filter((a) => a.group === "inquiry").map(item),
           ];
           const moreItems = [
+            ...(collapsible
+              ? [
+                  <MenuItem key="header" icon={headerOpen ? <ChevronUp20Regular /> : <ChevronDown20Regular />} onClick={() => setHeaderOpen((x) => !x)}>
+                    {headerOpen ? p.labels.header.hide : p.labels.header.show}
+                  </MenuItem>,
+                ]
+              : []),
             ...(p.canDuplicate && p.id
               ? [
                   <MenuItem key="dup" icon={<Copy24Regular />} disabled={busy} onClick={duplicate}>
@@ -523,15 +527,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             <MessageBarBody>{message.text}</MessageBarBody>
           </MessageBar>
         )}
-        {collapsible && !headerOpen ? (
-          <div className={s.card} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
-            <Text weight="semibold">{String(values[p.titleField ?? ""] ?? "")}</Text>
-            <Text style={{ color: tokens.colorNeutralForeground2, flex: 1 }}>{summary}</Text>
-            <Button size="small" appearance="subtle" icon={<ChevronDown20Regular />} onClick={() => setHeaderOpen(true)}>
-              {p.labels.header.show}
-            </Button>
-          </div>
-        ) : (
+        {collapsible && !headerOpen ? null : (
         <div className={s.card}>
           {collapsible && (
             <Button size="small" appearance="subtle" icon={<ChevronUp20Regular />} style={{ float: "right" }} onClick={() => setHeaderOpen(false)}>
