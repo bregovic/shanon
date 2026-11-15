@@ -7,6 +7,7 @@ import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { JournalStatus } from "@/modules/gl";
+import { postingAccount } from "@/modules/gl/setup";
 import { Vs } from "@/modules/tax/partner-ledger";
 
 export const PaymentKind = defineEnum({
@@ -55,12 +56,15 @@ export const MatchKind = defineEnum({
   id: "BankMatchKind",
   label: "@BANK:MatchKind",
   values: [
-    { value: "none", label: "@BANK:MatchNone" },
-    { value: "customer", label: "@BANK:MatchCustomer" },
-    { value: "vendor", label: "@BANK:MatchVendor" },
-    { value: "customerAdvance", label: "@BANK:MatchCustomerAdvance" },
-    { value: "vendorAdvance", label: "@BANK:MatchVendorAdvance" },
-    { value: "ledger", label: "@BANK:MatchLedger" },
+    { value: "none", label: "@BANK:MatchNone", color: "subtle" },
+    { value: "customer", label: "@BANK:MatchCustomer", color: "success" },
+    { value: "vendor", label: "@BANK:MatchVendor", color: "success" },
+    { value: "customerAdvance", label: "@BANK:MatchCustomerAdvance", color: "success" },
+    { value: "vendorAdvance", label: "@BANK:MatchVendorAdvance", color: "success" },
+    { value: "ledger", label: "@BANK:MatchLedger", color: "informative" },
+    { value: "customerAccount", label: "@BANK:MatchCustomerAccount", color: "warning" },
+    { value: "vendorAccount", label: "@BANK:MatchVendorAccount", color: "warning" },
+    { value: "rule", label: "@BANK:MatchRule", color: "informative" },
   ],
 });
 
@@ -245,6 +249,9 @@ export const statement = defineObject({
   unique: [["bankAccountId", "statementNum"]],
   defaultSort: { field: "date", dir: "desc" },
   lines: [{ object: "bank.statementLine", field: "statementId", label: "@BANK:Lines" }],
+  // detail výpisu: rovnou transakce, hlavička v Další ▾ → Hlavička
+  compactHeader: true,
+  collapseHeader: true,
   actions: [
     { id: "match", label: "@BANK:AutoMatch", when: { field: "status", equals: "draft" } },
     { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
@@ -274,14 +281,101 @@ export const statementLine = defineObject({
     customerAdvanceId: { edt: refEdt("ar.advance", "@AR:Advance") },
     vendorAdvanceId: { edt: refEdt("ap.advance", "@AP:Advance") },
     offsetAccountId: { edt: refEdt("gl.account", "@BANK:OffsetAccount") },
+    /** partner podle bankovního účtu protistrany — úhrada na jeho účet bez konkrétní faktury */
+    customerId: { edt: refEdt("ar.customer", "@BANK:Customer") },
+    vendorId: { edt: refEdt("ap.vendor", "@BANK:Vendor") },
+    /** předkontace, podle které se řádek spároval (poplatky, úroky…) */
+    postingRuleId: { edt: refEdt("bank.postingRule", "@BANK:PostingRule"), readOnly: true },
+    /** deník hlavní knihy, do kterého řádek přešel */
+    journalId: { edt: refEdt("gl.journal", "@BANK:Journal"), readOnly: true },
   },
   titleField: "message",
-  list: ["lineNum", "date", "amount", "vs", "counterAccount", "message", "matchKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "offsetAccountId"],
+  // v mřížce jen příznak párování; vazby (faktura, záloha) v detailu řádku
+  list: ["lineNum", "date", "amount", "vs", "counterAccount", "message", "matchKind", "offsetAccountId", "journalId"],
   form: [
     { label: "@SYS:General", fields: ["statementId", "lineNum", "date", "amount", "vs", "counterAccount", "message"] },
-    { label: "@BANK:Matching", fields: ["matchKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "offsetAccountId"] },
+    { label: "@BANK:Matching", fields: ["matchKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "customerId", "vendorId", "offsetAccountId", "postingRuleId", "journalId"] },
   ],
   defaultSort: { field: "lineNum", dir: "asc" },
+  // vybrané řádky (třeba jen spárované) → deník banky
+  actions: [{ id: "createJournal", label: "@BANK:CreateJournal", bulk: true }],
+});
+
+export const RuleDirection = defineEnum({
+  id: "BankRuleDirection",
+  label: "@BANK:RuleDirection",
+  values: [
+    { value: "any", label: "@BANK:DirAny" },
+    { value: "in", label: "@BANK:DirIn" },
+    { value: "out", label: "@BANK:DirOut" },
+  ],
+});
+
+/**
+ * Předkontace bankovních transakcí (poplatky, úroky, daně…): řádek výpisu, který nenajde fakturu
+ * ani zálohu, se podle textu / protiúčtu / směru spáruje s účtem hlavní knihy.
+ */
+export const postingRule = defineObject({
+  id: "bank.postingRule",
+  table: "bank_posting_rule",
+  label: "@BANK:PostingRule",
+  labelPlural: "@BANK:PostingRules",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    /** text zprávy / popisu obsahuje (bez ohledu na velikost písmen a diakritiku) */
+    textContains: { edt: Edts.Description, label: "@BANK:TextContains" },
+    /** protiúčet obsahuje (číslo účtu nebo jeho část) */
+    counterContains: { edt: Edts.Description, label: "@BANK:CounterContains" },
+    direction: { edt: enumEdt(RuleDirection), mandatory: true, default: "any" },
+    offsetAccountId: { edt: refEdt("gl.account", "@BANK:OffsetAccount"), mandatory: true },
+    priority: { edt: Edts.Int, label: "@BANK:RulePriority", default: 10 },
+    active: { edt: Edts.NoYes, label: "@BANK:RuleActive", default: true },
+  },
+  titleField: "code",
+  list: ["code", "name", "textContains", "counterContains", "direction", "offsetAccountId", "priority", "active"],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "priority", "active"] },
+    { label: "@BANK:RuleMatch", fields: ["textContains", "counterContains", "direction", "offsetAccountId"] },
+  ],
+  unique: [["code"]],
+  defaultSort: { field: "priority", dir: "asc" },
+});
+
+export const MatchMethod = defineEnum({
+  id: "BankMatchMethod",
+  label: "@BANK:MatchMethod",
+  values: [
+    { value: "vsInvoice", label: "@BANK:MmVsInvoice" },
+    { value: "vsAdvance", label: "@BANK:MmVsAdvance" },
+    { value: "counterPartner", label: "@BANK:MmCounterPartner" },
+    { value: "rules", label: "@BANK:MmRules" },
+  ],
+});
+
+/**
+ * Pořadí párování transakcí výpisu (Banka → Nastavení): kroky v pořadí, první úspěšný vyhrává.
+ * Víc kandidátů (stejný VS u víc dokladů) párování zastaví — rozhodne člověk.
+ */
+export const matchStep = defineObject({
+  id: "bank.matchStep",
+  table: "bank_match_step",
+  label: "@BANK:MatchStep",
+  labelPlural: "@BANK:MatchSteps",
+  scope: "company",
+  fields: {
+    sequence: { edt: Edts.Int, label: "@BANK:RulePriority", mandatory: true },
+    method: { edt: enumEdt(MatchMethod), mandatory: true },
+    /** u VS: částka musí odpovídat zbývající částce dokladu */
+    requireAmount: { edt: Edts.NoYes, label: "@BANK:RequireAmount" },
+    active: { edt: Edts.NoYes, label: "@BANK:RuleActive", default: true },
+  },
+  titleField: "method",
+  list: ["sequence", "method", "requireAmount", "active"],
+  form: [{ label: "@SYS:General", fields: ["sequence", "method", "requireAmount", "active"] }],
+  unique: [["method"]],
+  defaultSort: { field: "sequence", dir: "asc" },
 });
 
 /** Platební metoda: druh, účet, ze kterého se platí, a formát platebního příkazu (Transformace). */
@@ -412,6 +506,8 @@ export const importLog = defineObject({
   titleField: "fileName",
   list: ["fileName", "accountNum", "statementNum", "date", "status", "message", "statementId"],
   form: [{ label: "@SYS:General", fields: ["fileName", "accountNum", "statementNum", "date", "status", "message", "statementId"] }],
+  // smazat nahraný výpis (nezaúčtovaný) i s řádkem protokolu
+  actions: [{ id: "deleteStatement", label: "@BANK:DeleteStatement", bulk: true }],
   defaultSort: { field: "fileName", dir: "desc" },
 });
 
@@ -440,8 +536,29 @@ async function formatSetup(data: DataApi) {
   }
 }
 
+/** Výchozí předkontace (jen chybějící kód): poplatky a úroky. */
+async function ruleSetup(data: DataApi) {
+  for (const [code, name, textContains, direction, acc] of [
+    ["POPL", "Bankovní poplatky", "poplatek", "out", "568"],
+    ["UROK", "Připsané úroky", "úrok", "in", "662"],
+  ] as const) {
+    if ((await data.find("bank.postingRule", { code }, { take: 1 })).length) continue;
+    const accountId = await postingAccount(data, acc);
+    if (accountId) await data.create("bank.postingRule", { code, name, textContains, direction, offsetAccountId: accountId, priority: 10, active: true });
+  }
+}
+
+/** Výchozí pořadí párování (jen když firma žádné nemá). */
+async function stepSetup(data: DataApi) {
+  if ((await data.find("bank.matchStep", {}, { take: 1 })).length) return;
+  for (const [sequence, method] of [[10, "vsInvoice"], [20, "vsAdvance"], [30, "counterPartner"], [40, "rules"]] as const)
+    await data.create("bank.matchStep", { sequence, method, requireAmount: false, active: true });
+}
+
 async function bankSetup(data: DataApi) {
   await formatSetup(data);
+  await ruleSetup(data);
+  await stepSetup(data);
   if ((await data.find("bank.paymentMethod", {}, { take: 1 })).length) return;
   const tr = async (code: string) => (await data.find("sys.transformation", { code }, { take: 1 }))[0]?.id ?? null;
   await data.create("bank.paymentMethod", { code: "PREVOD", name: "Převodem (ABO)", kind: "transfer", transformationId: await tr("ABO") });
@@ -455,14 +572,14 @@ export default defineModule({
   description: "@BANK:ModuleDesc",
   icon: "BuildingBank",
   dependsOn: ["gl", "ar", "ap"],
-  enums: [MatchKind, PaymentKind, PayOrderStatus, CheckStatus, ImportStatus, TextEncoding, FormatSection, FormatTarget],
-  objects: [statementFormat, statementFormatField, account, accountMethod, statement, statementLine, paymentMethod, paymentOrder, paymentOrderLine, importLog],
+  enums: [MatchKind, MatchMethod, RuleDirection, PaymentKind, PayOrderStatus, CheckStatus, ImportStatus, TextEncoding, FormatSection, FormatTarget],
+  objects: [statementFormat, statementFormatField, account, accountMethod, statement, statementLine, postingRule, matchStep, paymentMethod, paymentOrder, paymentOrderLine, importLog],
   numberSeqs: [{ code: "BANKPO", name: "@BANK:PaymentOrders", format: "PP{YY}{#####}", usedFor: "bank.paymentOrder" }],
   setup: bankSetup,
   menu: [
     { label: "@BANK:Module", items: [{ object: "bank.statement" }, { object: "gl.journal", href: "/gl/journal?filter.journalType=bank", label: "@GL:JournalsBank", module: "gl" }, { object: "bank.importLog" }, { object: "bank.paymentOrder" }] },
     { label: "@BANK:Module", kind: "functions", items: [{ href: "/bank/import", label: "@BANK:BulkImport" }] },
-    { label: "@SYS:Setup", items: [{ object: "bank.account" }, { object: "bank.paymentMethod" }, { object: "bank.statementFormat" }] },
+    { label: "@SYS:Setup", items: [{ object: "bank.account" }, { object: "bank.paymentMethod" }, { object: "bank.matchStep" }, { object: "bank.postingRule" }, { object: "bank.statementFormat" }] },
   ],
   labels: {
     cs: {
@@ -597,14 +714,41 @@ export default defineModule({
       Line: "Řádek výpisu",
       Lines: "Řádky výpisu",
       LineNum: "Pořadí",
-      AmountSigned: "Částka (+ příjem, − výdej)",
+      AmountSigned: "Částka +/−",
       CounterAccount: "Protiúčet",
       Matching: "Párování",
-      MatchKind: "Spárováno s",
+      MatchKind: "Párování",
       MatchNone: "Nespárováno",
       MatchCustomer: "Odběratel",
       MatchVendor: "Dodavatel",
       MatchLedger: "Účet",
+      MatchRule: "Předkontace",
+      DeleteStatement: "Smazat výpis",
+      StatementJournalPosted: "Výpis je v zaúčtovaném deníku — smazat ho nejde.",
+      MatchCustomerAccount: "Odběratel (bez faktury)",
+      MatchVendorAccount: "Dodavatel (bez faktury)",
+      Customer: "Odběratel",
+      Vendor: "Dodavatel",
+      MatchMethod: "Způsob párování",
+      MmVsInvoice: "Jednoznačný VS → otevřená faktura",
+      MmVsAdvance: "VS → neuhrazená záloha",
+      MmCounterPartner: "Bankovní účet protistrany → dodavatel / odběratel",
+      MmRules: "Předkontace (text, protiúčet, směr)",
+      MatchStep: "Krok párování",
+      MatchSteps: "Pořadí párování",
+      RequireAmount: "Částka musí sedět",
+      PostingRule: "Předkontace",
+      PostingRules: "Předkontace transakcí",
+      RuleDirection: "Směr",
+      DirAny: "Příjem i výdej",
+      DirIn: "Příjem",
+      DirOut: "Výdej",
+      TextContains: "Text obsahuje",
+      CounterContains: "Protiúčet obsahuje",
+      RulePriority: "Pořadí",
+      RuleActive: "Aktivní",
+      RuleMatch: "Kdy a kam",
+      LineInJournal: "Řádek {line} už je v deníku {journal}.",
       CustomerTrans: "Faktura odběratele",
       VendorTrans: "Faktura dodavatele",
       OffsetAccount: "Protiúčet v hlavní knize",
@@ -751,14 +895,41 @@ export default defineModule({
       Line: "Statement line",
       Lines: "Statement lines",
       LineNum: "Line",
-      AmountSigned: "Amount (+ receipt, − payment)",
+      AmountSigned: "Amount +/−",
       CounterAccount: "Counter account",
       Matching: "Matching",
-      MatchKind: "Matched with",
+      MatchKind: "Matching",
       MatchNone: "Not matched",
       MatchCustomer: "Customer",
       MatchVendor: "Vendor",
       MatchLedger: "Account",
+      MatchRule: "Posting rule",
+      DeleteStatement: "Delete statement",
+      StatementJournalPosted: "The statement is in a posted journal and cannot be deleted.",
+      MatchCustomerAccount: "Customer (no invoice)",
+      MatchVendorAccount: "Vendor (no invoice)",
+      Customer: "Customer",
+      Vendor: "Vendor",
+      MatchMethod: "Matching method",
+      MmVsInvoice: "Unique VS → open invoice",
+      MmVsAdvance: "VS → unpaid advance",
+      MmCounterPartner: "Counter bank account → vendor / customer",
+      MmRules: "Posting rules (text, counter account, direction)",
+      MatchStep: "Matching step",
+      MatchSteps: "Matching sequence",
+      RequireAmount: "Amount must match",
+      PostingRule: "Posting rule",
+      PostingRules: "Transaction posting rules",
+      RuleDirection: "Direction",
+      DirAny: "In and out",
+      DirIn: "Incoming",
+      DirOut: "Outgoing",
+      TextContains: "Text contains",
+      CounterContains: "Counter account contains",
+      RulePriority: "Order",
+      RuleActive: "Active",
+      RuleMatch: "When and where",
+      LineInJournal: "Line {line} is already in journal {journal}.",
       CustomerTrans: "Customer invoice",
       VendorTrans: "Vendor invoice",
       OffsetAccount: "Offset ledger account",

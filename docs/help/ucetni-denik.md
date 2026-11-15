@@ -3,6 +3,7 @@ title: Účetní deník a hlavní kniha
 module: gl
 objects: gl.journal, gl.journalLine, gl.account, gl.voucher, gl.trans
 order: 10
+video: 04-obecny-denik
 summary: Ruční zápisy, druhy účtů (odběratel, dodavatel, banka), ověření a zaúčtování; účtový rozvrh.
 ---
 ## Kde deníky najdete

@@ -7,6 +7,7 @@
  *   objects: ar.invoice, ar.invoiceLine
  *   order: 10
  *   summary: Od založení faktury po zaúčtování a odeslání PDF.
+ *   video: 01-vydana-faktura      (volitelně: video návod z úložiště videí, nebo celá adresa)
  *   ---
  *
  * Návod se ukáže v Nápovědě, v hledání (Ctrl+K) a jako „?“ u modulu a
@@ -23,8 +24,14 @@ export interface HelpTopic {
   objects: string[];
   order: number;
   summary: string;
+  /** adresa video návodu (prázdné = bez videa) */
+  video: string | null;
   body: string;
 }
+
+/** Úložiště video návodů (veřejný bucket); `video: <název>` v hlavičce návodu → <úložiště>/<název>.mp4 */
+const VIDEO_BASE = (process.env.SHANON_HELP_VIDEO_BASE ?? "https://pub-bc34fee76f694dea8d40b45072363a7f.r2.dev/shanon/").replace(/\/?$/, "/");
+const videoUrl = (v: string | undefined) => (!v ? null : /^https?:\/\//.test(v) ? v : `${VIDEO_BASE}${v.replace(/\.mp4$/, "")}.mp4`);
 
 const DIR = join(process.cwd(), "docs", "help");
 let cache: HelpTopic[] | null = null;
@@ -43,6 +50,7 @@ function parse(id: string, src: string): HelpTopic {
     objects: (head.objects ?? "").split(/[,\s]+/).filter(Boolean),
     order: Number(head.order ?? 100),
     summary: head.summary ?? "",
+    video: videoUrl(head.video),
     body: m ? m[2] : src,
   };
 }

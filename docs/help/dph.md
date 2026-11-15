@@ -3,6 +3,7 @@ title: Přiznání k DPH a kontrolní hlášení
 module: tax
 objects: tax.return, tax.trans, tax.taxCode, tax.parameters, tax.taxGroup, tax.itemTaxGroup
 order: 10
+video: 05-dph-priznani
 summary: Výpočet z daňových transakcí, kontrola, XML pro EPO a podání.
 ---
 ## Odkud se berou údaje

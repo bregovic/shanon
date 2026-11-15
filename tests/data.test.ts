@@ -424,7 +424,8 @@ describe("banka a úhrady", () => {
     const [st] = (await listRecords(A, "bank.statement", { filter: { bankAccountId: bankAcc.id } }, client)).rows;
     expect([st.openingBalance, st.credit, st.debit, st.closingBalance]).toEqual(["50000.00", "2331.00", "650.00", "51681.00"]);
     const lines = (await listRecords(A, "bank.statementLine", { filter: { statementId: st.id }, sort: "lineNum" }, client)).rows;
-    expect(lines.map((l) => l.matchKind)).toEqual(["customer", "customer", "none", "vendor", "none"]);
+    // poplatek bez VS spáruje výchozí předkontace (POPL)
+    expect(lines.map((l) => l.matchKind)).toEqual(["customer", "customer", "none", "vendor", "rule"]);
 
     // nespárované řádky zastaví zaúčtování
     await expectUserError(runAction(A, "bank.statement", String(st.id), "post", client), "@BANK:Unmatched");

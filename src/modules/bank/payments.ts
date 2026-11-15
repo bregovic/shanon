@@ -174,16 +174,31 @@ export async function checkStatementChain(data: DataApi, st: RecordData, t: (r: 
 }
 
 /** Deník HK z výpisu: řádek = banka proti partnerovi / účtu podle spárování. */
-export async function journalFromStatement(data: DataApi, st: RecordData, t: (r: string, p?: Record<string, string>) => string) {
-  if (st.journalId || st.status === "posted") throw new UserError("@BANK:JournalExists", { num: String(st.statementNum) });
+export async function journalFromStatement(data: DataApi, st: RecordData, t: (r: string, p?: Record<string, string>) => string, only?: RecordData[]) {
+  if (st.status === "posted") throw new UserError("@BANK:JournalExists", { num: String(st.statementNum) });
+  // řádky, které ještě v deníku nejsou (celý výpis, nebo jen vybrané řádky)
+  const all = only ?? (await data.find("bank.statementLine", { statementId: st.id }, { take: 5000, orderBy: { lineNum: "asc" } }));
+  const lines = all.filter((l) => !l.journalId);
+  if (!lines.length) {
+    if (only?.length === 1 && only[0].journalId) {
+      const jj = await data.get("gl.journal", String(only[0].journalId));
+      throw new UserError("@BANK:LineInJournal", { line: String(only[0].lineNum ?? ""), journal: String(jj?.journalNum ?? "") });
+    }
+    throw new UserError("@BANK:JournalExists", { num: String(st.statementNum) });
+  }
+  // rozpracovaný deník výpisu se doplní, jinak nový (zaúčtovaný deník se nemění)
+  const open = st.journalId ? await data.get("gl.journal", String(st.journalId)) : null;
   const acc = await data.get("bank.account", String(st.bankAccountId));
   const [jn] = await data.find("gl.journalName", { journalType: "bank" }, { take: 1 });
-  const j = await data.create("gl.journal", {
-    journalNameId: jn?.id ?? null,
-    date: st.date,
-    description: `${acc?.code ?? ""} · ${st.statementNum}`.slice(0, 255),
-  });
-  for (const l of await data.find("bank.statementLine", { statementId: st.id }, { take: 5000, orderBy: { lineNum: "asc" } })) {
+  const j =
+    open && open.status === "draft"
+      ? open
+      : await data.create("gl.journal", {
+          journalNameId: jn?.id ?? null,
+          date: st.date,
+          description: `${acc?.code ?? ""} · ${st.statementNum}`.slice(0, 255),
+        });
+  for (const l of lines) {
     const amt = toCents(l.amount);
     const base: RecordData = {
       journalId: j.id,
@@ -199,17 +214,22 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
       const tr = l.customerTransId ? await data.get("ar.trans", String(l.customerTransId)) : null;
       const adv = l.customerAdvanceId ? await data.get("ar.advance", String(l.customerAdvanceId)) : null;
       Object.assign(base, { offsetType: "customer", offsetCustomerId: tr?.customerId ?? adv?.customerId ?? null });
+    } else if (l.matchKind === "customerAccount") {
+      Object.assign(base, { offsetType: "customer", offsetCustomerId: l.customerId ?? null });
+    } else if (l.matchKind === "vendorAccount") {
+      Object.assign(base, { offsetType: "vendor", offsetVendorId: l.vendorId ?? null });
     } else if (l.matchKind === "vendor" || l.matchKind === "vendorAdvance") {
       const tr = l.vendorTransId ? await data.get("ap.trans", String(l.vendorTransId)) : null;
       const adv = l.vendorAdvanceId ? await data.get("ap.advance", String(l.vendorAdvanceId)) : null;
       Object.assign(base, { offsetType: "vendor", offsetVendorId: tr?.vendorId ?? adv?.vendorId ?? null });
-    } else if (l.matchKind === "ledger" && l.offsetAccountId) {
+    } else if ((l.matchKind === "ledger" || l.matchKind === "rule") && l.offsetAccountId) {
       Object.assign(base, { offsetType: "ledger", offsetAccountId: l.offsetAccountId });
     } else {
       // nespárované: protistranu doplní účetní v deníku
       Object.assign(base, { offsetType: "ledger", offsetAccountId: null });
     }
     await data.create("gl.journalLine", base);
+    await data.update("bank.statementLine", String(l.id), { journalId: j.id });
   }
   await data.update("bank.statement", String(st.id), { journalId: j.id });
   void t;

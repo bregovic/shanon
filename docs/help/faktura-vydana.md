@@ -3,6 +3,7 @@ title: Vydaná faktura s QR platbou
 module: ar
 objects: ar.invoice, ar.invoiceLine, ar.customer
 order: 10
+video: 01-vydana-faktura
 summary: Od založení faktury přes zaúčtování po PDF s QR kódem a ISDOC.
 ---
 ## Co budete potřebovat

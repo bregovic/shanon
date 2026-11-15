@@ -1,8 +1,9 @@
 ---
 title: Banka měsíčně – import výpisů a zaúčtování
 module: bank
-objects: bank.statement, bank.statementLine, bank.importLog, bank.account
+objects: bank.statement, bank.statementLine, bank.importLog, bank.account, bank.postingRule
 order: 10
+video: 02-banka-vypis
 summary: Hromadný import GPC, kontrola návaznosti, párování plateb a deník hlavní knihy z výpisů.
 ---
 ## Jednou na začátku
@@ -36,6 +37,23 @@ Specifikace KB je připravená. Pro jinou banku založte novou podle jejího vzo
    - v seznamu výpisů označte jeden či více výpisů a dejte **Vytvořit deník HK**. Vznikne bankovní deník, který v [Deníky](/gl/journal) zkontrolujete (**Ověřit**) a **zaúčtujete**.
 
 > **Zkontrolovat návaznost** (i nad více výpisy) znovu prověří zůstatky a chybějící čísla.
+
+## Párování a předkontace
+
+Po načtení zkuste u výpisu **Automaticky spárovat**. Ve sloupci **Párování** je u každé transakce vidět, co se našlo:
+
+- **Faktura / záloha odběratele či dodavatele** – podle VS (jen jednoznačná shoda),
+- **Předkontace** – transakce bez dokladu podle pravidla v [Předkontace transakcí](/bank/postingRule): text zprávy obsahuje (např. „poplatek“), protiúčet obsahuje, směr příjem / výdaj → účet hlavní knihy. Připravené jsou bankovní poplatky (568) a úroky (662),
+- **Účet** – protiúčet zadaný ručně v detailu transakce,
+- **Nespárováno** – doplníte v deníku.
+
+Částka je jedním sloupcem **Částka +/−** (příjem kladně, výdaj záporně). Vazby na faktury a zálohy jsou v detailu transakce.
+
+## Deník z vybraných transakcí
+
+V detailu výpisu jsou rovnou transakce (hlavička je v **Další ▾ → Hlavička**). Transakce můžete vyfiltrovat (třeba Párování = spárované), označit a dát **Vytvořit deník HK** – přejdou jen vybrané. Další výběr se přidá do stejného rozpracovaného deníku výpisu; transakce, která už v deníku je, se podruhé nepřevede (sloupec **Deník**).
+
+Po hromadném importu bez chyb se aplikace sama přepne do přehledu bankovních výpisů.
 
 ## Na co si dát pozor
 

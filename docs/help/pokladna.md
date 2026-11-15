@@ -3,6 +3,7 @@ title: Pokladna – směna, prodej, zamknutí, uzávěrka
 module: pos
 objects: pos.register, pos.shift, pos.receipt, pos.box
 order: 10
+video: 06-pokladna
 summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a uzávěrka do účetnictví.
 ---
 ## Začátek dne

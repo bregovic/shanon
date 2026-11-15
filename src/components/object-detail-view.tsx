@@ -32,7 +32,7 @@ import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regul
 import { PostingPreviewDrawer } from "./posting-preview";
 import type { LineDims } from "./dims-dialog";
 import { ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons";
-import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
+import { bulkRecordAction, deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
@@ -68,6 +68,8 @@ export interface LineSpec {
   dims?: LineDims;
   /** řádek má akce — dvojklik otevře jeho stránku */
   openInPage?: boolean;
+  /** hromadné akce nad vybranými řádky */
+  bulkActions?: { id: string; label: string }[];
   sortField?: string;
   initial: { rows: Row[]; total: number; totals?: Record<string, string> };
 }
@@ -91,6 +93,7 @@ export interface ObjectDetailProps {
   printHref?: string;
   /** hlavička jako kompaktní pruh (deník), řádky přes celou stránku */
   compactHeader?: boolean;
+  collapseHeader?: boolean;
   /**
    * nový doklad s číselnou řadou a řádky: uloží se sám po vyplnění povinných
    * polí (výběr odběratele) — dostane číslo a hned jdou zadávat řádky
@@ -151,6 +154,24 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           aria-label={labels.export}
           onClick={() => (window.location.href = `/api/export/${spec.objectId}?filter=${encodeURIComponent(JSON.stringify({ [spec.field]: parentId }))}`)}
         />
+        {/* hromadné akce nad vybranými řádky */}
+        {(spec.bulkActions ?? []).map((a) => (
+          <Button
+            key={a.id}
+            appearance="primary"
+            disabled={!selected.length}
+            onClick={async () => {
+              const r = await bulkRecordAction(spec.objectId, selected.map((x) => String(x.id)), a.id);
+              if (!r.ok) setError(r.message);
+              else if (r.data.errors?.length) setError(r.data.errors.join(" · "));
+              else setError(undefined);
+              setReload((n) => n + 1);
+              router.refresh();
+            }}
+          >
+            {a.label}
+          </Button>
+        ))}
         {spec.editable && !spec.inline && (
           <>
             <Button icon={<Add24Regular />} onClick={() => open(null)}>
@@ -221,7 +242,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
         labels={labels.grid}
         initial={spec.initial}
         fixed={{ [spec.field]: parentId }}
-        selectable={spec.editable}
+        selectable={spec.editable || !!spec.bulkActions?.length}
         reloadKey={reload}
         maxHeight="420px"
         onOpen={spec.overview || spec.openInPage ? (row) => router.push(objectHref(spec.objectId, String(row.id))) : spec.editable ? open : undefined}
@@ -283,7 +304,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   const [confirm, setConfirm] = useState(false);
   const [posting, setPosting] = useState(false);
   // uložený doklad s mřížkou řádků (deník): hlavička sbalená do souhrnu, rozbalí se tlačítkem
-  const collapsible = !!p.compactHeader && !!p.id && p.lines.some((l) => l.inline);
+  const collapsible = !!p.compactHeader && !!p.id && (p.lines.some((l) => l.inline) || (!!p.collapseHeader && p.lines.length > 0));
   const [headerOpen, setHeaderOpen] = useState(!collapsible);
   // náhled: číslo nového dokladu a hodnoty, které uložení doplní — vidět hned
   const allFields = useMemo(() => p.groups.flatMap((g) => g.fields), [p.groups]);

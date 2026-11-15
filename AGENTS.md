@@ -148,6 +148,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   parser `src/modules/bank/csv-statement.ts` (výsledek ve tvaru GPC), specifikace na `bank.account`.
   Výchozí specifikace (KB) v `FORMATS` v `bank/index.ts`. Výpis za období: číslo `RRRRMMDD-RRRRMMDD`,
   návaznost podle data. Skutečné výpisy zákazníků nikdy do repa ani testů — test má vymyšlený výpis.
+- Řádky výpisu: v mřížce jen příznak `matchKind` (faktura / záloha / účet / předkontace), vazby v detailu. Předkontace
+  `bank.postingRule` (text / protiúčet / směr → účet) použije `autoMatch`, když VS nic nenajde. Deník z výpisu i z vybraných
+  řádků (`bank.statementLine` akce `createJournal`, bulk) — řádek si pamatuje `journalId`, další výběr se přidá do
+  rozpracovaného deníku výpisu. Hromadné akce řádků v detailu dokladu = `actions[].bulk` objektu řádků (tlačítka nad
+  mřížkou). `ObjectDef.collapseHeader` = sbalená hlavička i u řádků mimo mřížku (výpis).
 - Hromadný import výpisů `src/server/bank-import.ts` (firma podle čísla účtu, protokol
   `bank.importLog`, kontrola návaznosti `checkStatementChain`); z výpisu deník HK
   (`journalFromStatement`). Hromadné akce v seznamu: `actions[].bulk`.

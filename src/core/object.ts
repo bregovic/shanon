@@ -122,7 +122,8 @@ export interface ObjectDef {
     /** selfBalanced = pole, jejichž vyplnění dělá řádek vyrovnaným samo (protiúčet) */
     balance?: { group: string; debit: string; credit: string; selfBalanced?: string | string[]; /** pole, o které řádek mění vyrovnanost navíc (přičtené DPH) */ extra?: string };
     /** podrobnosti vybraného řádku pod mřížkou (záložky s poli, která se do mřížky nevejdou) */
-    details?: { label: LabelRef; fields: string[] }[];
+    /** záložky podrobností řádku; `sections` = dílčí oddíly záložky (fields = všechna pole záložky) */
+    details?: { label: LabelRef; fields: string[]; sections?: { label: LabelRef; fields: string[] }[] }[];
     /**
      * dimenze účtu a protiúčtu (pole <main>1…6 a <offset>1…6) + dialog pro jejich zadání;
      * `account` / `offsetAccount` = pole účtu (relevantní dimenze), `offsetType` = je-li protiúčet
@@ -138,6 +139,8 @@ export interface ObjectDef {
   related?: { object: string; field: string; label: LabelRef; ref?: string }[];
   /** stránka dokladu: hlavička jako jeden řádek nahoře, řádky přes celou stránku */
   compactHeader?: boolean;
+  /** uložený záznam s řádky (i neupravitelnými v mřížce) má hlavičku sbalenou — rovnou řádky */
+  collapseHeader?: boolean;
   /**
    * netransakční číselník (adresář, účty, položky…), který mohou firmy sdílet
    * ve virtuální společnosti (Správa systému → Virtuální společnosti)

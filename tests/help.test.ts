@@ -13,6 +13,11 @@ describe("nápověda", () => {
       for (const o of t.objects) expect(registry.objects.has(o), `${t.id}: objekt ${o}`).toBe(true);
     }
   });
+  it("video návody: adresa ve veřejném úložišti videí", () => {
+    const v = helpTopics().filter((t) => t.video);
+    expect(v.map((t) => t.id)).toEqual(expect.arrayContaining(["ucetni-denik", "pokladna", "dph"]));
+    for (const t of v) expect(t.video).toMatch(/^https:\/\/[^ ]+\/shanon\/\d\d-[a-z-]+\.mp4$/);
+  });
   it("návod k objektu i modulu", () => {
     expect(helpFor("ar.invoice")?.id).toBe("faktura-vydana");
     expect(helpFor("whs")?.id).toBe("sklad");

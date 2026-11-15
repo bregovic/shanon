@@ -510,9 +510,16 @@ export const journal = defineObject({
       carry: ["date", "text", "accountType"],
       balance: { group: "voucherNum", debit: "debit", credit: "credit", extra: "taxExtra", selfBalanced: ["offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
       // podrobnosti vybraného řádku pod mřížkou (záložky) a dialog dimenzí účtu / protiúčtu
+      // Obecné: platba a měna, pod tím oddíl DPH (bez DPH modulu se pole skryjí)
       details: [
-        { label: "@SYS:General", fields: ["vs", "currencyId"] },
-        { label: "@TAX:VatTab", fields: ["taxGroupId", "itemTaxGroupId", "taxCodeId", "taxAmount", "taxDocNum"] },
+        {
+          label: "@SYS:General",
+          fields: ["vs", "currencyId", "taxGroupId", "itemTaxGroupId", "taxCodeId", "taxAmount", "taxDocNum"],
+          sections: [
+            { label: "", fields: ["vs", "currencyId"] },
+            { label: "@TAX:VatTab", fields: ["taxGroupId", "itemTaxGroupId", "taxCodeId", "taxAmount", "taxDocNum"] },
+          ],
+        },
       ],
       dims: { main: "dim", offset: "offsetDim", account: "accountId", offsetAccount: "offsetAccountId", offsetType: "offsetType" },
     },
@@ -591,7 +598,6 @@ export const journalLine = defineObject({
     "offsetVendorId",
     "offsetBankAccountId",
     "offsetCashDeskId",
-    "taxCodeId",
   ],
   form: [
     { label: "@SYS:General", fields: ["journalId", "date", "voucherNum", "accountType", "accountId", "customerId", "vendorId", "bankAccountId", "cashDeskId", "text", "debit", "credit", "currencyId", "vs"] },
@@ -635,7 +641,9 @@ export default defineModule({
         { object: "gl.dimension" },
         { object: "gl.dimensionValue" },
         { object: "gl.dimensionRule" },
-        { object: "gl.journalName" }, { object: "gl.fiscalYear" }],
+        { object: "gl.journalName" }, { object: "gl.fiscalYear" },
+        // automatické předkontace bankovních transakcí (poplatky, úroky…) a pořadí párování
+        { object: "bank.postingRule", module: "bank" }, { object: "bank.matchStep", module: "bank" }],
     },
   ],
   numberSeqs: [

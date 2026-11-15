@@ -13,7 +13,7 @@ const run = Date.now().toString(36);
 
 describe("DPH přes skupiny", () => {
   it("výchozí sada, faktury přes skupiny, samovyměření, deník, přiznání a KH", async () => {
-    const T = (await provisionTenant(client, { code: `t-tg-${run}`, name: "TG", adminEmail: `tg-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap"], company: { code: "T", name: "TG s.r.o." } })).ctx;
+    const T = (await provisionTenant(client, { code: `t-tg-${run}`, name: "TG", adminEmail: `tg-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "inv"], company: { code: "T", name: "TG s.r.o." } })).ctx;
     const C = { ...T, dims: undefined };
     const one = async (obj: string, filter: Record<string, string>) => (await listRecords(C, obj, { filter }, client)).rows[0];
     const id = async (obj: string, code: string) => String((await one(obj, { code })).id);
@@ -52,6 +52,16 @@ describe("DPH přes skupiny", () => {
       ["input", "43", "-", "1000.00", "210.00"],
       ["output", "5", "A2", "1000.00", "210.00"],
     ]);
+
+    // vlastní kód položky (potraviny 12 %) má přednost před položkou DPH skupiny položek (Z21)
+    const ig = await one("inv.itemGroup", {});
+    expect(ig.itemTaxGroupId).toBe(await id("tax.itemTaxGroup", "Z21"));
+    const food = await saveRecord(C, "inv.item", null, { itemNum: "SUN01", name: "Šunka", groupId: ig.id, unitId: (await one("inv.unit", { code: "KG" })).id, salesPrice: "100", taxCodeId: await id("tax.taxCode", "V12") }, undefined, client);
+    const cs = await saveRecord(C, "gab.subject", null, { name: "Odběratel" }, undefined, client);
+    const cust = await saveRecord(C, "ar.customer", null, { subjectId: cs.id, groupId: (await one("ar.group", {})).id }, undefined, client);
+    const sinv = await saveRecord(C, "ar.invoice", null, { customerId: cust.id }, undefined, client);
+    const sl = await saveRecord(C, "ar.invoiceLine", null, { invoiceId: sinv.id, itemId: food.id, qty: "1" }, undefined, client);
+    expect([sl.taxCodeId, sl.taxAmount]).toEqual([await id("tax.taxCode", "V12"), "12.00"]);
 
     // deník: dodavatel tuzemsko + účet nákladů s položkou DPH S21 → P21; částky včetně DPH
     const a518 = await one("gl.account", { accountNum: "518000" });

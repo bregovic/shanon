@@ -51,7 +51,7 @@ export default async function ObjectListPage({ params, searchParams }: { params:
   for (const [n, f] of Object.entries(def.fields)) {
     if (f.default !== undefined) defaults[n] = coerce(f.edt, f.default === "$today" ? new Date().toISOString().slice(0, 10) : f.default, registry)[0];
   }
-  const openInPage = !!def.lines?.length || !!def.actions?.length;
+  const openInPage = !!def.lines?.length || !!def.actions?.some((a) => !a.bulk);
 
   return (
     <ObjectListView

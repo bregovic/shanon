@@ -17,6 +17,7 @@ export default async function BankImportPage() {
       crumbs={[{ label: k("Module"), href: "/bank" }, { label: k("BulkImport") }]}
       logHref={objectHref("bank.importLog")}
       statementHref={objectHref("bank.statement", "__ID__")}
+      listHref={objectHref("bank.statement")}
       statusLabels={{ imported: k("ImpImported"), warning: k("ImpWarning"), duplicate: k("ImpDuplicate"), error: k("ImpError") }}
       labels={{
         intro: k("BulkImportIntro"),

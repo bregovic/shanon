@@ -10,5 +10,5 @@ export default async function HelpTopicPage({ params }: { params: Promise<{ id: 
   const t = await getT(s.lang, s.ctx.tenantId);
   const topic = helpTopic(id);
   if (!topic) notFound();
-  return <HelpArticle crumbs={[{ label: t("@SYS:Help"), href: "/help" }]} title={topic.title} html={renderMarkdown(topic.body)} />;
+  return <HelpArticle crumbs={[{ label: t("@SYS:Help"), href: "/help" }]} title={topic.title} html={renderMarkdown(topic.body)} video={topic.video} videoLabel={t("@SYS:HelpVideo")} />;
 }

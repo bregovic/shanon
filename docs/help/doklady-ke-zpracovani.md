@@ -3,6 +3,7 @@ title: Přijaté doklady – načtení z PDF, fotky nebo ISDOC
 module: int
 objects: int.document, int.documentLine
 order: 10
+video: 03-prijata-faktura
 summary: Nahrání faktur a dalších dokladů, vytěžení, kontrola, založení dodavatele a zalistování do agendy.
 ---
 ## Co umí

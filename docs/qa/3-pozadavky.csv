@@ -70,3 +70,4 @@ CR-068;change;Banka a platby – opravy a úpravy;BANK-GPC;medium;uat;68;Souhrnn
 CR-069;change;Pokladna (kasa) – opravy a úpravy;POS-SALE;medium;uat;69;Souhrnný požadavek pokladny.
 CR-070;change;Testování a vývoj – opravy a úpravy;QA;medium;uat;70;Souhrnné požadavky s dílčími požadavky a kontrolním seznamem oprav.
 CR-071;change;Integrace a EET – opravy a úpravy;INT-EET;medium;uat;71;Souhrnný požadavek integrací a EET.
+CR-072;change;DPH přes skupinu DPH a položku DPH (jako v AX), DPH v deníku, přiznání a KH;TAX-VAT;high;uat;72;Skupina DPH (partner) × položka DPH (položka, účet) → daňový kód, kód i přímo, samovyměření, výchozí sada CZ, řádky přiznání a KH A.1, A.2, B.1.

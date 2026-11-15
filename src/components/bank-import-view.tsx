@@ -2,6 +2,7 @@
 
 /** Banka → Hromadný import výpisů: víc souborů GPC, přiřazení firmě a účtu, stav každého výpisu. */
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Badge, Button, makeStyles, Spinner, Text, tokens } from "@fluentui/react-components";
 import { DocumentArrowUp24Regular } from "@fluentui/react-icons";
 import { bankBulkImportAction } from "@/app/actions";
@@ -31,6 +32,8 @@ export function BankImportView(p: {
   crumbs: { label: string; href?: string }[];
   logHref: string;
   statementHref: string;
+  /** přehled bankovních výpisů (po importu bez chyb) */
+  listHref: string;
   statusLabels: Record<string, string>;
   labels: Record<"intro" | "files" | "upload" | "log" | "file" | "company" | "account" | "statement" | "status" | "message", string>;
 }) {
@@ -39,6 +42,7 @@ export function BankImportView(p: {
   const [files, setFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
+  const router = useRouter();
 
   async function start() {
     setBusy(true);
@@ -53,6 +57,8 @@ export function BankImportView(p: {
     }
     setFiles([]);
     setBusy(false);
+    // vše načteno (bez chyb): rovnou do přehledu bankovních výpisů; s chybou zůstane výsledek na očích
+    if (out.length && !out.some((r) => r.status === "error")) router.push(p.listHref);
   }
 
   return (

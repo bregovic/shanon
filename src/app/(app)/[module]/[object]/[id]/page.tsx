@@ -91,13 +91,21 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               defaults: { ...defaults(ld), ...Object.fromEntries(Object.entries(l.inherit ?? {}).map(([lf, pf]) => [lf, record[pf] ?? null])) },
               carry: l.carry,
               balance: l.balance,
-              details: (l.details ?? []).map((d) => ({ label: t(d.label), fields: d.fields.filter((f) => lm[f] && !hiddenFields(s.ctx, ld).includes(f)).map((f) => lm[f]) })).filter((d) => d.fields.length),
+              details: (l.details ?? [])
+                .map((d) => {
+                  const pick = (fs: string[]) => fs.filter((f) => lm[f] && !hiddenFields(s.ctx, ld).includes(f)).map((f) => lm[f]);
+                  const sections = d.sections?.map((x) => ({ label: t(x.label), fields: pick(x.fields) })).filter((x) => x.fields.length);
+                  return { label: t(d.label), fields: pick(d.fields), ...(sections ? { sections } : {}) };
+                })
+                .filter((d) => d.fields.length),
               dims: l.dims && dimDefs.length ? { ...l.dims, defs: dimDefs } : undefined,
               // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít
               overview: l.owned === false || !!ld.systemOnly,
               inline: !!l.inline,
               // řádek s akcemi (Osamostatnit…) se otevírá na své stránce
-              openInPage: !!ld.actions?.length,
+              openInPage: !!ld.actions?.some((a) => !a.bulk),
+              // hromadné akce nad vybranými řádky (deník z vybraných řádků výpisu…)
+              bulkActions: can(s.ctx.perms, ld.id, "write") ? (ld.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label) })) : [],
               sortField: ld.defaultSort?.field,
               editable: l.owned !== false && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               initial: { rows: initial.rows, total: initial.total, totals: initial.totals },
@@ -145,6 +153,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       showDelete={!isNew && !def.systemOnly && can(s.ctx.perms, def.id, "delete")}
       canDuplicate={!isNew && !def.systemOnly && mayWrite}
       compactHeader={!!def.compactHeader}
+      collapseHeader={!!def.collapseHeader}
       autoCreate={isNew && !!def.numberSeq && (def.lines ?? []).some((l) => l.owned !== false)}
       newLinesHint={t("@SYS:LinesAfterHeader")}
       printHref={!isNew && s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/${id}` : undefined}

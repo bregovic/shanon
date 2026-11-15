@@ -152,7 +152,7 @@ export function InlineLines({
   carry?: string[];
   balance?: LineBalance;
   /** podrobnosti vybraného řádku pod mřížkou (záložky) */
-  details?: { label: string; fields: FieldMeta[] }[];
+  details?: { label: string; fields: FieldMeta[]; sections?: { label: string; fields: FieldMeta[] }[] }[];
   /** dimenze účtu / protiúčtu a jejich dialog (Ctrl+Shift+D) */
   dims?: LineDims;
   /** tlačítka vpravo v liště záložek (import, export) */
@@ -571,7 +571,7 @@ export function InlineLines({
           </Text>
           {tab !== "dims" && details?.[Number(tab)] && (
             <RecordForm
-              groups={[{ label: "", fields: details[Number(tab)].fields }]}
+              groups={details[Number(tab)].sections ?? [{ label: "", fields: details[Number(tab)].fields }]}
               columns={4}
               values={current.values}
               titles={current.titles}

@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Input, makeStyles, Text, tokens } from "@fluentui/react-components";
-import { BookQuestionMark24Regular, Search20Regular } from "@fluentui/react-icons";
+import { BookQuestionMark24Regular, PlayCircle16Regular, PlayCircle24Regular, Search20Regular } from "@fluentui/react-icons";
 import { ActionBar, Crumbs, PageContent } from "./page";
 
 const useStyles = makeStyles({
@@ -24,6 +24,9 @@ const useStyles = makeStyles({
     ":hover": { border: `1px solid ${tokens.colorBrandStroke1}`, boxShadow: tokens.shadow4 },
   },
   muted: { color: tokens.colorNeutralForeground3 },
+  badge: { display: "inline-flex", alignItems: "center", gap: "4px", color: tokens.colorBrandForeground1, fontSize: tokens.fontSizeBase200 },
+  video: { width: "100%", maxWidth: "820px", borderRadius: tokens.borderRadiusLarge, backgroundColor: "#000", boxShadow: tokens.shadow8, display: "block" },
+  videoWrap: { maxWidth: "820px", display: "flex", flexDirection: "column", gap: "6px", marginBottom: "16px" },
   article: {
     maxWidth: "820px",
     padding: "24px 28px",
@@ -54,9 +57,11 @@ export interface HelpListItem {
   title: string;
   summary: string;
   module: string;
+  /** návod má video */
+  video?: boolean;
 }
 
-export function HelpIndex(p: { crumbs: { label: string; href?: string }[]; groups: { label: string; items: HelpListItem[] }[]; labels: { search: string; intro: string; none: string } }) {
+export function HelpIndex(p: { crumbs: { label: string; href?: string }[]; groups: { label: string; items: HelpListItem[] }[]; labels: { search: string; intro: string; none: string; video?: string } }) {
   const s = useStyles();
   const [q, setQ] = useState("");
   const norm = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -89,6 +94,11 @@ export function HelpIndex(p: { crumbs: { label: string; href?: string }[]; group
                     <Text size={200} className={s.muted}>
                       {i.summary}
                     </Text>
+                    {i.video && (
+                      <span className={s.badge}>
+                        <PlayCircle16Regular /> {p.labels.video ?? "Video"}
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>
@@ -100,7 +110,7 @@ export function HelpIndex(p: { crumbs: { label: string; href?: string }[]; group
   );
 }
 
-export function HelpArticle(p: { crumbs: { label: string; href?: string }[]; title: string; html: string }) {
+export function HelpArticle(p: { crumbs: { label: string; href?: string }[]; title: string; html: string; video?: string | null; videoLabel?: string }) {
   const s = useStyles();
   return (
     <>
@@ -108,6 +118,16 @@ export function HelpArticle(p: { crumbs: { label: string; href?: string }[]; tit
         <Crumbs items={[...p.crumbs, { label: p.title }]} />
       </ActionBar>
       <PageContent>
+        {p.video && (
+          // video návod (ukázka práce s hlasovým komentářem) nad textem návodu
+          <div className={s.videoWrap}>
+            <Text weight="semibold">
+              <PlayCircle24Regular style={{ verticalAlign: "middle", marginRight: 6 }} />
+              {p.videoLabel ?? "Video"}
+            </Text>
+            <video className={s.video} src={p.video} controls preload="metadata" playsInline />
+          </div>
+        )}
         <article className={s.article}>
           <h1 style={{ marginTop: 0, fontSize: tokens.fontSizeHero700 }}>{p.title}</h1>
           <div dangerouslySetInnerHTML={{ __html: p.html }} />
