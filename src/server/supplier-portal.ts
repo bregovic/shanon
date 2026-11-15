@@ -42,7 +42,24 @@ interface Loaded {
   companyName: string;
 }
 
-async function load(tenantId: string, token: string, client: PrismaClient): Promise<Loaded | null> {
+/** Jednoduchá adresa /<zkratka>/<portál> → tenant a klíč portálu (registr jedinečných klíčů). */
+async function resolveSimple(entity: string, path: string, client: PrismaClient): Promise<{ tenantId: string; token: string } | null> {
+  if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(entity) || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(path)) return null;
+  const k = await client.sysGlobalKey.findUnique({ where: { namespace_key: { namespace: "portal", key: `${entity}/${path}` } } });
+  if (!k) return null;
+  const p = await withTenant(k.tenantId, (tx) => (tx as unknown as { intPortal: { findFirst(a: unknown): Promise<Record<string, unknown> | null> } }).intPortal.findFirst({ where: { tenantId: k.tenantId, id: k.ownerId } }), client);
+  return p?.token ? { tenantId: k.tenantId, token: String(p.token) } : null;
+}
+
+async function load(tenantIdOrEntity: string, tokenOrPath: string, client: PrismaClient): Promise<Loaded | null> {
+  // jednoduchá adresa (zkratka organizace + adresa portálu), jinak odkaz s tajným klíčem
+  let tenantId = tenantIdOrEntity;
+  let token = tokenOrPath;
+  if (!UUID.test(tenantId)) {
+    const r = await resolveSimple(tenantIdOrEntity, tokenOrPath, client);
+    if (!r) return null;
+    ({ tenantId, token } = r);
+  }
   if (!UUID.test(tenantId) || !TOKEN.test(token)) return null;
   const tenant = await client.sysTenant.findUnique({ where: { id: tenantId }, include: { modules: true, users: { where: { role: "admin" }, take: 1 } } });
   if (!tenant || !tenant.modules.some((m) => m.moduleId === "int")) return null;
@@ -80,7 +97,7 @@ const kindsOf = (p: RecordData): PortalKind[] =>
 export async function portalInfo(tenantId: string, token: string, client: PrismaClient = prisma): Promise<PortalInfo | null> {
   const l = await load(tenantId, token, client);
   if (!l) return null;
-  const t = await getT("cs", tenantId);
+  const t = await getT("cs", l.ctx.tenantId);
   const labels: Record<PortalKind, string> = { invoice: t("@AP:Invoice"), advance: t("@AP:Advance"), order: t("@AP:Order"), other: t("@INT:OtherDoc") };
   return {
     companyName: l.companyName,
@@ -111,9 +128,9 @@ export interface PortalResult {
 export async function portalSubmit(tenantId: string, token: string, input: PortalInput, ip: string, client: PrismaClient = prisma): Promise<PortalResult | null> {
   const l = await load(tenantId, token, client);
   if (!l) return null;
-  const t = await getT("cs", tenantId);
+  const t = await getT("cs", l.ctx.tenantId);
   const p = l.portal;
-  const ipHash = createHash("sha256").update(`${tenantId}|${ip}`).digest("hex").slice(0, 32);
+  const ipHash = createHash("sha256").update(`${l.ctx.tenantId}|${ip}`).digest("hex").slice(0, 32);
   const maxMb = Math.min(PORTAL_CAPS.maxFileMb, Number(p.maxFileMb ?? 10));
   const maxFiles = Math.min(PORTAL_CAPS.maxFiles, Number(p.maxFiles ?? 5));
   const name = input.name.trim().slice(0, 120);

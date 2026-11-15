@@ -36,6 +36,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
     visibleWhen: f.visibleWhen,
     gridColumn: f.gridColumn,
     lookupFilter: f.lookupFilter,
+    share: f.share ? { subject: t(f.share.subject), body: t(f.share.body), copyLabel: t("@SYS:CopyLink"), mailLabel: t("@SYS:SendLink"), openLabel: t("@SYS:OpenLink") } : undefined,
   };
 }
 

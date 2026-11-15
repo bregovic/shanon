@@ -189,6 +189,22 @@ model SysUserCompany {
   @@map("sys_user_company")
 }
 
+/// Jedinečné klíče napříč všemi tenanty (jednoduchá adresa dodavatelského portálu…).
+/// Bez RLS: veřejná adresa se hledá dřív, než je známý tenant. Zápis jen přes DataApi.claimGlobalKey.
+model SysGlobalKey {
+  namespace String   @db.VarChar(40)
+  key       String   @db.VarChar(80)
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  /// záznam, kterému klíč patří (id portálu…)
+  ownerId   String   @map("owner_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([namespace, key])
+  @@index([tenantId, ownerId])
+  @@map("sys_global_key")
+}
+
 // ===========================================================================
 // Objekty modulů
 // ===========================================================================
@@ -745,6 +761,7 @@ model OrgEntity {
   bankAccount  String?  @map("bank_account") @db.VarChar(30)
   iban         String?  @db.VarChar(34)
   bic          String?  @db.VarChar(11)
+  publicSlug   String?  @map("public_slug") @db.VarChar(40)
   logo         String?  @db.VarChar(36)
   ext          Json     @default("{}")
   version      Int      @default(1)
@@ -3806,6 +3823,7 @@ model IntPortal {
   name         String   @db.VarChar(120)
   active       Boolean  @default(true)
   token        String?  @db.VarChar(64)
+  slug         String?  @default("doklady") @db.VarChar(40)
   publicUrl    String?  @map("public_url") @db.VarChar(200)
   title        String?  @db.VarChar(255)
   intro        String?

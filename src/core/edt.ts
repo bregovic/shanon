@@ -39,7 +39,7 @@ export interface Edt {
   /** decimal: nesčítat v řádku Celkem (ceny, množství, částky v různých měnách) */
   noTotal?: boolean;
   /** převod vstupu (např. velká písmena u kódů) */
-  transform?: "upper" | "trim";
+  transform?: "upper" | "lower" | "trim";
 }
 
 export function defineEdt(edt: Edt): Edt {

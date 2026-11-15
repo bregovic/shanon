@@ -186,3 +186,19 @@ model SysUserCompany {
   @@index([tenantId, companyId])
   @@map("sys_user_company")
 }
+
+/// Jedinečné klíče napříč všemi tenanty (jednoduchá adresa dodavatelského portálu…).
+/// Bez RLS: veřejná adresa se hledá dřív, než je známý tenant. Zápis jen přes DataApi.claimGlobalKey.
+model SysGlobalKey {
+  namespace String   @db.VarChar(40)
+  key       String   @db.VarChar(80)
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  /// záznam, kterému klíč patří (id portálu…)
+  ownerId   String   @map("owner_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([namespace, key])
+  @@index([tenantId, ownerId])
+  @@map("sys_global_key")
+}

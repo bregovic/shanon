@@ -9,6 +9,10 @@ import { provisionTenant } from "@/server/provision";
 import { portalInfo, portalSubmit } from "@/server/supplier-portal";
 import { sniffPortalFile } from "@/modules/int/portal";
 import { listDocuRefs } from "@/server/docuref";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { registry } from "@/registry";
+import { RESERVED_PATHS } from "@/lib/reserved-paths";
 
 const client = createPrisma();
 const run = Date.now().toString(36);
@@ -66,5 +70,42 @@ describe("dodavatelský portál", () => {
     expect(await portalSubmit(T.tenantId, String(p.token), { ...base, files: [{ name: "d.pdf", type: "application/pdf", data: pdf }] }, "10.0.0.3", client)).toBeNull();
     await saveRecord(T, "int.portal", String(p.id), { ...p2, active: false }, undefined, client);
     expect(await portalInfo(T.tenantId, String(p2.token), client)).toBeNull();
+  }, 120_000);
+
+  it("vyhrazené adresy pokrývají všechny moduly a stránky aplikace", () => {
+    for (const m of registry.modules.keys()) expect(RESERVED_PATHS.has(m), `modul ${m}`).toBe(true);
+    const top = (dir: string) => readdirSync(join(process.cwd(), "src", "app", dir), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    const routes = [...top(""), ...top("(app)"), ...top("(pos)"), ...top("(print)")].filter((d) => !d.startsWith("(") && !d.startsWith("["));
+    for (const r of routes) expect(RESERVED_PATHS.has(r), `stránka /${r}`).toBe(true);
+  });
+
+  it("jednoduchá adresa /<zkratka organizace>/<portál>, jedinečná napříč zákazníky", async () => {
+    const mk = async (code: string) =>
+      (await provisionTenant(client, { code: `t-${code}-${run}`, name: code, adminEmail: `${code}-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap", "int", "org"], company: { code: "S", name: `Firma ${code}` } })).ctx;
+    const A = await mk("sla");
+    const B = await mk("slb");
+    const slug = `kral${run}`.slice(0, 30);
+    const entA = (await listRecords(A, "org.entity", {}, client)).rows[0];
+    await saveRecord(A, "org.entity", String(entA.id), { ...entA, publicSlug: slug.toUpperCase() }, undefined, client);
+    const p = await saveRecord(A, "int.portal", null, { name: "Doklady" }, undefined, client);
+    expect([p.slug, p.publicUrl]).toEqual(["doklady", `/${slug}/doklady`]);
+    expect((await portalInfo(slug, "doklady", client))?.companyName).toBe("Firma sla");
+    const ok = await portalSubmit(slug, "doklady", { kind: "invoice", regNo: "27082440", name: "Dodavatel", email: "", note: "", files: [{ name: "f.pdf", type: "application/pdf", data: pdf }] }, "10.1.1.1", client);
+    expect(ok?.ok).toBe(true);
+    // jiný zákazník stejnou zkratku nedostane, vyhrazené slovo nejde
+    const entB = (await listRecords(B, "org.entity", {}, client)).rows[0];
+    await expect(saveRecord(B, "org.entity", String(entB.id), { ...entB, publicSlug: slug }, undefined, client)).rejects.toMatchObject({ label: "@ORG:SlugTaken" });
+    await expect(saveRecord(B, "org.entity", String(entB.id), { ...entB, publicSlug: "bank" }, undefined, client)).rejects.toMatchObject({ fields: { publicSlug: "@ORG:PublicSlugHelp" } });
+    // druhý portál téže firmy se stejnou adresou nejde, jiná adresa ano; změna zkratky přepočítá odkazy
+    await expect(saveRecord(A, "int.portal", null, { name: "Duplicita", slug: "doklady" }, undefined, client)).rejects.toMatchObject({ label: "@INT:SlugTaken" });
+    const p2 = await saveRecord(A, "int.portal", null, { name: "Faktury", slug: "faktury" }, undefined, client);
+    expect(p2.publicUrl).toBe(`/${slug}/faktury`);
+    const entA2 = (await getRecord(A, "org.entity", String(entA.id), client))!;
+    await saveRecord(A, "org.entity", String(entA.id), { ...entA2, publicSlug: `${slug}x` }, undefined, client);
+    expect((await getRecord(A, "int.portal", String(p.id), client))!.publicUrl).toBe(`/${slug}x/doklady`);
+    expect(await portalInfo(slug, "doklady", client)).toBeNull();
+    expect((await portalInfo(`${slug}x`, "doklady", client))?.companyName).toBe("Firma sla");
+    // stará zkratka je volná pro jiného zákazníka
+    await saveRecord(B, "org.entity", String(entB.id), { ...entB, publicSlug: slug }, undefined, client);
   }, 120_000);
 });

@@ -116,6 +116,12 @@ export interface DataApi {
    * objektu, pro který je řada určená (pole Použití).
    */
   nextNumber(seq: string | { id?: string; usedFor?: string; code?: string }, date?: Date): Promise<string>;
+  /**
+   * Jedinečný klíč napříč všemi tenanty (jednoduchá veřejná adresa): zabere `key` pro záznam `ownerId`
+   * (předchozí klíč téhož záznamu uvolní). false = klíč patří jinému záznamu / tenantovi.
+   * `key` null = jen uvolnit klíč záznamu.
+   */
+  claimGlobalKey?(namespace: string, key: string | null, ownerId: string): Promise<boolean>;
 }
 
 export interface EventContext {

@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { RESERVED_PATHS } from "@/lib/reserved-paths";
 
 /**
  * Jen rychlé přesměrování nepřihlášených na /login. Skutečné ověření
  * (platnost relace, oprávnění) dělá každá stránka a akce na serveru.
  */
 export function proxy(request: NextRequest) {
+  // jednoduchá adresa dodavatelského portálu: /<zkratka organizace>/<portál>
+  const m = /^\/([a-z0-9][a-z0-9-]{1,39})\/([a-z0-9][a-z0-9-]{0,39})\/?$/.exec(request.nextUrl.pathname);
+  if (m && !RESERVED_PATHS.has(m[1])) return NextResponse.rewrite(new URL(`/portal/${m[1]}/${m[2]}`, request.url));
   if (!request.cookies.has("shanon_session")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }

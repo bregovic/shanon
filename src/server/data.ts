@@ -261,7 +261,19 @@ export class Session {
       update: (o, id, data) => s.save(o, id, data, { system: true }),
       remove: (o, id) => s.remove(o, id),
       nextNumber: (seq, date) => s.nextNumber(seq, date),
+      claimGlobalKey: (ns, key, ownerId) => s.claimGlobalKey(ns, key, ownerId),
     };
+  }
+
+  /** Jedinečný klíč napříč tenanty (sys_global_key, bez RLS) — ve stejné transakci jako uložení záznamu. */
+  async claimGlobalKey(namespace: string, key: string | null, ownerId: string): Promise<boolean> {
+    if (key) {
+      const have = await this.tx.sysGlobalKey.findUnique({ where: { namespace_key: { namespace, key } } });
+      if (have && (have.tenantId !== this.ctx.tenantId || have.ownerId !== ownerId)) return false;
+    }
+    await this.tx.sysGlobalKey.deleteMany({ where: { namespace, tenantId: this.ctx.tenantId, ownerId, ...(key ? { NOT: { key } } : {}) } });
+    if (key) await this.tx.sysGlobalKey.upsert({ where: { namespace_key: { namespace, key } }, create: { namespace, key, tenantId: this.ctx.tenantId, companyId: this.ctx.companyId, ownerId }, update: {} });
+    return true;
   }
 
   async get(objectId: string, id: string): Promise<RecordData | null> {

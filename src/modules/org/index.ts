@@ -8,6 +8,7 @@ import { aresByIco } from "@/modules/gab/ares";
 import { Edts, defineEdt, defineEnum, enumEdt } from "@/core/edt";
 import { UserError, defineModule, type DataApi, type ObjectHandlers } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { isPublicSlug } from "@/lib/reserved-paths";
 
 export const LegalForm = defineEnum({
   id: "OrgLegalForm",
@@ -56,6 +57,8 @@ export const entity = defineObject({
     bankAccount: { edt: BankAccount },
     iban: { edt: Iban },
     bic: { edt: Str("OrgBic", "@ORG:Bic", 11, /^[A-Z0-9]{8}([A-Z0-9]{3})?$/) },
+    /** zkratka pro veřejné odkazy (dodavatelský portál /<zkratka>/doklady) — jedinečná v celé aplikaci */
+    publicSlug: { edt: defineEdt({ id: "OrgPublicSlug", kind: "string", label: "@ORG:PublicSlug", maxLength: 40, pattern: /^[a-z0-9][a-z0-9-]{1,39}$/, patternMessage: "@ORG:PublicSlugHelp", transform: "lower" }) },
     // logo na tiskových sestavách (faktura, účtenka)
     logo: { edt: Str("OrgLogo", "@ORG:Logo", 36), image: true, readOnly: true },
   },
@@ -65,7 +68,7 @@ export const entity = defineObject({
   form: [
     { label: "@ORG:Identity", fields: ["legalName", "tradeName", "legalForm", "firstName", "lastName", "regNo", "vatId", "vatPayer", "registration"] },
     { label: "@ORG:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode", "country"] },
-    { label: "@ORG:Contacts", fields: ["email", "phone", "web", "dataBoxId"] },
+    { label: "@ORG:Contacts", fields: ["email", "phone", "web", "dataBoxId", "publicSlug"] },
     { label: "@ORG:Bank", fields: ["bankAccount", "iban", "bic"] },
     { label: "@ORG:Logo", fields: ["logo"] },
   ],
@@ -176,6 +179,8 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
     async beforeSave(ctx, d, isNew) {
       if (isNew && (await ctx.data.find("org.entity", {}, { take: 1 })).length) throw new UserError("@ORG:OneEntity");
       if (d.legalForm === "natural" && (!d.firstName || !d.lastName)) return { [d.firstName ? "lastName" : "firstName"]: "@SYS:Required" };
+      if (d.publicSlug) d.publicSlug = String(d.publicSlug).trim().toLowerCase();
+      if (d.publicSlug && !isPublicSlug(String(d.publicSlug))) return { publicSlug: "@ORG:PublicSlugHelp" };
     },
     // název, IČO a DIČ jsou i ve firmě (přepínač firem, výběr firmy, oprávnění)
     async afterSave(ctx, d) {
@@ -187,6 +192,12 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
         vatPayer: !!d.vatPayer,
         country: d.country ?? "CZ",
       });
+      // zkratka pro veřejné odkazy je jedinečná v celé aplikaci (všichni zákazníci); odkazy portálů se přepočítají
+      const slug = (d.publicSlug as string) || null;
+      if (ctx.data.claimGlobalKey && !(await ctx.data.claimGlobalKey("entity", slug, String(d.id))))
+        throw new UserError("@ORG:SlugTaken", { slug: String(slug) }, { publicSlug: "@ORG:SlugTaken" });
+      if (ctx.modules && !ctx.modules.has("int")) return;
+      for (const p of await ctx.data.find("int.portal", {}, { take: 100 }).catch(() => [])) await ctx.data.update("int.portal", String(p.id), {});
     },
   },
 };
@@ -233,6 +244,9 @@ export default defineModule({
       City: "Obec",
       ZipCode: "PSČ",
       Contacts: "Kontakty",
+      PublicSlug: "Zkratka pro veřejné odkazy",
+      PublicSlugHelp: "Malá písmena, číslice a pomlčka (např. kral).",
+      SlugTaken: "Zkratka „{slug}“ je obsazená nebo vyhrazená — zvolte jinou.",
       Web: "Web",
       DataBoxId: "Datová schránka",
       Bank: "Bankovní spojení",
@@ -276,6 +290,9 @@ export default defineModule({
       City: "City",
       ZipCode: "ZIP code",
       Contacts: "Contacts",
+      PublicSlug: "Short name for public links",
+      PublicSlugHelp: "Lowercase letters, digits and dash (e.g. kral).",
+      SlugTaken: "The short name “{slug}” is taken or reserved — choose another.",
       Web: "Website",
       DataBoxId: "Data box",
       Bank: "Bank details",

@@ -21,7 +21,7 @@ import {
 } from "@fluentui/react-components";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
-import { Open24Regular } from "@fluentui/react-icons";
+import { Copy20Regular, Mail20Regular, Open24Regular } from "@fluentui/react-icons";
 import { searchRefs, uploadImageAction } from "@/app/actions";
 import { displayValue, type FieldMeta, refLink } from "@/lib/meta";
 
@@ -89,6 +89,8 @@ export function RecordForm({
               <div key={f.name} data-field={f.name} className={f.kind === "text" || f.image ? s.wide : undefined}>
                 {f.image ? (
                   <ImageField f={f} value={values[f.name] as string | null} record={record} disabled={readOnly} onChange={onChange} />
+                ) : f.share && values[f.name] ? (
+                  <ShareField f={f} value={String(values[f.name])} />
                 ) : fieldAction?.name === f.name && values[f.name] ? (
                   <Field label={f.label} hint={fieldAction.hint}>
                     <Button appearance="transparent" style={{ justifyContent: "flex-start", padding: "0 2px", fontWeight: 600, color: tokens.colorBrandForegroundLink }} onClick={fieldAction.onClick}>
@@ -113,6 +115,36 @@ export function RecordForm({
         </section>
       ))}
     </div>
+  );
+}
+
+/** Odkaz ke sdílení: celá adresa, Kopírovat, E-mail (předmět a text z popisků pole). */
+function ShareField({ f, value }: { f: FieldMeta; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = /^https?:\/\//.test(value) ? value : `${typeof window === "undefined" ? "" : window.location.origin}${value}`;
+  const fill = (x: string) => x.replace(/\{url\}/g, url);
+  const sh = f.share!;
+  return (
+    <Field label={f.label}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <Input readOnly value={url} style={{ flex: 1, minWidth: 220 }} onFocus={(e) => e.target.select()} />
+        <Button
+          icon={<Copy20Regular />}
+          onClick={() => {
+            void navigator.clipboard?.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            });
+          }}
+        >
+          {copied ? "✓" : sh.copyLabel}
+        </Button>
+        <Button as="a" icon={<Mail20Regular />} href={`mailto:?subject=${encodeURIComponent(fill(sh.subject))}&body=${encodeURIComponent(fill(sh.body))}`}>
+          {sh.mailLabel}
+        </Button>
+        <Button as="a" appearance="subtle" icon={<Open24Regular />} href={url} target="_blank" rel="noopener" aria-label={sh.openLabel} title={sh.openLabel} />
+      </div>
+    </Field>
   );
 }
 

@@ -3,7 +3,7 @@
  * Příjem z veřejné stránky dělá `src/server/supplier-portal.ts`.
  */
 import { randomBytes } from "node:crypto";
-import type { ObjectHandlers } from "@/core/module";
+import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 
 /** Nový tajný klíč odkazu (24 bajtů, base64url). */
 export const newPortalToken = () => randomBytes(24).toString("base64url");
@@ -37,11 +37,20 @@ export function sniffPortalFile(name: string, data: Buffer): PortalFileKind | nu
   return null;
 }
 
+/** Jednoduchá adresa portálu: /<zkratka organizace>/<adresa portálu> (bez zkratky null). */
+async function simplePath(data: DataApi, slug: unknown): Promise<string | null> {
+  if (!slug) return null;
+  const [ent] = await data.find("org.entity", {}, { take: 1 }).catch(() => [] as RecordData[]);
+  return ent?.publicSlug ? `${ent.publicSlug}/${slug}` : null;
+}
+
 export const portalHandlers: Record<string, ObjectHandlers> = {
   "int.portal": {
-    beforeSave(ctx, d) {
+    async beforeSave(ctx, d) {
       if (!d.token) d.token = newPortalToken();
-      d.publicUrl = portalPath(ctx.tenantId, String(d.token));
+      if (d.slug) d.slug = String(d.slug).trim().toLowerCase();
+      const simple = await simplePath(ctx.data, d.slug);
+      d.publicUrl = simple ? `/${simple}` : portalPath(ctx.tenantId, String(d.token));
       // limity v mezích platformy
       const cap = (f: keyof typeof PORTAL_CAPS, min: number) => {
         const v = Number(d[f] ?? 0);
@@ -52,11 +61,20 @@ export const portalHandlers: Record<string, ObjectHandlers> = {
       cap("ipHourLimit", 1);
       cap("dailyLimit", 1);
     },
+    /** jednoduchá adresa je jedinečná v celé aplikaci */
+    async afterSave(ctx, d) {
+      const simple = await simplePath(ctx.data, d.slug);
+      if (ctx.data.claimGlobalKey && !(await ctx.data.claimGlobalKey("portal", simple, String(d.id))))
+        throw new UserError("@INT:SlugTaken", { url: `/${simple}` }, { slug: "@INT:SlugTaken" });
+    },
+    async afterDelete(ctx, d) {
+      await ctx.data.claimGlobalKey?.("portal", null, String(d.id));
+    },
     actions: {
       /** nový odkaz: starý přestane platit (třeba když se dostal, kam neměl) */
       async newToken(ctx, p) {
         const token = newPortalToken();
-        await ctx.data.update("int.portal", String(p.id), { token, publicUrl: portalPath(ctx.tenantId, token) });
+        await ctx.data.update("int.portal", String(p.id), { token });
       },
     },
   },

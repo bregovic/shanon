@@ -16,7 +16,9 @@ summary: Veřejná stránka, kam dodavatelé nahrají faktury, zálohy a objedn�
 
 V [Dodavatelské portály](/int/portal) založte portál:
 
-- **Odkaz pro dodavatele** se vygeneruje sám (obsahuje tajný klíč). Pošlete ho dodavatelům, dejte na web nebo do patičky objednávek. **Další ▾ → Nový odkaz** vytvoří nový klíč a starý odkaz přestane platit.
+- **Jednoduchá adresa**: v [Organizaci](/org/entity) vyplňte **Zkratku pro veřejné odkazy** (např. `kral`) a u portálu **Adresu portálu** (výchozí `doklady`). Odkaz pak je `…/kral/doklady`. Zkratka je jedinečná v celé aplikaci – obsazenou (jiným subjektem) nebo vyhrazenou (názvy modulů) aplikace odmítne. Jedna firma může mít víc portálů (`/kral/faktury`).
+- Bez zkratky má portál odkaz s tajným klíčem (`/portal/…`); **Další ▾ → Nový odkaz** vytvoří nový klíč a starý přestane platit.
+- U odkazu jsou tlačítka **Kopírovat** a **E-mailem** (otevře e-mail s připraveným textem pro dodavatele) a **Otevřít odkaz**.
 - **Nadpis a text** stránky, povolené **druhy dokladů**, **povinné IČO**.
 - **Limity** (ochrana před zahlcením): max. velikost souboru (nejvýš 10 MB), počet souborů najednou, počet souborů za hodinu z jedné adresy a za den celkem.
 

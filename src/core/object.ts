@@ -22,6 +22,8 @@ export type ObjectScope = "tenant" | "company";
 
 export interface FieldDef {
   edt: Edt;
+  /** odkaz ke sdílení: ve formuláři tlačítka Kopírovat a E-mail (předmět a text s {url}, {company}) */
+  share?: { subject: LabelRef; body: LabelRef };
   /** přepíše label typu */
   label?: LabelRef;
   mandatory?: boolean;

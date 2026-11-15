@@ -31,6 +31,8 @@ export interface FieldMeta {
   gridColumn?: string;
   /** výběr omezený hodnotou jiného pole: { pole cíle: pole formuláře } */
   lookupFilter?: Record<string, string>;
+  /** odkaz ke sdílení (Kopírovat, E-mail) — přeložený předmět a text */
+  share?: { subject: string; body: string; copyLabel: string; mailLabel: string; openLabel: string };
 }
 
 export const objectHref = (objectId: string, id?: string) =>

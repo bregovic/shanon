@@ -26,6 +26,7 @@ export function coerce(
     case "text": {
       let s = String(raw);
       if (edt.transform === "upper") s = s.trim().toUpperCase();
+      else if (edt.transform === "lower") s = s.trim().toLowerCase();
       else if (edt.transform === "trim") s = s.trim();
       if (edt.maxLength && s.length > edt.maxLength) return [s, "@SYS:TooLong"];
       if (edt.pattern && !edt.pattern.test(s)) return [s, edt.patternMessage ?? "@SYS:InvalidFormat"];

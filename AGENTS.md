@@ -112,6 +112,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `src/proxy.ts`): `src/server/supplier-portal.ts` najde portál podle klíče (zapnutý), kontroluje druh souboru podle obsahu
   (`sniffPortalFile`), velikost, počet, limit za hodinu z adresy (otisk IP) a za den, zakládá `int.document` se zdrojem
   `portal` a údaji odesílatele + přílohu, protokol `int.portalUpload`, upozornění. Zalistování z portálu nikdy automaticky.
+  Jednoduchá adresa `/<zkratka organizace>/<portál>`: `org.entity.publicSlug` + `int.portal.slug`, jedinečné napříč tenanty přes
+  `DataApi.claimGlobalKey` (tabulka `sys_global_key` bez RLS, grant v `scripts/rls.ts`); `src/proxy.ts` přepíše dvoudílnou adresu,
+  jejíž první část není v `RESERVED_PATHS` (`src/lib/reserved-paths.ts` — nový modul / stránku přidat, test to hlídá).
+  Pole s `share` (odkaz) má ve formuláři Kopírovat / E-mailem / Otevřít.
 - Veřejné datové služby (ARES, ČNB, ECB) volat přes `withService(data, "ares"|"cnb"|"ecb", …)`
   (`src/modules/int/services.ts`): napojení druhu „service“ (zakládá výchozí nastavení)
   je jde vypnout, otestovat a volání jdou do `int.log`; bez Integrace běží služba bez logu.
