@@ -197,6 +197,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `src/server/mail.ts`): Odeslat e-mailem (akce `outside`) založí koncept `int.mail` s PDF dokladu
   v přílohách a otevře ho (akce smí vrátit `ActionOutcome.open`); Odeslat pošle napojením druhu
   „mail“, zapíše `int.log` a u faktury `emailedAt`. Příjemce = `docEmail` partnera, jinak e-mail subjektu.
+- Lišta formuláře (standard): Uložit + akce zpracování jako tlačítka; ostatní ve skupinách
+  `Tisk ▾` (tisk, PDF, soubory, e-mail), `Zobrazit ▾` (související doklady, Náhled dokladu), `Další ▾`
+  (Duplikovat). Skupina = `actions[].group` (výchozí: download → print, jinak process). Náhled dokladu =
+  `ObjectDef.postingPreview` (akce nanečisto v transakci, která se vrátí; `src/server/posting-preview.ts`).
+  Doklad s mřížkou řádků má po uložení sbalenou hlavičku; nový doklad se uloží klikem na předběžné číslo.
 - Náhled před uložením (`previewRecord`, `usePreview`): formulář, šuplík i mřížka se po výběru
   (odkaz, výčet, číslo, datum) zeptají serveru, co uložení doplní — `save(…, { preview: true })` projde
   výchozí hodnoty, číselnou řadu a `beforeSave` obsluh, transakce se vrátí. Doplňování tedy patří do

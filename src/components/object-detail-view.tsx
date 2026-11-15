@@ -15,13 +15,21 @@ import {
   DialogSurface,
   DialogTitle,
   makeStyles,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   MessageBar,
   MessageBarBody,
   tokens,
   ToolbarDivider,
   Text,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, Edit24Regular, Open24Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, DocumentSearch24Regular, Edit24Regular, Eye24Regular, MoreHorizontal24Regular, Open24Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
+import { PostingPreviewDrawer } from "./posting-preview";
+import { ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
@@ -86,7 +94,11 @@ export interface ObjectDetailProps {
   autoCreate?: boolean;
   /** text místo řádků u nového dokladu */
   newLinesHint?: string;
-  actions: { id: string; label: string; upload?: string; download?: boolean; disabled?: boolean }[];
+  actions: { id: string; label: string; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more" }[];
+  /** Náhled dokladu (zaúčtování nanečisto) — dokud jde zaúčtovat */
+  postingPreview?: boolean;
+  /** pole s číslem / kódem záznamu (souhrn sbalené hlavičky, klik = uložit nový doklad) */
+  titleField?: string;
   /** Smazat se ukáže i u zamčeného dokladu (neaktivní) — rozložení lišty se nemění */
   showDelete?: boolean;
   lines: LineSpec[];
@@ -249,6 +261,27 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   const [message, setMessage] = useState<{ intent: "error" | "success"; text: string }>();
   const [busy, start] = useTransition();
   const [confirm, setConfirm] = useState(false);
+  const [posting, setPosting] = useState(false);
+  // uložený doklad s mřížkou řádků (deník): hlavička sbalená do souhrnu, rozbalí se tlačítkem
+  const collapsible = !!p.compactHeader && !!p.id && p.lines.some((l) => l.inline);
+  const [headerOpen, setHeaderOpen] = useState(!collapsible);
+  const summary = useMemo(
+    () =>
+      p.groups
+        .flatMap((g) => g.fields)
+        .filter((f) => f.name !== p.titleField)
+        .map((f) => {
+          const v = values[f.name];
+          if (v === null || v === undefined || v === "") return null;
+          if (f.kind === "ref") return titles[f.name] || null;
+          if (f.kind === "enum") return f.options?.find((o) => o.value === v)?.label ?? String(v);
+          if (f.kind === "date") return String(v).split("-").reverse().map((x, i) => (i < 2 ? String(Number(x)) : x)).join(". ");
+          return String(v);
+        })
+        .filter(Boolean)
+        .join(" · "),
+    [p.groups, p.titleField, values, titles],
+  );
   // náhled: číslo nového dokladu a hodnoty, které uložení doplní — vidět hned
   const allFields = useMemo(() => p.groups.flatMap((g) => g.fields), [p.groups]);
   const pv = usePreview(p.objectId, p.id, { fields: useMemo(() => allFields.map((f) => f.name), [allFields]), disabled: p.readOnly });
@@ -366,44 +399,91 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             {p.labels.actions.save}
           </Button>
         )}
-        {p.actions.map((a) =>
-          a.download ? (
-            <Button
+        {/* zpracování: tlačítka přímo v liště (Zaúčtovat, Potvrdit…) */}
+        {p.actions
+          .filter((a) => (a.group ?? "process") === "process")
+          .map((a) =>
+            a.upload ? (
+              <UploadButton key={a.id} label={a.label} accept={a.upload} disabled={busy || !!a.disabled} onFile={(f) => upload(a.id, f)} />
+            ) : a.download ? (
+              <Button key={a.id} icon={<ArrowDownload24Regular />} disabled={busy || a.disabled} onClick={() => download(a.id)}>
+                {a.label}
+              </Button>
+            ) : (
+              <Button key={a.id} icon={<Play24Regular />} disabled={busy || a.disabled} onClick={() => act(a.id)}>
+                {a.label}
+              </Button>
+            ),
+          )}
+        {/* skupiny: Tisk, Zobrazit, Další — pevné místo, položky mimo svůj stav jen neaktivní */}
+        {(() => {
+          const item = (a: (typeof p.actions)[number]) => (
+            <MenuItem
               key={a.id}
-              icon={<ArrowDownload24Regular />}
+              icon={a.download ? <ArrowDownload24Regular /> : <Play24Regular />}
               disabled={busy || a.disabled}
-              onClick={() => download(a.id)}
+              onClick={() => (a.download ? download(a.id) : act(a.id))}
             >
               {a.label}
-            </Button>
-          ) : a.upload ? (
-            <UploadButton key={a.id} label={a.label} accept={a.upload} disabled={busy || !!a.disabled} onFile={(f) => upload(a.id, f)} />
-          ) : (
-            <Button key={a.id} icon={<Play24Regular />} disabled={busy || a.disabled} onClick={() => act(a.id)}>
-              {a.label}
-            </Button>
-          ),
-        )}
-        {(p.related ?? []).map((r) => (
-          <Button key={r.href} icon={<Open24Regular />} disabled={!r.count} onClick={() => router.push(r.href)}>
-            {`${r.label} (${r.count})`}
-          </Button>
-        ))}
-        {p.printHref && (
-          <Button icon={<Print24Regular />} onClick={() => window.open(p.printHref, "_blank")}>
-            {p.labels.actions.print}
-          </Button>
-        )}
-        {p.printHref && (
-          <Button icon={<DocumentPdf24Regular />} onClick={() => window.open(p.printHref!.replace(/^\/print\//, "/api/pdf/"), "_blank")}>
-            PDF
-          </Button>
-        )}
-        {p.canDuplicate && p.id && (
-          <Button icon={<Copy24Regular />} disabled={busy} onClick={duplicate}>
-            {p.labels.actions.duplicate}
-          </Button>
-        )}
+            </MenuItem>
+          );
+          const printItems = [
+            ...(p.printHref
+              ? [
+                  <MenuItem key="print" icon={<Print24Regular />} onClick={() => window.open(p.printHref, "_blank")}>
+                    {p.labels.actions.print}
+                  </MenuItem>,
+                  <MenuItem key="pdf" icon={<DocumentPdf24Regular />} onClick={() => window.open(p.printHref!.replace(/^\/print\//, "/api/pdf/"), "_blank")}>
+                    PDF
+                  </MenuItem>,
+                ]
+              : []),
+            ...p.actions.filter((a) => a.group === "print").map(item),
+          ];
+          const inquiryItems = [
+            ...(p.postingPreview && p.id
+              ? [
+                  <MenuItem key="posting" icon={<DocumentSearch24Regular />} onClick={() => setPosting(true)}>
+                    {p.labels.posting.preview}
+                  </MenuItem>,
+                ]
+              : []),
+            ...(p.related ?? []).map((r) => (
+              <MenuItem key={r.href} icon={<Open24Regular />} disabled={!r.count} onClick={() => router.push(r.href)}>
+                {`${r.label} (${r.count})`}
+              </MenuItem>
+            )),
+            ...p.actions.filter((a) => a.group === "inquiry").map(item),
+          ];
+          const moreItems = [
+            ...(p.canDuplicate && p.id
+              ? [
+                  <MenuItem key="dup" icon={<Copy24Regular />} disabled={busy} onClick={duplicate}>
+                    {p.labels.actions.duplicate}
+                  </MenuItem>,
+                ]
+              : []),
+            ...p.actions.filter((a) => a.group === "more").map(item),
+          ];
+          const group = (key: string, label: string, icon: React.ReactElement, items: React.ReactElement[]) =>
+            items.length ? (
+              <Menu key={key}>
+                <MenuTrigger disableButtonEnhancement>
+                  <MenuButton icon={icon}>{label}</MenuButton>
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>{items}</MenuList>
+                </MenuPopover>
+              </Menu>
+            ) : null;
+          return (
+            <>
+              {group("print", p.labels.groups.print, <Print24Regular />, printItems)}
+              {group("inquiry", p.labels.groups.inquiry, <Eye24Regular />, inquiryItems)}
+              {group("more", p.labels.groups.more, <MoreHorizontal24Regular />, moreItems)}
+            </>
+          );
+        })()}
         {p.id && (
           <>
             <ToolbarDivider />
@@ -428,7 +508,21 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             <MessageBarBody>{message.text}</MessageBarBody>
           </MessageBar>
         )}
+        {collapsible && !headerOpen ? (
+          <div className={s.card} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
+            <Text weight="semibold">{String(values[p.titleField ?? ""] ?? "")}</Text>
+            <Text style={{ color: tokens.colorNeutralForeground2, flex: 1 }}>{summary}</Text>
+            <Button size="small" appearance="subtle" icon={<ChevronDown20Regular />} onClick={() => setHeaderOpen(true)}>
+              {p.labels.header.show}
+            </Button>
+          </div>
+        ) : (
         <div className={s.card}>
+          {collapsible && (
+            <Button size="small" appearance="subtle" icon={<ChevronUp20Regular />} style={{ float: "right" }} onClick={() => setHeaderOpen(false)}>
+              {p.labels.header.hide}
+            </Button>
+          )}
           <RecordForm
             // kompaktní hlavička: všechna pole v jednom bloku, víc sloupců
             groups={p.compactHeader ? [{ label: "", fields: p.groups.flatMap((g) => g.fields) }] : p.groups}
@@ -439,6 +533,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             readOnly={p.readOnly}
             openLabel={p.labels.drawer.open}
             record={{ objectId: p.objectId, id: p.id, labels: p.labels.drawer.image }}
+            // nový doklad s řádky: klik na předběžné číslo uloží hlavičku a otevře řádky
+            fieldAction={!p.id && p.titleField && p.lines.length === 0 && p.newLinesHint ? { name: p.titleField, hint: p.labels.header.saveOpen, onClick: () => save() } : undefined}
             onChange={(name, value, t) => {
               const next = { ...values, [name]: value };
               pv.touch(name);
@@ -454,12 +550,15 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             }}
           />
         </div>
+        )}
         {!p.id && p.autoCreate && p.newLinesHint && <Text style={{ color: tokens.colorNeutralForeground3 }}>{p.newLinesHint}</Text>}
         {p.id &&
           p.lines.map((l) => (
             <Lines key={l.objectId} spec={l} parentId={p.id!} lang={p.lang} labels={p.labels} />
           ))}
       </PageContent>
+
+      {p.postingPreview && p.id && <PostingPreviewDrawer objectId={p.objectId} id={p.id} open={posting} onClose={() => setPosting(false)} labels={p.labels.posting} lang={p.lang} />}
 
       <Dialog open={confirm} onOpenChange={(_, d) => setConfirm(d.open)}>
         <DialogSurface>

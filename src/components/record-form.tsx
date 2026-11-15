@@ -61,6 +61,7 @@ export function RecordForm({
   columns = 2,
   openLabel,
   record,
+  fieldAction,
 }: {
   groups: FormGroup[];
   values: Values;
@@ -74,6 +75,8 @@ export function RecordForm({
   openLabel: string;
   /** záznam (pro pole s obrázkem: nahrání k uloženému záznamu) */
   record?: { objectId: string; id: string | null; labels: ImageLabels };
+  /** pole jako odkaz s akcí (číslo nového deníku: uložit a otevřít řádky) */
+  fieldAction?: { name: string; hint: string; onClick: () => void };
 }) {
   const s = useStyles();
   return (
@@ -86,6 +89,12 @@ export function RecordForm({
               <div key={f.name} className={f.kind === "text" || f.image ? s.wide : undefined}>
                 {f.image ? (
                   <ImageField f={f} value={values[f.name] as string | null} record={record} disabled={readOnly} onChange={onChange} />
+                ) : fieldAction?.name === f.name && values[f.name] ? (
+                  <Field label={f.label} hint={fieldAction.hint}>
+                    <Button appearance="transparent" style={{ justifyContent: "flex-start", padding: "0 2px", fontWeight: 600, color: tokens.colorBrandForegroundLink }} onClick={fieldAction.onClick}>
+                      {String(values[f.name])} →
+                    </Button>
+                  </Field>
                 ) : (
                 <FieldInput
                   f={f}

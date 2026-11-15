@@ -495,6 +495,7 @@ export const journal = defineObject({
     { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
   ],
   lockedWhen: { field: "status", equals: "posted" },
+  postingPreview: "post",
 });
 
 export const journalLine = defineObject({
@@ -612,7 +613,7 @@ export default defineModule({
       JournalsCash: "Pokladní deníky",
       JournalsPayment: "Deníky plateb",
       VoucherUnbalanced: "Doklad {voucher} není vyrovnaný: rozdíl {diff}",
-      VoucherLines: "Doklad HK",
+      VoucherLines: "Doklad",
       JournalType: "Druh deníku",
       JtDaily: "Obecný",
       JtVendorPayment: "Platby dodavatelům",

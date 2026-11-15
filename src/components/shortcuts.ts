@@ -30,8 +30,10 @@ export function useShortcuts(map: ShortcutMap, enabled = true) {
         return;
       }
       if (e.key === "Escape" && m.escape) {
-        // otevřený dialog/menu si Esc obslouží sám
-        if (document.querySelector("[role=dialog],[role=menu],[role=listbox]")) return;
+        // otevřený dialog/menu si Esc obslouží sám (nabídka se zavírá dřív, než sem Esc dorazí —
+        // proto i podle prvku, odkud Esc přišel)
+        if (e.defaultPrevented || document.querySelector("[role=dialog],[role=menu],[role=listbox]")) return;
+        if ((e.target as HTMLElement | null)?.closest?.("[role=menu],[role=menuitem],[role=listbox],[role=option],[role=combobox],[aria-expanded=true]")) return;
         m.escape();
         return;
       }

@@ -26,6 +26,7 @@ import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
 import { listNotices, markNoticesRead, type NoticeView } from "@/server/notices";
+import { previewPosting, type PostingPreview } from "@/server/posting-preview";
 
 export interface FormState {
   message?: string;
@@ -1016,6 +1017,16 @@ export async function previewRecordAction(
     const r = await previewRecord(s.ctx, objectId, id, values as RecordData);
     const { _titles, _provisional, ...vals } = r as RecordData & { _titles?: Record<string, string>; _provisional?: string[] };
     return { ok: true, data: { values: vals, titles: _titles ?? {}, provisional: _provisional ?? [] } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Náhled dokladu: zaúčtování nanečisto (zápisy HK a DPH), nic se nezapíše. */
+export async function previewPostingAction(objectId: string, id: string): Promise<ActionResult<PostingPreview>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: await previewPosting(s.ctx, objectId, id) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

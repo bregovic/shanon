@@ -194,12 +194,13 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
       ...(sp.side === 1
         ? [
-            { id: "isdoc", label: "@TAX:Isdoc", download: true, module: "prt" },
-            { id: "email", label: "@INT:SendByEmail", outside: true, module: "int", when: { field: "status", equals: "posted" } },
+            { id: "isdoc", label: "@TAX:Isdoc", download: true, module: "prt", group: "print" as const },
+            { id: "email", label: "@INT:SendByEmail", outside: true, module: "int", when: { field: "status", equals: "posted" }, group: "print" as const },
           ]
         : []),
     ],
     lockedWhen: { field: "status", equals: "posted" },
+    postingPreview: "post",
   });
 
   const invoiceLine = defineObject({
@@ -353,7 +354,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     defaultSort: { field: "issueDate", dir: "desc" },
     actions: [
       { id: "cancel", label: "@TAX:CancelDoc", when: { field: "status", equals: "open" } },
-      ...(sp.side === 1 ? [{ id: "email", label: "@INT:SendByEmail", outside: true, module: "int" }] : []),
+      ...(sp.side === 1 ? [{ id: "email", label: "@INT:SendByEmail", outside: true, module: "int", group: "print" as const }] : []),
     ],
     lockedWhen: { field: "status", equals: "settled" },
   });

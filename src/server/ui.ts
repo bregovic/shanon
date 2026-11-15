@@ -78,6 +78,23 @@ export function formGroups(ctx: Ctx, def: ObjectDef, t: T, meta: Record<string, 
 /** Texty pro klientské komponenty (grid, šuplík, lišta akcí). */
 export function uiLabels(t: T) {
   return {
+    header: { show: t("@SYS:HeaderShow"), hide: t("@SYS:HeaderHide"), saveOpen: t("@SYS:HeaderSaveOpen") },
+    groups: { print: t("@SYS:GroupPrint"), inquiry: t("@SYS:GroupInquiry"), more: t("@SYS:GroupMore") },
+    posting: {
+      preview: t("@SYS:PostingPreview"),
+      title: t("@SYS:PostingPreviewTitle"),
+      hint: t("@SYS:PostingPreviewHint"),
+      empty: t("@SYS:PostingPreviewEmpty"),
+      tax: t("@SYS:PostingPreviewTax"),
+      account: t("@SYS:PostingAccount"),
+      debit: t("@SYS:PostingDebit"),
+      credit: t("@SYS:PostingCredit"),
+      text: t("@SYS:PostingText"),
+      taxCode: t("@SYS:PostingTaxCode"),
+      base: t("@SYS:PostingBase"),
+      taxAmount: t("@SYS:PostingTaxAmount"),
+      close: t("@SYS:Close"),
+    },
     grid: {
       sortAsc: t("@SYS:SortAsc"),
       sortDesc: t("@SYS:SortDesc"),
