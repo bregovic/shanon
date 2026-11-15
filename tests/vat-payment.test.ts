@@ -26,6 +26,11 @@ describe("platba DPH", () => {
     await saveRecord(T, "ap.invoiceLine", null, { invoiceId: pinv.id, description: "Materiál", qty: "1", unitPrice: "2000" }, undefined, client);
     await runAction(T, "ap.invoice", String(pinv.id), "post", client);
 
+    // oddíl KH podle dokladu: přijatá 2 420 Kč → B.3, vydaná bez DIČ odběratele → A.5
+    const sec = async (obj: string, id: unknown) => (await listRecords(T, "tax.trans", { filter: { voucherId: String((await getRecord(T, obj, String(id), client))!.voucherId) } }, client)).rows.map((t) => t.khSection);
+    expect(await sec("ap.invoice", pinv.id)).toEqual(["B3"]);
+    expect(await sec("ar.invoice", inv.id)).toEqual(["A5"]);
+
     // Finanční úřad jako dodavatel s účtem pro DPH
     const fuSubj = await saveRecord(T, "gab.subject", null, { name: "Finanční úřad pro hl. m. Prahu" }, undefined, client);
     await saveRecord(T, "gab.bankAccount", null, { subjectId: fuSubj.id, accountNum: "705-77628031/0710" }, undefined, client);
@@ -34,6 +39,9 @@ describe("platba DPH", () => {
     await expect(runAction(T, "tax.return", String(ret.id), "postPayment", client)).rejects.toMatchObject({ label: "@TAX:NoTaxOfficeVendor" });
     await saveRecord(T, "tax.parameters", null, { taxOfficeCode: "451", subjectType: "P", filingPeriod: "month", taxOfficeVendorId: fu.id }, undefined, client);
     await runAction(T, "tax.return", String(ret.id), "calculate", client);
+    // tisk už před zaúčtováním: částka z výpočtu, QR
+    const pre = (await printJob(T, "tax.return", String(ret.id), null, client)).data as { doc: Record<string, unknown>; qr: string };
+    expect([pre.doc.amount, pre.qr.includes("AM:1680.00")]).toEqual(["1680.00", true]);
     await runAction(T, "tax.return", String(ret.id), "postPayment", client);
     const r = (await getRecord(T, "tax.return", String(ret.id), client))!;
     expect([r.paymentAmount, r.dueDate, r.paymentVs]).toEqual(["1680.00", "2026-11-25", "12345678"]);

@@ -47,6 +47,14 @@ export interface InvoiceConfig {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+/** Oddíl KH dokladu: A.4/B.2 jen od 10 000 Kč včetně DPH s českým DIČ a ne účtenka; jinak A.5/B.3. */
+function khSectionOf(sec: unknown, grossAcc: bigint, vatId: unknown, receipt: boolean): { khSection: string } | null {
+  const s = String(sec ?? "");
+  if (s !== "A4" && s !== "B2") return null;
+  const individual = !receipt && (grossAcc < BigInt(0) ? -grossAcc : grossAcc) >= BigInt(1_000_000) && /^CZ\d{8,10}$/.test(String(vatId ?? "").replace(/\s/g, "").toUpperCase());
+  return { khSection: individual ? s : s === "A4" ? "A5" : "B3" };
+}
+
 /** hlavička faktury → původní skupina DPH (mezi beforeSave a afterSave) */
 const groupChanged = new Map<string, string | null>();
 /** hlavička → původní měna (přepočet cen řádků z položek) */
@@ -430,6 +438,8 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     for (const part of taxTransParts(codeRecs.get(codeId)!, fromCents(t.base), fromCents(t.tax)))
       await data.create("tax.trans", {
         ...part,
+        // oddíl KH podle dokladu: jednotlivě (A.4 / B.2) jen od 10 000 Kč s DIČ, jinak souhrnně (A.5 / B.3)
+        ...(khSectionOf(part.khSection ?? codeRecs.get(codeId)!.khSection, grossAcc, subject?.vatId, !!header.receipt) ?? {}),
         taxDate,
         currencyId: curId,
         baseCur: fromCents(t.baseCur),

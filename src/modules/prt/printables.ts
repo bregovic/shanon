@@ -1168,7 +1168,9 @@ async function vatPaymentDataset(data: DataApi, companyId: string | null, id: st
     partner: { name: subj?.name ?? "", bankAccount: accountNum, iban },
     lines: [],
     vat: [],
-    qr: iban && toCents(amount) > zero ? await paymentQr(data, { iban, amount, currency: "CZK", vs, date: (ret.dueDate as string) ?? null, message: `DPH ${period}` }) : "",
+    qr: iban && toCents(amount) > zero ? await paymentQr(data, { iban, amount, currency: "CZK", vs, date: ret.dueDate ? String(ret.dueDate instanceof Date ? ret.dueDate.toISOString() : ret.dueDate).slice(0, 10) : null, message: `DPH ${period}` }) : "",
+    // proč QR chybí (bez účtu FÚ, bez částky k úhradě)
+    qrMissing: !vendor ? "QR platba: v Daňových parametrech chybí dodavatel Finanční úřad." : !iban ? "QR platba: dodavatel Finanční úřad nemá bankovní účet." : toCents(amount) <= zero ? "QR platba: není co platit (nejdřív Spočítat; nadměrný odpočet se neplatí)." : "",
   };
 }
 
@@ -1197,6 +1199,7 @@ function vatPaymentLayout(): PrintLayout {
       T("tot", 128, 57, 60, 9, "{doc.amount:money} Kč", { size: 16, bold: true, color: "#ffffff", align: "right" }),
       { id: "qr", type: "qr", x: 140, y: 100, w: 50, h: 50, field: "qr" },
       { ...T("qrT", 15, 120, 120, 12, "QR platba — naskenujte v bankovní aplikaci", { size: 9, bold: true, color: MUTED, align: "right" }), showIf: "qr" },
+      { ...T("qrM", 15, 100, 180, 8, "{qrMissing}", { size: 9, color: MUTED }), showIf: "qrMissing" },
     ],
   };
 }
