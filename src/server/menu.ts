@@ -36,7 +36,8 @@ export function moduleMenu(s: Session, t: T, mod: ModuleDef): (MenuEntry & { sec
   mod.menu.forEach((g, i) => {
     for (const it of g.items) {
       // stránky správy jen pro správce, objekty jen s právem číst
-      const ok = it.href ? !it.href.startsWith("/system/") || (it.href === "/system/modules" ? s.superUser : isAnyAdmin(s)) : can(s.ctx.perms, it.object!, "read");
+      // objekt (i s vlastním odkazem, např. filtrem) = právo číst; stránky správy jen pro správce
+      const ok = it.object ? can(s.ctx.perms, it.object, "read") : !it.href!.startsWith("/system/") || (it.href === "/system/modules" ? s.superUser : isAnyAdmin(s));
       if (!ok || (it.module && !s.ctx.modules.has(it.module))) continue;
       const o = it.object ? registry.objects.get(it.object)! : null;
       out.push({

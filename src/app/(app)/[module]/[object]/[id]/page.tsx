@@ -14,9 +14,10 @@ import { can } from "@/core/security";
 
 type Params = { module: string; object: string; id: string };
 
-export default async function ObjectDetailPage({ params, searchParams }: { params: Promise<Params>; searchParams: Promise<{ copy?: string }> }) {
+export default async function ObjectDetailPage({ params, searchParams }: { params: Promise<Params>; searchParams: Promise<Record<string, string | undefined>> }) {
   const { module, object, id } = await params;
-  const { copy } = await searchParams;
+  const sp = await searchParams;
+  const copy = sp.copy;
   const s = await requireSession();
   const def = registry.objects.get(`${module}.${object}`);
   if (!def || !s.ctx.modules.has(module)) notFound();
@@ -40,6 +41,13 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
     // Duplikovat: hodnoty zdrojového záznamu bez klíče
     const dup = copy ? await duplicateRecord(s.ctx, def.id, copy) : null;
     if (dup && "values" in dup) record = { ...record, ...dup.values, _titles: dup.titles };
+    // hodnoty z filtru seznamu (?set.pole=hodnota) — jen jednoduchá upravitelná pole
+    for (const [k, v] of Object.entries(sp)) {
+      const f = k.startsWith("set.") ? def.fields[k.slice(4)] : undefined;
+      if (!f || f.readOnly || !v || ["ref", "text"].includes(String(f.edt.kind))) continue;
+      const [val, err] = coerce(f.edt, v, registry);
+      if (!err) record[k.slice(4)] = val;
+    }
   }
   else {
     const r = await getRecord(s.ctx, def.id, id).catch(() => null);
@@ -61,7 +69,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
           .map(async (l) => {
             const ld = registry.objects.get(l.object)!;
             const lm = fieldsMeta(s.ctx, ld, t);
-            const initial = await listRecords(s.ctx, ld.id, { filter: { [l.field]: id }, pageSize: 100, lang: s.lang, totals: true });
+            const initial = await listRecords(s.ctx, ld.id, { filter: { [l.field]: id }, pageSize: l.inline ? 2000 : 100, maxPageSize: l.inline ? 2000 : undefined, lang: s.lang, totals: true });
             return {
               objectId: ld.id,
               field: l.field,
@@ -69,7 +77,9 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               titleField: ld.titleField,
               columns: ld.list.filter((f) => f !== l.field && !hiddenFields(s.ctx, ld).includes(f)).map((f) => lm[f]),
               groups: formGroups(s.ctx, ld, t, lm, [l.field]),
-              defaults: defaults(ld),
+              defaults: { ...defaults(ld), ...Object.fromEntries(Object.entries(l.inherit ?? {}).map(([lf, pf]) => [lf, record[pf] ?? null])) },
+              carry: l.carry,
+              balance: l.balance,
               // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít
               overview: l.owned === false || !!ld.systemOnly,
               inline: !!l.inline,

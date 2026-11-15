@@ -17,6 +17,7 @@ import { moduleOf } from "./object";
 
 export interface MenuItem {
   object?: string;
+  /** vlastní odkaz; s `object` např. seznam s filtrem (deníky banky) — právo podle objektu */
   href?: string;
   label?: LabelRef;
   /** položka jen se zapnutým modulem (odkaz do modulu, na kterém tento nezávisí) */

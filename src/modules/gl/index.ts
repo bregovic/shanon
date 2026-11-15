@@ -476,6 +476,8 @@ export const journal = defineObject({
     journalNum: { edt: VoucherNum, label: "@GL:JournalNum", mandatory: true, readOnly: true },
     /** prázdné = výchozí název deníku (GEN, jinak první) — doplní se při uložení */
     journalNameId: { edt: JournalNameRef },
+    /** druh z názvu deníku (deníky banky v Bance, pokladny v Pokladně…) */
+    journalType: { edt: enumEdt(JournalType) },
     date: { edt: Edts.TransDate, mandatory: true, default: "$today" },
     description: { edt: Edts.Description, mandatory: true },
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
@@ -484,7 +486,7 @@ export const journal = defineObject({
     checkResult: { edt: Edts.Description, label: "@GL:CheckResult", readOnly: true },
   },
   titleField: "journalNum",
-  list: ["journalNum", "journalNameId", "date", "description", "status", "checkResult"],
+  list: ["journalNum", "journalNameId", "journalType", "date", "description", "status", "checkResult"],
   // hlavička jako řádek nahoře, řádky v upravitelné mřížce přes celou stránku
   compactHeader: true,
   form: [
@@ -493,7 +495,17 @@ export const journal = defineObject({
   ],
   numberSeq: { field: "journalNum", seq: "GLJOURNAL" },
   defaultSort: { field: "date", dir: "desc" },
-  lines: [{ object: "gl.journalLine", field: "journalId", label: "@SYS:Lines", inline: true }],
+  lines: [
+    {
+      object: "gl.journalLine",
+      field: "journalId",
+      label: "@SYS:Lines",
+      inline: true,
+      inherit: { date: "date" },
+      carry: ["date", "text", "accountType", "offsetType"],
+      balance: { group: "voucherNum", debit: "debit", credit: "credit", selfBalanced: "offsetType" },
+    },
+  ],
   actions: [
     { id: "validate", label: "@GL:Validate", when: { field: "status", equals: "draft" } },
     { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
@@ -588,7 +600,7 @@ export default defineModule({
     },
     {
       label: "@GL:Module",
-      items: [{ object: "gl.journal" }, { object: "gl.voucher" }, { object: "gl.trans" }],
+      items: [{ object: "gl.journal", href: "/gl/journal?filter.journalType=daily", label: "@GL:JournalsDaily", module: "gl" }, { object: "gl.journal", label: "@GL:JournalsAll" }, { object: "gl.voucher" }, { object: "gl.trans" }],
     },
     {
       label: "@SYS:Setup",
@@ -610,6 +622,12 @@ export default defineModule({
   setup: glSetup,
   labels: {
     cs: {
+      JournalsDaily: "Obecné deníky",
+      JournalsAll: "Všechny deníky",
+      JournalsBank: "Bankovní deníky",
+      JournalsCash: "Pokladní deníky",
+      JournalsPayment: "Deníky plateb",
+      VoucherUnbalanced: "Doklad {voucher} není vyrovnaný: rozdíl {diff}",
       VoucherLines: "Doklad HK",
       JournalType: "Druh deníku",
       JtDaily: "Obecný",
@@ -803,6 +821,12 @@ export default defineModule({
       AmountCur: "Částka v měně",
     },
     en: {
+      JournalsDaily: "General journals",
+      JournalsAll: "All journals",
+      JournalsBank: "Bank journals",
+      JournalsCash: "Cash journals",
+      JournalsPayment: "Payment journals",
+      VoucherUnbalanced: "Voucher {voucher} is not balanced: difference {diff}",
       VoucherLines: "Ledger voucher",
       JournalType: "Journal type",
       JtDaily: "Daily",

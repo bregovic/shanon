@@ -52,6 +52,8 @@ export interface LineSpec {
   overview: boolean;
   /** úprava přímo v mřížce (deník) */
   inline?: boolean;
+  carry?: string[];
+  balance?: { group: string; debit: string; credit: string; selfBalanced?: string };
   /** řádek má akce — dvojklik otevře jeho stránku */
   openInPage?: boolean;
   sortField?: string;
@@ -173,8 +175,10 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           initial={spec.initial.rows}
           sortField={spec.sortField}
           readOnly={!spec.editable}
+          carry={spec.carry}
+          balance={spec.balance}
           lang={lang}
-          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "" }}
+          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys }}
           onChanged={() => router.refresh()}
         />
       ) : (

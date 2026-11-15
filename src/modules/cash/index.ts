@@ -98,7 +98,7 @@ export default defineModule({
   enums: [CashDirection],
   objects: [desk, voucher],
   menu: [
-    { label: "@CASH:Module", items: [{ object: "cash.voucher" }] },
+    { label: "@CASH:Module", items: [{ object: "cash.voucher" }, { object: "gl.journal", href: "/gl/journal?filter.journalType=cash", label: "@GL:JournalsCash", module: "gl" }] },
     { label: "@SYS:Reports", kind: "reports", items: [{ href: "/report/cash/cashBook", label: "@CASH:CashBook" }] },
     { label: "@SYS:Setup", kind: "setup", items: [{ object: "cash.desk" }] },
   ],

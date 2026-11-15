@@ -10,7 +10,7 @@
  */
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
-import { checkText, convertLines, postVoucher, resolveJournalName, type PostingLine } from "./posting";
+import { allocateVoucher, checkText, convertLines, postVoucher, resolveJournalName, type PostingLine } from "./posting";
 import { dimsOf } from "./dimensions";
 
 const zero = BigInt(0);
@@ -78,6 +78,17 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
   const jn = journal.journalNameId ? await data.get("gl.journalName", String(journal.journalNameId)) : null;
   const mode = String(jn?.voucherAllocation ?? "balance");
   const lines = await data.find("gl.journalLine", { journalId: journal.id }, { take: 5000, orderBy: { lineNum: "asc" } });
+  // řádky bez čísla dokladu (starší deníky, import) dostanou číslo stejně jako při zadání
+  if (jn && mode !== "manual") {
+    for (const [i, l] of lines.entries()) {
+      if (l.voucherNum) continue;
+      const num = await allocateVoucher(data, journal, jn, l, lines.slice(0, i));
+      if (num) {
+        l.voucherNum = num;
+        await data.update("gl.journalLine", String(l.id), { voucherNum: num });
+      }
+    }
+  }
   const errors: { ref: string; params?: Record<string, string>; prefix?: string }[] = [];
   if (!lines.length) errors.push({ ref: "@GL:JournalEmpty" });
   const legsByLine: Leg[][] = [];
@@ -126,7 +137,16 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
     groups.push(g);
     return g;
   };
-  if (mode === "journal") {
+  if (jn && lines.every((l) => l.voucherNum)) {
+    // čísla dokladů jsou na řádcích (přidělená při zadání, nebo ručně)
+    const byNum = new Map<string, Group>();
+    for (const [i, legs] of legsByLine.entries()) {
+      const num = String(lines[i].voucherNum);
+      const g = byNum.get(num) ?? open(`N${num}`, lines[i], num);
+      byNum.set(num, g);
+      g.legs.push(...legs);
+    }
+  } else if (mode === "journal") {
     const g = lines.length ? open("J", lines[0]) : null;
     for (const legs of legsByLine) g?.legs.push(...legs);
   } else if (mode === "line") {
@@ -184,8 +204,26 @@ function postingLines(g: Group): PostingLine[] {
  * Ověřit (`dryRun`) nebo zaúčtovat deník. Vrací počet dokladů a součty;
  * chyby: při ověření seznam, při účtování první chyba jako výjimka.
  */
+/**
+ * Čtení číselníků, které účtování nemění (účty, období, dimenze, měny, partneři),
+ * jednou za běh deníku — stovky dokladů by je jinak četly pořád dokola.
+ */
+const STATIC = new Set(["gl.account", "gl.period", "gl.dimension", "gl.dimensionValue", "gl.dimensionRule", "gl.parameters", "sys.currency", "sys.company", "ar.customer", "ap.vendor", "ar.group", "ap.group", "bank.account", "cash.desk", "gl.systemAccount"]);
+export function cachedReads(data: DataApi): DataApi {
+  const memo = new Map<string, Promise<unknown>>();
+  const once = <T>(key: string, fn: () => Promise<T>) => {
+    if (!memo.has(key)) memo.set(key, fn());
+    return memo.get(key) as Promise<T>;
+  };
+  return {
+    ...data,
+    get: (o, id) => (STATIC.has(o) ? once(`g:${o}:${id}`, () => data.get(o, id)) : data.get(o, id)),
+    find: (o, where, opts) => (STATIC.has(o) ? once(`f:${o}:${JSON.stringify(where)}:${JSON.stringify(opts ?? {})}`, () => data.find(o, where, opts)) : data.find(o, where, opts)),
+  };
+}
+
 export async function runJournal(ctx: EventContext, journal: RecordData, dryRun: boolean) {
-  const data = ctx.data;
+  const data = cachedReads(ctx.data);
   const plan = await planJournal(data, journal, ctx.companyId);
   // chyby: pro Ověřit text, pro Zaúčtovat první chyba jako výjimka (původní hláška)
   const raw: { ref: string; params?: Record<string, string>; prefix?: string }[] = [...plan.errors];
@@ -197,8 +235,9 @@ export async function runJournal(ctx: EventContext, journal: RecordData, dryRun:
       else credit -= x.amount;
     }
 
-  // každý doklad zkontroluje účtování nanečisto (účty, období, dimenze)
-  if (!raw.length) {
+  // Ověřit: každý doklad nanečisto (účty, období, dimenze). Zaúčtovat to nepotřebuje —
+  // běží v jedné transakci, první chyba vrátí všechno zpět.
+  if (!raw.length && dryRun) {
     for (const [k, g] of plan.groups.entries()) {
       try {
         const lines = await convertLines(data, ctx.companyId, g.date, postingLines(g));
@@ -238,8 +277,9 @@ export async function runJournal(ctx: EventContext, journal: RecordData, dryRun:
       lines,
     });
     first ??= voucher;
-    // číslo dokladu zpět na řádky deníku
-    for (const id of new Set(g.legs.map((x) => String(x.line.id)))) await data.update("gl.journalLine", id, { voucherNum: voucher.voucherNum });
+    // číslo dokladu zpět na řádky deníku (jen kde ještě není — obvykle je už od zadání)
+    for (const l of new Map(g.legs.map((x) => [String(x.line.id), x.line])).values())
+      if (l.voucherNum !== voucher.voucherNum) await data.update("gl.journalLine", String(l.id), { voucherNum: voucher.voucherNum });
     // saldo odběratelů a dodavatelů
     for (const [i, x] of g.legs.entries()) if (x.partner) await partnerTrans(data, x, lines[i], voucher);
   }
@@ -298,9 +338,11 @@ async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher:
 export const journalHandlers: Record<string, ObjectHandlers> = {
   "gl.journal": {
     async beforeSave(ctx, data) {
-      const jn = await resolveJournalName(ctx.data, data.journalNameId);
+      // deník z nabídky banky / pokladny… dostane název svého druhu
+      const jn = await resolveJournalName(ctx.data, data.journalNameId, data.journalType);
       if (jn.blocked) return { journalNameId: "@GL:JournalNameBlocked" };
       data.journalNameId = jn.id;
+      data.journalType = jn.journalType;
     },
     actions: {
       /** Ověřit: rozdělení na doklady, vyrovnanost, účty, období, dimenze — bez účtování */

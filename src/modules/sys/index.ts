@@ -506,6 +506,9 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      LinesUnbalanced: "Nevyrovnané doklady (MD − D): {list}",
+      LinesBalanced: "Všechny doklady jsou vyrovnané.",
+      LinesKeys: "Enter = uložit a další řádek · ↑/↓ = řádek výš/níž · datum: d = dnes, d+1, 15, 1511",
       Notice: "Upozornění",
       Notices: "Upozornění",
       NoticeRead: "Přečtení upozornění",
@@ -848,6 +851,9 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      LinesUnbalanced: "Unbalanced vouchers (debit − credit): {list}",
+      LinesBalanced: "All vouchers are balanced.",
+      LinesKeys: "Enter = save and next line · ↑/↓ = line up/down · date: d = today, d+1, 15, 1511",
       Notice: "Notification",
       Notices: "Notifications",
       NoticeRead: "Notification read",

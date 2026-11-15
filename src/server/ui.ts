@@ -90,6 +90,9 @@ export function uiLabels(t: T) {
       records: t("@SYS:Records"),
       selected: t("@SYS:Selected"),
       total: t("@SYS:Total"),
+      linesUnbalanced: t("@SYS:LinesUnbalanced"),
+      linesBalanced: t("@SYS:LinesBalanced"),
+      linesKeys: t("@SYS:LinesKeys"),
       help: FILTER_HELP.map(([code, label]) => [code, t(label)] as [string, string]),
     },
     drawer: {

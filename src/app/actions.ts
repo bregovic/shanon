@@ -231,6 +231,8 @@ export async function listAction(
       dir: params.dir,
       page: params.page,
       pageSize: params.pageSize,
+      // řádky dokladu (filtr na rodiče) celé — deník může mít stovky řádků
+      maxPageSize: params.filter && Object.keys(params.filter).length ? 2000 : undefined,
       filter: params.filter,
       totals: !!params.totals,
       lang: s.lang,

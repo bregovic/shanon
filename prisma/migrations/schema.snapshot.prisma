@@ -1243,6 +1243,7 @@ model GlJournal {
   companyId     String   @map("company_id") @db.Uuid
   journalNum    String   @map("journal_num") @db.VarChar(30)
   journalNameId String?  @map("journal_name_id") @db.Uuid
+  journalType   String?  @map("journal_type") @db.VarChar(40)
   date          DateTime @default(now()) @db.Date
   description   String   @db.VarChar(255)
   status        String   @default("draft") @db.VarChar(40)

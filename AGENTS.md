@@ -197,6 +197,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `src/server/mail.ts`): Odeslat e-mailem (akce `outside`) založí koncept `int.mail` s PDF dokladu
   v přílohách a otevře ho (akce smí vrátit `ActionOutcome.open`); Odeslat pošle napojením druhu
   „mail“, zapíše `int.log` a u faktury `emailedAt`. Příjemce = `docEmail` partnera, jinak e-mail subjektu.
+- Pořizování v mřížce (`InlineLines`, `ObjectDef.lines[]`): `inherit` (pole řádku ← hlavička), `carry`
+  (z předchozího řádku), `balance` (vyrovnanost skupin, dorovnání nového řádku). Klávesy: Enter = uložit
+  a další řádek, ↑/↓ = řádek, Tab přeskočí samočinná pole. Datum všude přes `DateInput` (zkratky AX
+  `d`, `d+1`, `15`, `1511` — `src/lib/date-input.ts`). Deník: číslo dokladu přiděluje `allocateVoucher`
+  už při založení řádku; druh deníku na hlavičce, menu modulů filtrem `?filter.journalType=…`
+  (`MenuItem` s `object` + `href`), „Nový“ ze seznamu s filtrem předvyplní `?set.<pole>=`.
 - Upozornění (zvoneček): `notify(data, { kind, title: label, params, message, href, key })`
   (`src/modules/sys/notify.ts`) — patří firmě, text se překládá až při zobrazení, `key` brání
   opakování (výchozí 24 h). Přečtení po uživatelích (`sys.notificationRead`), čtení `src/server/notices.ts`.

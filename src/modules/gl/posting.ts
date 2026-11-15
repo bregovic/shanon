@@ -228,16 +228,50 @@ export async function postVoucher(data: DataApi, req: PostingRequest): Promise<R
   return voucher;
 }
 
-/** Název deníku: zadaný, jinak GEN, jinak první nezablokovaný. */
-export async function resolveJournalName(data: DataApi, id: unknown): Promise<RecordData> {
+/** Název deníku: zadaný, jinak první daného druhu (deníky banky, pokladny…), jinak GEN, jinak první nezablokovaný. */
+export async function resolveJournalName(data: DataApi, id: unknown, journalType?: unknown): Promise<RecordData> {
   if (id) {
     const jn = await data.get("gl.journalName", String(id));
     if (jn) return jn;
+  }
+  if (journalType) {
+    const [typed] = await data.find("gl.journalName", { journalType: String(journalType), blocked: false }, { take: 1, orderBy: { code: "asc" } });
+    if (typed) return typed;
   }
   const [gen] = await data.find("gl.journalName", { code: "GEN", blocked: false }, { take: 1 });
   const [first] = gen ? [gen] : await data.find("gl.journalName", { blocked: false }, { take: 1 });
   if (!first) throw new UserError("@GL:MissingJournalName");
   return first;
+}
+
+const voucherSeq = (jn: RecordData) => ({ id: (jn.voucherSeqId as string) || undefined, usedFor: "gl.voucher", code: "GLVOUCHER" });
+const lineDiff = (l: RecordData) => (l.offsetType ? BigInt(0) : toCents(l.debit ?? 0) - toCents(l.credit ?? 0));
+
+/**
+ * Číslo dokladu pro nový řádek deníku podle číslování názvu deníku (jako v AX):
+ * po vyrovnání = číslo předchozího řádku, dokud jeho doklad není vyrovnaný;
+ * jeden za deník = číslo prvního řádku; řádek = vždy nové; ručně = nic.
+ */
+export async function allocateVoucher(data: DataApi, journal: RecordData, jn: RecordData, line: RecordData, before?: RecordData[]): Promise<string | null> {
+  const mode = String(jn.voucherAllocation ?? "balance");
+  if (mode === "manual") return null;
+  const date = new Date(String(line.date ?? journal.date ?? new Date().toISOString().slice(0, 10)));
+  if (mode === "line") return data.nextNumber(voucherSeq(jn), date);
+  // jen poslední doklad (ne celý deník — u stovek řádků by každý nový řádek četl všechny)
+  let last: RecordData | undefined;
+  let group: RecordData[] = [];
+  if (before) {
+    const prev = before.filter((l) => l.id !== line.id && l.voucherNum);
+    last = mode === "journal" ? prev[0] : prev[prev.length - 1];
+    group = last ? prev.filter((l) => l.voucherNum === last!.voucherNum) : [];
+  } else {
+    const ordered = await data.find("gl.journalLine", { journalId: journal.id }, { take: 50, orderBy: { lineNum: mode === "journal" ? "asc" : "desc" } });
+    last = ordered.find((l) => l.id !== line.id && l.voucherNum);
+    if (last && mode === "balance") group = (await data.find("gl.journalLine", { journalId: journal.id, voucherNum: last.voucherNum }, { take: 5000 })).filter((l) => l.id !== line.id);
+  }
+  if (mode === "journal") return last ? String(last.voucherNum) : data.nextNumber(voucherSeq(jn), date);
+  if (last && group.reduce((a, l) => a + lineDiff(l), BigInt(0)) !== BigInt(0)) return String(last.voucherNum);
+  return data.nextNumber(voucherSeq(jn), date);
 }
 
 async function assertJournalOpen(data: DataApi, journalId: unknown) {
@@ -311,11 +345,22 @@ export const glHandlers: Record<string, ObjectHandlers> = {
     async beforeSave(ctx, data, isNew) {
       const journal = data.journalId ? await ctx.data.get("gl.journal", String(data.journalId)) : null;
       if (journal?.status === "posted") throw new UserError("@GL:Locked");
+      // záporná částka = druhá strana (−100 v MD → 100 v D)
+      for (const [a, b] of [["debit", "credit"], ["credit", "debit"]] as const) {
+        if (data[a] !== null && data[a] !== undefined && data[a] !== "" && toCents(data[a]) < BigInt(0)) {
+          data[b] = fromCents(-toCents(data[a]));
+          data[a] = null;
+        }
+      }
       if (isNew) {
         // pořadí řádku, výchozí protiúčet z názvu deníku
         const last = await ctx.data.find("gl.journalLine", { journalId: data.journalId }, { take: 1, orderBy: { lineNum: "desc" } });
         data.lineNum ??= Number(last[0]?.lineNum ?? 0) + 1;
+        // datum jako předchozí řádek, jinak datum deníku
+        data.date ??= last[0]?.date ?? journal?.date ?? null;
         const jn = journal?.journalNameId ? await ctx.data.get("gl.journalName", String(journal.journalNameId)) : null;
+        // číslo dokladu hned (vidět, co k čemu patří a jestli je doklad vyrovnaný)
+        if (journal && jn && !data.voucherNum) data.voucherNum = await allocateVoucher(ctx.data, journal, jn, data);
         const defType = (jn?.offsetType as string) || (jn?.offsetAccountId ? "ledger" : null);
         if (!data.offsetType && defType) {
           data.offsetType = defType;

@@ -307,7 +307,7 @@ export default defineModule({
   numberSeqs: [{ code: "BANKPO", name: "@BANK:PaymentOrders", format: "PP{YY}{#####}", usedFor: "bank.paymentOrder" }],
   setup: bankSetup,
   menu: [
-    { label: "@BANK:Module", items: [{ object: "bank.statement" }, { object: "bank.importLog" }, { object: "bank.paymentOrder" }] },
+    { label: "@BANK:Module", items: [{ object: "bank.statement" }, { object: "gl.journal", href: "/gl/journal?filter.journalType=bank", label: "@GL:JournalsBank", module: "gl" }, { object: "bank.importLog" }, { object: "bank.paymentOrder" }] },
     { label: "@BANK:Module", kind: "functions", items: [{ href: "/bank/import", label: "@BANK:BulkImport" }] },
     { label: "@SYS:Setup", items: [{ object: "bank.account" }, { object: "bank.paymentMethod" }] },
   ],

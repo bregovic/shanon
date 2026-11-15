@@ -5,13 +5,34 @@ objects: gl.journal, gl.journalLine, gl.account, gl.voucher, gl.trans
 order: 10
 summary: Ruční zápisy, druhy účtů (odběratel, dodavatel, banka), ověření a zaúčtování; účtový rozvrh.
 ---
+## Kde deníky najdete
+
+Každý modul má své deníky: [Obecné deníky](/gl/journal?filter.journalType=daily) v Hlavní knize, **Bankovní deníky** v Bance, **Pokladní deníky** v Pokladně, **Deníky plateb** u odběratelů a dodavatelů. **Nový** v takovém seznamu založí deník správného druhu (název deníku se doplní sám). Všechny deníky jsou v [Všechny deníky](/gl/journal).
+
 ## Deník
 
-1. [Deníky](/gl/journal) → **Nový**, vyberte **název deníku** (určuje druh a číslování dokladů) a datum.
-2. Řádky v mřížce: **druh účtu** (hlavní kniha, odběratel, dodavatel, banka, pokladna), účet, **MD** nebo **D**, text, případně **protiúčet** na stejném řádku.
+1. **Nový**, doplňte popis a **Uložit** ([[Ctrl+S]]). Název deníku určuje druh, číslování dokladů a výchozí protiúčet.
+2. Řádky v mřížce: **druh účtu** (hlavní kniha, odběratel, dodavatel, banka, pokladna), účet, text, **MD** nebo **D**, případně **protiúčet** na stejném řádku.
    - Odběratel / dodavatel zapíše i do salda; úhrada s **VS** spáruje fakturu.
-3. **Ověřit** – kontrola vyrovnanosti, účtů, období a dimenzí bez zaúčtování. Výsledek je v poli *Kontrola*.
-4. **Zaúčtovat** – vzniknou účetní doklady podle nastavení deníku (po vyrovnání, jeden za deník, řádek).
+3. **Ověřit** – kontrola vyrovnanosti, účtů, období a dimenzí bez zaúčtování. Výsledek je v poli *Ověření*.
+4. **Zaúčtovat** – doklady vzniknou s čísly, která vidíte na řádcích.
+
+## Rychlé pořizování (jako v AX)
+
+| Klávesa | Co udělá |
+|---|---|
+| [[Enter]] | uloží řádek a skočí na **účet** dalšího řádku |
+| [[Tab]] / [[Shift+Tab]] | další / předchozí pole (datum a číslo dokladu přeskočí – plní se samy) |
+| [[↑]] / [[↓]] | řádek výš / níž ve stejném sloupci (řádek se při odchodu uloží) |
+| psaní v poli účtu | nabídka podle čísla i názvu, [[↓]] a [[Enter]] vybere |
+
+- **Datum**: nový řádek převezme datum předchozího řádku (první řádek datum deníku). Zkratky: `d` = dnes, `d+1` / `d-1`, `15` = 15. tohoto měsíce, `1511` = 15. 11., `15.11.26`.
+- **Číslo dokladu** se ukáže hned po uložení řádku. Při číslování *po vyrovnání* drží řádky stejné číslo, dokud doklad není vyrovnaný; pak začne nový.
+- **Dorovnání**: dokud doklad není vyrovnaný, nový řádek má předvyplněné jeho číslo a zbývající částku na opačné straně – stačí vybrat účet a [[Enter]].
+- Text a druh účtu se přebírají z předchozího řádku. Záporná částka v MD se přesune do D (a naopak).
+- Pod mřížkou je vidět, které doklady nejsou vyrovnané a o kolik; řádky takového dokladu mají oranžový proužek.
+
+> Doporučení: pro opakované zápisy (bankovní poplatky, nájem) si založte **název deníku s výchozím protiúčtem** – každý řádek je pak vyrovnaný sám a stačí účet, text a částka. Velké množství řádků (výpis, mzdy) nahrajte **Importem** z Excelu; čísla dokladů se doplní při Ověřit.
 
 ## Účtový rozvrh
 

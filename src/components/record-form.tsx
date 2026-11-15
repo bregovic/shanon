@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "./date-input";
 
 /**
  * Formulář záznamu vykreslený z popisu polí (FieldMeta). Řízený stavem —
@@ -154,7 +155,7 @@ function FieldInput({
       control = <Textarea value={v} disabled={disabled} resize="vertical" rows={3} onChange={(_, d) => onChange(f.name, d.value)} />;
       break;
     case "date":
-      control = <Input type="date" value={v} disabled={disabled} onChange={(_, d) => onChange(f.name, d.value)} />;
+      control = <DateInput value={v} disabled={disabled} onChange={(iso) => onChange(f.name, iso ?? "")} />;
       break;
     case "datetime": {
       const local = v ? new Date(new Date(v).getTime() - new Date(v).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
@@ -257,6 +258,8 @@ export function RefCombobox({
       <Combobox
         // obal se má zúžit (primární slot Comboboxu je input, proto root)
         root={{ style: { flex: 1, minWidth: 0 } }}
+        // šipka rozbalení není zastávka Tabu (Tab = další pole, nabídku otevře psaní nebo Alt+↓)
+        expandIcon={{ tabIndex: -1 }}
         size={compact ? "small" : undefined}
         value={query}
         selectedOptions={value ? [value] : []}

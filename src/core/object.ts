@@ -100,7 +100,20 @@ export interface ObjectDef {
    */
   /** `copy: false` = řádky se při Duplikovat nekopírují (diskuze, historie) */
   /** `inline` = řádky se upravují přímo v mřížce (deník, řádky dokladu) */
-  lines?: { object: string; field: string; label: LabelRef; owned?: boolean; copy?: boolean; inline?: boolean }[];
+  lines?: {
+    object: string;
+    field: string;
+    label: LabelRef;
+    owned?: boolean;
+    copy?: boolean;
+    inline?: boolean;
+    /** nový řádek v mřížce: pole řádku ← pole hlavičky (datum řádku = datum deníku) */
+    inherit?: Record<string, string>;
+    /** nový řádek v mřížce převezme tato pole z předchozího řádku (jako v AX) */
+    carry?: string[];
+    /** vyrovnanost skupin řádků (doklad deníku): rozdíl MD − D po skupinách, dorovnání nového řádku */
+    balance?: { group: string; debit: string; credit: string; selfBalanced?: string };
+  }[];
   /**
    * související doklady (faktury a zálohy objednávky): tlačítko v horní liště
    * s počtem, otevře jejich seznam s filtrem; bez záznamů je neaktivní.

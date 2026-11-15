@@ -4,7 +4,7 @@
  * Seznam záznamů objektu: lišta akcí + SmartGrid + šuplík.
  * Objekty s řádky (deník, doklad) se místo šuplíku otevírají na celé stránce.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -77,15 +77,18 @@ export function ObjectListView(p: ObjectListProps) {
     return `/api/export/${p.objectId}?${q}`;
   };
 
+  // nový záznam ze seznamu s filtrem z menu (např. deníky banky) dostane hodnoty filtru
+  const preset = useMemo((): Record<string, string> => Object.fromEntries(Object.entries(p.initialFilters ?? {}).filter(([, v]) => /^[\p{L}\d_.-]+$/u.test(v))), [p.initialFilters]);
   const open = useCallback(
     (row: Row | null) => {
       if (p.openInPage) {
-        router.push(objectHref(p.objectId, row ? String(row.id) : "new"));
+        const q = new URLSearchParams(Object.entries(preset).map(([k, v]) => [`set.${k}`, v]));
+        router.push(objectHref(p.objectId, row ? String(row.id) : "new") + (!row && q.size ? `?${q}` : ""));
         return;
       }
-      setDrawer({ open: true, id: row ? String(row.id) : null, title: row ? String(row[p.titleField] ?? p.label) : "" });
+      setDrawer({ open: true, id: row ? String(row.id) : null, title: row ? String(row[p.titleField] ?? p.label) : "", values: row ? undefined : { ...p.defaults, ...preset } });
     },
-    [p.openInPage, p.objectId, p.titleField, p.label, router],
+    [p.openInPage, p.objectId, p.titleField, p.label, p.defaults, preset, router],
   );
 
   // Duplikovat vybraný záznam: nový formulář s jeho hodnotami (klíč prázdný, číslo z řady při uložení);
