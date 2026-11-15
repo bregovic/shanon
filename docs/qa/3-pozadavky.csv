@@ -64,3 +64,9 @@ CR-062;change;Deník: číslo dokladu hned, datum z hlavičky, zkratky data, dru
 CR-063;change;Náhled hodnot před uložením (položka, čísla deníku a dokladu), výběr řádků deníku, Alt+↓, lookup partnerů jen jménem (* = číslo), názvy deníků podle druhu;GL-JOURNAL-ENTRY;high;uat;63;Podněty z testování 15.11.2026.
 CR-064;change;Lišta se skupinami a Náhled dokladu, SysLastValue, deník: Enter po polích, nový řádek šipkou, víc řádků na nevyrovnaný doklad, podrobnosti řádku, dialog dimenzí účtu a protiúčtu;GL-JOURNAL-ENTRY;high;uat;64;Podněty z testování 15.11.2026.
 CR-065;change;Import bankovních výpisů v CSV podle specifikace (transformace CSV, specifikace na účtu, rozpoznání podle prefixu a názvu souboru, výchozí KB);BANK-GPC;high;uat;65;Bez napevno zapsaného formátu banky, vzorek KB ověřen lokálně (965 transakcí, zůstatky sedí).
+CR-066;change;Deníky – opravy a úpravy;GL-JOURNAL-ENTRY;medium;uat;66;Souhrnný požadavek: dílčí požadavky deníků a seznam oprav.
+CR-067;change;Ovládání aplikace – opravy a úpravy;SYS-UI;medium;uat;67;Souhrnný požadavek: ovládání, lišta, výběry, zkratky.
+CR-068;change;Banka a platby – opravy a úpravy;BANK-GPC;medium;uat;68;Souhrnný požadavek: účty, platební metody, výpisy.
+CR-069;change;Pokladna (kasa) – opravy a úpravy;POS-SALE;medium;uat;69;Souhrnný požadavek pokladny.
+CR-070;change;Testování a vývoj – opravy a úpravy;QA;medium;uat;70;Souhrnné požadavky s dílčími požadavky a kontrolním seznamem oprav.
+CR-071;change;Integrace a EET – opravy a úpravy;INT-EET;medium;uat;71;Souhrnný požadavek integrací a EET.
