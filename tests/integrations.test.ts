@@ -890,6 +890,21 @@ describe("založení firmy z rejstříku", () => {
     expect(await createCompanyFromRegistry(T, "27079864", client)).toBe(id);
     expect((await getRecord(T, "sys.company", id, client))!.name).toBe("Uzenářství s.r.o.");
   });
+
+  it("registr plátců DPH → plátce, finanční úřad a sídlo do daňových parametrů", async () => {
+    const { createCompanyFromRegistry } = await import("@/server/company-lookup");
+    const T = (await provisionTenant(client, { code: `t-cmt-${run}`, name: "Cmt", adminEmail: `cmt-${run}@test.local`, adminPassword: "heslo-12345", modules: ["org", "gl", "tax"], company: { code: "A", name: "A" } })).ctx;
+    vi.stubGlobal("fetch", async (url: string) =>
+      String(url).includes("adis")
+        ? new Response('<soap><status statusCode="0"/><statusPlatceDPH dic="11223344" nespolehlivyPlatce="NE" cisloFu="451"/></soap>', { status: 200 })
+        : new Response(JSON.stringify({ ico: "11223344", obchodniJmeno: "Kamenictví s.r.o.", dic: "CZ11223344", pravniForma: "112", sidlo: { kodStatu: "CZ", nazevObce: "Praha", nazevUlice: "Dlouhá", cisloDomovni: 5, psc: 11000 } }), { status: 200 }),
+    );
+    const id = await createCompanyFromRegistry(T, "11223344", client);
+    const C2 = { ...T, companyId: id };
+    const [tp] = (await listRecords(C2, "tax.parameters", {}, client)).rows;
+    expect([tp.taxOfficeCode, tp.subjectType, tp.street, tp.city, tp.zipCode]).toEqual(["451", "P", "Dlouhá", "Praha", "110 00"]);
+    expect((await getRecord(T, "sys.company", id, client))!.vatPayer).toBe(true);
+  });
 });
 
 describe("deníky jako v AX (CR-045)", () => {

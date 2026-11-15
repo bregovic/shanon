@@ -31,13 +31,33 @@ export function createCompanyFromRegistry(
         country: hit.country,
         currency: hit.country === "CZ" ? "CZK" : "EUR",
       });
+      // registr plátců DPH (podle DIČ): plátce, finanční úřad, zveřejněné účty
+      const dicDigits = hit.vatId && /^CZ\d+$/i.test(String(hit.vatId)) ? String(hit.vatId).slice(2) : null;
+      const vatStatus = dicDigits ? ((await vatRegistryStatus([dicDigits]).catch(() => null))?.get(dicDigits) ?? null) : null;
+      const vatPayer = vatStatus ? vatStatus.reliability !== "notFound" : !!hit.vatId;
+      if (vatPayer !== !!hit.vatId) await sess.save("sys.company", String(company.id), { ...company, vatPayer });
+      const companyApi = new Session(sess.tx, { ...ctx, companyId: String(company.id) }, true).api();
+      // daňové parametry pro přiznání: finanční úřad z registru, typ subjektu, jméno a sídlo (perioda a územní pracoviště ručně)
+      if (ctx.modules.has("tax") && vatStatus?.taxOffice) {
+        const [first, ...rest] = hit.name.split(/\s+/);
+        const tp = {
+          taxOfficeCode: vatStatus.taxOffice,
+          subjectType: hit.person ? "F" : "P",
+          firstName: hit.person ? first : null,
+          lastName: hit.person ? rest.join(" ") || null : null,
+          street: hit.streetName ?? hit.street ?? null,
+          houseNo: hit.houseNo ?? null,
+          orientNo: hit.orientNo ?? null,
+          city: hit.city ?? null,
+          zipCode: hit.zipCode ?? null,
+        };
+        const [have] = await companyApi.find("tax.parameters", {}, { take: 1 });
+        if (have) await companyApi.update("tax.parameters", String(have.id), Object.fromEntries(Object.entries(tp).filter(([k]) => k !== "taxOfficeCode" || !have.taxOfficeCode)));
+        else await companyApi.create("tax.parameters", tp);
+      }
       // údaje organizace nové firmy (výchozí nastavení je založilo z firmy) doplnit o sídlo a formu
       if (ctx.modules.has("org")) {
-        const api = new Session(
-          sess.tx,
-          { ...ctx, companyId: String(company.id) },
-          true,
-        ).api();
+        const api = companyApi;
         const [org] = await api.find("org.entity", {}, { take: 1 });
         const values = {
           legalName: hit.name.slice(0, 120),
@@ -48,7 +68,7 @@ export function createCompanyFromRegistry(
             : null,
           regNo: hit.regNo,
           vatId: hit.vatId,
-          vatPayer: !!hit.vatId,
+          vatPayer,
           street: hit.streetName ?? hit.street,
           houseNo: hit.houseNo ?? null,
           orientNo: hit.orientNo ?? null,
@@ -57,10 +77,7 @@ export function createCompanyFromRegistry(
           country: hit.country,
         };
         // bankovní účty zveřejněné v registru plátců DPH
-        const published =
-          hit.vatId && /^CZ\d+$/i.test(String(hit.vatId))
-            ? ((await vatRegistryStatus([String(hit.vatId).slice(2)]).catch(() => null))?.get(String(hit.vatId).slice(2))?.accounts ?? [])
-            : [];
+        const published = vatStatus?.accounts ?? [];
         // do organizace první z nich (když tam účet ještě není)
         const bankAccount: string | null = (org?.bankAccount as string) ?? published.find((a) => a.accountNum)?.accountNum ?? null;
         if (org) await api.update("org.entity", String(org.id), { ...values, bankAccount });
