@@ -317,12 +317,14 @@ export const account = defineObject({
     ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`dim${n}Req`, { edt: enumEdt(DimRequirement), readOnly: true, dimSlot: n }])),
     // výchozí hodnoty dimenzí při účtování na účet (když je nedá řádek ani partner)
     ...dimFields(),
+    /** položka DPH pro řádky deníku a dokladů bez položky (modul DPH) */
+    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup"), optionalRef: true },
   },
   titleField: "accountNum",
   list: ["accountNum", "name", "type", "postingType", "noManualEntry", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["accountNum", "name", "type", "synthetic", "accountClass", "blocked"] },
-    { label: "@GL:Control", fields: ["postingType", "noManualEntry"] },
+    { label: "@GL:Control", fields: ["postingType", "noManualEntry", "itemTaxGroupId"] },
     { label: "@GL:Dimensions", fields: ["dim1Req", "dim2Req", "dim3Req", "dim4Req", "dim5Req", "dim6Req"] },
     { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
   ],
@@ -413,6 +415,8 @@ export const journalName = defineObject({
     offsetAccountId: { edt: AccountRef, label: "@GL:OffsetAccount", visibleWhen: when("offsetType", "ledger") },
     offsetBankAccountId: { edt: refEdt("bank.account", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "bank") },
     offsetCashDeskId: { edt: refEdt("cash.desk", "@GL:OffsetAccount"), optionalRef: true, visibleWhen: when("offsetType", "cash") },
+    /** částky řádků jsou včetně DPH (daň se z nich vypočte), jinak se DPH přičte */
+    amountsIncludeTax: { edt: Edts.NoYes, label: "@GL:AmountsIncludeTax" },
     // výchozí dimenze řádků (účet / partner mají přednost)
     ...dimFields(),
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
@@ -421,7 +425,7 @@ export const journalName = defineObject({
   list: ["code", "name", "journalType", "voucherAllocation", "voucherSeqId", "offsetType", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["code", "name", "journalType", "blocked"] },
-    { label: "@GL:Posting", fields: ["voucherAllocation", "voucherSeqId", "offsetType", "offsetAccountId", "offsetBankAccountId", "offsetCashDeskId"] },
+    { label: "@GL:Posting", fields: ["voucherAllocation", "voucherSeqId", "amountsIncludeTax", "offsetType", "offsetAccountId", "offsetBankAccountId", "offsetCashDeskId"] },
     { label: "@GL:LineDefaultDims", fields: DIM_NAMES },
   ],
   unique: [["code"]],
@@ -504,9 +508,12 @@ export const journal = defineObject({
       inline: true,
       inherit: { date: "date" },
       carry: ["date", "text", "accountType"],
-      balance: { group: "voucherNum", debit: "debit", credit: "credit", selfBalanced: ["offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
+      balance: { group: "voucherNum", debit: "debit", credit: "credit", extra: "taxExtra", selfBalanced: ["offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
       // podrobnosti vybraného řádku pod mřížkou (záložky) a dialog dimenzí účtu / protiúčtu
-      details: [{ label: "@SYS:General", fields: ["vs", "currencyId"] }],
+      details: [
+        { label: "@SYS:General", fields: ["vs", "currencyId"] },
+        { label: "@TAX:VatTab", fields: ["taxGroupId", "itemTaxGroupId", "taxCodeId", "taxAmount", "taxDocNum"] },
+      ],
       dims: { main: "dim", offset: "offsetDim", account: "accountId", offsetAccount: "offsetAccountId", offsetType: "offsetType" },
     },
   ],
@@ -554,6 +561,15 @@ export const journalLine = defineObject({
     ...offsetDimFields(),
     /** prázdné = účetní měna firmy */
     currencyId: { edt: CurrencyRef },
+    // DPH: kód přímo, nebo skupina (partner) × položka DPH (účet) → kód; vypočtená daň
+    taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode"), optionalRef: true },
+    taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup"), optionalRef: true },
+    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup"), optionalRef: true },
+    taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
+    /** o kolik daň mění vyrovnanost dokladu (DPH přičtené k částce bez daně); MD + / D − */
+    taxExtra: { edt: Edts.Amount, label: "@GL:TaxExtra", readOnly: true },
+    /** číslo daňového dokladu partnera (KH), prázdné = číslo dokladu */
+    taxDocNum: { edt: Edts.Code, label: "@TAX:TaxDocNum" },
   },
   titleField: "text",
   defaultSort: { field: "lineNum", dir: "asc" },
@@ -575,9 +591,11 @@ export const journalLine = defineObject({
     "offsetVendorId",
     "offsetBankAccountId",
     "offsetCashDeskId",
+    "taxCodeId",
   ],
   form: [
     { label: "@SYS:General", fields: ["journalId", "date", "voucherNum", "accountType", "accountId", "customerId", "vendorId", "bankAccountId", "cashDeskId", "text", "debit", "credit", "currencyId", "vs"] },
+    { label: "@TAX:VatTab", fields: ["taxGroupId", "itemTaxGroupId", "taxCodeId", "taxAmount", "taxDocNum"] },
     { label: "@GL:Offset", fields: ["offsetType", "offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
     { label: "@GL:Dimensions", fields: DIM_NAMES },
     { label: "@GL:OffsetDimensions", fields: OFFSET_DIM_NAMES },
@@ -648,6 +666,8 @@ export default defineModule({
       VaManual: "Ručně",
       AccountKind: "Druh účtu",
       OffsetKind: "Druh protiúčtu",
+      AmountsIncludeTax: "Částky včetně DPH",
+      TaxExtra: "DPH navíc",
       LineDefaults: "Výchozí protiúčet řádků",
       LineDefaultDims: "Výchozí dimenze řádků",
       AkLedger: "Hlavní kniha",
@@ -850,6 +870,8 @@ export default defineModule({
       VaManual: "Manual",
       AccountKind: "Account type",
       OffsetKind: "Offset account type",
+      AmountsIncludeTax: "Amounts include VAT",
+      TaxExtra: "Added VAT",
       LineDefaults: "Default line offset account",
       LineDefaultDims: "Default line dimensions",
       AkLedger: "Ledger",

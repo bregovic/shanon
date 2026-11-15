@@ -37,32 +37,161 @@ export const taxCode = defineObject({
     accountId: { edt: refEdt("gl.account", "@TAX:Account"), mandatory: true },
     reportLine: { edt: ReportLine },
     khSection: { edt: KhSection },
+    /** samovyměření (přenesená povinnost, EU, služby ze zahraničí): řádek nároku na odpočet (43, 44…) */
+    deductLine: { edt: defineEdt({ id: "TaxDeductLine", kind: "string", label: "@TAX:DeductLine", maxLength: 10 }), visibleWhen: { field: "reverseCharge", in: ["true"] } },
+    /** účet daně na výstupu u samovyměření (prázdné = účet DPH) */
+    outputAccountId: { edt: refEdt("gl.account", "@TAX:OutputAccount"), visibleWhen: { field: "reverseCharge", in: ["true"] } },
+    /** kód předmětu plnění pro KH (A.1 / B.1 — přenesená povinnost v tuzemsku) */
+    khItemCode: { edt: defineEdt({ id: "KhItemCode", kind: "string", label: "@TAX:KhItemCode", maxLength: 4 }) },
   },
   titleField: "code",
-  list: ["code", "name", "rate", "direction", "reverseCharge", "accountId", "reportLine", "khSection"],
+  list: ["code", "name", "rate", "direction", "reverseCharge", "accountId", "reportLine", "deductLine", "khSection"],
   form: [
     { label: "@SYS:General", fields: ["code", "name", "rate", "direction", "reverseCharge"] },
-    { label: "@TAX:Posting", fields: ["accountId", "reportLine", "khSection"] },
+    { label: "@TAX:Posting", fields: ["accountId", "reportLine", "khSection", "khItemCode", "deductLine", "outputAccountId"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
 });
 
-/** Výchozí daňové kódy (jen pokud firma žádné nemá). */
+/**
+ * Skupina DPH (obdoba Sales tax group v AX): kde a komu se plní — tuzemsko, přenesená povinnost,
+ * EU, třetí země. Patří partnerovi (a skupině partnerů), na dokladu jde změnit.
+ */
+export const taxGroup = defineObject({
+  id: "tax.taxGroup",
+  table: "tax_group",
+  label: "@TAX:TaxGroup",
+  labelPlural: "@TAX:TaxGroups",
+  scope: "company",
+  shareable: true,
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    description: { edt: Edts.Description },
+  },
+  titleField: "code",
+  list: ["code", "name", "description"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "description"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+  lines: [{ object: "tax.taxGroupCode", field: "taxGroupId", label: "@TAX:TaxGroupCodes", inline: true }],
+});
+
+/** Položka DPH (Item sales tax group): co se plní — zboží / služba, sazba, osvobozeno, mimo předmět. */
+export const itemTaxGroup = defineObject({
+  id: "tax.itemTaxGroup",
+  table: "tax_item_group",
+  label: "@TAX:ItemTaxGroup",
+  labelPlural: "@TAX:ItemTaxGroups",
+  scope: "company",
+  shareable: true,
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+  },
+  titleField: "code",
+  list: ["code", "name"],
+  form: [{ label: "@SYS:General", fields: ["code", "name"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+});
+
+/** Kombinace skupina DPH × položka DPH → daňový kód pro prodej a pro nákup. */
+export const taxGroupCode = defineObject({
+  id: "tax.taxGroupCode",
+  table: "tax_group_code",
+  label: "@TAX:TaxGroupCode",
+  labelPlural: "@TAX:TaxGroupCodes",
+  scope: "company",
+  shareable: true,
+  fields: {
+    taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup"), mandatory: true },
+    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup"), mandatory: true },
+    salesCodeId: { edt: refEdt("tax.taxCode", "@TAX:SalesCode") },
+    purchaseCodeId: { edt: refEdt("tax.taxCode", "@TAX:PurchaseCode") },
+  },
+  titleField: "itemTaxGroupId",
+  list: ["itemTaxGroupId", "salesCodeId", "purchaseCodeId"],
+  form: [{ label: "@SYS:General", fields: ["taxGroupId", "itemTaxGroupId", "salesCodeId", "purchaseCodeId"] }],
+  unique: [["taxGroupId", "itemTaxGroupId"]],
+});
+
+/**
+ * Výchozí nastavení DPH pro české firmy (zakládá jen chybějící podle kódu — kódy, skupiny
+ * i kombinace si firma pak upraví). Řádky přiznání DPHDP3, oddíly KH DPHKH1.
+ *   kód, název, sazba, směr, samovyměření, řádek, řádek nároku, oddíl KH, kód předmětu plnění
+ */
+const CZ_CODES: [string, string, number, "output" | "input", boolean, string, string, string, string][] = [
+  ["V21", "DPH na výstupu 21 %", 21, "output", false, "1", "", "A4", ""],
+  ["V12", "DPH na výstupu 12 %", 12, "output", false, "2", "", "A4", ""],
+  ["V0EU", "Dodání zboží do EU (osvobozeno)", 0, "output", false, "20", "", "", ""],
+  ["V0SEU", "Poskytnutí služby do EU", 0, "output", false, "21", "", "", ""],
+  ["V0EX", "Vývoz zboží", 0, "output", false, "22", "", "", ""],
+  ["VPDP", "Přenesená daňová povinnost – dodavatel", 0, "output", false, "25", "", "A1", "4"],
+  ["V0OST", "Ostatní plnění s nárokem na odpočet (mimo tuzemsko)", 0, "output", false, "26", "", "", ""],
+  ["VOSV", "Osvobozeno bez nároku na odpočet", 0, "output", false, "50", "", "", ""],
+  ["VMIMO", "Mimo předmět DPH", 0, "output", false, "-", "", "", ""],
+  ["P21", "DPH na vstupu 21 %", 21, "input", false, "40", "", "B2", ""],
+  ["P12", "DPH na vstupu 12 %", 12, "input", false, "41", "", "B2", ""],
+  ["PEUZ21", "Pořízení zboží z EU 21 %", 21, "input", true, "3", "43", "A2", ""],
+  ["PEUZ12", "Pořízení zboží z EU 12 %", 12, "input", true, "4", "44", "A2", ""],
+  ["PEUS21", "Přijetí služby z EU 21 %", 21, "input", true, "5", "43", "A2", ""],
+  ["PEUS12", "Přijetí služby z EU 12 %", 12, "input", true, "6", "44", "A2", ""],
+  ["PPDP21", "Přenesená daňová povinnost – odběratel 21 %", 21, "input", true, "10", "43", "B1", "4"],
+  ["PPDP12", "Přenesená daňová povinnost – odběratel 12 %", 12, "input", true, "11", "44", "B1", "4"],
+  ["PZAH21", "Služba ze třetí země 21 %", 21, "input", true, "12", "43", "A2", ""],
+  ["PZAH12", "Služba ze třetí země 12 %", 12, "input", true, "13", "44", "A2", ""],
+  ["PDOV21", "Dovoz zboží 21 % (daň vyměřená celním úřadem)", 21, "input", false, "42", "", "", ""],
+  ["PDOV12", "Dovoz zboží 12 % (daň vyměřená celním úřadem)", 12, "input", false, "42", "", "", ""],
+  ["P0", "Nákup bez DPH (neplátce, osvobozeno, mimo předmět)", 0, "input", false, "-", "", "", ""],
+];
+const CZ_GROUPS: [string, string, string][] = [
+  ["TUZ", "Tuzemsko", "Plátce i neplátce v tuzemsku, běžný režim"],
+  ["PDP", "Tuzemsko – přenesená daňová povinnost", "§ 92a: stavební práce, šrot, … daň přizná odběratel"],
+  ["EU", "Členské státy EU", "Plátce DPH v jiném členském státě (DIČ)"],
+  ["EUNP", "EU – osoba bez DIČ", "Prodej osobě z EU, která není plátcem"],
+  ["ZAH", "Třetí země", "Mimo EU: vývoz, dovoz, služby"],
+  ["NEPL", "Dodavatel neplátce", "Nákup od neplátce DPH"],
+];
+const CZ_ITEMS: [string, string][] = [
+  ["Z21", "Zboží 21 %"],
+  ["Z12", "Zboží 12 %"],
+  ["S21", "Služby 21 %"],
+  ["S12", "Služby 12 %"],
+  ["OSV", "Osvobozeno bez nároku"],
+  ["MIMO", "Mimo předmět DPH"],
+];
+// skupina → položka → [prodej, nákup]
+const CZ_MATRIX: Record<string, Record<string, [string, string]>> = {
+  TUZ: { Z21: ["V21", "P21"], Z12: ["V12", "P12"], S21: ["V21", "P21"], S12: ["V12", "P12"], OSV: ["VOSV", "P0"], MIMO: ["VMIMO", "P0"] },
+  PDP: { Z21: ["VPDP", "PPDP21"], Z12: ["VPDP", "PPDP12"], S21: ["VPDP", "PPDP21"], S12: ["VPDP", "PPDP12"], OSV: ["VOSV", "P0"], MIMO: ["VMIMO", "P0"] },
+  EU: { Z21: ["V0EU", "PEUZ21"], Z12: ["V0EU", "PEUZ12"], S21: ["V0SEU", "PEUS21"], S12: ["V0SEU", "PEUS12"], OSV: ["VOSV", "P0"], MIMO: ["VMIMO", "P0"] },
+  EUNP: { Z21: ["V21", "P0"], Z12: ["V12", "P0"], S21: ["V21", "P0"], S12: ["V12", "P0"], OSV: ["VOSV", "P0"], MIMO: ["VMIMO", "P0"] },
+  ZAH: { Z21: ["V0EX", "PDOV21"], Z12: ["V0EX", "PDOV12"], S21: ["V0OST", "PZAH21"], S12: ["V0OST", "PZAH12"], OSV: ["VOSV", "P0"], MIMO: ["VMIMO", "P0"] },
+  NEPL: { Z21: ["V21", "P0"], Z12: ["V12", "P0"], S21: ["V21", "P0"], S12: ["V12", "P0"], OSV: ["VOSV", "P0"], MIMO: ["VMIMO", "P0"] },
+};
+
 async function taxSetup(data: DataApi) {
-  if ((await data.find("tax.taxCode", {}, { take: 1 })).length) return;
   const vatId = await postingAccount(data, "343");
   if (!vatId) return;
-  const vat = { id: vatId };
-  const codes: [string, string, string, string, string, string][] = [
-    ["V21", "DPH na výstupu 21 %", "21", "output", "1", "A4"],
-    ["V12", "DPH na výstupu 12 %", "12", "output", "2", "A4"],
-    ["P21", "DPH na vstupu 21 %", "21", "input", "40", "B2"],
-    ["P12", "DPH na vstupu 12 %", "12", "input", "41", "B2"],
-  ];
-  for (const [code, name, rate, direction, reportLine, khSection] of codes) {
-    await data.create("tax.taxCode", { code, name, rate, direction, accountId: vat.id, reportLine, khSection });
+  const byCode = async (obj: string, code: string) => (await data.find(obj, { code }, { take: 1 }))[0] ?? null;
+  const codes = new Map<string, string>();
+  for (const [code, name, rate, direction, reverseCharge, reportLine, deductLine, khSection, khItemCode] of CZ_CODES) {
+    const have = await byCode("tax.taxCode", code);
+    const rec = have ?? (await data.create("tax.taxCode", { code, name, rate: String(rate), direction, reverseCharge, accountId: vatId, reportLine, deductLine: deductLine || null, khSection: khSection || null, khItemCode: khItemCode || null }));
+    codes.set(code, String(rec.id));
   }
+  const groups = new Map<string, string>();
+  for (const [code, name, description] of CZ_GROUPS) groups.set(code, String((await byCode("tax.taxGroup", code))?.id ?? (await data.create("tax.taxGroup", { code, name, description })).id));
+  const items = new Map<string, string>();
+  for (const [code, name] of CZ_ITEMS) items.set(code, String((await byCode("tax.itemTaxGroup", code))?.id ?? (await data.create("tax.itemTaxGroup", { code, name })).id));
+  for (const [g, row] of Object.entries(CZ_MATRIX))
+    for (const [it, [sales, purchase]] of Object.entries(row)) {
+      const where = { taxGroupId: groups.get(g)!, itemTaxGroupId: items.get(it)! };
+      if ((await data.find("tax.taxGroupCode", where, { take: 1 })).length) continue;
+      await data.create("tax.taxGroupCode", { ...where, salesCodeId: codes.get(sales) ?? null, purchaseCodeId: codes.get(purchase) ?? null });
+    }
 }
 
 /**
@@ -93,9 +222,13 @@ export const taxTrans = defineObject({
     sourceId: { edt: Edts.Description, label: "@GL:SourceId" },
     /** zjednodušený daňový doklad (účtenky z pokladny) — v KH vždy souhrnně */
     simplified: { edt: Edts.NoYes, label: "@TAX:Simplified" },
+    /** řádek přiznání a oddíl KH této transakce (prázdné = podle daňového kódu) */
+    reportLine: { edt: ReportLine },
+    khSection: { edt: KhSection },
+    khItemCode: { edt: defineEdt({ id: "TaxTransKhItem", kind: "string", label: "@TAX:KhItemCode", maxLength: 4 }) },
   },
   titleField: "documentNum",
-  list: ["taxDate", "taxCodeId", "direction", "base", "tax", "currencyId", "subjectId", "vatId", "documentNum", "voucherId"],
+  list: ["taxDate", "taxCodeId", "direction", "reportLine", "khSection", "base", "tax", "currencyId", "subjectId", "vatId", "documentNum", "voucherId"],
   form: [
     { label: "@SYS:General", fields: ["taxDate", "taxCodeId", "direction", "base", "tax"] },
     { label: "@TAX:Partner", fields: ["subjectId", "vatId", "documentNum", "voucherId"] },
@@ -210,6 +343,8 @@ export const vatReturn = defineObject({
     a4Count: { edt: Edts.Int, label: "@TAX:A4Count", readOnly: true },
     b2Count: { edt: Edts.Int, label: "@TAX:B2Count", readOnly: true },
     warnings: { edt: Edts.Notes, label: "@TAX:Warnings", readOnly: true },
+    /** všechny řádky přiznání se základem a daní (přenesená povinnost, EU, osvobozená plnění…) */
+    lineSummary: { edt: Edts.Notes, label: "@TAX:LineSummary", readOnly: true },
   },
   titleField: "period",
   list: ["kind", "period", "status", "taxOut", "deduction", "result", "computedAt"],
@@ -218,6 +353,7 @@ export const vatReturn = defineObject({
     { label: "@TAX:OutputSection", fields: ["out21Base", "out21Tax", "out12Base", "out12Tax", "taxOut"] },
     { label: "@TAX:InputSection", fields: ["in21Base", "in21Tax", "in12Base", "in12Tax", "deduction"] },
     { label: "@TAX:Result", fields: ["result", "a4Count", "b2Count", "warnings"] },
+    { label: "@TAX:LineSummary", fields: ["lineSummary"] },
   ],
   unique: [["kind", "period"]],
   defaultSort: { field: "period", dir: "desc" },
@@ -236,10 +372,10 @@ export default defineModule({
   icon: "ReceiptMoney",
   dependsOn: ["gl", "gab"],
   enums: [TaxDirection, SubjectKind, FilingPeriod, ReturnKind, ReturnStatus],
-  objects: [taxCode, taxTrans, parameters, vatReturn],
+  objects: [taxCode, taxGroup, itemTaxGroup, taxGroupCode, taxTrans, parameters, vatReturn],
   menu: [
     { label: "@TAX:Module", items: [{ object: "tax.return" }, { object: "tax.trans" }] },
-    { label: "@SYS:Setup", items: [{ object: "tax.taxCode" }, { object: "tax.parameters" }] },
+    { label: "@SYS:Setup", items: [{ object: "tax.taxCode" }, { object: "tax.taxGroup" }, { object: "tax.itemTaxGroup" }, { object: "tax.parameters" }] },
   ],
   setup: taxSetup,
   labels: {
@@ -298,6 +434,20 @@ export default defineModule({
       ReportLine: "Řádek přiznání",
       KhSection: "Oddíl KH",
       Posting: "Zaúčtování a výkazy",
+      DeductLine: "Řádek nároku na odpočet",
+      OutputAccount: "Účet daně na výstupu",
+      KhItemCode: "Kód předmětu plnění (KH)",
+      TaxGroup: "Skupina DPH",
+      TaxGroups: "Skupiny DPH",
+      ItemTaxGroup: "Položka DPH",
+      ItemTaxGroups: "Položky DPH",
+      TaxGroupCode: "Kód DPH skupiny",
+      TaxGroupCodes: "Kódy DPH podle položky",
+      SalesCode: "Kód při prodeji",
+      PurchaseCode: "Kód při nákupu",
+      TaxDocNum: "Číslo daňového dokladu",
+      VatTab: "DPH",
+      LineSummary: "Všechny řádky přiznání",
       Trans: "Daňová transakce",
       TransPlural: "Daňové transakce",
       TaxDate: "DUZP",
@@ -451,6 +601,20 @@ export default defineModule({
       ReportLine: "Return line",
       KhSection: "Control statement section",
       Posting: "Posting and reporting",
+      DeductLine: "Deduction line",
+      OutputAccount: "Output tax account",
+      KhItemCode: "Subject code (control statement)",
+      TaxGroup: "Sales tax group",
+      TaxGroups: "Sales tax groups",
+      ItemTaxGroup: "Item sales tax group",
+      ItemTaxGroups: "Item sales tax groups",
+      TaxGroupCode: "Tax group code",
+      TaxGroupCodes: "Tax codes by item group",
+      SalesCode: "Sales code",
+      PurchaseCode: "Purchase code",
+      TaxDocNum: "Tax document number",
+      VatTab: "VAT",
+      LineSummary: "All return lines",
       Trans: "Tax transaction",
       TransPlural: "Tax transactions",
       TaxDate: "Tax point date",

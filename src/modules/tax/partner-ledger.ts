@@ -89,16 +89,18 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       name: { edt: Edts.Name, mandatory: true },
       [sp.summaryField]: { edt: AccountRef(L("SummaryAccount")), mandatory: true },
       [sp.lineAccountField]: { edt: AccountRef(L("LineAccount")) },
+      /** skupina DPH partnerů skupiny (tuzemsko, EU…) — s položkou DPH dá daňový kód */
+      taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
       taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode") },
       /** prázdné = první účet syntetiky záloh (324 / 314) */
       advanceAccountId: { edt: AccountRef(L("AdvanceAccount")) },
       paymentDays: { edt: Edts.Int, label: "@TAX:PaymentDays", default: 14 },
     },
     titleField: "code",
-    list: ["code", "name", sp.summaryField, sp.lineAccountField, "taxCodeId", "paymentDays"],
+    list: ["code", "name", sp.summaryField, sp.lineAccountField, "taxGroupId", "taxCodeId", "paymentDays"],
     form: [
       { label: "@SYS:General", fields: ["code", "name", "paymentDays"] },
-      { label: "@GL:Posting", fields: [sp.summaryField, sp.lineAccountField, "taxCodeId", "advanceAccountId"] },
+      { label: "@GL:Posting", fields: [sp.summaryField, sp.lineAccountField, "taxGroupId", "taxCodeId", "advanceAccountId"] },
     ],
     unique: [["code"]],
     defaultSort: { field: "code", dir: "asc" },
@@ -117,6 +119,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       // výchozí dimenze dokladů partnera (z adresáře se doplní samy)
       ...dimFields(),
       groupId: { edt: refEdt(id("group"), L("Group")), mandatory: true },
+      /** prázdné = skupina DPH ze skupiny partnerů */
+      taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
       paymentDays: { edt: Edts.Int, label: "@TAX:PaymentDays" },
       /** výchozí účet pro platby (z bankovních účtů subjektu) */
@@ -129,7 +133,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     titleField: "accountNum",
     list: ["accountNum", "subjectId", "groupId", "currencyId", "paymentDays", "blocked"],
     form: [
-      { label: "@SYS:General", fields: ["accountNum", "subjectId", "groupId", "blocked"] },
+      { label: "@SYS:General", fields: ["accountNum", "subjectId", "groupId", "taxGroupId", "blocked"] },
       { label: L("Terms"), fields: ["currencyId", "paymentDays", "paymentMethodId", "bankAccountId", "docEmail"] },
       { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
@@ -156,6 +160,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     taxDate: { edt: Edts.TransDate, label: "@TAX:TaxDate" },
     dueDate: { edt: Edts.TransDate, label: "@TAX:DueDate" },
     currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
+    /** z partnera; nové řádky ji převezmou */
+    taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
     /** prázdné = číslice z čísla faktury (u přijaté z čísla dodavatele) */
     vs: { edt: Vs },
     description: { edt: Edts.Description },
@@ -183,7 +189,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
     form: [
       { label: "@TAX:Header", fields: headerFields },
-      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs"] },
+      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs", "taxGroupId"] },
       { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "advanceAmount", "paidAmount", "status", "voucherId", ...(sp.side === 1 ? ["emailedAt"] : [])] },
     ],
     numberSeq: { field: "invoiceNum", seq: sp.invoiceSeq },
@@ -219,16 +225,19 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       unitId: { edt: refEdt("inv.unit", "@TAX:Unit"), optionalRef: true },
       unitPrice: { edt: Edts.Price, label: "@TAX:UnitPrice" },
       [sp.lineAccountField]: { edt: AccountRef(L("LineAccount")) },
+      // skupina × položka DPH → daňový kód (ručně zadaný kód má přednost)
+      taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
+      itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup") },
       taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode") },
       ...dimFields(),
       amountNet: { edt: Edts.Amount, label: "@TAX:AmountNet", readOnly: true },
       taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
     },
     titleField: "description",
-    list: ["itemId", "description", "qty", "unitId", "unitPrice", sp.lineAccountField, "taxCodeId", ...DIM_NAMES, "amountNet", "taxAmount"],
+    list: ["itemId", "description", "qty", "unitId", "unitPrice", sp.lineAccountField, "itemTaxGroupId", "taxCodeId", ...DIM_NAMES, "amountNet", "taxAmount"],
     form: [
       { label: "@SYS:General", fields: ["invoiceId", "itemId", "description", "qty", "unitId", "unitPrice"] },
-      { label: "@GL:Posting", fields: [sp.lineAccountField, "taxCodeId", "amountNet", "taxAmount"] },
+      { label: "@GL:Posting", fields: [sp.lineAccountField, "taxGroupId", "itemTaxGroupId", "taxCodeId", "amountNet", "taxAmount"] },
       { label: "@GL:Dimensions", fields: DIM_NAMES },
     ],
   });
@@ -248,6 +257,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       deliveryDate: { edt: Edts.TransDate, label: "@TAX:DeliveryDate" },
       warehouseId: { edt: refEdt("whs.warehouse", "@TAX:Warehouse"), optionalRef: true },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
+      taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
       description: { edt: Edts.Description },
       amountNet: { edt: Edts.Amount, label: "@TAX:AmountNet", readOnly: true },
       taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
@@ -260,7 +270,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     list: ["orderNum", "externalRef", partnerId, "orderDate", "deliveryDate", "currencyId", "amountNet", "taxAmount", "amountGross", "status", "invoiceId"],
     form: [
       { label: "@TAX:Header", fields: ["orderNum", "externalRef", partnerId, "description"] },
-      { label: "@TAX:Dates", fields: ["orderDate", "deliveryDate", "warehouseId", "currencyId"] },
+      { label: "@TAX:Dates", fields: ["orderDate", "deliveryDate", "warehouseId", "currencyId", "taxGroupId"] },
       { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "status", "invoiceId"] },
     ],
     numberSeq: { field: "orderNum", seq: sp.orderSeq },
@@ -295,6 +305,9 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       unitId: { edt: refEdt("inv.unit", "@TAX:Unit"), optionalRef: true },
       unitPrice: { edt: Edts.Price, label: "@TAX:UnitPrice" },
       [sp.lineAccountField]: { edt: AccountRef(L("LineAccount")) },
+      // skupina × položka DPH → daňový kód (ručně zadaný kód má přednost)
+      taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
+      itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup") },
       taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode") },
       ...dimFields(),
       amountNet: { edt: Edts.Amount, label: "@TAX:AmountNet", readOnly: true },
@@ -303,10 +316,10 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       deliveredQty: { edt: Edts.Qty, label: "@TAX:DeliveredQty", readOnly: true },
     },
     titleField: "description",
-    list: ["itemId", "description", "qty", "deliveredQty", "unitId", "unitPrice", sp.lineAccountField, "taxCodeId", ...DIM_NAMES, "amountNet", "taxAmount"],
+    list: ["itemId", "description", "qty", "deliveredQty", "unitId", "unitPrice", sp.lineAccountField, "itemTaxGroupId", "taxCodeId", ...DIM_NAMES, "amountNet", "taxAmount"],
     form: [
       { label: "@SYS:General", fields: ["orderId", "itemId", "description", "qty", "unitId", "unitPrice"] },
-      { label: "@GL:Posting", fields: [sp.lineAccountField, "taxCodeId", "amountNet", "taxAmount"] },
+      { label: "@GL:Posting", fields: [sp.lineAccountField, "taxGroupId", "itemTaxGroupId", "taxCodeId", "amountNet", "taxAmount"] },
       { label: "@GL:Dimensions", fields: DIM_NAMES },
     ],
   });
@@ -449,6 +462,9 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     /** výchozí skupina partnerů (účtovací profil) podle čísel účtů */
     setup: (groupDefaults: { code: string; name: string; summary: string; line: string; taxCode: string }) =>
       async (data: DataApi) => {
+        // skupina DPH Tuzemsko skupinám partnerů, které žádnou nemají
+        const [tuz] = await data.find("tax.taxGroup", { code: "TUZ" }, { take: 1 });
+        if (tuz) for (const g of await data.find(group.id, { taxGroupId: null }, { take: 500 })) await data.update(group.id, String(g.id), { taxGroupId: tuz.id });
         if ((await data.find(group.id, {}, { take: 1 })).length) return;
         const acc = (num: string) => postingAccount(data, num);
         const summary = await acc(groupDefaults.summary);
@@ -460,6 +476,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
           [sp.summaryField]: summary,
           [sp.lineAccountField]: await acc(groupDefaults.line),
           taxCodeId: tc?.id ?? null,
+          taxGroupId: tuz?.id ?? null,
           paymentDays: 14,
         });
       },

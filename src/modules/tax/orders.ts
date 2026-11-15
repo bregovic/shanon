@@ -7,6 +7,7 @@
  * Záloha:      výzva k platbě mimo účetnictví; úhradu účtuje banka na účet záloh
  *              (324 / 314), konečná faktura ji při zaúčtování odečte.
  */
+import { partnerTaxGroup } from "./tax-groups";
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { postingAccount } from "@/modules/gl/setup";
@@ -23,7 +24,7 @@ export interface OrderDocs {
   vsSource: string;
 }
 
-const LINE_FIELDS = ["itemId", "description", "qty", "unitId", "unitPrice", "taxCodeId", "dim1", "dim2", "dim3", "dim4", "dim5", "dim6"];
+const LINE_FIELDS = ["itemId", "description", "qty", "unitId", "unitPrice", "taxGroupId", "itemTaxGroupId", "taxCodeId", "dim1", "dim2", "dim3", "dim4", "dim5", "dim6"];
 
 const addDays = (date: string, days: number) => {
   const d = new Date(`${date}T00:00:00Z`);
@@ -54,6 +55,7 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
         const p = await partnerOf(ctx.data, docs, d[pf]);
         if (p.blocked) return { [pf]: "@SYS:PartnerBlocked" };
         if (isNew && !d.currencyId) d.currencyId = p.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
+        if (!d.taxGroupId) d.taxGroupId = await partnerTaxGroup(ctx.data, cfg.partnerObject, cfg.groupObject, d[pf]);
       },
       actions: {
         async confirm(ctx, o) {
@@ -85,6 +87,7 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
           const inv = await ctx.data.create(cfg.header, {
             [pf]: o[pf],
             currencyId: o.currencyId ?? null,
+            taxGroupId: o.taxGroupId ?? null,
             description: o.description ?? null,
             orderId: o.id,
             advanceId: adv?.id ?? null,

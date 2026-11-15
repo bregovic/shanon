@@ -11,6 +11,7 @@ import { convertCents } from "@/modules/sys/currency";
 import { accountingCurrencyId, convertPrice, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { dimsOf } from "@/modules/gl/dimensions";
 import { postingAccount } from "@/modules/gl/setup";
+import { partnerTaxGroup, resolveLineCode, taxTransParts } from "./tax-groups";
 
 export interface InvoiceConfig {
   /** hlavička a řádky, např. ar.invoice / ar.invoiceLine */
@@ -88,6 +89,11 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
           const a = await ctx.data.get(cfg.advance.object, String(data.advanceId));
           if (!a || a[cfg.partnerField] !== data[cfg.partnerField]) return { advanceId: "@TAX:AdvanceOtherPartner" };
         }
+        // skupina DPH z partnera (nový doklad, jiný partner; ručně změněnou nepřepisovat)
+        const before = !isNew && data.id ? await ctx.data.get(cfg.header, String(data.id)) : null;
+        const partnerGroup = await partnerTaxGroup(ctx.data, cfg.partnerObject, cfg.groupObject, data[cfg.partnerField]);
+        const oldGroup = before && before[cfg.partnerField] !== data[cfg.partnerField] ? await partnerTaxGroup(ctx.data, cfg.partnerObject, cfg.groupObject, before[cfg.partnerField]) : undefined;
+        if (!data.taxGroupId || (oldGroup !== undefined && data.taxGroupId === oldGroup)) data.taxGroupId = partnerGroup;
         if (!data.invoiceDate) data.invoiceDate = today();
         if (!data.taxDate) data.taxDate = data.invoiceDate;
         if (isNew && !data.currencyId) data.currencyId = partner.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
@@ -120,6 +126,10 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         const h = await assertDraft(ctx.data, cfg, data[cfg.lineHeaderField]);
         if (!h) return;
         const { group } = await partnerAndGroup(ctx.data, cfg, h[cfg.partnerField]);
+        // kód zadaný uživatelem (před výchozími hodnotami) a řádek před změnou
+        const userCode = (data.taxCodeId as string) || null;
+        const before = !isNew && data.id ? await ctx.data.get(cfg.line, String(data.id)) : null;
+        let itemTaxGroup: unknown = null;
         // položka: doplní jen to, co uživatel nevyplnil
         if (data.itemId) {
           const item = await ctx.data.get("inv.item", String(data.itemId));
@@ -132,6 +142,7 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
               const date = String(h.invoiceDate ?? h.orderDate ?? new Date().toISOString().slice(0, 10));
               data.unitPrice = await convertPrice(ctx.data, ctx.companyId, item[cfg.item.price] ?? null, item.currencyId as string, h.currencyId as string, date);
             }
+            itemTaxGroup = item.itemTaxGroupId ?? ig?.itemTaxGroupId ?? null;
             if (isNew && !data.taxCodeId) data.taxCodeId = (cfg.side === 1 ? item.taxCodeId : null) ?? ig?.[cfg.item.tax] ?? null;
             if (isNew && !data[cfg.lineAccountField]) data[cfg.lineAccountField] = ig?.[cfg.item.groupAccount] ?? null;
           }
@@ -144,10 +155,23 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         if (isNew && !data[cfg.lineAccountField]) data[cfg.lineAccountField] = group[cfg.groupLineAccountField] ?? null;
         if (isNew && !data.taxCodeId) data.taxCodeId = group.taxCodeId ?? null;
         if (!data[cfg.lineAccountField]) return { [cfg.lineAccountField]: "@SYS:Required" };
+        // DPH přes skupiny: skupina z hlavičky, položka DPH z položky / skupiny položek, jinak z účtu
+        if (!data.taxGroupId && (isNew || !before?.taxGroupId)) data.taxGroupId = h.taxGroupId ?? null;
+        const itemChanged = !!before && before.itemId !== data.itemId;
+        if (!data.itemTaxGroupId || (itemChanged && data.itemTaxGroupId === before?.itemTaxGroupId)) {
+          const acc = itemTaxGroup ? null : await ctx.data.get("gl.account", String(data[cfg.lineAccountField]));
+          data.itemTaxGroupId = (itemTaxGroup as string) ?? (acc?.itemTaxGroupId as string) ?? null;
+        }
+        // kód z kombinace skupin má přednost před výchozím kódem položky / skupiny partnerů; ručně zadaný zůstane
+        const legacy = data.taxCodeId ?? null;
+        data.taxCodeId = userCode;
+        await resolveLineCode(ctx.data, data, before, cfg.side === 1 ? "sales" : "purchase");
+        data.taxCodeId ??= legacy;
         const net = mulCents(data.qty ?? "1", 4, data.unitPrice ?? "0", 2);
         const code = data.taxCodeId ? await ctx.data.get("tax.taxCode", String(data.taxCodeId)) : null;
         data.amountNet = fromCents(net);
-        data.taxAmount = fromCents(code ? percentOf(net, code.rate) : BigInt(0));
+        // samovyměření (přenesená povinnost, EU): daň se nefakturuje, přizná ji příjemce při zaúčtování
+        data.taxAmount = fromCents(code && !code.reverseCharge ? percentOf(net, code.rate) : BigInt(0));
       },
       async afterSave(ctx, data) {
         await recalcHeader(ctx.data, cfg, String(data[cfg.lineHeaderField]));
@@ -219,10 +243,21 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
       taxByCode.set(String(l.taxCodeId), t);
     }
   }
+  const codeRecs = new Map<string, RecordData>();
   for (const [codeId, t] of taxByCode) {
+    const code = (await data.get("tax.taxCode", codeId))!;
+    codeRecs.set(codeId, code);
+    if (code.reverseCharge) {
+      // daň vyměří příjemce: nárok MD (vstup) a daň D (výstup), závazek bez daně
+      t.tax = percentOf(t.base, code.rate);
+      t.taxCur = percentOf(t.baseCur, code.rate);
+      if (t.tax === BigInt(0)) continue;
+      posting.push({ accountId: String(code.accountId), amount: fromCents(-s * t.tax), amountCur: fromCents(-s * t.taxCur), currencyId: curId, text: String(code.code) });
+      posting.push({ accountId: String(code.outputAccountId ?? code.accountId), amount: fromCents(s * t.tax), amountCur: fromCents(s * t.taxCur), currencyId: curId, text: String(code.code) });
+      continue;
+    }
     if (t.tax === BigInt(0)) continue;
-    const code = await data.get("tax.taxCode", codeId);
-    posting.push({ accountId: String(code!.accountId), amount: fromCents(-s * t.tax), amountCur: fromCents(-s * t.taxCur), currencyId: curId });
+    posting.push({ accountId: String(code.accountId), amount: fromCents(-s * t.tax), amountCur: fromCents(-s * t.taxCur), currencyId: curId });
   }
   // pohledávka MD / závazek D — celkem s DPH
   posting.push({
@@ -273,23 +308,21 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
   });
 
   for (const [codeId, t] of taxByCode) {
-    const code = await data.get("tax.taxCode", codeId);
-    await data.create("tax.trans", {
-      taxDate,
-      taxCodeId: codeId,
-      direction: code!.direction,
-      base: fromCents(t.base),
-      tax: fromCents(t.tax),
-      currencyId: curId,
-      baseCur: fromCents(t.baseCur),
-      taxCur: fromCents(t.taxCur),
-      subjectId: partner.subjectId ?? null,
-      vatId: subject?.vatId ?? null,
-      documentNum: docNum,
-      voucherId: voucher.id,
-      sourceObject: cfg.header,
-      sourceId: String(header.id),
-    });
+    // samovyměření = dvě transakce (daň na výstupu + nárok na vstupu)
+    for (const part of taxTransParts(codeRecs.get(codeId)!, fromCents(t.base), fromCents(t.tax)))
+      await data.create("tax.trans", {
+        ...part,
+        taxDate,
+        currencyId: curId,
+        baseCur: fromCents(t.baseCur),
+        taxCur: fromCents(t.taxCur),
+        subjectId: partner.subjectId ?? null,
+        vatId: subject?.vatId ?? null,
+        documentNum: docNum,
+        voucherId: voucher.id,
+        sourceObject: cfg.header,
+        sourceId: String(header.id),
+      });
   }
   // odpočet DPH zálohy v daňových transakcích (záporný základ a daň k DUZP faktury)
   if (adv && advCode && advTax > BigInt(0)) {

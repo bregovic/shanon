@@ -56,16 +56,37 @@ export interface KhDoc {
   slots: Slots;
 }
 
+/** Doklad v oddílu A.1 / A.2 / B.1 kontrolního hlášení. */
+export interface KhSpecialDoc extends KhDoc {
+  /** kód předmětu plnění (A.1, B.1) */
+  kod: string;
+  /** stát DIČ zahraniční osoby (A.2) */
+  country: string;
+}
+
 export interface VatComputation {
   period: ReturnType<typeof periodRange>;
   /** řádky přiznání v haléřích */
   rows: { out21: [bigint, bigint]; out12: [bigint, bigint]; in21: [bigint, bigint]; in12: [bigint, bigint] };
+  /** všechny řádky přiznání (číslo řádku → základ, daň) */
+  lines: Map<string, [bigint, bigint]>;
+  taxOut: bigint;
+  deduction: bigint;
+  a1: KhSpecialDoc[];
+  a2: KhSpecialDoc[];
   a4: KhDoc[];
   a5: Slots;
+  b1: KhSpecialDoc[];
   b2: KhDoc[];
   b3: Slots;
   warnings: string[];
 }
+
+/** Řádky přiznání, které Shanon umí (daň na výstupu 1–13, plnění bez daně 20–26, nárok 40–47, 50). */
+export const OUTPUT_LINES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"];
+export const SUPPLY_LINES = ["20", "21", "22", "23", "24", "25", "26"];
+export const DEDUCT_LINES = ["40", "41", "42", "43", "44", "45", "47"];
+const KNOWN = new Set([...OUTPUT_LINES, ...SUPPLY_LINES, ...DEDUCT_LINES, "50"]);
 
 /** Výpočet z daňových transakcí období (podle DUZP). `t` přeloží varování. */
 export async function computeVat(
@@ -83,23 +104,31 @@ export async function computeVat(
   }
 
   const zero = BigInt(0);
-  const rows = { out21: [zero, zero], out12: [zero, zero], in21: [zero, zero], in12: [zero, zero] } as VatComputation["rows"];
+  const lines = new Map<string, [bigint, bigint]>();
   const warnings = new Set<string>();
-  // doklady pro KH: transakce jednoho dokladu (sourceId) dohromady
-  const docs = new Map<string, { dir: string; dic: string; num: string; date: string; slots: Slots; gross: bigint; simplified: boolean }>();
+  // doklady pro KH: transakce jednoho dokladu (oddíl, směr, zdroj) dohromady
+  type Doc = { sec: string; dir: string; dic: string; num: string; date: string; slots: Slots; gross: bigint; simplified: boolean; kod: string };
+  const docs = new Map<string, Doc>();
   for (const t of trans) {
     const code = codes.get(String(t.taxCodeId))!;
     const base = toCents(t.base);
     const tax = toCents(t.tax);
-    const line = String(code.reportLine ?? "");
-    const target = { "1": "out21", "2": "out12", "40": "in21", "41": "in12" }[line] as keyof typeof rows | undefined;
-    if (target) {
-      rows[target][0] += base;
-      rows[target][1] += tax;
+    const line = String(t.reportLine ?? code.reportLine ?? "");
+    if (line === "-") continue; // mimo přiznání (mimo předmět, nákup od neplátce)
+    if (KNOWN.has(line)) {
+      const v = lines.get(line) ?? [zero, zero];
+      lines.set(line, [v[0] + base, v[1] + tax]);
     } else warnings.add(warn("@TAX:WarnLine", { code: String(code.code), line: line || "—" }));
 
-    const key = `${t.direction}|${t.sourceId ?? t.id}`;
+    // oddíl KH: z transakce, jinak z kódu; starší kódy bez oddílu podle řádku (1, 2 → A; 40, 41 → B)
+    let sec = String(t.khSection ?? code.khSection ?? "").toUpperCase();
+    if (!sec && ["1", "2", "40", "41"].includes(line)) sec = t.direction === "output" ? "A4" : "B2";
+    if (!sec || sec === "-") continue;
+    if (sec === "A5") sec = "A4";
+    if (sec === "B3") sec = "B2";
+    const key = `${sec}|${t.direction}|${t.sourceId ?? t.id}`;
     const d = docs.get(key) ?? {
+      sec,
       dir: String(t.direction),
       dic: String(t.vatId ?? "").replace(/\s/g, "").toUpperCase(),
       num: String(t.documentNum ?? ""),
@@ -107,6 +136,7 @@ export async function computeVat(
       slots: emptySlots(),
       gross: zero,
       simplified: !!t.simplified,
+      kod: String(t.khItemCode ?? code.khItemCode ?? ""),
     };
     const s = slotOf(code.rate);
     d.slots[s].base += base;
@@ -115,12 +145,26 @@ export async function computeVat(
     docs.set(key, d);
   }
 
+  const a1: KhSpecialDoc[] = [];
+  const a2: KhSpecialDoc[] = [];
+  const b1: KhSpecialDoc[] = [];
   const a4: KhDoc[] = [];
   const b2: KhDoc[] = [];
   const a5 = emptySlots();
   const b3 = emptySlots();
   for (const d of docs.values()) {
-    const out = d.dir === "output";
+    if (d.sec === "A1" || d.sec === "B1") {
+      if (!/^CZ\d{8,10}$/.test(d.dic)) warnings.add(warn("@TAX:WarnNoDic", { doc: d.num }));
+      (d.sec === "A1" ? a1 : b1).push({ dic: d.dic.replace(/^CZ/, ""), num: d.num, date: d.date, slots: d.slots, kod: d.kod || "4", country: "CZ" });
+      continue;
+    }
+    if (d.sec === "A2") {
+      const m = /^([A-Z]{2})(.+)$/.exec(d.dic);
+      if (!m) warnings.add(warn("@TAX:WarnForeign", { doc: d.num, dic: d.dic || "—" }));
+      a2.push({ dic: m ? m[2] : d.dic, country: m ? m[1] : "", num: d.num, date: d.date, slots: d.slots, kod: "" });
+      continue;
+    }
+    const out = d.sec.startsWith("A");
     const czDic = /^CZ\d{8,10}$/.test(d.dic);
     if (d.gross >= KH_LIMIT_CENTS && czDic && d.num) {
       (out ? a4 : b2).push({ dic: d.dic.replace(/^CZ/, ""), num: d.num, date: d.date, slots: d.slots });
@@ -146,7 +190,11 @@ export async function computeVat(
     }
   }
   if (drafts) warnings.add(warn("@TAX:WarnDraft", { n: String(drafts) }));
-  return { period, rows, a4, a5, b2, b3, warnings: [...warnings] };
+  const get = (l: string): [bigint, bigint] => lines.get(l) ?? [zero, zero];
+  const rows = { out21: get("1"), out12: get("2"), in21: get("40"), in12: get("41") };
+  const taxOut = OUTPUT_LINES.reduce((a, l) => a + get(l)[1], zero);
+  const deduction = DEDUCT_LINES.reduce((a, l) => a + get(l)[1], zero);
+  return { period, rows, lines, taxOut, deduction, a1, a2, a4, a5, b1, b2, b3, warnings: [...warnings] };
 }
 
 /** Celé koruny pro přiznání (half-up, symetricky). */
@@ -210,10 +258,54 @@ const wrap = (name: string, version: string, vety: string[]) =>
     .join("\n") +
   `\n  </${name}>\n</Pisemnost>\n`;
 
+/** Atributy vět DPHDP3 pro řádek přiznání: [základ, daň] (daň chybí u plnění bez daně). */
+const DP3_ATTRS: Record<string, [string, string | null]> = {
+  "1": ["obrat23", "dan23"],
+  "2": ["obrat5", "dan5"],
+  "3": ["p_zb23", "dan_pzb23"],
+  "4": ["p_zb5", "dan_pzb5"],
+  "5": ["p_sl23_e", "dan_psl23_e"],
+  "6": ["p_sl5_e", "dan_psl5_e"],
+  "7": ["dov_zb23", "dan_dzb23"],
+  "8": ["dov_zb5", "dan_dzb5"],
+  "9": ["p_dop_nrg", "dan_pdop_nrg"],
+  "10": ["rez_pren23", "dan_rpren23"],
+  "11": ["rez_pren5", "dan_rpren5"],
+  "12": ["p_sl23_z", "dan_psl23_z"],
+  "13": ["p_sl5_z", "dan_psl5_z"],
+  "20": ["dod_zb", null],
+  "21": ["pln_sluzby", null],
+  "22": ["pln_vyvoz", null],
+  "23": ["dod_dop_nrg", null],
+  "24": ["pln_zaslani", null],
+  "25": ["pln_rez_pren", null],
+  "26": ["pln_ost", null],
+  "40": ["pln23", "odp_tuz23_nar"],
+  "41": ["pln5", "odp_tuz5_nar"],
+  "42": ["dov_cu", "odp_cu_nar"],
+  "43": ["nar_zdp23", "od_zdp23"],
+  "44": ["nar_zdp5", "od_zdp5"],
+  "45": ["", "odp_rez_nar"],
+  "47": ["nar_maj", "od_maj"],
+  "50": ["plnosv_kf", null],
+};
+
+function vetaAttrs(c: VatComputation, lines: string[]) {
+  const out: Record<string, number | null> = {};
+  for (const l of lines) {
+    const v = c.lines.get(l);
+    const [b, t] = DP3_ATTRS[l];
+    if (!v) continue;
+    if (b) out[b] = kc(v[0]);
+    if (t) out[t] = kc(v[1]);
+  }
+  return out;
+}
+
 export function dp3Xml(c: VatComputation, subj: Subject): string {
-  const { rows, period } = c;
-  const taxOut = kc(rows.out21[1]) + kc(rows.out12[1]);
-  const deduction = kc(rows.in21[1]) + kc(rows.in12[1]);
+  const { period } = c;
+  const taxOut = OUTPUT_LINES.reduce((a, l) => a + kc(c.lines.get(l)?.[1] ?? BigInt(0)), 0);
+  const deduction = DEDUCT_LINES.reduce((a, l) => a + kc(c.lines.get(l)?.[1] ?? BigInt(0)), 0);
   const result = taxOut - deduction;
   return wrap("DPHDP3", "01.02", [
     `<VetaD ${attr({
@@ -228,14 +320,10 @@ export function dp3Xml(c: VatComputation, subj: Subject): string {
       trans: "N",
     })}/>`,
     vetaP(subj),
-    `<Veta1 ${attr({ obrat23: kc(rows.out21[0]), dan23: kc(rows.out21[1]), obrat5: kc(rows.out12[0]), dan5: kc(rows.out12[1]) })}/>`,
-    `<Veta4 ${attr({
-      pln23: kc(rows.in21[0]),
-      odp_tuz23_nar: kc(rows.in21[1]),
-      pln5: kc(rows.in12[0]),
-      odp_tuz5_nar: kc(rows.in12[1]),
-      odp_sum_nar: deduction,
-    })}/>`,
+    `<Veta1 ${attr(vetaAttrs(c, OUTPUT_LINES))}/>`,
+    `<Veta2 ${attr(vetaAttrs(c, SUPPLY_LINES))}/>`,
+    `<Veta4 ${attr({ ...vetaAttrs(c, DEDUCT_LINES), odp_sum_nar: deduction })}/>`,
+    `<Veta5 ${attr(vetaAttrs(c, ["50"]))}/>`,
     `<Veta6 ${attr({ dan_zocelk: taxOut, odp_zocelk: deduction, dano_da: result > 0 ? result : null, dano_no: result < 0 ? -result : null })}/>`,
   ]);
 }
@@ -255,10 +343,18 @@ export function khXml(c: VatComputation, subj: Subject): string {
     `<VetaD ${attr({ khdph_forma: "B", dokument: "KH1", mesic: c.period.month, ctvrt: c.period.quarter, rok: c.period.year, d_poddp: today() })}/>`,
     vetaP(subj),
   ];
+  // A.1 přenesená povinnost – dodavatel (jen základ), A.2 přijatá plnění od zahraniční osoby
+  c.a1.forEach((d, i) => {
+    const base = d.slots[1].base + d.slots[2].base + d.slots[3].base;
+    vety.push(`<VetaA1 ${attr({ c_radku: i + 1, dic_odb: d.dic, c_evid_dd: d.num, duzp: czDate(d.date), zakl_dane1: amt(base), kod_pred_pl: d.kod })}/>`);
+  });
+  c.a2.forEach((d, i) => vety.push(`<VetaA2 ${attr({ c_radku: i + 1, k_stat: d.country, vatid_dod: d.dic, c_evid_dd: d.num, dppd: czDate(d.date), ...slotAttrs(d.slots) })}/>`));
   c.a4.forEach((d, i) =>
     vety.push(`<VetaA4 ${attr({ c_radku: i + 1, dic_odb: d.dic, c_evid_dd: d.num, dppd: czDate(d.date), ...slotAttrs(d.slots), kod_rezim_pl: "0", zdph_44: "N" })}/>`),
   );
   if (hasAny(c.a5)) vety.push(`<VetaA5 ${attr(slotAttrs(c.a5))}/>`);
+  // B.1 přenesená povinnost – odběratel
+  c.b1.forEach((d, i) => vety.push(`<VetaB1 ${attr({ c_radku: i + 1, dic_dod: d.dic, c_evid_dd: d.num, duzp: czDate(d.date), ...slotAttrs(d.slots), kod_pred_pl: d.kod })}/>`));
   c.b2.forEach((d, i) =>
     vety.push(`<VetaB2 ${attr({ c_radku: i + 1, dic_dod: d.dic, c_evid_dd: d.num, dppd: czDate(d.date), ...slotAttrs(d.slots), pomer: "N", zdph_44: "N" })}/>`),
   );
@@ -269,12 +365,18 @@ export function khXml(c: VatComputation, subj: Subject): string {
     return v === BigInt(0) ? null : v; // nulové sazby se jako v ostatních větách vynechávají
   };
   const c0 = (v: bigint | null) => (v === null ? null : amt(v));
+  const nz = (v: bigint) => (v === BigInt(0) ? null : v);
   vety.push(
     `<VetaC ${attr({
       obrat23: c0(sumBase(c.a4, c.a5, 1)),
       obrat5: c0(sumBase(c.a4, c.a5, 2)),
       pln23: c0(sumBase(c.b2, c.b3, 1)),
       pln5: c0(sumBase(c.b2, c.b3, 2)),
+      // přenesená povinnost a plnění ze zahraničí (návaznost na ř. 10, 11, 25 a A.2)
+      rez_pren23: c0(sumBase(c.b1, emptySlots(), 1)),
+      rez_pren5: c0(sumBase(c.b1, emptySlots(), 2)),
+      pln_rez_pren: c0(nz(c.a1.reduce((a, d) => a + d.slots[1].base + d.slots[2].base + d.slots[3].base, BigInt(0)))),
+      celk_zd_a2: c0(nz(c.a2.reduce((a, d) => a + d.slots[1].base + d.slots[2].base + d.slots[3].base, BigInt(0)))),
     })}/>`,
   );
   return wrap("DPHKH1", "03.01", vety);
@@ -303,8 +405,13 @@ export const vatReturnHandlers: Record<string, ObjectHandlers> = {
     actions: {
       async calculate(ctx, ret) {
         const c = await computeVat(ctx.data, ret, ctx.t);
-        const taxOut = c.rows.out21[1] + c.rows.out12[1];
-        const deduction = c.rows.in21[1] + c.rows.in12[1];
+        const taxOut = c.taxOut;
+        const deduction = c.deduction;
+        // přehled všech řádků přiznání (i těch mimo 1, 2, 40, 41)
+        const overview = [...c.lines.entries()]
+          .sort((x, y) => Number(x[0]) - Number(y[0]))
+          .map(([l, [b, tx]]) => `ř. ${l}: ${ctx.t("@TAX:Base")} ${fromCents(b)}${tx !== BigInt(0) ? ` · ${ctx.t("@TAX:Tax")} ${fromCents(tx)}` : ""}`)
+          .join("\n");
         const company = ctx.companyId ? await ctx.data.get("sys.company", ctx.companyId) : null;
         const params = (await ctx.data.find("tax.parameters", {}, { take: 1 }))[0];
         const warnings = [...c.warnings];
@@ -325,6 +432,7 @@ export const vatReturnHandlers: Record<string, ObjectHandlers> = {
           result: fromCents(taxOut - deduction),
           a4Count: c.a4.length,
           b2Count: c.b2.length,
+          lineSummary: overview || null,
           warnings: warnings.map((w) => `• ${w}`).join("\n") || null,
         });
       },

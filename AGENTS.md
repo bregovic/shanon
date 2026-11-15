@@ -72,6 +72,14 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - DPH: přiznání a KH se počítají z `tax.trans` podle DUZP; kam transakce patří,
   určuje daňový kód (řádek přiznání, sazba). Pasti formátu EPO jsou v
   `src/modules/tax/vat-return.ts` — před změnou XML je přečíst.
+- DPH přes skupiny (`src/modules/tax/tax-groups.ts`): skupina DPH (partner / skupina partnerů → hlavička dokladu)
+  × položka DPH (položka / skupina položek / účet HK) → `tax.taxGroupCode` (kód pro prodej a nákup). Ručně zadaný kód
+  zůstane (`resolveLineCode` přepíše jen prázdný nebo ten z předchozí kombinace). Samovyměření (`reverseCharge`,
+  `deductLine`): na dokladu bez daně, při zaúčtování MD i D 343 a dvě `tax.trans` (`taxTransParts`, transakce nese
+  `reportLine`/`khSection`). Deník: kód přímo v mřížce, výpočet `lineTax` (název deníku `amountsIncludeTax`),
+  obsluha `journal-tax.ts`, zaúčtování v `gl/journal.ts`, přičtené DPH v `taxExtra` (vyrovnanost dokladu).
+  Výchozí sada CZ v `taxSetup` (CZ_CODES/GROUPS/ITEMS/MATRIX). Přiznání: všechny řádky 1–13, 20–26, 40–47, 50
+  (`DP3_ATTRS`), KH A.1, A.2, B.1 navíc k A.4/A.5/B.2/B.3.
 - Párování plateb se nesmí hádat: automat páruje jen jednoznačnou shodu VS,
   víc kandidátů = ručně. Import výpisu se uloží jen když součty sedí na hlavičku.
 - Pokladna (`src/modules/pos`): ceny a DPH počítá vždy server z položek

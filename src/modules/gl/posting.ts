@@ -247,7 +247,7 @@ export async function resolveJournalName(data: DataApi, id: unknown, journalType
 const voucherSeq = (jn: RecordData) => ({ id: (jn.voucherSeqId as string) || undefined, usedFor: "gl.voucher", code: "GLVOUCHER" });
 const OFFSET_REFS = ["offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"];
 // řádek s vyplněným protiúčtem je vyrovnaný sám
-const lineDiff = (l: RecordData) => (OFFSET_REFS.some((f) => l[f]) ? BigInt(0) : toCents(l.debit ?? 0) - toCents(l.credit ?? 0));
+const lineDiff = (l: RecordData) => (OFFSET_REFS.some((f) => l[f]) ? BigInt(0) : toCents(l.debit ?? 0) - toCents(l.credit ?? 0) + toCents(l.taxExtra ?? 0));
 
 /**
  * Číslo dokladu pro nový řádek deníku podle číslování názvu deníku (jako v AX):

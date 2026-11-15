@@ -40,6 +40,8 @@ export interface LineBalance {
   debit: string;
   credit: string;
   selfBalanced?: string | string[];
+  /** pole, o které řádek mění vyrovnanost navíc (přičtené DPH) */
+  extra?: string;
 }
 
 const useStyles = makeStyles({
@@ -95,7 +97,7 @@ function groupDiffs(rows: EditRow[], b?: LineBalance): Map<string, number> {
     const g = String(r.values[b.group] ?? "");
     if (!g) continue;
     const self = b.selfBalanced ? (Array.isArray(b.selfBalanced) ? b.selfBalanced : [b.selfBalanced]).some((f) => r.values[f]) : false;
-    const d = self ? 0 : cents(r.values[b.debit]) - cents(r.values[b.credit]);
+    const d = self ? 0 : cents(r.values[b.debit]) - cents(r.values[b.credit]) + (b.extra ? cents(r.values[b.extra]) : 0);
     out.set(g, (out.get(g) ?? 0) + d);
   }
   return out;

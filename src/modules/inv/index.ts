@@ -60,6 +60,8 @@ export const itemGroup = defineObject({
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
+    /** položka DPH (zboží / služba, sazba) — se skupinou DPH partnera dá daňový kód */
+    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup") },
     taxCodeId: { edt: TaxRef("@INV:SalesTax"), aliases: ["dph"] },
     revenueAccountId: { edt: AccountRef("@INV:RevenueAccount") },
     purchaseTaxCodeId: { edt: TaxRef("@INV:PurchaseTax") },
@@ -69,7 +71,7 @@ export const itemGroup = defineObject({
   list: ["code", "name", "taxCodeId", "revenueAccountId", "purchaseTaxCodeId", "costAccountId"],
   form: [
     { label: "@SYS:General", fields: ["code", "name"] },
-    { label: "@INV:Sales", fields: ["taxCodeId", "revenueAccountId"] },
+    { label: "@INV:Sales", fields: ["itemTaxGroupId", "taxCodeId", "revenueAccountId"] },
     { label: "@INV:Purchase", fields: ["purchaseTaxCodeId", "costAccountId"] },
   ],
   unique: [["code"]],
@@ -126,6 +128,8 @@ export const item = defineObject({
     /** měna prodejní i nákupní ceny; prázdné = účetní měna (doklad i pokladna přepočtou kurzem) */
     currencyId: { edt: refEdt("sys.currency", "@INV:PriceCurrency"), aliases: ["mena", "měna", "currency"] },
     priceInclTax: { edt: Edts.NoYes, label: "@INV:PriceInclTax", aliases: ["s dph", "vcetne dph", "včetně dph"] },
+    /** prázdné = položka DPH skupiny položek */
+    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup"), aliases: ["položka dph"] },
     taxCodeId: { edt: TaxRef(), aliases: ["dph", "sazba dph", "vat"] },
     priceNet: { edt: Edts.Price, label: "@INV:PriceNet", readOnly: true },
     priceGross: { edt: Edts.Price, label: "@INV:PriceGross", readOnly: true },
@@ -143,7 +147,7 @@ export const item = defineObject({
   list: ["image", "itemNum", "name", "categoryId", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "vendorId", "weighed", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["itemNum", "name", "itemType", "categoryId", "groupId", "unitId", "ean", "weighed", "blocked"] },
-    { label: "@INV:Prices", fields: ["salesPrice", "currencyId", "priceInclTax", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
+    { label: "@INV:Prices", fields: ["salesPrice", "currencyId", "priceInclTax", "itemTaxGroupId", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
     { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName"] },
     { label: "@SYS:Image", fields: ["image"] },
     { label: "@INV:Description", fields: ["description"] },
@@ -220,6 +224,14 @@ async function invSetup(data: DataApi) {
       purchaseTaxCodeId: await tax("P21"),
       costAccountId: await acc("504"),
     });
+  }
+  // položka DPH skupin položek bez ní: podle sazby prodejního kódu (21 % → Z21, 12 % → Z12)
+  const itg = async (c: string) => (await data.find("tax.itemTaxGroup", { code: c }, { take: 1 }))[0]?.id ?? null;
+  for (const g of await data.find("inv.itemGroup", { itemTaxGroupId: null }, { take: 500 })) {
+    const code = g.taxCodeId ? await data.get("tax.taxCode", String(g.taxCodeId)) : null;
+    const rate = Number(code?.rate ?? 21);
+    const id = await itg(rate >= 20 ? "Z21" : rate >= 11 ? "Z12" : "OSV");
+    if (id) await data.update("inv.itemGroup", String(g.id), { itemTaxGroupId: id });
   }
 }
 

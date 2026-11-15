@@ -120,7 +120,7 @@ export interface ObjectDef {
     carry?: string[];
     /** vyrovnanost skupin řádků (doklad deníku): rozdíl MD − D po skupinách, dorovnání nového řádku */
     /** selfBalanced = pole, jejichž vyplnění dělá řádek vyrovnaným samo (protiúčet) */
-    balance?: { group: string; debit: string; credit: string; selfBalanced?: string | string[] };
+    balance?: { group: string; debit: string; credit: string; selfBalanced?: string | string[]; /** pole, o které řádek mění vyrovnanost navíc (přičtené DPH) */ extra?: string };
     /** podrobnosti vybraného řádku pod mřížkou (záložky s poli, která se do mřížky nevejdou) */
     details?: { label: LabelRef; fields: string[] }[];
     /**

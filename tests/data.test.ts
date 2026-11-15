@@ -801,7 +801,8 @@ describe("filtry gridu na serveru", () => {
     const notEnum = await listRecords(A, "gab.subject", { filters: { name: "filtr*", type: "!osoba" }, lang: "cs" }, client);
     expect(notEnum.rows.map((r) => r.name)).toEqual(["Filtr Dva"]);
     const codes = await listRecords(A, "tax.taxCode", { filters: { accountId: "343000", rate: "> 15" } }, client);
-    expect(codes.rows.map((r) => r.code).sort()).toEqual(["P21", "V21"]);
+    expect(codes.rows.map((r) => r.code)).toEqual(expect.arrayContaining(["P21", "V21"]));
+    expect(codes.rows.every((r) => Number(r.rate) > 15)).toBe(true);
     const sorted = await listRecords(A, "tax.taxCode", { sort: "accountId", dir: "desc" }, client);
     expect(sorted.total).toBeGreaterThanOrEqual(4);
     const nothing = await listRecords(A, "tax.taxCode", { filters: { rate: "abc" } }, client);

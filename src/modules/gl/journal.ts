@@ -8,6 +8,7 @@
  *   partnera (a zápis do salda, platba podle VS se spáruje s fakturou);
  *   banka = účet hlavní knihy bankovního účtu; pokladna = účet pokladny.
  */
+import { lineTax, taxOnMain, taxTransParts } from "@/modules/tax/tax-groups";
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { allocateVoucher, checkText, convertLines, postVoucher, resolveJournalName, type PostingLine } from "./posting";
@@ -39,6 +40,8 @@ interface Leg {
   partner: { kind: "customer" | "vendor"; rec: RecordData } | null;
   /** dimenze strany (protiúčet může mít vlastní) */
   dims?: ReturnType<typeof dimsOf>;
+  /** daňové transakce řádku (modul DPH), vzniknou po zaúčtování dokladu */
+  taxes?: Record<string, unknown>[];
 }
 
 /** Účet hlavní knihy pro druh a odkaz (plus partner pro saldo). */
@@ -128,6 +131,55 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
       const off = await resolveLeg(data, ok, (l[REF[ok]?.offset] as string) ?? null);
       if (!off) errors.push({ ref: "@GL:LineAccountMissing", params: { line: String(n) } });
       else legs.push({ ...off, line: l, lineNo: n, amount: -amount, currencyId, amountCur: neg(amountCur), dims: offsetDimsOf(l) });
+    }
+    // DPH: základ na straně účtu hlavní knihy, řádek daně (u samovyměření MD i D), protistrana s daní
+    if (l.taxCodeId) {
+      let code: RecordData | null = null;
+      try {
+        code = await data.get("tax.taxCode", String(l.taxCodeId));
+      } catch {
+        code = null; // modul DPH vypnutý
+      }
+      if (code) {
+        const ti = !taxOnMain(l) && legs.length > 1 ? 1 : 0;
+        const side = legs[ti];
+        const a = side.amount;
+        const t = lineTax(code, a, !!jn?.amountsIncludeTax);
+        const aCur = side.amountCur !== null ? toCents(side.amountCur) : null;
+        const tc = aCur !== null ? lineTax(code, aCur, !!jn?.amountsIncludeTax) : null;
+        side.amount = t.base;
+        if (tc) side.amountCur = fromCents(tc.base);
+        const other = legs[1 - ti];
+        if (legs.length > 1 && other) {
+          other.amount = -(a + t.extra);
+          if (tc && aCur !== null && other.amountCur !== null) other.amountCur = fromCents(-(aCur + tc.extra));
+        }
+        const taxLeg = (accountId: unknown, amt: bigint, cur: bigint | null): Leg => ({
+          accountId: String(accountId),
+          viaSubledger: true, // automatický řádek daně (účet DPH má zákaz ručního zápisu)
+          partner: null,
+          line: l,
+          lineNo: n,
+          amount: amt,
+          currencyId,
+          amountCur: cur === null ? null : fromCents(cur),
+          dims: {},
+        });
+        if (t.tax !== zero) {
+          legs.push(taxLeg(code.accountId, t.tax, tc ? tc.tax : null));
+          if (code.reverseCharge) legs.push(taxLeg(code.outputAccountId ?? code.accountId, -t.tax, tc ? -tc.tax : null));
+        }
+        // daňové transakce: základ a daň kladné pro běžný doklad (výstup = výnos v D, vstup = náklad v MD)
+        const sign = code.direction === "output" && !code.reverseCharge ? BigInt(-1) : BigInt(1);
+        legs[0].taxes = taxTransParts(code, fromCents(sign * t.base), fromCents(sign * t.tax)).map((x) => ({
+          ...x,
+          taxDate: String(l.date ?? journal.date),
+          documentNum: (l.taxDocNum as string) || null,
+          currencyId,
+          baseCur: tc ? fromCents(sign * tc.base) : null,
+          taxCur: tc ? fromCents(sign * tc.tax) : null,
+        }));
+      }
     }
     legsByLine.push(legs);
   }
@@ -285,6 +337,20 @@ export async function runJournal(ctx: EventContext, journal: RecordData, dryRun:
       if (l.voucherNum !== voucher.voucherNum) await data.update("gl.journalLine", String(l.id), { voucherNum: voucher.voucherNum });
     // saldo odběratelů a dodavatelů
     for (const [i, x] of g.legs.entries()) if (x.partner) await partnerTrans(data, x, lines[i], voucher);
+    // daňové transakce (modul DPH): partner dokladu pro KH
+    const partnerLeg = g.legs.find((x) => x.partner);
+    const subject = partnerLeg?.partner?.rec.subjectId ? await data.get("gab.subject", String(partnerLeg.partner.rec.subjectId)) : null;
+    for (const x of g.legs)
+      for (const t of x.taxes ?? [])
+        await data.create("tax.trans", {
+          ...t,
+          documentNum: t.documentNum ?? voucher.voucherNum ?? null,
+          subjectId: subject?.id ?? null,
+          vatId: subject?.vatId ?? null,
+          voucherId: voucher.id,
+          sourceObject: "gl.journal",
+          sourceId: String(journal.id),
+        });
   }
   await data.update("gl.journal", String(journal.id), { status: "posted", voucherId: first?.id ?? null });
   return summary;

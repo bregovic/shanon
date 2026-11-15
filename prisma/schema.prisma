@@ -242,6 +242,9 @@ model SysCompany {
   glJournal_company                GlJournal[]                @relation("GlJournal_company")
   glJournalLine_company            GlJournalLine[]            @relation("GlJournalLine_company")
   taxCode_company                  TaxCode[]                  @relation("TaxCode_company")
+  taxGroup_company                 TaxGroup[]                 @relation("TaxGroup_company")
+  taxItemGroup_company             TaxItemGroup[]             @relation("TaxItemGroup_company")
+  taxGroupCode_company             TaxGroupCode[]             @relation("TaxGroupCode_company")
   taxTrans_company                 TaxTrans[]                 @relation("TaxTrans_company")
   taxParameters_company            TaxParameters[]            @relation("TaxParameters_company")
   taxReturn_company                TaxReturn[]                @relation("TaxReturn_company")
@@ -1037,37 +1040,39 @@ model GlDimensionRule {
 
 /// gl.account — generováno z definice objektu
 model GlAccount {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  tenantId      String   @map("tenant_id") @db.Uuid
-  companyId     String   @map("company_id") @db.Uuid
-  accountNum    String   @map("account_num") @db.VarChar(6)
-  name          String   @db.VarChar(120)
-  type          String?  @db.VarChar(40)
-  synthetic     String?  @db.VarChar(3)
-  accountClass  Int?     @map("account_class")
-  postingType   String?  @map("posting_type") @db.VarChar(40)
-  noManualEntry Boolean  @default(false) @map("no_manual_entry")
-  blocked       Boolean  @default(false)
-  dim1Req       String?  @map("dim1_req") @db.VarChar(40)
-  dim2Req       String?  @map("dim2_req") @db.VarChar(40)
-  dim3Req       String?  @map("dim3_req") @db.VarChar(40)
-  dim4Req       String?  @map("dim4_req") @db.VarChar(40)
-  dim5Req       String?  @map("dim5_req") @db.VarChar(40)
-  dim6Req       String?  @map("dim6_req") @db.VarChar(40)
-  dim1          String?  @db.VarChar(20)
-  dim2          String?  @db.VarChar(20)
-  dim3          String?  @db.VarChar(20)
-  dim4          String?  @db.VarChar(20)
-  dim5          String?  @db.VarChar(20)
-  dim6          String?  @db.VarChar(20)
-  ext           Json     @default("{}")
-  version       Int      @default(1)
-  createdAt     DateTime @default(now()) @map("created_at")
-  createdBy     String?  @map("created_by") @db.Uuid
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy     String?  @map("updated_by") @db.Uuid
+  id             String   @id @default(uuid(7)) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  accountNum     String   @map("account_num") @db.VarChar(6)
+  name           String   @db.VarChar(120)
+  type           String?  @db.VarChar(40)
+  synthetic      String?  @db.VarChar(3)
+  accountClass   Int?     @map("account_class")
+  postingType    String?  @map("posting_type") @db.VarChar(40)
+  noManualEntry  Boolean  @default(false) @map("no_manual_entry")
+  blocked        Boolean  @default(false)
+  dim1Req        String?  @map("dim1_req") @db.VarChar(40)
+  dim2Req        String?  @map("dim2_req") @db.VarChar(40)
+  dim3Req        String?  @map("dim3_req") @db.VarChar(40)
+  dim4Req        String?  @map("dim4_req") @db.VarChar(40)
+  dim5Req        String?  @map("dim5_req") @db.VarChar(40)
+  dim6Req        String?  @map("dim6_req") @db.VarChar(40)
+  dim1           String?  @db.VarChar(20)
+  dim2           String?  @db.VarChar(20)
+  dim3           String?  @db.VarChar(20)
+  dim4           String?  @db.VarChar(20)
+  dim5           String?  @db.VarChar(20)
+  dim6           String?  @db.VarChar(20)
+  itemTaxGroupId String?  @map("item_tax_group_id") @db.Uuid
+  ext            Json     @default("{}")
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?  @map("updated_by") @db.Uuid
 
   company                         SysCompany          @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  itemTaxGroup                    TaxItemGroup?       @relation("GlAccount_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
   glSystemAccount_account         GlSystemAccount[]   @relation("GlSystemAccount_account")
   glTrans_account                 GlTrans[]           @relation("GlTrans_account")
   glJournalName_offsetAccount     GlJournalName[]     @relation("GlJournalName_offsetAccount")
@@ -1075,6 +1080,7 @@ model GlAccount {
   glJournalLine_account           GlJournalLine[]     @relation("GlJournalLine_account")
   glJournalLine_offsetAccount     GlJournalLine[]     @relation("GlJournalLine_offsetAccount")
   taxCode_account                 TaxCode[]           @relation("TaxCode_account")
+  taxCode_outputAccount           TaxCode[]           @relation("TaxCode_outputAccount")
   invItemGroup_revenueAccount     InvItemGroup[]      @relation("InvItemGroup_revenueAccount")
   invItemGroup_costAccount        InvItemGroup[]      @relation("InvItemGroup_costAccount")
   arGroup_receivableAccount       ArGroup[]           @relation("ArGroup_receivableAccount")
@@ -1103,6 +1109,7 @@ model GlAccount {
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
+  @@index([itemTaxGroupId])
   @@map("gl_account")
 }
 
@@ -1241,6 +1248,7 @@ model GlJournalName {
   offsetAccountId     String?  @map("offset_account_id") @db.Uuid
   offsetBankAccountId String?  @map("offset_bank_account_id") @db.Uuid
   offsetCashDeskId    String?  @map("offset_cash_desk_id") @db.Uuid
+  amountsIncludeTax   Boolean  @default(false) @map("amounts_include_tax")
   dim1                String?  @db.VarChar(20)
   dim2                String?  @db.VarChar(20)
   dim3                String?  @db.VarChar(20)
@@ -1363,6 +1371,12 @@ model GlJournalLine {
   offsetDim5          String?   @map("offset_dim5") @db.VarChar(20)
   offsetDim6          String?   @map("offset_dim6") @db.VarChar(20)
   currencyId          String?   @map("currency_id") @db.Uuid
+  taxCodeId           String?   @map("tax_code_id") @db.Uuid
+  taxGroupId          String?   @map("tax_group_id") @db.Uuid
+  itemTaxGroupId      String?   @map("item_tax_group_id") @db.Uuid
+  taxAmount           Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  taxExtra            Decimal?  @map("tax_extra") @db.Decimal(18, 2)
+  taxDocNum           String?   @map("tax_doc_num") @db.VarChar(20)
   ext                 Json      @default("{}")
   version             Int       @default(1)
   createdAt           DateTime  @default(now()) @map("created_at")
@@ -1370,19 +1384,22 @@ model GlJournalLine {
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy           String?   @map("updated_by") @db.Uuid
 
-  company           SysCompany   @relation("GlJournalLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  journal           GlJournal    @relation("GlJournalLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
-  account           GlAccount?   @relation("GlJournalLine_account", fields: [accountId], references: [id], onDelete: Restrict)
-  customer          ArCustomer?  @relation("GlJournalLine_customer", fields: [customerId], references: [id], onDelete: Restrict)
-  vendor            ApVendor?    @relation("GlJournalLine_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
-  bankAccount       BankAccount? @relation("GlJournalLine_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
-  cashDesk          CashDesk?    @relation("GlJournalLine_cashDesk", fields: [cashDeskId], references: [id], onDelete: Restrict)
-  offsetAccount     GlAccount?   @relation("GlJournalLine_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
-  offsetCustomer    ArCustomer?  @relation("GlJournalLine_offsetCustomer", fields: [offsetCustomerId], references: [id], onDelete: Restrict)
-  offsetVendor      ApVendor?    @relation("GlJournalLine_offsetVendor", fields: [offsetVendorId], references: [id], onDelete: Restrict)
-  offsetBankAccount BankAccount? @relation("GlJournalLine_offsetBankAccount", fields: [offsetBankAccountId], references: [id], onDelete: Restrict)
-  offsetCashDesk    CashDesk?    @relation("GlJournalLine_offsetCashDesk", fields: [offsetCashDeskId], references: [id], onDelete: Restrict)
-  currency          SysCurrency? @relation("GlJournalLine_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  company           SysCompany    @relation("GlJournalLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journal           GlJournal     @relation("GlJournalLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
+  account           GlAccount?    @relation("GlJournalLine_account", fields: [accountId], references: [id], onDelete: Restrict)
+  customer          ArCustomer?   @relation("GlJournalLine_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  vendor            ApVendor?     @relation("GlJournalLine_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  bankAccount       BankAccount?  @relation("GlJournalLine_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  cashDesk          CashDesk?     @relation("GlJournalLine_cashDesk", fields: [cashDeskId], references: [id], onDelete: Restrict)
+  offsetAccount     GlAccount?    @relation("GlJournalLine_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
+  offsetCustomer    ArCustomer?   @relation("GlJournalLine_offsetCustomer", fields: [offsetCustomerId], references: [id], onDelete: Restrict)
+  offsetVendor      ApVendor?     @relation("GlJournalLine_offsetVendor", fields: [offsetVendorId], references: [id], onDelete: Restrict)
+  offsetBankAccount BankAccount?  @relation("GlJournalLine_offsetBankAccount", fields: [offsetBankAccountId], references: [id], onDelete: Restrict)
+  offsetCashDesk    CashDesk?     @relation("GlJournalLine_offsetCashDesk", fields: [offsetCashDeskId], references: [id], onDelete: Restrict)
+  currency          SysCurrency?  @relation("GlJournalLine_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxCode           TaxCode?      @relation("GlJournalLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  taxGroup          TaxGroup?     @relation("GlJournalLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup      TaxItemGroup? @relation("GlJournalLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([journalId])
@@ -1397,31 +1414,41 @@ model GlJournalLine {
   @@index([offsetBankAccountId])
   @@index([offsetCashDeskId])
   @@index([currencyId])
+  @@index([taxCodeId])
+  @@index([taxGroupId])
+  @@index([itemTaxGroupId])
   @@map("gl_journal_line")
 }
 
 /// tax.taxCode — generováno z definice objektu
 model TaxCode {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  tenantId      String   @map("tenant_id") @db.Uuid
-  companyId     String   @map("company_id") @db.Uuid
-  code          String   @db.VarChar(20)
-  name          String   @db.VarChar(120)
-  rate          Decimal  @db.Decimal(7, 4)
-  direction     String   @db.VarChar(40)
-  reverseCharge Boolean  @default(false) @map("reverse_charge")
-  accountId     String   @map("account_id") @db.Uuid
-  reportLine    String?  @map("report_line") @db.VarChar(10)
-  khSection     String?  @map("kh_section") @db.VarChar(4)
-  ext           Json     @default("{}")
-  version       Int      @default(1)
-  createdAt     DateTime @default(now()) @map("created_at")
-  createdBy     String?  @map("created_by") @db.Uuid
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy     String?  @map("updated_by") @db.Uuid
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  code            String   @db.VarChar(20)
+  name            String   @db.VarChar(120)
+  rate            Decimal  @db.Decimal(7, 4)
+  direction       String   @db.VarChar(40)
+  reverseCharge   Boolean  @default(false) @map("reverse_charge")
+  accountId       String   @map("account_id") @db.Uuid
+  reportLine      String?  @map("report_line") @db.VarChar(10)
+  khSection       String?  @map("kh_section") @db.VarChar(4)
+  deductLine      String?  @map("deduct_line") @db.VarChar(10)
+  outputAccountId String?  @map("output_account_id") @db.Uuid
+  khItemCode      String?  @map("kh_item_code") @db.VarChar(4)
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
 
   company                      SysCompany       @relation("TaxCode_company", fields: [companyId], references: [id], onDelete: Restrict)
   account                      GlAccount        @relation("TaxCode_account", fields: [accountId], references: [id], onDelete: Restrict)
+  outputAccount                GlAccount?       @relation("TaxCode_outputAccount", fields: [outputAccountId], references: [id], onDelete: Restrict)
+  glJournalLine_taxCode        GlJournalLine[]  @relation("GlJournalLine_taxCode")
+  taxGroupCode_salesCode       TaxGroupCode[]   @relation("TaxGroupCode_salesCode")
+  taxGroupCode_purchaseCode    TaxGroupCode[]   @relation("TaxGroupCode_purchaseCode")
   taxTrans_taxCode             TaxTrans[]       @relation("TaxTrans_taxCode")
   invItemGroup_taxCode         InvItemGroup[]   @relation("InvItemGroup_taxCode")
   invItemGroup_purchaseTaxCode InvItemGroup[]   @relation("InvItemGroup_purchaseTaxCode")
@@ -1440,7 +1467,105 @@ model TaxCode {
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
   @@index([accountId])
+  @@index([outputAccountId])
   @@map("tax_code")
+}
+
+/// tax.taxGroup — generováno z definice objektu
+model TaxGroup {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  description String?  @db.VarChar(255)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company                SysCompany      @relation("TaxGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glJournalLine_taxGroup GlJournalLine[] @relation("GlJournalLine_taxGroup")
+  taxGroupCode_taxGroup  TaxGroupCode[]  @relation("TaxGroupCode_taxGroup")
+  arGroup_taxGroup       ArGroup[]       @relation("ArGroup_taxGroup")
+  arCustomer_taxGroup    ArCustomer[]    @relation("ArCustomer_taxGroup")
+  arOrder_taxGroup       ArOrder[]       @relation("ArOrder_taxGroup")
+  arOrderLine_taxGroup   ArOrderLine[]   @relation("ArOrderLine_taxGroup")
+  arInvoice_taxGroup     ArInvoice[]     @relation("ArInvoice_taxGroup")
+  arInvoiceLine_taxGroup ArInvoiceLine[] @relation("ArInvoiceLine_taxGroup")
+  apGroup_taxGroup       ApGroup[]       @relation("ApGroup_taxGroup")
+  apVendor_taxGroup      ApVendor[]      @relation("ApVendor_taxGroup")
+  apOrder_taxGroup       ApOrder[]       @relation("ApOrder_taxGroup")
+  apOrderLine_taxGroup   ApOrderLine[]   @relation("ApOrderLine_taxGroup")
+  apInvoice_taxGroup     ApInvoice[]     @relation("ApInvoice_taxGroup")
+  apInvoiceLine_taxGroup ApInvoiceLine[] @relation("ApInvoiceLine_taxGroup")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("tax_group")
+}
+
+/// tax.itemTaxGroup — generováno z definice objektu
+model TaxItemGroup {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company                    SysCompany      @relation("TaxItemGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  glAccount_itemTaxGroup     GlAccount[]     @relation("GlAccount_itemTaxGroup")
+  glJournalLine_itemTaxGroup GlJournalLine[] @relation("GlJournalLine_itemTaxGroup")
+  taxGroupCode_itemTaxGroup  TaxGroupCode[]  @relation("TaxGroupCode_itemTaxGroup")
+  invItemGroup_itemTaxGroup  InvItemGroup[]  @relation("InvItemGroup_itemTaxGroup")
+  invItem_itemTaxGroup       InvItem[]       @relation("InvItem_itemTaxGroup")
+  arOrderLine_itemTaxGroup   ArOrderLine[]   @relation("ArOrderLine_itemTaxGroup")
+  arInvoiceLine_itemTaxGroup ArInvoiceLine[] @relation("ArInvoiceLine_itemTaxGroup")
+  apOrderLine_itemTaxGroup   ApOrderLine[]   @relation("ApOrderLine_itemTaxGroup")
+  apInvoiceLine_itemTaxGroup ApInvoiceLine[] @relation("ApInvoiceLine_itemTaxGroup")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("tax_item_group")
+}
+
+/// tax.taxGroupCode — generováno z definice objektu
+model TaxGroupCode {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  taxGroupId     String   @map("tax_group_id") @db.Uuid
+  itemTaxGroupId String   @map("item_tax_group_id") @db.Uuid
+  salesCodeId    String?  @map("sales_code_id") @db.Uuid
+  purchaseCodeId String?  @map("purchase_code_id") @db.Uuid
+  ext            Json     @default("{}")
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?  @map("updated_by") @db.Uuid
+
+  company      SysCompany   @relation("TaxGroupCode_company", fields: [companyId], references: [id], onDelete: Restrict)
+  taxGroup     TaxGroup     @relation("TaxGroupCode_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup TaxItemGroup @relation("TaxGroupCode_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  salesCode    TaxCode?     @relation("TaxGroupCode_salesCode", fields: [salesCodeId], references: [id], onDelete: Restrict)
+  purchaseCode TaxCode?     @relation("TaxGroupCode_purchaseCode", fields: [purchaseCodeId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, taxGroupId, itemTaxGroupId])
+  @@index([tenantId, companyId])
+  @@index([taxGroupId])
+  @@index([itemTaxGroupId])
+  @@index([salesCodeId])
+  @@index([purchaseCodeId])
+  @@map("tax_group_code")
 }
 
 /// tax.trans — generováno z definice objektu
@@ -1463,6 +1588,9 @@ model TaxTrans {
   sourceObject String?  @map("source_object") @db.VarChar(255)
   sourceId     String?  @map("source_id") @db.VarChar(255)
   simplified   Boolean  @default(false)
+  reportLine   String?  @map("report_line") @db.VarChar(10)
+  khSection    String?  @map("kh_section") @db.VarChar(4)
+  khItemCode   String?  @map("kh_item_code") @db.VarChar(4)
   ext          Json     @default("{}")
   version      Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at")
@@ -1520,36 +1648,37 @@ model TaxParameters {
 
 /// tax.return — generováno z definice objektu
 model TaxReturn {
-  id         String    @id @default(uuid(7)) @db.Uuid
-  tenantId   String    @map("tenant_id") @db.Uuid
-  companyId  String    @map("company_id") @db.Uuid
-  period     String?   @db.VarChar(7)
-  kind       String    @default("dp3") @db.VarChar(40)
-  year       Int
-  month      Int?
-  quarter    Int?
-  status     String    @default("draft") @db.VarChar(40)
-  computedAt DateTime? @map("computed_at") @db.Date
-  out21Base  Decimal?  @map("out21_base") @db.Decimal(18, 2)
-  out21Tax   Decimal?  @map("out21_tax") @db.Decimal(18, 2)
-  out12Base  Decimal?  @map("out12_base") @db.Decimal(18, 2)
-  out12Tax   Decimal?  @map("out12_tax") @db.Decimal(18, 2)
-  in21Base   Decimal?  @map("in21_base") @db.Decimal(18, 2)
-  in21Tax    Decimal?  @map("in21_tax") @db.Decimal(18, 2)
-  in12Base   Decimal?  @map("in12_base") @db.Decimal(18, 2)
-  in12Tax    Decimal?  @map("in12_tax") @db.Decimal(18, 2)
-  taxOut     Decimal?  @map("tax_out") @db.Decimal(18, 2)
-  deduction  Decimal?  @db.Decimal(18, 2)
-  result     Decimal?  @db.Decimal(18, 2)
-  a4Count    Int?      @map("a4_count")
-  b2Count    Int?      @map("b2_count")
-  warnings   String?
-  ext        Json      @default("{}")
-  version    Int       @default(1)
-  createdAt  DateTime  @default(now()) @map("created_at")
-  createdBy  String?   @map("created_by") @db.Uuid
-  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy  String?   @map("updated_by") @db.Uuid
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  period      String?   @db.VarChar(7)
+  kind        String    @default("dp3") @db.VarChar(40)
+  year        Int
+  month       Int?
+  quarter     Int?
+  status      String    @default("draft") @db.VarChar(40)
+  computedAt  DateTime? @map("computed_at") @db.Date
+  out21Base   Decimal?  @map("out21_base") @db.Decimal(18, 2)
+  out21Tax    Decimal?  @map("out21_tax") @db.Decimal(18, 2)
+  out12Base   Decimal?  @map("out12_base") @db.Decimal(18, 2)
+  out12Tax    Decimal?  @map("out12_tax") @db.Decimal(18, 2)
+  in21Base    Decimal?  @map("in21_base") @db.Decimal(18, 2)
+  in21Tax     Decimal?  @map("in21_tax") @db.Decimal(18, 2)
+  in12Base    Decimal?  @map("in12_base") @db.Decimal(18, 2)
+  in12Tax     Decimal?  @map("in12_tax") @db.Decimal(18, 2)
+  taxOut      Decimal?  @map("tax_out") @db.Decimal(18, 2)
+  deduction   Decimal?  @db.Decimal(18, 2)
+  result      Decimal?  @db.Decimal(18, 2)
+  a4Count     Int?      @map("a4_count")
+  b2Count     Int?      @map("b2_count")
+  warnings    String?
+  lineSummary String?   @map("line_summary")
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
 
   company SysCompany @relation("TaxReturn_company", fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -1593,6 +1722,7 @@ model InvItemGroup {
   companyId         String   @map("company_id") @db.Uuid
   code              String   @db.VarChar(20)
   name              String   @db.VarChar(120)
+  itemTaxGroupId    String?  @map("item_tax_group_id") @db.Uuid
   taxCodeId         String?  @map("tax_code_id") @db.Uuid
   revenueAccountId  String?  @map("revenue_account_id") @db.Uuid
   purchaseTaxCodeId String?  @map("purchase_tax_code_id") @db.Uuid
@@ -1605,6 +1735,7 @@ model InvItemGroup {
   updatedBy         String?  @map("updated_by") @db.Uuid
 
   company           SysCompany    @relation("InvItemGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  itemTaxGroup      TaxItemGroup? @relation("InvItemGroup_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
   taxCode           TaxCode?      @relation("InvItemGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   revenueAccount    GlAccount?    @relation("InvItemGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
   purchaseTaxCode   TaxCode?      @relation("InvItemGroup_purchaseTaxCode", fields: [purchaseTaxCodeId], references: [id], onDelete: Restrict)
@@ -1614,6 +1745,7 @@ model InvItemGroup {
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
+  @@index([itemTaxGroupId])
   @@index([taxCodeId])
   @@index([revenueAccountId])
   @@index([purchaseTaxCodeId])
@@ -1664,6 +1796,7 @@ model InvItem {
   salesPrice     Decimal? @map("sales_price") @db.Decimal(18, 2)
   currencyId     String?  @map("currency_id") @db.Uuid
   priceInclTax   Boolean  @default(false) @map("price_incl_tax")
+  itemTaxGroupId String?  @map("item_tax_group_id") @db.Uuid
   taxCodeId      String?  @map("tax_code_id") @db.Uuid
   priceNet       Decimal? @map("price_net") @db.Decimal(18, 2)
   priceGross     Decimal? @map("price_gross") @db.Decimal(18, 2)
@@ -1687,6 +1820,7 @@ model InvItem {
   category            InvCategory?     @relation("InvItem_category", fields: [categoryId], references: [id], onDelete: Restrict)
   unit                InvUnit          @relation("InvItem_unit", fields: [unitId], references: [id], onDelete: Restrict)
   currency            SysCurrency?     @relation("InvItem_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  itemTaxGroup        TaxItemGroup?    @relation("InvItem_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
   taxCode             TaxCode?         @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   vendor              ApVendor?        @relation("InvItem_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
   invDiscount_item    InvDiscount[]    @relation("InvDiscount_item")
@@ -1708,6 +1842,7 @@ model InvItem {
   @@index([categoryId])
   @@index([unitId])
   @@index([currencyId])
+  @@index([itemTaxGroupId])
   @@index([taxCodeId])
   @@index([vendorId])
   @@map("inv_item")
@@ -1756,6 +1891,7 @@ model ArGroup {
   name                String   @db.VarChar(120)
   receivableAccountId String   @map("receivable_account_id") @db.Uuid
   revenueAccountId    String?  @map("revenue_account_id") @db.Uuid
+  taxGroupId          String?  @map("tax_group_id") @db.Uuid
   taxCodeId           String?  @map("tax_code_id") @db.Uuid
   advanceAccountId    String?  @map("advance_account_id") @db.Uuid
   paymentDays         Int?     @default(14) @map("payment_days")
@@ -1769,6 +1905,7 @@ model ArGroup {
   company           SysCompany   @relation("ArGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
   receivableAccount GlAccount    @relation("ArGroup_receivableAccount", fields: [receivableAccountId], references: [id], onDelete: Restrict)
   revenueAccount    GlAccount?   @relation("ArGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxGroup          TaxGroup?    @relation("ArGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   taxCode           TaxCode?     @relation("ArGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   advanceAccount    GlAccount?   @relation("ArGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
   arCustomer_group  ArCustomer[] @relation("ArCustomer_group")
@@ -1777,6 +1914,7 @@ model ArGroup {
   @@index([tenantId, companyId])
   @@index([receivableAccountId])
   @@index([revenueAccountId])
+  @@index([taxGroupId])
   @@index([taxCodeId])
   @@index([advanceAccountId])
   @@map("ar_group")
@@ -1796,6 +1934,7 @@ model ArCustomer {
   dim5            String?  @db.VarChar(20)
   dim6            String?  @db.VarChar(20)
   groupId         String   @map("group_id") @db.Uuid
+  taxGroupId      String?  @map("tax_group_id") @db.Uuid
   currencyId      String?  @map("currency_id") @db.Uuid
   paymentDays     Int?     @map("payment_days")
   bankAccountId   String?  @map("bank_account_id") @db.Uuid
@@ -1812,6 +1951,7 @@ model ArCustomer {
   company                      SysCompany         @relation("ArCustomer_company", fields: [companyId], references: [id], onDelete: Restrict)
   subject                      GabSubject         @relation("ArCustomer_subject", fields: [subjectId], references: [id], onDelete: Restrict)
   group                        ArGroup            @relation("ArCustomer_group", fields: [groupId], references: [id], onDelete: Restrict)
+  taxGroup                     TaxGroup?          @relation("ArCustomer_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   currency                     SysCurrency?       @relation("ArCustomer_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   bankAccount                  GabBankAccount?    @relation("ArCustomer_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
   paymentMethod                BankPaymentMethod? @relation("ArCustomer_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
@@ -1829,6 +1969,7 @@ model ArCustomer {
   @@index([tenantId, companyId])
   @@index([subjectId])
   @@index([groupId])
+  @@index([taxGroupId])
   @@index([currencyId])
   @@index([bankAccountId])
   @@index([paymentMethodId])
@@ -1847,6 +1988,7 @@ model ArOrder {
   deliveryDate DateTime? @map("delivery_date") @db.Date
   warehouseId  String?   @map("warehouse_id") @db.Uuid
   currencyId   String?   @map("currency_id") @db.Uuid
+  taxGroupId   String?   @map("tax_group_id") @db.Uuid
   description  String?   @db.VarChar(255)
   amountNet    Decimal?  @map("amount_net") @db.Decimal(18, 2)
   taxAmount    Decimal?  @map("tax_amount") @db.Decimal(18, 2)
@@ -1864,6 +2006,7 @@ model ArOrder {
   customer          ArCustomer    @relation("ArOrder_customer", fields: [customerId], references: [id], onDelete: Restrict)
   warehouse         WhsWarehouse? @relation("ArOrder_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
   currency          SysCurrency?  @relation("ArOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxGroup          TaxGroup?     @relation("ArOrder_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   invoice           ArInvoice?    @relation("ArOrder_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
   arOrderLine_order ArOrderLine[] @relation("ArOrderLine_order")
   arInvoice_order   ArInvoice[]   @relation("ArInvoice_order")
@@ -1873,6 +2016,7 @@ model ArOrder {
   @@index([customerId])
   @@index([warehouseId])
   @@index([currencyId])
+  @@index([taxGroupId])
   @@index([invoiceId])
   @@map("ar_order")
 }
@@ -1889,6 +2033,8 @@ model ArOrderLine {
   unitId           String?  @map("unit_id") @db.Uuid
   unitPrice        Decimal? @map("unit_price") @db.Decimal(18, 2)
   revenueAccountId String?  @map("revenue_account_id") @db.Uuid
+  taxGroupId       String?  @map("tax_group_id") @db.Uuid
+  itemTaxGroupId   String?  @map("item_tax_group_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   dim1             String?  @db.VarChar(20)
   dim2             String?  @db.VarChar(20)
@@ -1906,18 +2052,22 @@ model ArOrderLine {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company        SysCompany @relation("ArOrderLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  order          ArOrder    @relation("ArOrderLine_order", fields: [orderId], references: [id], onDelete: Restrict)
-  item           InvItem?   @relation("ArOrderLine_item", fields: [itemId], references: [id], onDelete: Restrict)
-  unit           InvUnit?   @relation("ArOrderLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
-  revenueAccount GlAccount? @relation("ArOrderLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
-  taxCode        TaxCode?   @relation("ArOrderLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  company        SysCompany    @relation("ArOrderLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  order          ArOrder       @relation("ArOrderLine_order", fields: [orderId], references: [id], onDelete: Restrict)
+  item           InvItem?      @relation("ArOrderLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit           InvUnit?      @relation("ArOrderLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  revenueAccount GlAccount?    @relation("ArOrderLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxGroup       TaxGroup?     @relation("ArOrderLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup   TaxItemGroup? @relation("ArOrderLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?      @relation("ArOrderLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([orderId])
   @@index([itemId])
   @@index([unitId])
   @@index([revenueAccountId])
+  @@index([taxGroupId])
+  @@index([itemTaxGroupId])
   @@index([taxCodeId])
   @@map("ar_order_line")
 }
@@ -1933,6 +2083,7 @@ model ArInvoice {
   taxDate       DateTime? @map("tax_date") @db.Date
   dueDate       DateTime? @map("due_date") @db.Date
   currencyId    String?   @map("currency_id") @db.Uuid
+  taxGroupId    String?   @map("tax_group_id") @db.Uuid
   vs            String?   @db.VarChar(10)
   description   String?   @db.VarChar(255)
   amountNet     Decimal?  @map("amount_net") @db.Decimal(18, 2)
@@ -1955,6 +2106,7 @@ model ArInvoice {
   company               SysCompany      @relation("ArInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
   customer              ArCustomer      @relation("ArInvoice_customer", fields: [customerId], references: [id], onDelete: Restrict)
   currency              SysCurrency?    @relation("ArInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxGroup              TaxGroup?       @relation("ArInvoice_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   voucher               GlVoucher?      @relation("ArInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   order                 ArOrder?        @relation("ArInvoice_order", fields: [orderId], references: [id], onDelete: Restrict)
   advance               ArAdvance?      @relation("ArInvoice_advance", fields: [advanceId], references: [id], onDelete: Restrict)
@@ -1965,6 +2117,7 @@ model ArInvoice {
   @@index([tenantId, companyId])
   @@index([customerId])
   @@index([currencyId])
+  @@index([taxGroupId])
   @@index([voucherId])
   @@index([orderId])
   @@index([advanceId])
@@ -1983,6 +2136,8 @@ model ArInvoiceLine {
   unitId           String?  @map("unit_id") @db.Uuid
   unitPrice        Decimal? @map("unit_price") @db.Decimal(18, 2)
   revenueAccountId String?  @map("revenue_account_id") @db.Uuid
+  taxGroupId       String?  @map("tax_group_id") @db.Uuid
+  itemTaxGroupId   String?  @map("item_tax_group_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   dim1             String?  @db.VarChar(20)
   dim2             String?  @db.VarChar(20)
@@ -1999,18 +2154,22 @@ model ArInvoiceLine {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company        SysCompany @relation("ArInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  invoice        ArInvoice  @relation("ArInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
-  item           InvItem?   @relation("ArInvoiceLine_item", fields: [itemId], references: [id], onDelete: Restrict)
-  unit           InvUnit?   @relation("ArInvoiceLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
-  revenueAccount GlAccount? @relation("ArInvoiceLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
-  taxCode        TaxCode?   @relation("ArInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  company        SysCompany    @relation("ArInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  invoice        ArInvoice     @relation("ArInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  item           InvItem?      @relation("ArInvoiceLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit           InvUnit?      @relation("ArInvoiceLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  revenueAccount GlAccount?    @relation("ArInvoiceLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxGroup       TaxGroup?     @relation("ArInvoiceLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup   TaxItemGroup? @relation("ArInvoiceLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?      @relation("ArInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([invoiceId])
   @@index([itemId])
   @@index([unitId])
   @@index([revenueAccountId])
+  @@index([taxGroupId])
+  @@index([itemTaxGroupId])
   @@index([taxCodeId])
   @@map("ar_invoice_line")
 }
@@ -2113,6 +2272,7 @@ model ApGroup {
   name             String   @db.VarChar(120)
   payableAccountId String   @map("payable_account_id") @db.Uuid
   expenseAccountId String?  @map("expense_account_id") @db.Uuid
+  taxGroupId       String?  @map("tax_group_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   advanceAccountId String?  @map("advance_account_id") @db.Uuid
   paymentDays      Int?     @default(14) @map("payment_days")
@@ -2126,6 +2286,7 @@ model ApGroup {
   company        SysCompany @relation("ApGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
   payableAccount GlAccount  @relation("ApGroup_payableAccount", fields: [payableAccountId], references: [id], onDelete: Restrict)
   expenseAccount GlAccount? @relation("ApGroup_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  taxGroup       TaxGroup?  @relation("ApGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   taxCode        TaxCode?   @relation("ApGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   advanceAccount GlAccount? @relation("ApGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
   apVendor_group ApVendor[] @relation("ApVendor_group")
@@ -2134,6 +2295,7 @@ model ApGroup {
   @@index([tenantId, companyId])
   @@index([payableAccountId])
   @@index([expenseAccountId])
+  @@index([taxGroupId])
   @@index([taxCodeId])
   @@index([advanceAccountId])
   @@map("ap_group")
@@ -2153,6 +2315,7 @@ model ApVendor {
   dim5            String?  @db.VarChar(20)
   dim6            String?  @db.VarChar(20)
   groupId         String   @map("group_id") @db.Uuid
+  taxGroupId      String?  @map("tax_group_id") @db.Uuid
   currencyId      String?  @map("currency_id") @db.Uuid
   paymentDays     Int?     @map("payment_days")
   bankAccountId   String?  @map("bank_account_id") @db.Uuid
@@ -2169,6 +2332,7 @@ model ApVendor {
   company                     SysCompany             @relation("ApVendor_company", fields: [companyId], references: [id], onDelete: Restrict)
   subject                     GabSubject             @relation("ApVendor_subject", fields: [subjectId], references: [id], onDelete: Restrict)
   group                       ApGroup                @relation("ApVendor_group", fields: [groupId], references: [id], onDelete: Restrict)
+  taxGroup                    TaxGroup?              @relation("ApVendor_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   currency                    SysCurrency?           @relation("ApVendor_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   bankAccount                 GabBankAccount?        @relation("ApVendor_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
   paymentMethod               BankPaymentMethod?     @relation("ApVendor_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
@@ -2188,6 +2352,7 @@ model ApVendor {
   @@index([tenantId, companyId])
   @@index([subjectId])
   @@index([groupId])
+  @@index([taxGroupId])
   @@index([currencyId])
   @@index([bankAccountId])
   @@index([paymentMethodId])
@@ -2206,6 +2371,7 @@ model ApOrder {
   deliveryDate DateTime? @map("delivery_date") @db.Date
   warehouseId  String?   @map("warehouse_id") @db.Uuid
   currencyId   String?   @map("currency_id") @db.Uuid
+  taxGroupId   String?   @map("tax_group_id") @db.Uuid
   description  String?   @db.VarChar(255)
   amountNet    Decimal?  @map("amount_net") @db.Decimal(18, 2)
   taxAmount    Decimal?  @map("tax_amount") @db.Decimal(18, 2)
@@ -2223,6 +2389,7 @@ model ApOrder {
   vendor                   ApVendor      @relation("ApOrder_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
   warehouse                WhsWarehouse? @relation("ApOrder_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
   currency                 SysCurrency?  @relation("ApOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxGroup                 TaxGroup?     @relation("ApOrder_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   invoice                  ApInvoice?    @relation("ApOrder_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
   apOrderLine_order        ApOrderLine[] @relation("ApOrderLine_order")
   apInvoice_order          ApInvoice[]   @relation("ApInvoice_order")
@@ -2233,6 +2400,7 @@ model ApOrder {
   @@index([vendorId])
   @@index([warehouseId])
   @@index([currencyId])
+  @@index([taxGroupId])
   @@index([invoiceId])
   @@map("ap_order")
 }
@@ -2249,6 +2417,8 @@ model ApOrderLine {
   unitId           String?  @map("unit_id") @db.Uuid
   unitPrice        Decimal? @map("unit_price") @db.Decimal(18, 2)
   expenseAccountId String?  @map("expense_account_id") @db.Uuid
+  taxGroupId       String?  @map("tax_group_id") @db.Uuid
+  itemTaxGroupId   String?  @map("item_tax_group_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   dim1             String?  @db.VarChar(20)
   dim2             String?  @db.VarChar(20)
@@ -2271,6 +2441,8 @@ model ApOrderLine {
   item                     InvItem?         @relation("ApOrderLine_item", fields: [itemId], references: [id], onDelete: Restrict)
   unit                     InvUnit?         @relation("ApOrderLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
   expenseAccount           GlAccount?       @relation("ApOrderLine_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  taxGroup                 TaxGroup?        @relation("ApOrderLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup             TaxItemGroup?    @relation("ApOrderLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
   taxCode                  TaxCode?         @relation("ApOrderLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   whsJournalLine_orderLine WhsJournalLine[] @relation("WhsJournalLine_orderLine")
 
@@ -2279,6 +2451,8 @@ model ApOrderLine {
   @@index([itemId])
   @@index([unitId])
   @@index([expenseAccountId])
+  @@index([taxGroupId])
+  @@index([itemTaxGroupId])
   @@index([taxCodeId])
   @@map("ap_order_line")
 }
@@ -2295,6 +2469,7 @@ model ApInvoice {
   taxDate       DateTime? @map("tax_date") @db.Date
   dueDate       DateTime? @map("due_date") @db.Date
   currencyId    String?   @map("currency_id") @db.Uuid
+  taxGroupId    String?   @map("tax_group_id") @db.Uuid
   vs            String?   @db.VarChar(10)
   description   String?   @db.VarChar(255)
   amountNet     Decimal?  @map("amount_net") @db.Decimal(18, 2)
@@ -2317,6 +2492,7 @@ model ApInvoice {
   company               SysCompany      @relation("ApInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
   vendor                ApVendor        @relation("ApInvoice_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
   currency              SysCurrency?    @relation("ApInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxGroup              TaxGroup?       @relation("ApInvoice_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   voucher               GlVoucher?      @relation("ApInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   order                 ApOrder?        @relation("ApInvoice_order", fields: [orderId], references: [id], onDelete: Restrict)
   advance               ApAdvance?      @relation("ApInvoice_advance", fields: [advanceId], references: [id], onDelete: Restrict)
@@ -2327,6 +2503,7 @@ model ApInvoice {
   @@index([tenantId, companyId])
   @@index([vendorId])
   @@index([currencyId])
+  @@index([taxGroupId])
   @@index([voucherId])
   @@index([orderId])
   @@index([advanceId])
@@ -2345,6 +2522,8 @@ model ApInvoiceLine {
   unitId           String?  @map("unit_id") @db.Uuid
   unitPrice        Decimal? @map("unit_price") @db.Decimal(18, 2)
   expenseAccountId String?  @map("expense_account_id") @db.Uuid
+  taxGroupId       String?  @map("tax_group_id") @db.Uuid
+  itemTaxGroupId   String?  @map("item_tax_group_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   dim1             String?  @db.VarChar(20)
   dim2             String?  @db.VarChar(20)
@@ -2361,18 +2540,22 @@ model ApInvoiceLine {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company        SysCompany @relation("ApInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  invoice        ApInvoice  @relation("ApInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
-  item           InvItem?   @relation("ApInvoiceLine_item", fields: [itemId], references: [id], onDelete: Restrict)
-  unit           InvUnit?   @relation("ApInvoiceLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
-  expenseAccount GlAccount? @relation("ApInvoiceLine_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
-  taxCode        TaxCode?   @relation("ApInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  company        SysCompany    @relation("ApInvoiceLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  invoice        ApInvoice     @relation("ApInvoiceLine_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  item           InvItem?      @relation("ApInvoiceLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit           InvUnit?      @relation("ApInvoiceLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  expenseAccount GlAccount?    @relation("ApInvoiceLine_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  taxGroup       TaxGroup?     @relation("ApInvoiceLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup   TaxItemGroup? @relation("ApInvoiceLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode?      @relation("ApInvoiceLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([invoiceId])
   @@index([itemId])
   @@index([unitId])
   @@index([expenseAccountId])
+  @@index([taxGroupId])
+  @@index([itemTaxGroupId])
   @@index([taxCodeId])
   @@map("ap_invoice_line")
 }

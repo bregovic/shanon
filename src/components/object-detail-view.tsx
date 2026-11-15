@@ -63,7 +63,7 @@ export interface LineSpec {
   /** úprava přímo v mřížce (deník) */
   inline?: boolean;
   carry?: string[];
-  balance?: { group: string; debit: string; credit: string; selfBalanced?: string | string[] };
+  balance?: { group: string; debit: string; credit: string; selfBalanced?: string | string[]; extra?: string };
   details?: { label: string; fields: FieldMeta[] }[];
   dims?: LineDims;
   /** řádek má akce — dvojklik otevře jeho stránku */
