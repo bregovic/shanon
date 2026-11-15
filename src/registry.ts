@@ -37,6 +37,7 @@ import { bankHandlers } from "@/modules/bank/handlers";
 import { paymentHandlers } from "@/modules/bank/payments";
 import { vatReturnHandlers } from "@/modules/tax/vat-return";
 import { journalTaxHandlers } from "@/modules/tax/journal-tax";
+import { portalHandlers } from "@/modules/int/portal";
 import subjectRating from "@/extensions/subject-rating";
 
 export const modules = [sys, prt, org, gab, gl, tax, inv, ar, ap, bank, cash, pos, whs, int, qa];
@@ -66,7 +67,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 

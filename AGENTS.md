@@ -108,6 +108,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `SHANON_TEST_OCR_KEY` z prostředí, nikdy v DB), mezitabulka `int.document` (+ řádky),
   Vytěžit → kontrola (partner podle IČO/DIČ, součty, duplicita) → Zalistovat = koncept
   dokladu v agendě s přiloženým souborem. Denní limit napojení, dávka `int.processDocuments`.
+- Dodavatelský portál (`int.portal`, veřejně `/portal/<tenantId>/<klíč>` + `/api/portal/...`, mimo přihlášení v
+  `src/proxy.ts`): `src/server/supplier-portal.ts` najde portál podle klíče (zapnutý), kontroluje druh souboru podle obsahu
+  (`sniffPortalFile`), velikost, počet, limit za hodinu z adresy (otisk IP) a za den, zakládá `int.document` se zdrojem
+  `portal` a údaji odesílatele + přílohu, protokol `int.portalUpload`, upozornění. Zalistování z portálu nikdy automaticky.
 - Veřejné datové služby (ARES, ČNB, ECB) volat přes `withService(data, "ares"|"cnb"|"ecb", …)`
   (`src/modules/int/services.ts`): napojení druhu „service“ (zakládá výchozí nastavení)
   je jde vypnout, otestovat a volání jdou do `int.log`; bez Integrace běží služba bez logu.

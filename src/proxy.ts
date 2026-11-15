@@ -14,5 +14,6 @@ export function proxy(request: NextRequest) {
 export const config = {
   // api/files: nahrávání souborů (proxy by omezilo velikost těla); relaci ověřuje route
   // api/v1: REST API s vlastní autorizací klíčem (bez přihlášení)
-  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1).*)"],
+  // portal, api/portal: dodavatelský portál (veřejný odkaz s tajným klíčem, limity v src/server/supplier-portal.ts)
+  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1|api/portal|portal/).*)"],
 };

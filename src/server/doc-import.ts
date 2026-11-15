@@ -138,11 +138,18 @@ export async function processPendingDocuments(ctx: Ctx, client?: PrismaClient): 
   let attention = 0;
   for (const id of ids) {
     try {
+      // dodavatelský portál bez automatického vytěžení: čeká na ruční Vytěžit
+      const before = await inTenant(ctx, (s) => s.sys().api().get("int.document", id), client);
+      if (before?.source === "portal" && before.portalId) {
+        const portal = await inTenant(ctx, (s) => s.sys().api().get("int.portal", String(before.portalId)), client);
+        if (portal && portal.autoExtract === false) continue;
+      }
       const doc = await extractDocument(ctx, id, client);
       done++;
       if (doc.status === "attention") attention++;
       const conn = doc.connectionId ? await inTenant(ctx, (s) => s.sys().api().get("int.connection", String(doc.connectionId)), client) : null;
-      if (doc.status === "ready" && conn?.autoList) {
+      // doklad z dodavatelského portálu zalistuje vždy člověk (schválení)
+      if (doc.status === "ready" && conn?.autoList && doc.source !== "portal") {
         await listDocumentWithFile(ctx, id, client);
         listed++;
       }

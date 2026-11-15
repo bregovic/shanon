@@ -302,6 +302,8 @@ model SysCompany {
   whsItemCost_company              WhsItemCost[]              @relation("WhsItemCost_company")
   intConnection_company            IntConnection[]            @relation("IntConnection_company")
   intLog_company                   IntLog[]                   @relation("IntLog_company")
+  intPortal_company                IntPortal[]                @relation("IntPortal_company")
+  intPortalUpload_company          IntPortalUpload[]          @relation("IntPortalUpload_company")
   intDocument_company              IntDocument[]              @relation("IntDocument_company")
   intDocumentLine_company          IntDocumentLine[]          @relation("IntDocumentLine_company")
   intMail_company                  IntMail[]                  @relation("IntMail_company")
@@ -3796,6 +3798,74 @@ model IntLog {
   @@map("int_log")
 }
 
+/// int.portal — generováno z definice objektu
+model IntPortal {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  name         String   @db.VarChar(120)
+  active       Boolean  @default(true)
+  token        String?  @db.VarChar(64)
+  publicUrl    String?  @map("public_url") @db.VarChar(200)
+  title        String?  @db.VarChar(255)
+  intro        String?
+  allowInvoice Boolean  @default(true) @map("allow_invoice")
+  allowAdvance Boolean  @default(true) @map("allow_advance")
+  allowOrder   Boolean  @default(true) @map("allow_order")
+  allowOther   Boolean  @default(true) @map("allow_other")
+  requireRegNo Boolean  @default(true) @map("require_reg_no")
+  autoExtract  Boolean  @default(true) @map("auto_extract")
+  maxFileMb    Int?     @default(10) @map("max_file_mb")
+  maxFiles     Int?     @default(5) @map("max_files")
+  ipHourLimit  Int?     @default(10) @map("ip_hour_limit")
+  dailyLimit   Int?     @default(100) @map("daily_limit")
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+
+  company                SysCompany        @relation("IntPortal_company", fields: [companyId], references: [id], onDelete: Restrict)
+  intPortalUpload_portal IntPortalUpload[] @relation("IntPortalUpload_portal")
+  intDocument_portal     IntDocument[]     @relation("IntDocument_portal")
+
+  @@index([tenantId, companyId])
+  @@map("int_portal")
+}
+
+/// int.portalUpload — generováno z definice objektu
+model IntPortalUpload {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  portalId    String   @map("portal_id") @db.Uuid
+  at          DateTime
+  status      String   @db.VarChar(40)
+  reason      String?  @db.VarChar(255)
+  fileName    String?  @map("file_name") @db.VarChar(255)
+  size        Int?
+  ipHash      String?  @map("ip_hash") @db.VarChar(64)
+  senderName  String?  @map("sender_name") @db.VarChar(120)
+  senderRegNo String?  @map("sender_reg_no") @db.VarChar(20)
+  documentId  String?  @map("document_id") @db.Uuid
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company  SysCompany   @relation("IntPortalUpload_company", fields: [companyId], references: [id], onDelete: Restrict)
+  portal   IntPortal    @relation("IntPortalUpload_portal", fields: [portalId], references: [id], onDelete: Restrict)
+  document IntDocument? @relation("IntPortalUpload_document", fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([portalId])
+  @@index([documentId])
+  @@map("int_portal_upload")
+}
+
 /// int.document — generováno z definice objektu
 model IntDocument {
   id           String    @id @default(uuid(7)) @db.Uuid
@@ -3829,6 +3899,12 @@ model IntDocument {
   resultId     String?   @map("result_id") @db.VarChar(36)
   resultTitle  String?   @map("result_title") @db.VarChar(255)
   raw          String?
+  source       String?   @default("manual") @db.VarChar(40)
+  portalId     String?   @map("portal_id") @db.Uuid
+  senderName   String?   @map("sender_name") @db.VarChar(120)
+  senderRegNo  String?   @map("sender_reg_no") @db.VarChar(20)
+  senderEmail  String?   @map("sender_email") @db.VarChar(254)
+  senderNote   String?   @map("sender_note") @db.VarChar(255)
   ext          Json      @default("{}")
   version      Int       @default(1)
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -3841,6 +3917,8 @@ model IntDocument {
   vendor                   ApVendor?         @relation("IntDocument_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
   customer                 ArCustomer?       @relation("IntDocument_customer", fields: [customerId], references: [id], onDelete: Restrict)
   connection               IntConnection?    @relation("IntDocument_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+  portal                   IntPortal?        @relation("IntDocument_portal", fields: [portalId], references: [id], onDelete: Restrict)
+  intPortalUpload_document IntPortalUpload[] @relation("IntPortalUpload_document")
   intDocumentLine_document IntDocumentLine[] @relation("IntDocumentLine_document")
 
   @@index([tenantId, companyId])
@@ -3848,6 +3926,7 @@ model IntDocument {
   @@index([vendorId])
   @@index([customerId])
   @@index([connectionId])
+  @@index([portalId])
   @@map("int_document")
 }
 
