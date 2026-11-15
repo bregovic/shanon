@@ -20,6 +20,7 @@ export async function deleteCompanyWithData(ctx: Ctx, companyId: string, client:
   if (ctx.companyId === companyId) throw new UserError("@SYS:DeleteCompanyCurrent");
   const files: { storage: string; key: string }[] = [];
   let total = 0;
+  try {
   await client.$transaction(
     async (tx) => {
       const q = tx as unknown as Q;
@@ -87,6 +88,13 @@ export async function deleteCompanyWithData(ctx: Ctx, companyId: string, client:
       await q.$executeRawUnsafe("UPDATE sys_session SET company_id = NULL WHERE company_id = $1::uuid", companyId);
       await q.$executeRawUnsafe("DELETE FROM sys_user_company WHERE company_id = $1::uuid", companyId);
       await q.$executeRawUnsafe("DELETE FROM sys_global_key WHERE company_id = $1::uuid", companyId);
+      // ostatní odkazy na firmu (členství ve virtuální společnosti…): nepovinné vynulovat, povinné vazby smazat
+      for (const fk of fks) {
+        const t = clean(fk.tbl);
+        if (clean(fk.ref) !== "sys_company" || t === "sys_company" || tables.has(t)) continue;
+        if (fk.nullable) await q.$executeRawUnsafe(`UPDATE "${t}" SET "${fk.col}" = NULL WHERE "${fk.col}" = $1::uuid`, companyId);
+        else await q.$executeRawUnsafe(`DELETE FROM "${t}" WHERE "${fk.col}" = $1::uuid`, companyId);
+      }
       await q.$executeRawUnsafe("DELETE FROM sys_company WHERE id = $1::uuid AND tenant_id = $2::uuid", companyId, ctx.tenantId);
       await q.$executeRawUnsafe(
         `INSERT INTO sys_audit (id, tenant_id, object_id, record_id, action, user_id, changes, created_at)
@@ -99,6 +107,12 @@ export async function deleteCompanyWithData(ctx: Ctx, companyId: string, client:
     },
     { timeout: 180_000, maxWait: 20_000 },
   );
+  } catch (e) {
+    // chyba databáze → srozumitelná hláška (transakce se vrátila, firma zůstala celá)
+    if (e instanceof UserError) throw e;
+    const m = /table "([^"]+)"/.exec(e instanceof Error ? e.message : "");
+    throw new UserError("@SYS:DeleteCompanyBlocked", { tables: m?.[1] ?? "?" });
+  }
 
   // vzdálené úložiště (R2…) až po potvrzení transakce
   for (const f of files.filter((x) => x.storage !== "db")) {

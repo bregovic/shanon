@@ -45,12 +45,16 @@ describe("smazání firmy s daty", () => {
     expect(before).toBeGreaterThan(20);
     const aRows = await countCompanyRows(A.tenantId, String(A.companyId));
 
+    // člen virtuální společnosti (vazba na firmu jiným sloupcem než company_id)
+    const vc = await saveRecord(A, "sys.virtualCompany", null, { code: "SKUP", name: "Skupina" }, undefined, client);
+    await saveRecord(A, "sys.virtualMember", null, { virtualCompanyId: vc.id, memberCompanyId: b.id }, undefined, client);
+
     // vlastní firmu smazat nejde
     await expect(runAction(B, "sys.company", String(b.id), "deleteWithData", client)).rejects.toMatchObject({ label: "@SYS:DeleteCompanyCurrent" });
     // z ostré firmy: zkušební i se vším zmizí
     await runAction(A, "sys.company", String(b.id), "deleteWithData", client);
     expect(await countCompanyRows(A.tenantId, String(b.id))).toBe(0);
-    expect((await listRecords(A, "sys.company", {}, client)).rows.map((c) => c.code)).toEqual(["A"]);
+    expect((await listRecords(A, "sys.company", {}, client)).rows.filter((c) => !c.virtual).map((c) => c.code)).toEqual(["A"]);
     const refs = await client.$transaction(async (tx) => {
       await tx.$executeRawUnsafe("SET LOCAL ROLE shanon_app");
       await tx.$queryRawUnsafe("SELECT set_config('app.tenant_id', $1, true)", A.tenantId);
@@ -58,6 +62,7 @@ describe("smazání firmy s daty", () => {
     });
     expect(Number(refs[0].c)).toBe(0);
     expect(await client.sysUserCompany.count({ where: { companyId: String(b.id) } })).toBe(0);
+    expect((await listRecords(A, "sys.virtualMember", {}, client)).rows.filter((m) => m.memberCompanyId === b.id)).toEqual([]);
     // ostrá firma beze změny
     expect(await countCompanyRows(A.tenantId, String(A.companyId))).toBe(aRows);
   }, 180_000);
