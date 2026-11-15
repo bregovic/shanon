@@ -110,3 +110,55 @@ describe("deník: dimenze protiúčtu a poslední název deníku", () => {
     expect(rec2.journalNameId).toBeUndefined();
   }, 120_000);
 });
+
+describe("deník: výchozí dimenze a protiúčet", () => {
+  it("dimenze z dodavatele a účtu, do protiúčtu, změna účtu; výchozí hodnoty z názvu deníku; banka jako protiúčet", async () => {
+    const D = (await provisionTenant(client, { code: `t-jdd-${run}`, name: "JDD", adminEmail: `jdd-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "bank", "cash"], company: { code: "J", name: "J" } })).ctx;
+    const C = { ...D, dims: undefined };
+    const acc = async (n: string) => String((await listRecords(C, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
+    const dim = (await listRecords(C, "gl.dimension", {}, client)).rows.find((d) => Number(d.position) === 1)!;
+    for (const c of ["VYR", "ADM", "OBC"]) await saveRecord(C, "gl.dimensionValue", null, { dimensionId: dim.id, code: c, name: c }, undefined, client);
+    const a518 = await acc("518000");
+    const a548 = await acc("548000");
+    const a501 = await acc("501000");
+    const r518 = await getRecord(C, "gl.account", a518, client);
+    await saveRecord(C, "gl.account", a518, { ...r518, dim1: "VYR" }, undefined, client);
+    const subj = await saveRecord(C, "gab.subject", null, { name: "Dodavatel s dimenzí" }, undefined, client);
+    const grp = (await listRecords(C, "ap.group", {}, client)).rows[0];
+    const vendor = await saveRecord(C, "ap.vendor", null, { subjectId: subj.id, groupId: grp.id, dim1: "ADM" }, undefined, client);
+
+    const j = await saveRecord(C, "gl.journal", null, { date: "2026-11-15", description: "Výchozí dimenze" }, undefined, client);
+    const line = (v: Record<string, unknown>, id: string | null = null) => saveRecord(C, "gl.journalLine", id, { journalId: j.id, ...v }, undefined, client);
+    // dodavatel: dimenze z dodavatele, protiúčet 518 svou vlastní
+    const l1 = await line({ accountType: "vendor", vendorId: vendor.id, credit: "100", offsetType: "ledger", offsetAccountId: a518 });
+    expect([l1.dim1, l1.offsetDim1]).toEqual(["ADM", "VYR"]);
+    // účet 518 (VYR), protiúčet 548 bez dimenzí → jako účet
+    const l2 = await line({ accountType: "ledger", accountId: a518, debit: "50", offsetType: "ledger", offsetAccountId: a548 });
+    expect([l2.dim1, l2.offsetDim1]).toEqual(["VYR", "VYR"]);
+    // změna účtu na 548: výchozí VYR zmizí i z protiúčtu
+    const l2b = await line({ ...l2, accountId: a548 }, String(l2.id));
+    expect([l2b.dim1 ?? null, l2b.offsetDim1 ?? null]).toEqual([null, null]);
+    // ručně zadaná dimenze se změnou účtu nepřepíše
+    const l3 = await line({ accountType: "ledger", accountId: a548, debit: "10", dim1: "OBC", offsetType: "ledger", offsetAccountId: a501 });
+    const l3b = await line({ ...l3, accountId: a518 }, String(l3.id));
+    expect([l3b.dim1, l3b.offsetDim1]).toEqual(["OBC", "OBC"]);
+
+    // název deníku s výchozím protiúčtem a dimenzí → hlavička deníku → nový řádek
+    const jn = await saveRecord(C, "gl.journalName", null, { code: "REZIE", name: "Režie", journalType: "daily", voucherAllocation: "line", offsetType: "ledger", offsetAccountId: a548, dim1: "ADM" }, undefined, client);
+    const j2 = await saveRecord(C, "gl.journal", null, { journalNameId: jn.id, date: "2026-11-15", description: "Režie" }, undefined, client);
+    expect([j2.offsetType, j2.offsetAccountId, j2.dim1]).toEqual(["ledger", a548, "ADM"]);
+    const l4 = await saveRecord(C, "gl.journalLine", null, { journalId: j2.id, accountType: "ledger", accountId: a501, debit: "20" }, undefined, client);
+    expect([l4.offsetAccountId, l4.dim1, l4.offsetDim1]).toEqual([a548, "ADM", "ADM"]);
+    // účet s vlastní dimenzí má přednost před deníkem
+    const l5 = await saveRecord(C, "gl.journalLine", null, { journalId: j2.id, accountType: "ledger", accountId: a518, debit: "20" }, undefined, client);
+    expect(l5.dim1).toBe("VYR");
+
+    // bankovní deník: protiúčet = jediný bankovní účet firmy
+    const bank = await saveRecord(C, "bank.account", null, { code: "KB", name: "KB", glAccountId: await acc("221000") }, undefined, client);
+    const banka = (await listRecords(C, "gl.journalName", { filter: { code: "BANKA" } }, client)).rows[0];
+    expect(banka.offsetType).toBe("bank");
+    const j3 = await saveRecord(C, "gl.journal", null, { journalNameId: banka.id, date: "2026-11-15", description: "Výpis" }, undefined, client);
+    const l6 = await saveRecord(C, "gl.journalLine", null, { journalId: j3.id, accountType: "vendor", vendorId: vendor.id, debit: "100" }, undefined, client);
+    expect([l6.offsetType, l6.offsetBankAccountId, l6.dim1, l6.offsetDim1]).toEqual(["bank", bank.id, "ADM", "ADM"]);
+  }, 120_000);
+});
