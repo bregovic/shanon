@@ -232,6 +232,10 @@ export const dimensionHandlers: Record<string, ObjectHandlers> = {
             if (v.name !== d.name) await ctx.data.update("gl.dimensionValue", String(v.id), { name: d.name });
       }
     },
+    // smazání subjektu: jeho hodnoty dimenzí z adresáře pryč (zápisy drží kód hodnoty jako text)
+    async beforeDelete(ctx, d) {
+      for (const v of await ctx.data.find("gl.dimensionValue", { subjectId: d.id }, { take: 20 })) await ctx.data.remove("gl.dimensionValue", String(v.id));
+    },
   },
   "ap.vendor": { beforeSave: (ctx, d, isNew) => partnerDefaults(ctx.data, d, isNew) },
   "ar.customer": { beforeSave: (ctx, d, isNew) => partnerDefaults(ctx.data, d, isNew) },

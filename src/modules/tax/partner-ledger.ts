@@ -183,7 +183,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     advanceAmount: { edt: Edts.Amount, label: "@TAX:AdvanceDeducted", readOnly: true },
     emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
   };
-  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "description", "orderId", "advanceId"];
+  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "taxGroupId", "description", "orderId", "advanceId"];
   const invoice = defineObject({
     id: id("invoice"),
     table: `${m}_invoice`,
@@ -195,7 +195,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
     form: [
       { label: "@TAX:Header", fields: headerFields },
-      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs", "taxGroupId"] },
+      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs"] },
       { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "advanceAmount", "paidAmount", "status", "voucherId", ...(sp.side === 1 ? ["emailedAt"] : [])] },
     ],
     numberSeq: { field: "invoiceNum", seq: sp.invoiceSeq },
@@ -240,7 +240,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
     },
     titleField: "description",
-    list: ["itemId", "description", "qty", "unitId", "unitPrice", sp.lineAccountField, "itemTaxGroupId", "taxCodeId", ...DIM_NAMES, "amountNet", "taxAmount"],
+    list: ["itemId", "description", "qty", "unitId", "unitPrice", sp.lineAccountField, "taxGroupId", "itemTaxGroupId", "taxCodeId", ...DIM_NAMES, "amountNet", "taxAmount"],
     form: [
       { label: "@SYS:General", fields: ["invoiceId", "itemId", "description", "qty", "unitId", "unitPrice"] },
       { label: "@GL:Posting", fields: [sp.lineAccountField, "taxGroupId", "itemTaxGroupId", "taxCodeId", "amountNet", "taxAmount"] },

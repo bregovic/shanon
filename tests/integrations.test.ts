@@ -438,7 +438,7 @@ describe("finanční dimenze", () => {
   it("pravidla podle začátku účtu, povinná / nepovolená v deníku, partner z faktury, popisky", async () => {
     const D = (await provisionTenant(client, { code: `t-dim-${run}`, name: "Dim", adminEmail: `dim-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar"], company: { code: "D", name: "D" } })).ctx;
     const dims = (await listRecords(D, "gl.dimension", {}, client)).rows;
-    expect(dims.map((d) => [d.position, d.code, d.source])).toEqual([[1, "STR", "custom"], [2, "ZAK", "custom"], [3, "PAR", "partner"]]);
+    expect(dims.map((d) => [d.position, d.code, d.source])).toEqual([[1, "STR", "custom"], [2, "ZAK", "custom"], [3, "PAR", "subject"]]);
     const str = dims[0];
     await saveRecord(D, "gl.dimensionValue", null, { dimensionId: str.id, code: "prodejna", name: "Prodejna" }, undefined, client);
     // náklady (5) vyžadují středisko, účet 518100 ho naopak nepovoluje (nejdelší shoda)
@@ -461,7 +461,7 @@ describe("finanční dimenze", () => {
     const tr = (await listRecords(D, "gl.trans", { filter: { voucherId: String(posted.voucherId) } }, client)).rows;
     expect(tr.find((t) => t.accountId === a518.id)!.dim1).toBe("PRODEJNA");
 
-    // vydaná faktura: partner = číslo odběratele, doplní se sám na všech řádcích zápisu
+    // vydaná faktura: partner = hodnota z adresáře (P00001…) odběratele, doplní se sama na všech řádcích zápisu
     const grp = (await listRecords(D, "ar.group", {}, client)).rows[0];
     const subj = await saveRecord(D, "gab.subject", null, { name: "Restaurace" }, undefined, client);
     const cust = await saveRecord(D, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
@@ -470,7 +470,9 @@ describe("finanční dimenze", () => {
     await runAction(D, "ar.invoice", String(inv.id), "post", client);
     const v = (await getRecord(D, "ar.invoice", String(inv.id), client))!.voucherId;
     const lines = (await listRecords(D, "gl.trans", { filter: { voucherId: String(v) } }, client)).rows;
-    expect(lines.every((l) => l.dim3 === cust.accountNum)).toBe(true);
+    const custDim = (await getRecord(D, "ar.customer", String(cust.id), client))!.dim3;
+    expect(String(custDim)).toMatch(/^P\d{5}$/);
+    expect(lines.every((l) => l.dim3 === custDim)).toBe(true);
   });
 });
 
@@ -666,7 +668,10 @@ describe("výchozí dimenze a hodnoty z adresáře (CR-001)", () => {
     const E = (await provisionTenant(client, { code: `t-dd-${run}`, name: "DD", adminEmail: `dd-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap", "ar"], company: { code: "D", name: "D" } })).ctx;
     const dims = (await listRecords(E, "gl.dimension", {}, client)).rows;
     const par = dims.find((d) => d.code === "PAR")!;
-    // existující subjekt před přepnutím — doplní se akcí
+    // výchozí nastavení: partner je hned dimenze z adresáře (P00001…)
+    expect([par.source, par.valuePrefix, par.valueDigits]).toEqual(["subject", "P", 5]);
+    // starší firma s dimenzí „partner“: existující subjekt před přepnutím — doplní se akcí
+    await saveRecord(E, "gl.dimension", String(par.id), { ...par, source: "partner" }, undefined, client);
     const old = await saveRecord(E, "gab.subject", null, { name: "Starý dodavatel" }, undefined, client);
     await saveRecord(E, "gl.dimension", String(par.id), { source: "subject", valuePrefix: "P", valueDigits: 4, nextValue: 1 }, undefined, client);
     const s1 = await saveRecord(E, "gab.subject", null, { name: "Masna Novák" }, undefined, client);

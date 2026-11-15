@@ -45,6 +45,10 @@ export interface InvoiceConfig {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+/** hlavička faktury → původní skupina DPH (mezi beforeSave a afterSave) */
+const groupChanged = new Map<string, string | null>();
+/** datum jako RRRR-MM-DD (z DB může přijít Date) */
+const day = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : v ? String(v).slice(0, 10) : null);
 const addDays = (date: string, days: number) => {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -94,7 +98,19 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         const partnerGroup = await partnerTaxGroup(ctx.data, cfg.partnerObject, cfg.groupObject, data[cfg.partnerField]);
         const oldGroup = before && before[cfg.partnerField] !== data[cfg.partnerField] ? await partnerTaxGroup(ctx.data, cfg.partnerObject, cfg.groupObject, before[cfg.partnerField]) : undefined;
         if (!data.taxGroupId || (oldGroup !== undefined && data.taxGroupId === oldGroup)) data.taxGroupId = partnerGroup;
+        // jiná skupina DPH na hlavičce: řádky se starou skupinou ji po uložení převezmou (afterSave)
+        if (before && (before.taxGroupId ?? null) !== (data.taxGroupId ?? null)) groupChanged.set(String(data.id), (before.taxGroupId as string) ?? null);
+        else if (data.id) groupChanged.delete(String(data.id));
         if (!data.invoiceDate) data.invoiceDate = today();
+        // změna data vystavení: DUZP a splatnost ho následují, pokud je uživatel nezměnil ručně
+        // (DUZP = staré datum vystavení, splatnost = staré datum + dny splatnosti partnera / skupiny)
+        const days = Number(partner.paymentDays ?? group.paymentDays ?? 14);
+        const oldDate = day(before?.invoiceDate);
+        if (oldDate && oldDate !== day(data.invoiceDate)) {
+          if (day(data.taxDate) === oldDate) data.taxDate = null;
+          const samePartner = before![cfg.partnerField] === data[cfg.partnerField];
+          if (samePartner && day(data.dueDate) === addDays(oldDate, days)) data.dueDate = null;
+        }
         if (!data.taxDate) data.taxDate = data.invoiceDate;
         if (isNew && !data.currencyId) data.currencyId = partner.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
         // VS = číslice z čísla faktury (vydaná) / z čísla dodavatele (přijatá), nejvýš 10
@@ -102,10 +118,16 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
           const digits = String(data[cfg.vsSourceField]).replace(/\D/g, "").slice(-10);
           if (digits) data.vs = digits;
         }
-        if (!data.dueDate) {
-          const days = Number(partner.paymentDays ?? group.paymentDays ?? 14);
-          data.dueDate = addDays(String(data.invoiceDate), days);
-        }
+        if (!data.dueDate) data.dueDate = addDays(day(data.invoiceDate)!, days);
+      },
+      async afterSave(ctx, data) {
+        const key = String(data.id);
+        if (!groupChanged.has(key)) return;
+        const old = groupChanged.get(key) ?? null;
+        groupChanged.delete(key);
+        // kód z kombinace skupina × položka DPH se na řádku přepočítá, ručně zadaný zůstane
+        for (const l of await ctx.data.find(cfg.line, { [cfg.lineHeaderField]: data.id, taxGroupId: old }, { take: 1000 }))
+          await ctx.data.update(cfg.line, String(l.id), { taxGroupId: data.taxGroupId ?? null });
       },
       actions: {
         async post(ctx, header) {

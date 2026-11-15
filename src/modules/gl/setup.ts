@@ -183,15 +183,17 @@ export async function glSetup(data: DataApi): Promise<void> {
     if (!accountId && def) accountId = String((await data.create("gl.account", { accountNum: def[0], name: def[1], type: def[2], postingType: def[3] ?? null, noManualEntry: !!def[4] })).id);
     if (accountId) await data.create("gl.systemAccount", { postingType, accountId });
   }
-  // finanční dimenze (sdílené v tenantovi): středisko, zakázka, partner
+  // finanční dimenze: středisko, zakázka a partner — partner automaticky z adresáře
+  // (nový subjekt dostane hodnotu P00001…, jeho dodavatelé a odběratelé ji mají jako výchozí)
   for (const [code, name, position, source] of [
     ["STR", "Středisko", 1, "custom"],
     ["ZAK", "Zakázka", 2, "custom"],
-    ["PAR", "Partner", 3, "partner"],
+    ["PAR", "Partner", 3, "subject"],
   ] as const) {
     // jen chybějící kód na volném pořadí (tenant si mohl dimenze upravit)
     const taken = await data.find("gl.dimension", { position }, { take: 1 });
-    if (!taken.length && !(await data.find("gl.dimension", { code }, { take: 1 })).length) await data.create("gl.dimension", { code, name, position, source, active: true });
+    if (!taken.length && !(await data.find("gl.dimension", { code }, { take: 1 })).length)
+      await data.create("gl.dimension", { code, name, position, source, active: true, ...(source === "subject" ? { valuePrefix: "P", valueDigits: 5, nextValue: 1 } : {}) });
   }
   // názvy deníků podle druhu (jen chybějící kód; tenant si je pak upraví)
   // výchozí protiúčet: platby a banka → bankovní účet, pokladna → pokladna (konkrétní účet doplní

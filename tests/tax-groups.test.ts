@@ -54,7 +54,7 @@ describe("DPH přes skupiny", () => {
     ]);
 
     // vlastní kód položky (potraviny 12 %) má přednost před položkou DPH skupiny položek (Z21)
-    const ig = await one("inv.itemGroup", {});
+    const ig = await one("inv.itemGroup", { code: "ZBOZI" });
     expect(ig.itemTaxGroupId).toBe(await id("tax.itemTaxGroup", "Z21"));
     const food = await saveRecord(C, "inv.item", null, { itemNum: "SUN01", name: "Šunka", groupId: ig.id, unitId: (await one("inv.unit", { code: "KG" })).id, salesPrice: "100", taxCodeId: await id("tax.taxCode", "V12") }, undefined, client);
     const cs = await saveRecord(C, "gab.subject", null, { name: "Odběratel" }, undefined, client);

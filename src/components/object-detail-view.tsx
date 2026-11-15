@@ -578,7 +578,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             openLabel={p.labels.drawer.open}
             record={{ objectId: p.objectId, id: p.id, labels: p.labels.drawer.image }}
             // nový doklad s řádky: klik na předběžné číslo uloží hlavičku a otevře řádky
-            fieldAction={!p.id && p.titleField && p.lines.length === 0 && p.newLinesHint ? { name: p.titleField, hint: p.labels.header.saveOpen, onClick: () => save() } : undefined}
+            // jen předběžné číslo z řady (pole jen pro čtení) — ručně psaný kód (skupina položek) zůstane polem
+            fieldAction={!p.id && p.titleField && p.lines.length === 0 && p.newLinesHint && allFields.find((f) => f.name === p.titleField)?.readOnly ? { name: p.titleField, hint: p.labels.header.saveOpen, onClick: () => save() } : undefined}
             onChange={(name, value, t) => {
               const next = { ...values, [name]: value };
               pv.touch(name);

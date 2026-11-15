@@ -578,8 +578,8 @@ describe("položky a import", () => {
   it("výchozí jednotky, skupina, ceny s DPH i bez", async () => {
     const units = (await listRecords(I, "inv.unit", {}, client)).rows.map((r) => r.code);
     expect(units).toEqual(expect.arrayContaining(["KS", "KG", "BAL"]));
-    const [grp] = (await listRecords(I, "inv.itemGroup", {}, client)).rows;
-    expect(grp.code).toBe("ZBOZI");
+    const groups = (await listRecords(I, "inv.itemGroup", {}, client)).rows.map((r) => r.code);
+    expect(groups).toEqual(["SLUZBY", "ZBOZI"]);
     const v12 = (await listRecords(I, "tax.taxCode", { filter: { code: "V12" } }, client)).rows[0];
     await saveRecord(I, "inv.itemGroup", null, { code: "UZENINY", name: "Uzeniny", taxCodeId: v12.id }, undefined, client);
   });

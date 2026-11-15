@@ -206,6 +206,7 @@ const UNITS: [string, string, number][] = [
 const ACCOUNTS: [string, string, string][] = [
   ["504000", "Prodané zboží", "expense"],
   ["601000", "Tržby za vlastní výrobky", "revenue"],
+  ["602000", "Tržby z prodeje služeb", "revenue"],
 ];
 
 async function invSetup(data: DataApi) {
@@ -215,9 +216,9 @@ async function invSetup(data: DataApi) {
   if (!(await data.find("inv.unit", {}, { take: 1 })).length) {
     for (const [code, name, decimals] of UNITS) await data.create("inv.unit", { code, name, decimals });
   }
+  const acc = (n: string) => postingAccount(data, n);
+  const tax = async (c: string) => (await data.find("tax.taxCode", { code: c }, { take: 1 }))[0]?.id ?? null;
   if (!(await data.find("inv.itemGroup", {}, { take: 1 })).length) {
-    const acc = (n: string) => postingAccount(data, n);
-    const tax = async (c: string) => (await data.find("tax.taxCode", { code: c }, { take: 1 }))[0]?.id ?? null;
     await data.create("inv.itemGroup", {
       code: "ZBOZI",
       name: "Zboží",
@@ -225,6 +226,19 @@ async function invSetup(data: DataApi) {
       revenueAccountId: await acc("604"),
       purchaseTaxCodeId: await tax("P21"),
       costAccountId: await acc("504"),
+    });
+  }
+  // služby (i ve stávajících firmách): tržby 602, náklady 518, položka DPH Služby 21 % (EU / třetí země se liší od zboží)
+  if (!(await data.find("inv.itemGroup", { code: "SLUZBY" }, { take: 1 })).length) {
+    const s21 = (await data.find("tax.itemTaxGroup", { code: "S21" }, { take: 1 }))[0]?.id ?? null;
+    await data.create("inv.itemGroup", {
+      code: "SLUZBY",
+      name: "Služby",
+      itemTaxGroupId: s21,
+      taxCodeId: await tax("V21"),
+      revenueAccountId: await acc("602"),
+      purchaseTaxCodeId: await tax("P21"),
+      costAccountId: await acc("518"),
     });
   }
   // položka DPH skupin položek bez ní: podle sazby prodejního kódu (21 % → Z21, 12 % → Z12)
