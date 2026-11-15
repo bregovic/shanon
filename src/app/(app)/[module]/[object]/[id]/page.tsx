@@ -63,7 +63,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
   }
 
   const locked = !isNew && !!def.lockedWhen && record[def.lockedWhen.field] === def.lockedWhen.equals;
-  const readOnly = !!def.systemOnly || locked || !mayWrite;
+  const readOnly = (!!def.systemOnly && !def.userCorrect) || locked || !mayWrite;
   const recordTitle = isNew ? `${t("@SYS:New")} · ${t(def.label)}` : String(record[def.titleField] ?? t(def.label));
   const mod = registry.modules.get(module)!;
 

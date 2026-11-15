@@ -193,7 +193,14 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     amountNet: { edt: Edts.Amount, label: "@TAX:AmountNet", readOnly: true },
     taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
     /** zaokrouhlení celkové částky podle měny (Zaokrouhlení faktur), mimo základ DPH */
-    roundingAmount: { edt: Edts.Amount, label: "@TAX:Rounding", readOnly: true },
+    roundingAmount: { edt: Edts.Amount, label: "@TAX:Rounding", readOnly: sp.side !== 1 },
+    // vydaná: náš účet pro platbu (výchozí účet měny faktury) a způsob úhrady (z odběratele) → tisk
+    ...(sp.side === 1
+      ? {
+          bankAccountId: { edt: refEdt("bank.account", "@TAX:OurBankAccount"), optionalRef: true },
+          paymentMethodId: { edt: refEdt("bank.paymentMethod", "@TAX:PaymentMethod"), optionalRef: true },
+        }
+      : {}),
     amountGross: { edt: Edts.Amount, label: "@TAX:AmountGross", readOnly: true },
     paidAmount: { edt: Edts.Amount, label: "@TAX:PaidAmount", readOnly: true },
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
@@ -216,7 +223,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
     form: [
       { label: "@TAX:Header", fields: headerFields },
-      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs"] },
+      { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs", ...(sp.side === 1 ? ["bankAccountId", "paymentMethodId"] : [])] },
       { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "roundingAmount", "amountGross", "advanceAmount", "paidAmount", "status", "voucherId", ...(sp.side === 1 ? ["emailedAt"] : [])] },
     ],
     numberSeq: { field: "invoiceNum", seq: sp.invoiceSeq },

@@ -37,6 +37,14 @@ Po změně data vystavení se posune i DUZP a splatnost. Splatnost se počítá 
 
 Skupina DPH se doplní z odběratele (jinak ze skupiny odběratelů) a je v hlavičce faktury. Kód DPH řádku vznikne z kombinace skupiny DPH a položky DPH (z položky, skupiny položek nebo účtu). Po změně skupiny na hlavičce se řádky přepočítají, ručně zadaný kód zůstane.
 
+## Účet pro platbu a způsob úhrady
+
+Na faktuře je **Účet pro platbu** (výchozí bankovní účet pro měnu faktury, Banka → Bankovní účty → Výchozí pro měnu) a **Platební metoda** (z odběratele). Obojí jde změnit a vytiskne se na faktuře.
+
+## Zaokrouhlení
+
+Celková částka se zaokrouhlí podle měny (Kč na celé koruny, Správa systému → Měny → Zaokrouhlení faktur). Zaokrouhlení jde na faktuře přepsat; ručně změněné zůstane i po úpravě řádků.
+
 ## Měna
 
 Faktura je v měně odběratele, jinak v účetní měně. Cena položky v jiné měně se přepočte kurzem ČNB k datu faktury. Po změně měny na hlavičce se přepočtou ceny řádků, které přišly z položky.

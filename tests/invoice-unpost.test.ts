@@ -40,9 +40,18 @@ describe("zrušit zaúčtování faktury", () => {
     const again = (await getRecord(T, "ar.invoice", String(inv.id), client))!;
     expect([again.status, again.amountNet]).toEqual(["posted", "1200.00"]);
 
+    // oprava daňové transakce: DIČ a DUZP jdou změnit, ostatní pole ne
+    const [tt] = (await listRecords(T, "tax.trans", { filter: { voucherId: String(again.voucherId) } }, client)).rows;
+    await saveRecord(T, "tax.trans", String(tt.id), { ...tt, vatId: "CZ12345678", taxDate: "2026-10-20", tax: "1" }, undefined, client);
+    const fixed = (await getRecord(T, "tax.trans", String(tt.id), client))!;
+    expect([fixed.vatId, String(fixed.taxDate).slice(0, 10), fixed.tax]).toEqual(["CZ12345678", "2026-10-20", tt.tax]);
+    await expect(saveRecord(T, "tax.trans", null, { taxDate: "2026-10-20", taxCodeId: tt.taxCodeId, direction: "output", base: "1", tax: "1" }, undefined, client)).rejects.toBeTruthy();
+
     // podané přiznání za říjen → zrušit nejde
     await inTenant(T, (x) => x.sys().api().create("tax.return", { kind: "dp3", year: 2026, month: 10, period: "2026-10", status: "filed" }), client);
     await expect(runAction(T, "ar.invoice", String(inv.id), "unpost", client)).rejects.toMatchObject({ label: "@TAX:UnpostFiled" });
+    // a transakci podaného období opravit nejde
+    await expect(saveRecord(T, "tax.trans", String(tt.id), { ...fixed, vatId: "CZ87654321" }, undefined, client)).rejects.toMatchObject({ label: "@TAX:TransFiled" });
   }, 120_000);
 
   it("účtenka v přijatých fakturách: bez čísla dokladu dodavatele, DPH jako zjednodušený doklad", async () => {

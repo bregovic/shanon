@@ -84,9 +84,12 @@ export async function recalcHeader(data: DataApi, cfg: InvoiceConfig, headerId: 
   let rounding = BigInt(0);
   if (h && "roundingAmount" in h && lines.length) {
     const r = await currencyRounding(data, (h.currencyId as string) ?? (await accountingCurrencyId(data, data.companyId ?? null)));
-    const rounded = roundCents(gross, r.invoiceUnit, "nearest");
-    rounding = rounded - gross;
-    gross = rounded;
+    const propose = (raw: bigint) => roundCents(raw, r.invoiceUnit, "nearest") - raw;
+    // dosavadní zaokrouhlení = návrh k předchozím částkám? pak nový návrh, jinak ho uživatel změnil ručně a zůstane
+    const prevRaw = toCents(h.amountNet ?? "0") + toCents(h.taxAmount ?? "0");
+    const prev = h.roundingAmount === null || h.roundingAmount === undefined ? null : toCents(h.roundingAmount);
+    rounding = prev === null || prev === propose(prevRaw) ? propose(gross) : prev;
+    gross += rounding;
   }
   await data.update(cfg.header, headerId, {
     amountNet: fromCents(net),
@@ -139,6 +142,22 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
           if (digits) data.vs = digits;
         }
         if (!data.dueDate) data.dueDate = addDays(day(data.invoiceDate)!, days);
+        // vydaná: náš bankovní účet (výchozí pro měnu faktury) a způsob úhrady z odběratele
+        if (cfg.side === 1 && ctx.modules?.has("bank")) {
+          if (!data.paymentMethodId && partner.paymentMethodId) data.paymentMethodId = partner.paymentMethodId;
+          const base = await accountingCurrencyId(ctx.data, ctx.companyId);
+          const cur = (data.currencyId as string) || base;
+          const curOf = (a: RecordData | null) => (a ? (a.currencyId as string) || base : null);
+          const current = data.bankAccountId ? await ctx.data.get("bank.account", String(data.bankAccountId)) : null;
+          if (!current || curOf(current) !== cur) {
+            const accs = (await ctx.data.find("bank.account", { blocked: false }, { take: 50, orderBy: { code: "asc" } })).filter((a) => curOf(a) === cur);
+            data.bankAccountId = (accs.find((a) => a.isDefault) ?? accs[0])?.id ?? null;
+          }
+        }
+        // ručně změněné zaokrouhlení: celkem = základ + DPH + zaokrouhlení
+        if (cfg.side === 1 && before && String(before.roundingAmount ?? "") !== String(data.roundingAmount ?? "")) {
+          data.amountGross = fromCents(toCents(data.amountNet ?? "0") + toCents(data.taxAmount ?? "0") + toCents(data.roundingAmount ?? "0"));
+        }
         // číslo faktury už existuje (přijatá: u téhož dodavatele) — podle parametrů přijmout / varovat / odmítnout
         const num = data[cfg.docNumField];
         if (cfg.parameters && num && (!before || before[cfg.docNumField] !== num || day(before.invoiceDate) !== day(data.invoiceDate))) {

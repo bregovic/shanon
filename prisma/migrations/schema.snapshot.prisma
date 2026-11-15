@@ -2133,51 +2133,57 @@ model ArOrderLine {
 
 /// ar.invoice — generováno z definice objektu
 model ArInvoice {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
-  companyId      String    @map("company_id") @db.Uuid
-  invoiceNum     String    @map("invoice_num") @db.VarChar(20)
-  customerId     String    @map("customer_id") @db.Uuid
-  invoiceDate    DateTime  @default(now()) @map("invoice_date") @db.Date
-  taxDate        DateTime? @map("tax_date") @db.Date
-  dueDate        DateTime? @map("due_date") @db.Date
-  currencyId     String?   @map("currency_id") @db.Uuid
-  taxGroupId     String?   @map("tax_group_id") @db.Uuid
-  vs             String?   @db.VarChar(10)
-  description    String?   @db.VarChar(255)
-  amountNet      Decimal?  @map("amount_net") @db.Decimal(18, 2)
-  taxAmount      Decimal?  @map("tax_amount") @db.Decimal(18, 2)
-  roundingAmount Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
-  amountGross    Decimal?  @map("amount_gross") @db.Decimal(18, 2)
-  paidAmount     Decimal?  @map("paid_amount") @db.Decimal(18, 2)
-  status         String    @default("draft") @db.VarChar(40)
-  voucherId      String?   @map("voucher_id") @db.Uuid
-  orderId        String?   @map("order_id") @db.Uuid
-  advanceId      String?   @map("advance_id") @db.Uuid
-  advanceAmount  Decimal?  @map("advance_amount") @db.Decimal(18, 2)
-  emailedAt      DateTime? @map("emailed_at")
-  ext            Json      @default("{}")
-  version        Int       @default(1)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  createdBy      String?   @map("created_by") @db.Uuid
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy      String?   @map("updated_by") @db.Uuid
+  id              String    @id @default(uuid(7)) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  invoiceNum      String    @map("invoice_num") @db.VarChar(20)
+  customerId      String    @map("customer_id") @db.Uuid
+  invoiceDate     DateTime  @default(now()) @map("invoice_date") @db.Date
+  taxDate         DateTime? @map("tax_date") @db.Date
+  dueDate         DateTime? @map("due_date") @db.Date
+  currencyId      String?   @map("currency_id") @db.Uuid
+  taxGroupId      String?   @map("tax_group_id") @db.Uuid
+  vs              String?   @db.VarChar(10)
+  description     String?   @db.VarChar(255)
+  amountNet       Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount       Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  roundingAmount  Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
+  bankAccountId   String?   @map("bank_account_id") @db.Uuid
+  paymentMethodId String?   @map("payment_method_id") @db.Uuid
+  amountGross     Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  paidAmount      Decimal?  @map("paid_amount") @db.Decimal(18, 2)
+  status          String    @default("draft") @db.VarChar(40)
+  voucherId       String?   @map("voucher_id") @db.Uuid
+  orderId         String?   @map("order_id") @db.Uuid
+  advanceId       String?   @map("advance_id") @db.Uuid
+  advanceAmount   Decimal?  @map("advance_amount") @db.Decimal(18, 2)
+  emailedAt       DateTime? @map("emailed_at")
+  ext             Json      @default("{}")
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  createdBy       String?   @map("created_by") @db.Uuid
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?   @map("updated_by") @db.Uuid
 
-  company               SysCompany      @relation("ArInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
-  customer              ArCustomer      @relation("ArInvoice_customer", fields: [customerId], references: [id], onDelete: Restrict)
-  currency              SysCurrency?    @relation("ArInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  taxGroup              TaxGroup?       @relation("ArInvoice_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  voucher               GlVoucher?      @relation("ArInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
-  order                 ArOrder?        @relation("ArInvoice_order", fields: [orderId], references: [id], onDelete: Restrict)
-  advance               ArAdvance?      @relation("ArInvoice_advance", fields: [advanceId], references: [id], onDelete: Restrict)
-  arOrder_invoice       ArOrder[]       @relation("ArOrder_invoice")
-  arInvoiceLine_invoice ArInvoiceLine[] @relation("ArInvoiceLine_invoice")
-  arTrans_invoice       ArTrans[]       @relation("ArTrans_invoice")
+  company               SysCompany         @relation("ArInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
+  customer              ArCustomer         @relation("ArInvoice_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  currency              SysCurrency?       @relation("ArInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxGroup              TaxGroup?          @relation("ArInvoice_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  bankAccount           BankAccount?       @relation("ArInvoice_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  paymentMethod         BankPaymentMethod? @relation("ArInvoice_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  voucher               GlVoucher?         @relation("ArInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  order                 ArOrder?           @relation("ArInvoice_order", fields: [orderId], references: [id], onDelete: Restrict)
+  advance               ArAdvance?         @relation("ArInvoice_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  arOrder_invoice       ArOrder[]          @relation("ArOrder_invoice")
+  arInvoiceLine_invoice ArInvoiceLine[]    @relation("ArInvoiceLine_invoice")
+  arTrans_invoice       ArTrans[]          @relation("ArTrans_invoice")
 
   @@index([tenantId, companyId])
   @@index([customerId])
   @@index([currencyId])
   @@index([taxGroupId])
+  @@index([bankAccountId])
+  @@index([paymentMethodId])
   @@index([voucherId])
   @@index([orderId])
   @@index([advanceId])
@@ -2824,6 +2830,7 @@ model BankAccount {
   glJournal_offsetBankAccount     GlJournal[]          @relation("GlJournal_offsetBankAccount")
   glJournalLine_bankAccount       GlJournalLine[]      @relation("GlJournalLine_bankAccount")
   glJournalLine_offsetBankAccount GlJournalLine[]      @relation("GlJournalLine_offsetBankAccount")
+  arInvoice_bankAccount           ArInvoice[]          @relation("ArInvoice_bankAccount")
   bankAccountMethod_bankAccount   BankAccountMethod[]  @relation("BankAccountMethod_bankAccount")
   bankStatement_bankAccount       BankStatement[]      @relation("BankStatement_bankAccount")
   bankPaymentMethod_bankAccount   BankPaymentMethod[]  @relation("BankPaymentMethod_bankAccount")
@@ -3032,6 +3039,7 @@ model BankPaymentMethod {
   bankAccount                     BankAccount?        @relation("BankPaymentMethod_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
   transformation                  SysTransformation?  @relation("BankPaymentMethod_transformation", fields: [transformationId], references: [id], onDelete: Restrict)
   arCustomer_paymentMethod        ArCustomer[]        @relation("ArCustomer_paymentMethod")
+  arInvoice_paymentMethod         ArInvoice[]         @relation("ArInvoice_paymentMethod")
   apVendor_paymentMethod          ApVendor[]          @relation("ApVendor_paymentMethod")
   bankAccountMethod_paymentMethod BankAccountMethod[] @relation("BankAccountMethod_paymentMethod")
   bankPaymentOrder_paymentMethod  BankPaymentOrder[]  @relation("BankPaymentOrder_paymentMethod")

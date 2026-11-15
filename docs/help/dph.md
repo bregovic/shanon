@@ -72,3 +72,7 @@ Závazek je uhrazený, jakmile platbu z bankovního výpisu spáruje banka (VS =
 ## Daň z příjmů
 
 Druh **Daň z příjmů** je připravený; výpočet a podání doplníme.
+
+## Oprava daňové transakce
+
+V **Daňových transakcích** jde u transakce opravit **DUZP**, **DIČ partnera** a **číslo dokladu** (ostatní údaje vznikají zaúčtováním dokladu). Transakci, která patří do podaného přiznání nebo kontrolního hlášení (původní i nové DUZP), opravit nejde — tu opravte dodatečným podáním.

@@ -75,10 +75,14 @@ async function paymentAccount(data: DataApi, org: RecordData | null, currencyId?
   return { bankAccount: "", iban: "", swift: "" };
 }
 
-async function companyData(data: DataApi, companyId: string | null, currencyId?: string | null) {
+async function companyData(data: DataApi, companyId: string | null, currencyId?: string | null, bankAccountId?: string | null) {
   const org = (await orgOf(data)) as RecordData | null;
   const company = companyId ? await data.get("sys.company", companyId) : null;
-  const pay = await paymentAccount(data, org, currencyId);
+  // účet zvolený na dokladu má přednost
+  const chosen = bankAccountId ? await data.get("bank.account", bankAccountId).catch(() => null) : null;
+  const pay = chosen
+    ? { bankAccount: (chosen.accountNum as string) ?? "", iban: (chosen.iban as string) || czIban(chosen.accountNum as string) || "", swift: bicOf((chosen.iban as string) || czIban(chosen.accountNum as string) || "", (chosen.accountNum as string) ?? "") }
+    : await paymentAccount(data, org, currencyId);
   const iban = pay.iban || null;
   return {
     name: String(org?.legalName ?? company?.name ?? ""),
@@ -123,8 +127,11 @@ async function paymentQr(data: DataApi, p: Parameters<typeof spayd>[0]): Promise
 async function invoiceDataset(data: DataApi, companyId: string | null, id: string) {
   const inv = await data.get("ar.invoice", id);
   if (!inv) throw new Error("not found");
-  const company = await companyData(data, companyId, (inv.currencyId as string) ?? null);
+  const company = await companyData(data, companyId, (inv.currencyId as string) ?? null, (inv.bankAccountId as string) ?? null);
   const cust = await data.get("ar.customer", String(inv.customerId));
+  // způsob úhrady: platební metoda faktury (převodem / hotově / kartou), jinak převodem
+  const method = inv.paymentMethodId ? await data.get("bank.paymentMethod", String(inv.paymentMethodId)).catch(() => null) : null;
+  const paymentMethod = method?.kind === "cash" ? "hotově" : method?.kind === "card" ? "kartou" : method?.code === "QR" ? "převodem (QR)" : "převodem";
   const subj = cust ? await data.get("gab.subject", String(cust.subjectId)) : null;
   const [addr] = subj ? await data.find("gab.address", { subjectId: subj.id }, { take: 1 }) : [];
   const cur = inv.currencyId ? await data.get("sys.currency", String(inv.currencyId)) : null;
@@ -185,6 +192,7 @@ async function invoiceDataset(data: DataApi, companyId: string | null, id: strin
       currency,
       /** označení měny pro tisk (CZK → Kč) */
       currencySymbol: currency === "CZK" ? "Kč" : currency,
+      paymentMethod,
       rounding: inv.roundingAmount ?? "0.00",
       /** cizí měna: kurz ČNB k DUZP, DPH a celkem v Kč */
       fx: fx ? "1" : "",
@@ -221,10 +229,105 @@ const MUTED = "#6b7280";
 const PANEL = "#f3f5f8";
 
 /**
- * Výchozí faktura (v5): číslo dokladu výrazně, nadpis střídmě; účet a VS seskupené a zvýrazněné; vzdušná tabulka
+ * Výchozí faktura (v6): číslo dokladu výrazně, nadpis střídmě; účet a VS seskupené a zvýrazněné; vzdušná tabulka
  * (Bez DPH / S DPH); rekapitulace a částka k úhradě hned pod tabulkou (delší tabulka je posune); větší QR.
  */
 function invoiceLayout(): PrintLayout {
+  const H = (id: string, x: number, y: number, w: number, text: string, color = MUTED) => T(id, x, y, w, 5, text, { size: 7, bold: true, color });
+  return {
+    paper: "a4",
+    fontSize: 9,
+    elements: [
+      { id: "band", type: "rect", x: 0, y: 0, w: 210, h: 3, style: { fill: ACCENT, color: ACCENT } },
+      { id: "logo", type: "image", x: 15, y: 11, w: 55, h: 20, field: "company.logo" },
+      T("title", 105, 12, 90, 5, "FAKTURA – DAŇOVÝ DOKLAD", { size: 8, bold: true, align: "right", color: MUTED }),
+      T("num", 105, 17, 90, 10, "{doc.number}", { size: 18, bold: true, align: "right", color: INK }),
+      // dodavatel
+      H("supH", 15, 37, 85, "DODAVATEL"),
+      T("supN", 15, 42, 85, 5, "{company.name}", { size: 10, bold: true, color: INK }),
+      T("supA", 15, 47, 85, 9, "{company.address}", { size: 9, color: INK }),
+      T("supL", 15, 56, 12, 9, "IČO:\nDIČ:", { size: 9, color: MUTED }),
+      T("supV", 27, 56, 73, 9, "{company.regNo}\n{company.vatId}", { size: 9, color: INK }),
+      T("supR", 15, 65, 85, 5, "{company.registration}", { size: 7.5, color: MUTED }),
+      // odběratel
+      { id: "custBox", type: "rect", x: 106, y: 35, w: 89, h: 35, style: { fill: PANEL, color: PANEL } },
+      H("custH", 110, 37, 82, "ODBĚRATEL"),
+      T("custN", 110, 42, 82, 5, "{partner.name}", { size: 10, bold: true, color: INK }),
+      T("custA", 110, 47, 82, 9, "{partner.address}", { size: 9, color: INK }),
+      T("custL", 110, 56, 12, 9, "IČO:\nDIČ:", { size: 9, color: MUTED }),
+      T("custV", 122, 56, 70, 9, "{partner.regNo}\n{partner.vatId}", { size: 9, color: INK }),
+      // data dokladu
+      H("k1h", 15, 76, 42, "DATUM VYSTAVENÍ"),
+      T("k1", 15, 81, 42, 6, "{doc.date:date}", { size: 10, color: INK }),
+      H("k2h", 60, 76, 42, "DATUM ZDAN. PLNĚNÍ"),
+      T("k2", 60, 81, 42, 6, "{doc.taxDate:date}", { size: 10, color: INK }),
+      H("k3h", 106, 76, 42, "DATUM SPLATNOSTI"),
+      T("k3", 106, 81, 42, 6, "{doc.dueDate:date}", { size: 10, bold: true, color: ACCENT }),
+      H("k4h", 152, 76, 43, "ZPŮSOB ÚHRADY"),
+      T("k4", 152, 81, 43, 6, "{doc.paymentMethod}", { size: 10, color: INK }),
+      // platební údaje pohromadě a výrazně (ruční platba)
+      { id: "payBox", type: "rect", x: 15, y: 90, w: 180, h: 17, style: { fill: PANEL, color: PANEL } },
+      H("payH", 19, 92, 80, "BANKOVNÍ ÚČET"),
+      T("pay", 19, 97, 80, 6, "{company.bankAccount}", { size: 12, bold: true, color: INK }),
+      T("iban", 19, 103, 85, 4, "IBAN {company.iban}   SWIFT {company.swift}", { size: 7, color: MUTED }),
+      H("vsH", 106, 92, 45, "VARIABILNÍ SYMBOL"),
+      T("vs", 106, 97, 45, 6, "{doc.vs}", { size: 12, bold: true, color: INK }),
+      T("desc", 15, 111, 180, 6, "{doc.description}", { italic: true, color: INK }),
+      {
+        id: "lines",
+        type: "table",
+        x: 15,
+        y: 118,
+        w: 180,
+        // tabulka do 44 mm; delší posune rekapitulaci a souhrn níž (případně na další stranu)
+        h: 44,
+        style: { fill: ACCENT, color: "#ffffff", size: 9, rowPad: 1.8 },
+        columns: [
+          { field: "description", label: "Položka", width: 62 },
+          { field: "qty", label: "Množství", width: 22, align: "right", format: "qty" },
+          { field: "unit", label: "MJ", width: 12 },
+          { field: "unitPrice", label: "Cena za MJ", width: 22, align: "right", format: "money" },
+          { field: "rate", label: "DPH", width: 12, align: "right", format: "percent" },
+          { field: "net", label: "Bez DPH", width: 25, align: "right", format: "money" },
+          { field: "gross", label: "S DPH", width: 25, align: "right", format: "money" },
+        ],
+      },
+      // souhrn hned pod tabulkou
+      H("vatH", 15, 168, 90, "REKAPITULACE DPH"),
+      {
+        id: "vat",
+        type: "vat",
+        x: 15,
+        y: 173,
+        w: 90,
+        h: 20,
+        style: { fill: PANEL, size: 8, rowPad: 1 },
+        columns: [
+          { field: "rate", label: "Sazba", width: 18, align: "right", format: "percent" },
+          { field: "base", label: "Bez DPH", width: 24, align: "right", format: "money" },
+          { field: "tax", label: "DPH", width: 22, align: "right", format: "money" },
+          { field: "gross", label: "S DPH", width: 26, align: "right", format: "money" },
+        ],
+      },
+      { id: "totBox", type: "rect", x: 118, y: 168, w: 77, h: 21, style: { fill: ACCENT, color: ACCENT } },
+      T("totH", 121, 170, 71, 5, "K ÚHRADĚ", { size: 7.5, bold: true, color: "#dbe7f3", align: "right" }),
+      T("tot", 121, 175, 71, 9, "{doc.due:money} {doc.currencySymbol}", { size: 17, bold: true, color: "#ffffff", align: "right" }),
+      T("totS", 121, 183, 71, 5, "včetně DPH", { size: 7.5, color: "#dbe7f3", align: "right" }),
+      // zaokrouhlení (Kč na celé koruny) a u cizí měny přepočet do Kč kurzem ČNB k DUZP (§ 29 ZDPH)
+      { ...T("rnd", 15, 196, 90, 5, "Zaokrouhlení: {doc.rounding:money} {doc.currencySymbol}", { size: 8, color: MUTED }), showIf: "doc.rounding" },
+      { ...T("fxH", 15, 202, 90, 5, "PŘEPOČET DO CZK", { size: 7, bold: true, color: MUTED }), showIf: "doc.fx" },
+      { ...T("fx", 15, 207, 90, 14, "Kurz ČNB k DUZP: {doc.fxRate}\n{doc.fxVat}\nCelkem s DPH: {doc.fxGross} CZK", { size: 8, color: INK }), showIf: "doc.fx" },
+      { id: "qr", type: "qr", x: 159, y: 194, w: 36, h: 36, field: "qr" },
+      // popisek jen s QR kódem (transformace QR platba zapnutá, účet, nezaplaceno)
+      { ...T("qrT", 118, 208, 38, 8, "QR platba", { size: 8, bold: true, align: "right", color: MUTED }), showIf: "qr" },
+      { id: "footLine", type: "line", x: 15, y: 284, w: 180, h: 1, style: { color: "#d1d5db" } },
+      T("foot", 15, 286, 180, 5, "{company.email}   {company.phone}   {company.web}", { size: 7.5, color: MUTED, align: "center" }),
+    ],
+  };
+}
+
+/** Rozvržení v5 (15. 11. 2026, způsob úhrady napevno „převodem“). */
+export function invoiceLayoutV5(): PrintLayout {
   const H = (id: string, x: number, y: number, w: number, text: string, color = MUTED) => T(id, x, y, w, 5, text, { size: 7, bold: true, color });
   return {
     paper: "a4",
@@ -317,6 +420,7 @@ function invoiceLayout(): PrintLayout {
     ],
   };
 }
+
 
 /** Rozvržení v4 (15. 11. 2026, podle zpětné vazby, bez přepočtu do Kč). */
 export function invoiceLayoutV4(): PrintLayout {
@@ -727,6 +831,7 @@ export const invoicePrintable: PrintableDef = {
     { path: "doc.currency", label: "@PRT:Currency" },
     { path: "doc.currencySymbol", label: "@PRT:CurrencySymbol" },
     { path: "doc.rounding", label: "@PRT:Rounding" },
+    { path: "doc.paymentMethod", label: "@PRT:Payment" },
     { path: "doc.fxRate", label: "@PRT:FxRate" },
     { path: "doc.fxVat", label: "@PRT:FxVat" },
     { path: "doc.fxGross", label: "@PRT:FxGross" },
@@ -758,7 +863,7 @@ export const invoicePrintable: PrintableDef = {
     return [{ name: x.name, mime: "application/xml", data: x.xml }];
   },
   defaultLayout: invoiceLayout,
-  legacyLayouts: [legacyInvoiceLayout(), invoiceLayoutV1(), invoiceLayoutV2(), invoiceLayoutV3(), invoiceLayoutV4()],
+  legacyLayouts: [legacyInvoiceLayout(), invoiceLayoutV1(), invoiceLayoutV2(), invoiceLayoutV3(), invoiceLayoutV4(), invoiceLayoutV5()],
 };
 
 // ---------------------------------------------------------------------------

@@ -390,7 +390,34 @@ async function subject(data: DataApi, companyId: string | null): Promise<Subject
   return { company, params };
 }
 
+/** Je DUZP v období podaného přiznání nebo kontrolního hlášení? (měsíc, případně čtvrtletí) */
+export async function filedPeriodOf(data: DataApi, date: unknown): Promise<string | null> {
+  const d = (date instanceof Date ? date.toISOString() : String(date ?? "")).slice(0, 10);
+  if (!/^\d{4}-\d{2}/.test(d)) return null;
+  const year = Number(d.slice(0, 4));
+  const month = Number(d.slice(5, 7));
+  const filed = await data.find("tax.return", { year, status: "filed" }, { take: 100 });
+  const hit = filed.find((r) => (r.kind === "dp3" || r.kind === "kh") && (Number(r.month) === month || (!r.month && Number(r.quarter) === Math.ceil(month / 3))));
+  return hit ? `${String(month).padStart(2, "0")}/${year}` : null;
+}
+
 export const vatReturnHandlers: Record<string, ObjectHandlers> = {
+  // oprava daňové transakce (DUZP, DIČ, číslo dokladu) jen mimo podané období — původní i nové DUZP
+  "tax.trans": {
+    async beforeSave(ctx, d, isNew) {
+      if (isNew || !d.id) return;
+      const before = await ctx.data.get("tax.trans", String(d.id));
+      if (!before) return;
+      const day = (v: unknown) => (v instanceof Date ? v.toISOString() : String(v ?? "")).slice(0, 10);
+      const changed = day(before.taxDate) !== day(d.taxDate) || (before.vatId ?? null) !== (d.vatId ?? null) || (before.documentNum ?? null) !== (d.documentNum ?? null);
+      if (!changed) return;
+      for (const date of [before.taxDate, d.taxDate]) {
+        const period = await filedPeriodOf(ctx.data, date);
+        if (period) throw new UserError("@TAX:TransFiled", { period });
+      }
+      if (d.vatId) d.vatId = String(d.vatId).replace(/\s/g, "").toUpperCase();
+    },
+  },
   "tax.parameters": {
     async beforeSave(ctx, data, isNew) {
       if (isNew && (await ctx.data.find("tax.parameters", {}, { take: 1 })).length) throw new UserError("@TAX:OneParameters");

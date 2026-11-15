@@ -30,6 +30,27 @@ describe("výchozí bankovní účet podle měny", () => {
     };
     expect(await acc(eur.id)).toBe(e2.accountNum);
     expect(await acc(null)).toBe("123456789/0100");
+    // účet a metoda přímo na faktuře: EUR faktura dostane výchozí eurový účet, metoda z odběratele
+    const [qr] = (await listRecords(T, "bank.paymentMethod", { filter: { code: "QR" } }, client)).rows;
+    await saveRecord(T, "ar.customer", String(cust.id), { ...(await getRecord(T, "ar.customer", String(cust.id), client))!, paymentMethodId: qr.id }, undefined, client);
+    const fe = await saveRecord(T, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-06", currencyId: eur.id }, undefined, client);
+    expect([fe.bankAccountId, fe.paymentMethodId]).toEqual([e2.id, qr.id]);
+    // ručně jiný účet → vytiskne se ten
+    await saveRecord(T, "ar.invoice", String(fe.id), { ...fe, bankAccountId: e1.id }, undefined, client);
+    await saveRecord(T, "ar.invoiceLine", null, { invoiceId: fe.id, description: "Služba", qty: "1", unitPrice: "100" }, undefined, client);
+    const d = (await printJob(T, "ar.invoice", String(fe.id), null, client)).data as { company: { bankAccount: string }; doc: { paymentMethod: string } };
+    expect([d.company.bankAccount, d.doc.paymentMethod]).toEqual(["1111111111/2010", "převodem (QR)"]);
+    // zaokrouhlení: návrh podle měny (Kč na koruny), ruční změna zůstane i po změně řádků
+    const fc = await saveRecord(T, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-06" }, undefined, client);
+    await saveRecord(T, "ar.invoiceLine", null, { invoiceId: fc.id, description: "A", qty: "1", unitPrice: "99.99" }, undefined, client);
+    let h = (await getRecord(T, "ar.invoice", String(fc.id), client))!;
+    expect([h.roundingAmount, h.amountGross]).toEqual(["0.01", "121.00"]);
+    await saveRecord(T, "ar.invoice", String(fc.id), { ...h, roundingAmount: "0.00" }, undefined, client);
+    h = (await getRecord(T, "ar.invoice", String(fc.id), client))!;
+    expect([h.roundingAmount, h.amountGross]).toEqual(["0.00", "120.99"]);
+    await saveRecord(T, "ar.invoiceLine", null, { invoiceId: fc.id, description: "B", qty: "1", unitPrice: "10" }, undefined, client);
+    h = (await getRecord(T, "ar.invoice", String(fc.id), client))!;
+    expect([h.roundingAmount, h.amountGross]).toEqual(["0.00", "133.09"]);
   }, 120_000);
 
   it("jméno fyzické osoby bez titulů", () => {

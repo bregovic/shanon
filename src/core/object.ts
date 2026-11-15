@@ -102,6 +102,8 @@ export interface ObjectDef {
   adminOnly?: boolean;
   /** záznamy vytváří jen systém (např. účetní zápisy), v UI jen čtení */
   systemOnly?: boolean;
+  /** systémový záznam smí uživatel opravit (pole, která nejsou readOnly) — nezaloží ani nesmaže (daňové transakce) */
+  userCorrect?: boolean;
   /** podřízené řádky zobrazené ve formuláři (např. řádky dokladu) */
   /**
    * podřízené záznamy zobrazené ve formuláři. `owned: false` = jen přehled

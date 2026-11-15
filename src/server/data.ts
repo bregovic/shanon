@@ -507,7 +507,8 @@ export class Session {
   ): Promise<RecordData> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system || !!opts.system);
-    if (def.systemOnly && !opts.system) throw new UserError("@SYS:InvalidValue");
+    // systémový záznam: uživatel jen opravuje údaje (userCorrect), nezakládá
+    if (def.systemOnly && !opts.system && (!def.userCorrect || !id)) throw new UserError("@SYS:InvalidValue");
 
     const xf = extFields(this.ctx, objectId);
     const fieldsForInput = opts.system
