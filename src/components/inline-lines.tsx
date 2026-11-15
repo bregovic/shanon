@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Checkbox, Input, makeStyles, Select, Tab, TabList, Text, Tooltip, tokens } from "@fluentui/react-components";
 import { Add20Regular, Delete20Regular, Tag20Regular } from "@fluentui/react-icons";
-import { DimsDialog, type LineDims } from "./dims-dialog";
+import { DimsDialog, DimsEditor, type LineDims } from "./dims-dialog";
 import { deleteRecordsAction, listAction, previewRecordAction, saveRecordAction } from "@/app/actions";
 import { triggersPreview } from "./use-preview";
 import type { FieldMeta } from "@/lib/meta";
@@ -217,6 +217,19 @@ export function InlineLines({
   const autoCols = useMemo(() => new Set([balance?.group, ...Object.keys(defaults).filter((k) => k === "date")].filter(Boolean) as string[]), [balance, defaults]);
   // Enter skočí na další řádek do prvního sloupce, který se nepřebírá
   const entryCol = useMemo(() => Math.max(0, columns.findIndex((c) => !autoCols.has(c.key) && !(carry ?? []).includes(c.key) && !c.fields.some((f) => f.readOnly))), [columns, autoCols, carry]);
+  // po otevření dokladu: kurzor do posledního řádku na první pole, které se neplní samo (deník: Druh účtu)
+  const firstCol = useMemo(() => Math.max(0, columns.findIndex((c) => !autoCols.has(c.key) && !c.fields.some((f) => f.readOnly))), [columns, autoCols]);
+  useEffect(() => {
+    if (readOnly) return;
+    const t = setTimeout(() => {
+      const trs = tbody.current?.querySelectorAll("tr[data-row]");
+      const el = trs?.[trs.length - 1]?.querySelectorAll("td")[firstCol + 1]?.querySelector<HTMLElement>("input:not([type=checkbox]), select");
+      el?.focus();
+    }, 250);
+    return () => clearTimeout(t);
+    // jen při otevření
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const reload = useCallback(async () => {
     const r = await listAction(objectId, { filter: { [parentField]: parentId }, sort: sortField, dir: "asc", pageSize: 2000 });
@@ -342,7 +355,13 @@ export function InlineLines({
       const tr = (e.target as HTMLElement).closest("tr");
       const inputs = [...(tr?.querySelectorAll<HTMLElement>("input:not([type=checkbox]), select") ?? [])].filter((x) => x.tabIndex !== -1);
       const at = inputs.findIndex((x) => x === e.target || x.contains(e.target as Node));
-      if (at >= 0 && at + 1 < inputs.length) {
+      // Shift+Enter = předchozí pole (jako Shift+Tab)
+      if (e.shiftKey) {
+        if (at > 0) {
+          inputs[at - 1].focus();
+          if (inputs[at - 1] instanceof HTMLInputElement) (inputs[at - 1] as HTMLInputElement).select();
+        }
+      } else if (at >= 0 && at + 1 < inputs.length) {
         inputs[at + 1].focus();
         if (inputs[at + 1] instanceof HTMLInputElement) (inputs[at + 1] as HTMLInputElement).select();
       } else await save(row.key);
@@ -407,11 +426,6 @@ export function InlineLines({
     await new Promise((r) => setTimeout(r, 0));
     await save(key);
   };
-  const dimSummary = (r: EditRow, prefix: string) =>
-    (dims?.defs ?? [])
-      .map((d) => r.values[`${prefix}${d.slot}`] && `${d.name}: ${r.values[`${prefix}${d.slot}`]}`)
-      .filter(Boolean)
-      .join(", ");
 
   const totals = useMemo(() => {
     const t: Record<string, number> = {};
@@ -567,19 +581,14 @@ export function InlineLines({
             />
           )}
           {tab === "dims" && dims && labels.dims && (
-            <div style={{ display: "flex", gap: 24, alignItems: "center", paddingTop: 4, flexWrap: "wrap" }}>
-              <Text>
-                <b>{labels.dims.account}:</b> {dimSummary(current, dims.main) || labels.dims.none}
-              </Text>
-              <Text>
-                <b>{labels.dims.offset}:</b> {dimSummary(current, dims.offset) || labels.dims.none}
-              </Text>
-              {!readOnly && (
-                <Button size="small" icon={<Tag20Regular />} onClick={() => setDimRow(current.key)}>
-                  {labels.dims.button} (Ctrl+Shift+D)
-                </Button>
-              )}
-            </div>
+            <DimsEditor
+              key={current.key}
+              dims={dims}
+              values={current.values}
+              labels={labels.dims}
+              onChange={(patch) => update(current.key, { values: { ...current.values, ...patch }, dirty: true, error: undefined })}
+              onDone={() => void stepRow(1)}
+            />
           )}
           <Text block className={s.hint} style={{ paddingTop: 8 }}>
             {labels.detailKeys ?? "↑/↓ = předchozí / další řádek · Esc = zpět na řádky"}
@@ -689,9 +698,7 @@ export function InlineLines({
             <span className={s.warn}>
               {(labels.unbalanced ?? "{list}").replace("{list}", openGroups.map(([g, d]) => `${g} (${nf.format(d / 100)})`).join(", "))}
             </span>
-          ) : (
-            <span className={s.ok}>{labels.balanced}</span>
-          )}
+          ) : null}
           {!readOnly && labels.keys ? <span> · {labels.keys}</span> : null}
         </div>
       )}
