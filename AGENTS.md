@@ -226,6 +226,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   potvrzení opsáním kódu = `actions[].confirm`): všechny tabulky objektů firmy (nepovinné odkazy vynulovat, mazat v kolech
   se savepointy), přílohy a soubory, sys vazby (po `RESET ROLE`), záznam do `sys_audit`. Nová tabulka firmy s odkazem
   na sys tabulku mimo objekty = doplnit sem.
+- Zrušit zaúčtování faktury (`unpostInvoice` v `tax/document.ts`, akce `unpost` s `actions[].adminOnly` = jen superuživatel):
+  smaže gl.trans + gl.voucher, tax.trans a položku salda, vrátí zálohu; odmítne úhradu, podané přiznání za DUZP, uzavřené
+  období a pohyb skladu. Hlavička faktury: DUZP a splatnost následují datum vystavení, změna skupiny DPH / měny přepočte
+  řádky (afterSave, mapy `groupChanged` / `currencyChanged`). Import vydaných faktur z ISDOC: `src/server/isdoc-import.ts`
+  (větev v `importAction` pro `ar.invoice`), číslo faktury z ISDOC.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

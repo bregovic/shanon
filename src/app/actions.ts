@@ -17,6 +17,7 @@ import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
 import { importRecords, imagesFromUploads, readTable, type ImportReport } from "@/server/import";
+import { importIssuedIsdoc, isdocXml } from "@/server/isdoc-import";
 import { runReport } from "@/server/report";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
@@ -321,7 +322,16 @@ export async function importAction(form: FormData): Promise<ActionResult<ImportR
   const file = form.get("file");
   try {
     if (!(file instanceof File) || !file.size) throw new UserError("@SYS:Required");
-    const table = await readTable(file.name, Buffer.from(await file.arrayBuffer()));
+    const buf = Buffer.from(await file.arrayBuffer());
+    // vydané faktury: soubor ISDOC (.isdoc, .isdocx, PDF s ISDOC) založí koncept faktury
+    if (objectId === "ar.invoice") {
+      if (isdocXml(file.name, buf)) {
+        const report = await importIssuedIsdoc(s.ctx, { name: file.name, data: buf }, form.get("dryRun") === "1", s.lang);
+        if (report.applied) revalidatePath(objectHref(objectId));
+        return { ok: true, data: report };
+      }
+    }
+    const table = await readTable(file.name, buf);
     // obrázky ke sloupci Obrázek: soubory ze zvolené složky (název = relativní cesta)
     const uploads: { path: string; data: Buffer }[] = [];
     for (const f of form.getAll("images")) if (f instanceof File && f.size) uploads.push({ path: f.name, data: Buffer.from(await f.arrayBuffer()) });

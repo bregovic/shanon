@@ -167,7 +167,7 @@ export interface ObjectDef {
    * process = tlačítko v liště (Zaúčtovat, Potvrdit…), print = nabídka Tisk (soubory, e-mail),
    * inquiry = nabídka Zobrazit, more = nabídka Další. Výchozí: soubor ke stažení → print, jinak process.
    */
-  actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown }; upload?: string; download?: boolean; downloadNeedsWrite?: boolean; module?: string; outside?: boolean; bulk?: boolean; group?: ActionGroup; /** nevratná akce: uživatel musí opsat hodnotu pole (kód firmy) */ confirm?: { field: string; text: LabelRef } }[];
+  actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown }; upload?: string; download?: boolean; downloadNeedsWrite?: boolean; module?: string; outside?: boolean; bulk?: boolean; group?: ActionGroup; /** jen superuživatel (oprava zaúčtovaného dokladu) */ adminOnly?: boolean; /** nevratná akce: uživatel musí opsat hodnotu pole (kód firmy) */ confirm?: { field: string; text: LabelRef } }[];
   /** akce, kterou jde spustit nanečisto a ukázat vzniklé účetní zápisy a DPH (Náhled dokladu) */
   postingPreview?: string;
   /** záznam (i jeho řádky) nelze měnit ani mazat, když pole má danou hodnotu */

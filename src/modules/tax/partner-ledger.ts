@@ -204,6 +204,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     lines: [{ object: id("invoiceLine"), field: "invoiceId", label: "@TAX:Lines" }],
     actions: [
       { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
+      { id: "unpost", label: "@TAX:Unpost", when: { field: "status", equals: "posted" }, adminOnly: true, group: "more" as const, confirm: { field: "invoiceNum", text: "@TAX:UnpostConfirm" } },
       ...(sp.side === 1
         ? [
             { id: "isdoc", label: "@TAX:Isdoc", download: true, module: "prt", group: "print" as const },

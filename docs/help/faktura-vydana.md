@@ -28,3 +28,31 @@ summary: Od založení faktury přes zaúčtování po PDF s QR kódem a ISDOC.
 - **QR platba** se netiskne, když chybí bankovní účet, faktura je už uhrazená nebo je vypnutá transformace [QR platba (SPAYD)](/sys/transformation).
 - Zaúčtovanou fakturu nejde měnit. Opravu udělejte dobropisem (nová faktura se zápornými řádky).
 - **Souvislá řada**: když v [číselné řadě](/sys/numberSeq) zaškrtnete Souvislá řada, číslo smazaného konceptu se použije znovu.
+
+## Datum vystavení, DUZP a splatnost
+
+Po změně data vystavení se posune i DUZP a splatnost. Splatnost se počítá podle dnů splatnosti odběratele, jinak jeho skupiny, jinak 14 dní. Ručně změněné DUZP nebo splatnost zůstanou.
+
+## Skupina DPH
+
+Skupina DPH se doplní z odběratele (jinak ze skupiny odběratelů) a je v hlavičce faktury. Kód DPH řádku vznikne z kombinace skupiny DPH a položky DPH (z položky, skupiny položek nebo účtu). Po změně skupiny na hlavičce se řádky přepočítají, ručně zadaný kód zůstane.
+
+## Měna
+
+Faktura je v měně odběratele, jinak v účetní měně. Cena položky v jiné měně se přepočte kurzem ČNB k datu faktury. Po změně měny na hlavičce se přepočtou ceny řádků, které přišly z položky.
+
+## Import faktur z ISDOC
+
+V seznamu vydaných faktur **Import** → soubor `.isdoc`, `.isdocx` nebo PDF s vloženým ISDOC. Založí se koncept faktury s číslem z ISDOC, odběratel se najde podle IČO / DIČ (jinak se založí z registru), řádky dostanou kód DPH podle sazby a soubor se přiloží. **Zkontrolovat** jen ověří, nic nezaloží. Fakturu se stejným číslem import odmítne.
+
+## Zrušit zaúčtování (oprava)
+
+Superuživatel může zaúčtovanou fakturu vrátit do konceptu: **Další ▾ → Zrušit zaúčtování**, potvrzení opsáním čísla faktury. Smažou se její zápisy v hlavní knize, DPH i položka salda a odečtená záloha se uvolní. Po opravě fakturu znovu zaúčtujte.
+
+Nejde to, když:
+- je faktura uhrazená (nejdřív zrušte párování úhrady),
+- je DPH faktury v podaném přiznání nebo kontrolním hlášení,
+- je účetní období uzavřené,
+- faktura pohnula skladem.
+
+Pak opravte fakturu dobropisem.

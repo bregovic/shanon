@@ -1,7 +1,7 @@
 /** Položka s cenou v EUR: faktura v CZK i v EUR, pokladna v účetní měně. */
 import { describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
-import { inTenant, listRecords, saveRecord } from "@/server/data";
+import { getRecord, inTenant, listRecords, saveRecord } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { quote } from "@/modules/pos/sale";
 
@@ -35,6 +35,13 @@ describe("měna ceny na položce", () => {
     const czkItem = await saveRecord(T, "inv.item", null, { itemNum: "C1", name: "Klobása", groupId: grp.id, unitId: unit.id, salesPrice: "500", taxCodeId: tc.id }, undefined, client);
     const l3 = await saveRecord(T, "ar.invoiceLine", null, { invoiceId: invEur.id, itemId: czkItem.id, qty: "1" }, undefined, client);
     expect(l3.unitPrice).toBe("20.00");
+
+    // změna měny hlavičky CZK → EUR: cena z položky se přepočte, ručně zadaná zůstane
+    const manual = await saveRecord(T, "ar.invoiceLine", null, { invoiceId: invCzk.id, itemId: item.id, qty: "1", unitPrice: "300" }, undefined, client);
+    const h = (await getRecord(T, "ar.invoice", String(invCzk.id), client))!;
+    await saveRecord(T, "ar.invoice", String(invCzk.id), { ...h, currencyId: eur.id }, undefined, client);
+    expect((await getRecord(T, "ar.invoiceLine", String(l1.id), client))!.unitPrice).toBe("10.00");
+    expect((await getRecord(T, "ar.invoiceLine", String(manual.id), client))!.unitPrice).toBe("300.00");
 
     // pokladna účtuje v CZK: 12,10 EUR × 25 = 302,50 Kč
     const [reg] = (await listRecords(T, "pos.register", {}, client)).rows;

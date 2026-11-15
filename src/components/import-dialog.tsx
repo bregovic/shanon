@@ -117,7 +117,7 @@ export function ImportButton({
                 <input
                   ref={input}
                   type="file"
-                  accept=".csv,.txt,.xml,.xlsx"
+                  accept={objectId === "ar.invoice" ? ".csv,.txt,.xml,.xlsx,.isdoc,.isdocx,.pdf" : ".csv,.txt,.xml,.xlsx"}
                   aria-label={labels.title}
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null;

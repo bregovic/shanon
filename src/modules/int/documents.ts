@@ -170,7 +170,7 @@ export async function createDocPartner(data: DataApi, doc: RecordData, t: T): Pr
 }
 
 /** Daňový kód podle sazby a směru (nákup = vstup, prodej = výstup), bez přenesení. */
-async function taxCodeFor(data: DataApi, rate: number | null, direction: "input" | "output"): Promise<string | null> {
+export async function taxCodeFor(data: DataApi, rate: number | null, direction: "input" | "output"): Promise<string | null> {
   if (rate === null || rate === undefined) return null;
   const codes = (await data.find("tax.taxCode", { direction }, { take: 200 })).filter((c) => !c.reverseCharge);
   const hit = codes.find((c) => Math.abs(Number(c.rate) - rate) < 0.01);

@@ -665,6 +665,7 @@ export class Session {
     const a = def.actions?.find((x) => x.id === actionId);
     if (a?.module && !this.ctx.modules.has(a.module)) throw new UserError("@SYS:NoAccess");
     if (!a) throw new UserError("@SYS:InvalidValue");
+    if (a.adminOnly && !this.ctx.perms.admin && !this.system) throw new UserError("@SYS:NoAccess");
     const record = await this.sys().get(objectId, id);
     if (!record) throw new UserError("@SYS:NotFound");
     if (a.when && record[a.when.field] !== a.when.equals) throw new UserError("@SYS:Locked");

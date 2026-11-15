@@ -8,7 +8,7 @@
 import { fromCents, mulCents, percentOf, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents } from "@/modules/sys/currency";
-import { accountingCurrencyId, convertPrice, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
+import { accountingCurrencyId, assertOpenPeriod, convertPrice, ledgerRate, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { dimsOf } from "@/modules/gl/dimensions";
 import { postingAccount } from "@/modules/gl/setup";
 import { partnerTaxGroup, resolveLineCode, taxTransParts } from "./tax-groups";
@@ -47,6 +47,8 @@ export interface InvoiceConfig {
 const today = () => new Date().toISOString().slice(0, 10);
 /** hlavička faktury → původní skupina DPH (mezi beforeSave a afterSave) */
 const groupChanged = new Map<string, string | null>();
+/** hlavička → původní měna (přepočet cen řádků z položek) */
+const currencyChanged = new Map<string, string>();
 /** datum jako RRRR-MM-DD (z DB může přijít Date) */
 const day = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : v ? String(v).slice(0, 10) : null);
 const addDays = (date: string, days: number) => {
@@ -101,6 +103,9 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         // jiná skupina DPH na hlavičce: řádky se starou skupinou ji po uložení převezmou (afterSave)
         if (before && (before.taxGroupId ?? null) !== (data.taxGroupId ?? null)) groupChanged.set(String(data.id), (before.taxGroupId as string) ?? null);
         else if (data.id) groupChanged.delete(String(data.id));
+        // jiná měna dokladu: ceny řádků převzaté z položky se po uložení přepočtou (afterSave)
+        if (before && before.currencyId && data.currencyId && before.currencyId !== data.currencyId) currencyChanged.set(String(data.id), String(before.currencyId));
+        else if (data.id) currencyChanged.delete(String(data.id));
         if (!data.invoiceDate) data.invoiceDate = today();
         // změna data vystavení: DUZP a splatnost ho následují, pokud je uživatel nezměnil ručně
         // (DUZP = staré datum vystavení, splatnost = staré datum + dny splatnosti partnera / skupiny)
@@ -122,6 +127,21 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
       },
       async afterSave(ctx, data) {
         const key = String(data.id);
+        const oldCur = currencyChanged.get(key);
+        if (oldCur) {
+          currencyChanged.delete(key);
+          const date = day(data.invoiceDate ?? data.orderDate) ?? today();
+          for (const l of await ctx.data.find(cfg.line, { [cfg.lineHeaderField]: data.id }, { take: 1000 })) {
+            if (!l.itemId) continue;
+            const item = await ctx.data.get("inv.item", String(l.itemId));
+            if (!item) continue;
+            // jen cena, kterou dala položka (ručně změněná zůstane)
+            const was = await convertPrice(ctx.data, ctx.companyId, item[cfg.item.price] ?? null, item.currencyId as string, oldCur, date);
+            if (was === null || was === undefined || l.unitPrice === null || toCents(was) !== toCents(l.unitPrice)) continue;
+            const now = await convertPrice(ctx.data, ctx.companyId, item[cfg.item.price] ?? null, item.currencyId as string, String(data.currencyId), date);
+            await ctx.data.update(cfg.line, String(l.id), { unitPrice: now });
+          }
+        }
         if (!groupChanged.has(key)) return;
         const old = groupChanged.get(key) ?? null;
         groupChanged.delete(key);
@@ -132,6 +152,10 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
       actions: {
         async post(ctx, header) {
           await postInvoice(ctx.data, ctx.companyId, cfg, header);
+        },
+        // superuživatel (actions[].adminOnly): oprava zaúčtované faktury, dokud DPH není v podaném přiznání
+        async unpost(ctx, header) {
+          await unpostInvoice(ctx.data, cfg, header);
         },
       },
     },
@@ -397,4 +421,49 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     }
   }
   await data.update(cfg.header, String(header.id), { status: "posted", voucherId: voucher.id, advanceAmount: fromCents(advCur), paidAmount: fromCents(advCur) });
+}
+
+/**
+ * Zrušit zaúčtování (oprava chyby, jen superuživatel): faktura zpět do konceptu, zápisy hlavní knihy, daňové
+ * transakce a položka salda se smažou, odečtená záloha se vrátí. Nejde u uhrazené faktury, u DPH v podaném
+ * přiznání / kontrolním hlášení, v uzavřeném období ani když faktura pohnula skladem. Historie změn zůstane.
+ */
+export async function unpostInvoice(data: DataApi, cfg: InvoiceConfig, header: RecordData) {
+  if (header.status !== "posted" || !header.voucherId) throw new UserError("@SYS:Locked");
+  const voucherId = String(header.voucherId);
+  const voucher = await data.get("gl.voucher", voucherId);
+  // úhrady (banka, deník, zápočet) — nejdřív zrušit párování
+  const payments = await data.find(cfg.partnerTrans, { invoiceId: header.id, kind: "payment" }, { take: 1 });
+  if (payments.length || toCents(header.paidAmount ?? "0") > toCents(header.advanceAmount ?? "0")) throw new UserError("@TAX:UnpostPaid");
+  // otevřené období (datum dokladu)
+  await assertOpenPeriod(data, day(voucher?.date ?? header.invoiceDate)!);
+  // DPH v podaném přiznání nebo kontrolním hlášení za období DUZP
+  const taxes = await data.find("tax.trans", { voucherId }, { take: 1000 });
+  for (const t of taxes) {
+    const d = day(t.taxDate)!;
+    const year = Number(d.slice(0, 4));
+    const month = Number(d.slice(5, 7));
+    const filed = await data.find("tax.return", { year, status: "filed" }, { take: 100 });
+    if (filed.some((r) => Number(r.month) === month || (!r.month && Number(r.quarter) === Math.ceil(month / 3))))
+      throw new UserError("@TAX:UnpostFiled", { period: `${String(month).padStart(2, "0")}/${year}` });
+  }
+  // pohyb skladu (výdej / příjem) — opravit dobropisem nebo skladovým dokladem
+  const stock = await data.find("whs.trans", { sourceObject: cfg.header, sourceId: String(header.id) }, { take: 1 }).catch(() => [] as RecordData[]);
+  if (stock.length) throw new UserError("@TAX:UnpostStock");
+
+  for (const t of taxes) await data.remove("tax.trans", String(t.id));
+  for (const t of await data.find(cfg.partnerTrans, { invoiceId: header.id, voucherId }, { take: 100 })) await data.remove(cfg.partnerTrans, String(t.id));
+  // odečtená záloha zpět k vyúčtování
+  const advCur = toCents(header.advanceAmount ?? "0");
+  if (cfg.advance && header.advanceId && advCur > BigInt(0)) {
+    const adv = await data.get(cfg.advance.object, String(header.advanceId));
+    if (adv) {
+      const settled = toCents(adv.settledAmount) - advCur;
+      await data.update(cfg.advance.object, String(adv.id), { settledAmount: fromCents(settled > BigInt(0) ? settled : BigInt(0)), status: "paid" });
+      for (const t of await data.find(cfg.partnerTrans, { advanceId: adv.id, kind: "advance", closed: true }, { take: 100 })) await data.update(cfg.partnerTrans, String(t.id), { closed: false });
+    }
+  }
+  await data.update(cfg.header, String(header.id), { status: "draft", voucherId: null, advanceAmount: "0", paidAmount: "0" });
+  for (const t of await data.find("gl.trans", { voucherId }, { take: 5000 })) await data.remove("gl.trans", String(t.id));
+  if (voucher) await data.remove("gl.voucher", voucherId);
 }
