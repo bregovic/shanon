@@ -122,11 +122,23 @@ export function ObjectListView(p: ObjectListProps) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const bulk = async (actionId: string) => {
     setBulkBusy(true);
-    const res = await bulkRecordAction(p.objectId, selected.map((r) => String(r.id)), actionId);
+    // po jednom záznamu (vytěžení dokladu trvá desítky sekund) — průběh „3/10“
+    const ids = selected.map((r) => String(r.id));
+    const label = (ok: number) => (p.bulkDoneLabel ?? "{ok}/{n}").replace("{ok}", String(ok)).replace("{n}", String(ids.length));
+    let ok = 0;
+    const errors: string[] = [];
+    for (const id of ids) {
+      const res = await bulkRecordAction(p.objectId, [id], actionId);
+      if (!res.ok) errors.push(res.message ?? "");
+      else {
+        ok += res.data.ok;
+        errors.push(...res.data.errors);
+      }
+      setInfo(label(ok));
+    }
     setBulkBusy(false);
-    if (!res.ok) return setError(res.message);
-    setError(res.data.errors.length ? res.data.errors.join(" · ") : undefined);
-    setInfo((p.bulkDoneLabel ?? "{ok}/{n}").replace("{ok}", String(res.data.ok)).replace("{n}", String(selected.length)));
+    setError(errors.length ? [...new Set(errors)].join(" · ") : undefined);
+    setInfo(label(ok));
     setReload((n) => n + 1);
   };
 

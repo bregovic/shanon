@@ -197,9 +197,11 @@ function toDb(def: ObjectDef, data: RecordData): RecordData {
     const v = data[name];
     const conv = (x: unknown) => (x !== null && f.edt.kind === "date" ? new Date(`${x}T00:00:00Z`) : x);
     if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-      // rozsah pro DataApi.find: { gte: "2026-01-01", lte: "2026-12-31" }
+      // rozsah pro DataApi.find: { gte: "2026-01-01", lte: "2026-12-31" }; výčet: { in: ["new", "ready"] }
       const r: RecordData = {};
       for (const op of RANGE_OPS) if (op in (v as RecordData)) r[op] = conv((v as RecordData)[op]);
+      const list = (v as RecordData).in;
+      if (Array.isArray(list)) r.in = list.map(conv);
       out[name] = r;
     } else out[name] = conv(v);
   }

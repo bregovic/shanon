@@ -203,7 +203,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     related: [{ object: "gl.trans", field: "voucherId", label: "@GL:VoucherLines", ref: "voucherId" }, { object: "tax.trans", field: "voucherId", label: "@TAX:VatShort", ref: "voucherId" }],
     lines: [{ object: id("invoiceLine"), field: "invoiceId", label: "@TAX:Lines" }],
     actions: [
-      { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" } },
+      // hromadně ze seznamu (vybrané faktury, každá zvlášť)
+      { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" }, bulk: true },
       { id: "unpost", label: "@TAX:Unpost", when: { field: "status", equals: "posted" }, adminOnly: true, group: "more" as const, confirm: { field: "invoiceNum", text: "@TAX:UnpostConfirm" } },
       ...(sp.side === 1
         ? [

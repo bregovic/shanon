@@ -289,6 +289,14 @@ export async function runRecordAction(objectId: string, id: string, actionId: st
   try {
     const out = await runAction(s.ctx, objectId, id, actionId);
     revalidatePath(objectHref(objectId, id));
+    // fronta (doklady ke zpracování): další záznam, který čeká; žádný = seznam
+    const def = registry.objects.get(objectId);
+    const next = def?.actions?.find((a) => a.id === actionId)?.next;
+    if (next) {
+      const sortField = def!.numberSeq?.field ?? def!.defaultSort?.field ?? "createdAt";
+      const n = (await inTenant(s.ctx, (x) => x.api().find(objectId, { [next.field]: { in: next.in } }, { take: 2, orderBy: { [sortField]: "asc" } }))).find((r) => r.id !== id);
+      return { ok: true, data: { open: n ? objectHref(objectId, String(n.id)) : objectHref(objectId) } };
+    }
     // akce může otevřít vzniklý záznam (koncept e-mailu…)
     return { ok: true, data: out?.open ? { open: objectHref(out.open.object, out.open.id) } : undefined };
   } catch (e) {

@@ -381,11 +381,12 @@ export const document = defineObject({
   defaultSort: { field: "docNum", dir: "desc" },
   lines: [{ object: "int.documentLine", field: "documentId", label: "@INT:DocLines", inline: true }],
   actions: [
-    { id: "extract", label: "@INT:Extract", outside: true },
+    { id: "extract", label: "@INT:Extract", outside: true, bulk: true },
     { id: "check", label: "@INT:Check" },
     { id: "createPartner", label: "@INT:CreatePartner", module: "gab" },
-    { id: "list", label: "@INT:ListDoc", outside: true },
-    { id: "reject", label: "@INT:Reject" },
+    // po zalistování / zamítnutí v detailu rovnou další doklad ke zpracování
+    { id: "list", label: "@INT:ListDoc", outside: true, bulk: true, next: { field: "status", in: ["new", "attention", "ready", "error"] } },
+    { id: "reject", label: "@INT:Reject", next: { field: "status", in: ["new", "attention", "ready", "error"] } },
   ],
   lockedWhen: { field: "status", equals: "listed" },
 });

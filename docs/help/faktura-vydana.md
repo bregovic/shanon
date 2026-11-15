@@ -41,6 +41,10 @@ Skupina DPH se doplní z odběratele (jinak ze skupiny odběratelů) a je v hlav
 
 Faktura je v měně odběratele, jinak v účetní měně. Cena položky v jiné měně se přepočte kurzem ČNB k datu faktury. Po změně měny na hlavičce se přepočtou ceny řádků, které přišly z položky.
 
+## Hromadné zaúčtování
+
+V seznamu faktur zaškrtněte koncepty a dejte **Zaúčtovat** nad seznamem. Každá faktura se zaúčtuje zvlášť; které nejdou (chybí kód DPH, uzavřené období), se vypíšou nahoře.
+
 ## Import faktur z ISDOC
 
 V seznamu vydaných faktur **Import** → soubor `.isdoc`, `.isdocx` nebo PDF s vloženým ISDOC. Založí se koncept faktury s číslem z ISDOC, odběratel se najde podle IČO / DIČ (jinak se založí z registru), řádky dostanou kód DPH podle sazby a soubor se přiloží. **Zkontrolovat** jen ověří, nic nezaloží. Fakturu se stejným číslem import odmítne.
