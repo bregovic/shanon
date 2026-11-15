@@ -6,6 +6,8 @@
  * (`reportLine`) a sazba; nic není napsané natvrdo podle kódu.
  *
  * Pasti formátu EPO (ověřené v DMS na validátoru portálu):
+ *  - Věta D přiznání: `trans` = A (jsou údaje v oddíle C, tj. řádky přiznání), N jen u prázdného přiznání —
+ *    „N“ s vyplněnými částkami EPO odmítne („zaškrtnuto, že neexistují údaje pro C. ODDÍL“).
  *  - Věta D přiznání: druh daně `k_uladis="DPH"` (ne `k_uladb` — EPO ho odmítne fatální chybou);
  *    věta D hlášení (DPHKH1) má jiné atributy (`khdph_forma`).
  *  - `pomer` (krácení nároku) patří jen k přijatým plněním (B.2), ne k A.4.
@@ -318,7 +320,8 @@ export function dp3Xml(c: VatComputation, subj: Subject): string {
       rok: period.year,
       d_poddp: today(),
       typ_platce: "P",
-      trans: "N",
+      // „Neexistují-li údaje pro C. ODDÍL, proškrtněte“: A = daňová povinnost vznikla (jsou údaje), N = prázdné přiznání
+      trans: [...c.lines.values()].some(([b, t]) => b !== BigInt(0) || t !== BigInt(0)) ? "A" : "N",
     })}/>`,
     vetaP(subj),
     `<Veta1 ${attr(vetaAttrs(c, OUTPUT_LINES))}/>`,

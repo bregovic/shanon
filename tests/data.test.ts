@@ -543,6 +543,7 @@ describe("přiznání k DPH a kontrolní hlášení", () => {
     expect(xml).toContain('<DPHDP3 verzePis="01.02">');
     expect(xml).toContain('k_uladis="DPH"');
     expect(xml).not.toContain("k_uladb");
+    expect(xml).toContain('trans="A"');
     expect(xml).toContain('mesic="11"');
     expect(xml).toContain('c_ufo="451"');
     expect(xml).toContain('dic="27082440"');
