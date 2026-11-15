@@ -75,6 +75,18 @@ export const IssueStatus = defineEnum({
   ],
 });
 
+/** stav jedné opravy v souhrnném požadavku (kontrolní seznam) */
+export const ItemStatus = defineEnum({
+  id: "QaItemStatus",
+  label: "@QA:ItemStatus",
+  values: [
+    { value: "todo", label: "@QA:ItemTodo", color: "subtle" },
+    { value: "fixed", label: "@QA:ItemFixed", color: "important" },
+    { value: "ok", label: "@QA:ItemOk", color: "success" },
+    { value: "failing", label: "@QA:ItemFailing", color: "danger" },
+  ],
+});
+
 const Text = (id: string, label: string, max = 120) => defineEdt({ id, kind: "string", label, maxLength: max, transform: "trim" });
 
 export const feature = defineObject({
@@ -146,6 +158,8 @@ export const issue = defineObject({
     title: { edt: Edts.Description, label: "@QA:Title", mandatory: true },
     featureId: { edt: refEdt("qa.feature", "@QA:Feature") },
     scenarioId: { edt: refEdt("qa.scenario", "@QA:Scenario") },
+    /** souhrnný požadavek (např. Deníky – opravy a úpravy), pod který dílčí požadavek patří */
+    parentId: { edt: refEdt("qa.issue", "@QA:Parent") },
     priority: { edt: enumEdt(Priority), mandatory: true, default: "medium" },
     status: { edt: enumEdt(IssueStatus), mandatory: true, default: "new" },
     order: { edt: Edts.Int, label: "@QA:Order" },
@@ -158,17 +172,43 @@ export const issue = defineObject({
     resolution: { edt: Edts.Notes, label: "@QA:Resolution" },
   },
   titleField: "issueNum",
-  list: ["issueNum", "type", "title", "featureId", "priority", "status", "order", "assignedTo", "dueDate"],
+  list: ["issueNum", "type", "title", "parentId", "featureId", "priority", "status", "order", "assignedTo", "dueDate"],
   form: [
-    { label: "@SYS:General", fields: ["issueNum", "type", "title", "featureId", "scenarioId", "priority", "status", "order"] },
+    { label: "@SYS:General", fields: ["issueNum", "type", "title", "parentId", "featureId", "scenarioId", "priority", "status", "order"] },
     { label: "@QA:Responsibility", fields: ["reportedBy", "assignedTo", "dueDate"] },
     { label: "@QA:DescriptionGroup", fields: ["description", "resolution"] },
   ],
   unique: [["issueNum"]],
   numberSeq: { field: "issueNum", seq: "QAISSUE" },
   defaultSort: { field: "priorityRank", dir: "asc" },
-  // detail požadavku s diskuzí (příspěvky patří požadavku)
-  lines: [{ object: "qa.comment", field: "issueId", label: "@QA:Discussion", copy: false }],
+  // detail: opravy (kontrolní seznam se stavem), dílčí požadavky, diskuze
+  lines: [
+    { object: "qa.issueItem", field: "issueId", label: "@QA:Items", inline: true, copy: false },
+    { object: "qa.issue", field: "parentId", label: "@QA:Children", owned: false },
+    { object: "qa.comment", field: "issueId", label: "@QA:Discussion", copy: false },
+  ],
+});
+
+/** Oprava / kontrolní bod souhrnného požadavku: co se opravilo a jestli to tester potvrdil. */
+export const issueItem = defineObject({
+  id: "qa.issueItem",
+  table: "qa_issue_item",
+  label: "@QA:Item",
+  labelPlural: "@QA:Items",
+  scope: "tenant",
+  fields: {
+    issueId: { edt: refEdt("qa.issue", "@QA:Issue"), mandatory: true },
+    lineNum: { edt: Edts.Int, label: "@QA:LineNum", readOnly: true },
+    text: { edt: Edts.Description, label: "@QA:ItemText", mandatory: true },
+    status: { edt: enumEdt(ItemStatus), mandatory: true, default: "todo" },
+    fixedAt: { edt: Edts.TransDate, label: "@QA:FixedAt" },
+    checkedAt: { edt: Edts.TransDate, label: "@QA:CheckedAt", readOnly: true },
+    note: { edt: Edts.Description, label: "@QA:ItemNote" },
+  },
+  titleField: "text",
+  list: ["lineNum", "text", "status", "fixedAt", "checkedAt", "note"],
+  form: [{ label: "@SYS:General", fields: ["issueId", "text", "status", "fixedAt", "checkedAt", "note"] }],
+  defaultSort: { field: "lineNum", dir: "asc" },
 });
 
 /** Příspěvek diskuze pod požadavkem (autor a čas doplní systém). */
@@ -204,6 +244,25 @@ export const qaHandlers: Record<string, ObjectHandlers> = {
       if ((d.status === "development" || d.status === "returned") && !d.assignedTo) d.assignedTo = DEVELOPER;
     },
   },
+  "qa.issueItem": {
+    async beforeSave(ctx, d, isNew) {
+      if (isNew && !d.lineNum) {
+        const [last] = await ctx.data.find("qa.issueItem", { issueId: d.issueId }, { take: 1, orderBy: { lineNum: "desc" } });
+        d.lineNum = Number(last?.lineNum ?? 0) + 1;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      if (d.status === "fixed" && !d.fixedAt) d.fixedAt = today;
+      // potvrzení testerem (funguje / nefunguje) = datum ověření
+      if (d.status === "ok" || d.status === "failing") d.checkedAt = today;
+      else d.checkedAt = null;
+    },
+    async afterSave(ctx, d) {
+      // stále nefunguje → požadavek v testu / hotový se vrací do vývoje
+      if (d.status !== "failing") return;
+      const iss = await ctx.data.get("qa.issue", String(d.issueId));
+      if (iss && ["fat", "uat", "done"].includes(String(iss.status))) await ctx.data.update("qa.issue", String(iss.id), { status: "returned", assignedTo: iss.assignedTo || DEVELOPER });
+    },
+  },
   "qa.comment": {
     beforeSave(ctx, d, isNew) {
       if (isNew) {
@@ -225,8 +284,8 @@ export default defineModule({
   description: "@QA:ModuleDesc",
   icon: "Beaker",
   dependsOn: ["sys"],
-  enums: [FeatureStatus, TestStage, TestResult, IssueType, Priority, IssueStatus],
-  objects: [feature, scenario, issue, comment],
+  enums: [FeatureStatus, TestStage, TestResult, IssueType, Priority, IssueStatus, ItemStatus],
+  objects: [feature, scenario, issue, issueItem, comment],
   menu: [
     { label: "@QA:Module", items: [{ object: "qa.issue" }, { object: "qa.scenario" }] },
     { label: "@SYS:Setup", items: [{ object: "qa.feature" }] },
@@ -288,6 +347,20 @@ export default defineModule({
       DescriptionGroup: "Popis",
       Comment: "Příspěvek",
       Discussion: "Diskuze",
+      Parent: "Souhrnný požadavek",
+      Children: "Dílčí požadavky",
+      Items: "Opravy",
+      Item: "Oprava",
+      ItemText: "Co se opravuje",
+      ItemStatus: "Stav opravy",
+      ItemTodo: "Čeká",
+      ItemFixed: "Opraveno – k ověření",
+      ItemOk: "Funguje",
+      ItemFailing: "Stále nefunguje",
+      FixedAt: "Opraveno dne",
+      CheckedAt: "Ověřeno dne",
+      ItemNote: "Poznámka",
+      LineNum: "Pořadí",
       CommentText: "Text",
       Author: "Autor",
       PostedAt: "Datum",
@@ -346,6 +419,20 @@ export default defineModule({
       DescriptionGroup: "Description",
       Comment: "Comment",
       Discussion: "Discussion",
+      Parent: "Parent request",
+      Children: "Sub-requests",
+      Items: "Fixes",
+      Item: "Fix",
+      ItemText: "What is fixed",
+      ItemStatus: "Fix status",
+      ItemTodo: "Pending",
+      ItemFixed: "Fixed – to verify",
+      ItemOk: "Works",
+      ItemFailing: "Still failing",
+      FixedAt: "Fixed on",
+      CheckedAt: "Verified on",
+      ItemNote: "Note",
+      LineNum: "Order",
       CommentText: "Text",
       Author: "Author",
       PostedAt: "Date",

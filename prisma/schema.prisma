@@ -3721,6 +3721,7 @@ model QaIssue {
   title        String    @db.VarChar(255)
   featureId    String?   @map("feature_id") @db.Uuid
   scenarioId   String?   @map("scenario_id") @db.Uuid
+  parentId     String?   @map("parent_id") @db.Uuid
   priority     String    @default("medium") @db.VarChar(40)
   status       String    @default("new") @db.VarChar(40)
   order        Int?
@@ -3737,15 +3738,44 @@ model QaIssue {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?   @map("updated_by") @db.Uuid
 
-  feature         QaFeature?  @relation("QaIssue_feature", fields: [featureId], references: [id], onDelete: Restrict)
-  scenario        QaScenario? @relation("QaIssue_scenario", fields: [scenarioId], references: [id], onDelete: Restrict)
-  qaComment_issue QaComment[] @relation("QaComment_issue")
+  feature           QaFeature?    @relation("QaIssue_feature", fields: [featureId], references: [id], onDelete: Restrict)
+  scenario          QaScenario?   @relation("QaIssue_scenario", fields: [scenarioId], references: [id], onDelete: Restrict)
+  parent            QaIssue?      @relation("QaIssue_parent", fields: [parentId], references: [id], onDelete: Restrict)
+  qaIssue_parent    QaIssue[]     @relation("QaIssue_parent")
+  qaIssueItem_issue QaIssueItem[] @relation("QaIssueItem_issue")
+  qaComment_issue   QaComment[]   @relation("QaComment_issue")
 
   @@unique([tenantId, issueNum])
   @@index([tenantId])
   @@index([featureId])
   @@index([scenarioId])
+  @@index([parentId])
   @@map("qa_issue")
+}
+
+/// qa.issueItem — generováno z definice objektu
+model QaIssueItem {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  issueId   String    @map("issue_id") @db.Uuid
+  lineNum   Int?      @map("line_num")
+  text      String    @db.VarChar(255)
+  status    String    @default("todo") @db.VarChar(40)
+  fixedAt   DateTime? @map("fixed_at") @db.Date
+  checkedAt DateTime? @map("checked_at") @db.Date
+  note      String?   @db.VarChar(255)
+  ext       Json      @default("{}")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.Uuid
+
+  issue QaIssue @relation("QaIssueItem_issue", fields: [issueId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([issueId])
+  @@map("qa_issue_item")
 }
 
 /// qa.comment — generováno z definice objektu

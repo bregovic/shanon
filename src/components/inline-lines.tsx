@@ -210,6 +210,8 @@ export function InlineLines({
           width: f.kind === "ref" ? 190 : f.kind === "decimal" ? 110 : f.kind === "date" ? 110 : f.kind === "enum" ? 130 : f.kind === "bool" ? 50 : f.name === "text" ? 220 : 120,
         });
     }
+    // málo sloupců (kontrolní seznam): dlouhý text dostane víc místa
+    if (out.length <= 6) for (const c of out) if (c.fields[0].kind === "string" && (c.fields[0].maxLength ?? 0) >= 200) c.width = 420;
     return out;
   }, [metas, parentField]);
 
@@ -512,7 +514,7 @@ export function InlineLines({
       case "int":
         return <Input size="small" inputMode="decimal" value={v === null || v === undefined ? "" : String(v)} input={{ style: { textAlign: "right" } }} onChange={(_, d) => set(d.value)} {...common} aria-label={f.label} />;
       default:
-        return <Input size="small" value={String(v ?? "")} onChange={(_, d) => set(d.value)} {...common} aria-label={f.label} />;
+        return <Input size="small" style={{ width: "100%" }} value={String(v ?? "")} onChange={(_, d) => set(d.value)} {...common} aria-label={f.label} />;
     }
   };
 

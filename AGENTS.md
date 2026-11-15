@@ -334,6 +334,10 @@ ta používá stejné komponenty a akce.
   v `docs/qa/*.csv` (import tlačítkem Import); nová funkce = řádek ve funkcích
   + UAT scénář, nový požadavek = řádek v požadavcích s dalším číslem CR-nnn.
 
+- Souhrnný požadavek (např. „Deníky – opravy a úpravy“): dílčí požadavky mají `qa.issue.parentId`, opravy jsou
+  kontrolní seznam `qa.issueItem` (Čeká / Opraveno – k ověření / Funguje / Stále nefunguje; datum opravy a ověření
+  se doplní samo). „Stále nefunguje“ vrátí požadavek z testu do vývoje. Novou opravu k oblasti = nová položka
+  souhrnného požadavku (stav Opraveno – k ověření), ne nový samostatný požadavek.
 - GitHub Issues se štítky Analysis → Development → Testing → Done.
 - Commity: `feat(gl): … [#123]`, `fix(gab): …`, `docs: …`.
 - Před pushem: `npm run lint && npm run typecheck && npm test && npm run schema:check`

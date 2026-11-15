@@ -210,7 +210,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           details={spec.details}
           dims={spec.dims}
           lang={lang}
-          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys, select: labels.grid.select, selectAll: labels.grid.selectAll, removeSelected: labels.grid.removeSelected, clearSelection: labels.grid.clearSelection, newLine: labels.grid.newLine, linesTab: labels.grid.linesTab, lineOf: labels.grid.lineOf, detailKeys: labels.grid.detailKeys, dims: labels.dims }}
+          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys, select: labels.grid.select, selectAll: labels.grid.selectAll, removeSelected: labels.grid.removeSelected, clearSelection: labels.grid.clearSelection, newLine: labels.grid.newLine, linesTab: spec.label || labels.grid.linesTab, lineOf: labels.grid.lineOf, detailKeys: labels.grid.detailKeys, dims: labels.dims }}
           onChanged={() => router.refresh()}
         />
       ) : (

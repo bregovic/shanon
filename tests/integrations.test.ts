@@ -389,6 +389,19 @@ describe("testování a vývoj", () => {
     const iss = await saveRecord(Q, "qa.issue", null, { type: "bug", title: "Špatné zaokrouhlení", featureId: f.id, scenarioId: sc.id, priority: "high" }, undefined, client);
     expect(String(iss.issueNum)).toMatch(/^CR\d{2}-0001$/);
     expect(iss.status).toBe("new");
+
+    // souhrnný požadavek s opravami (kontrolní seznam) a dílčími požadavky
+    const sum = await saveRecord(Q, "qa.issue", null, { type: "bug", title: "Deníky – opravy", status: "uat" }, undefined, client);
+    await saveRecord(Q, "qa.issue", String(iss.id), { ...iss, parentId: sum.id }, undefined, client);
+    const i1 = await saveRecord(Q, "qa.issueItem", null, { issueId: sum.id, text: "Tab z názvu deníku", status: "fixed" }, undefined, client);
+    const i2 = await saveRecord(Q, "qa.issueItem", null, { issueId: sum.id, text: "Číslo dokladu u nevyrovnaného", status: "ok" }, undefined, client);
+    const today = new Date().toISOString().slice(0, 10);
+    expect([i1.lineNum, i1.fixedAt, i1.checkedAt ?? null, i2.lineNum, i2.checkedAt]).toEqual([1, today, null, 2, today]);
+    expect((await listRecords(Q, "qa.issue", { filter: { parentId: sum.id } }, client)).rows.map((r) => r.id)).toEqual([iss.id]);
+    // tester: stále nefunguje → souhrnný požadavek zpět do vývoje
+    await saveRecord(Q, "qa.issueItem", String(i1.id), { ...i1, status: "failing" }, undefined, client);
+    const back = await getRecord(Q, "qa.issue", String(sum.id), client);
+    expect([back!.status, back!.assignedTo]).toEqual(["returned", "Claude (vývoj)"]);
   });
 });
 
