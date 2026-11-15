@@ -291,7 +291,10 @@ export class Session {
     const page = Math.max(p.page ?? 1, 1);
     const where: RecordData = { ...scopeWhere(this.ctx, def) };
     for (const [k, v] of Object.entries(p.filter ?? {})) {
-      if (k in def.fields) where[k] = v;
+      if (!(k in def.fields)) continue;
+      // přesná shoda: text z URL / API převést na typ pole (číslo, ano/ne)
+      const kind = def.fields[k].edt.kind;
+      where[k] = typeof v === "string" && (kind === "int" || kind === "decimal") && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : typeof v === "string" && kind === "bool" ? v === "true" || v === "1" : v;
     }
     const and: RecordData[] = [];
     for (const [k, expr] of Object.entries(p.filters ?? {})) {
@@ -337,6 +340,42 @@ export class Session {
       totals = Object.fromEntries(sumFields.map((f) => [f, (agg._sum?.[f] ?? new Prisma.Decimal(0)).toFixed(def.fields[f].edt.scale ?? 2)]));
     }
     return { rows: out, total, page, pageSize, totals };
+  }
+
+  /** SysLastValue: zapamatovat hodnoty polí s `rememberLast` (uživatel + firma + objekt + pole). */
+  private async rememberLast(def: ObjectDef, merged: RecordData) {
+    const fields = Object.entries(def.fields).filter(([, f]) => f.rememberLast);
+    if (!fields.length || !this.ctx.companyId) return;
+    const api = this.sys().api();
+    for (const [name] of fields) {
+      const v = merged[name];
+      if (v === null || v === undefined || v === "") continue;
+      const key = { userId: this.ctx.userId, objectId: def.id, field: name };
+      const [have] = await api.find("sys.lastValue", key, { take: 1 });
+      if (have) {
+        if (have.value !== String(v)) await api.update("sys.lastValue", String(have.id), { value: String(v).slice(0, 255) });
+      } else await api.create("sys.lastValue", { ...key, value: String(v).slice(0, 255) });
+    }
+  }
+
+  /** Nový záznam: doplnit poslední hodnoty (jen prázdná pole, u odkazů s lookupFilter jen odpovídající). */
+  async applyLastValues(def: ObjectDef, record: RecordData): Promise<void> {
+    const fields = Object.entries(def.fields).filter(([, f]) => f.rememberLast);
+    if (!fields.length || !this.ctx.companyId) return;
+    const sys = this.sys();
+    for (const [name, f] of fields) {
+      if (record[name] !== null && record[name] !== undefined && record[name] !== "") continue;
+      const [last] = await sys.find("sys.lastValue", { userId: this.ctx.userId, objectId: def.id, field: name }, 1);
+      if (!last?.value) continue;
+      if (f.edt.kind === "ref") {
+        const target = await sys.get(f.edt.refObject!, String(last.value)).catch(() => null);
+        if (!target) continue;
+        const ok = Object.entries(f.lookupFilter ?? {}).every(([tf, src]) => record[src] === null || record[src] === undefined || record[src] === "" || String(target[tf]) === String(record[src]));
+        if (!ok) continue;
+      }
+      record[name] = last.value;
+    }
+    await this.attachRefTitles(def, [record]);
   }
 
   /** k odkazům doplní text cílového záznamu: row._titles[pole] */
@@ -530,6 +569,9 @@ export class Session {
       if (res) Object.assign(errors, res);
     }
     if (Object.keys(errors).length) throw new UserError("@SYS:FixErrors", {}, errors);
+
+    // poslední hodnoty uživatele (rememberLast) — jen uložení uživatelem, ne logika modulů
+    if (!opts.system && !this.system) await this.rememberLast(def, merged);
 
     const d = delegate(this.tx, def);
     const values = toDb(def, merged);

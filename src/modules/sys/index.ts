@@ -447,6 +447,29 @@ export const notification = defineObject({
   defaultSort: { field: "createdAt", dir: "desc" },
 });
 
+const LastKey = defineEdt({ id: "LastValueKey", kind: "string", label: "@SYS:Field", maxLength: 80 });
+const LastVal = defineEdt({ id: "LastValueValue", kind: "string", label: "@SYS:Value", maxLength: 255 });
+
+/** Poslední použité hodnoty uživatele (SysLastValue): pole s `rememberLast`. */
+export const lastValue = defineObject({
+  id: "sys.lastValue",
+  table: "sys_last_value",
+  label: "@SYS:LastValue",
+  labelPlural: "@SYS:LastValue",
+  scope: "company",
+  systemOnly: true,
+  fields: {
+    userId: { edt: LastKey, mandatory: true },
+    objectId: { edt: LastKey, mandatory: true },
+    field: { edt: LastKey, mandatory: true },
+    value: { edt: LastVal },
+  },
+  titleField: "field",
+  list: ["userId", "objectId", "field", "value"],
+  form: [{ label: "@SYS:General", fields: ["userId", "objectId", "field", "value"] }],
+  unique: [["userId", "objectId", "field"]],
+});
+
 /** Kdo upozornění přečetl. */
 export const notificationRead = defineObject({
   id: "sys.notificationRead",
@@ -491,7 +514,7 @@ export default defineModule({
   dependsOn: [],
   enums: [RateSource, RoundingMethod, PermLevel, SecurityTarget, NumberedObject, ShareableObject, TransformDirectionEnum, TransformPurposeEnum, BatchClass, BatchRecurrence, BatchStatus, NoticeKind],
   setup: sysSetup,
-  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare, numberSeqFree, transformation, notification, notificationRead],
+  objects: [company, numberSeq, currency, exchangeRate, role, rolePermission, batchJob, batchRun, virtualCompany, virtualMember, virtualShare, numberSeqFree, transformation, notification, notificationRead, lastValue],
   menu: [
     {
       label: "@SYS:Setup",
@@ -506,6 +529,18 @@ export default defineModule({
   ],
   labels: {
     cs: {
+      NewLine: "Nový řádek",
+      DimsTitle: "Finanční dimenze řádku",
+      DimsAccount: "Účet",
+      DimsOffset: "Protiúčet",
+      DimsHint: "Pište a vyberte šipkami, Enter = další dimenze. Dimenze účtu se předvyplní do protiúčtu.",
+      DimsButton: "Dimenze",
+      DimsTab: "Dimenze",
+      DimsNone: "—",
+      Ok: "OK",
+      LastValue: "Poslední hodnoty",
+      Field: "Pole",
+      Value: "Hodnota",
       HeaderShow: "Hlavička",
       HeaderHide: "Skrýt hlavičku",
       HeaderSaveOpen: "Klikněte na číslo: uloží se a otevřou řádky",
@@ -530,7 +565,7 @@ export default defineModule({
       ClearSelection: "Zrušit výběr",
       LinesUnbalanced: "Nevyrovnané doklady (MD − D): {list}",
       LinesBalanced: "Všechny doklady jsou vyrovnané.",
-      LinesKeys: "Enter = uložit a další řádek · ↑/↓ = řádek výš/níž · Alt+↓ = nabídka · datum: d = dnes, d+1, 15, 1511",
+      LinesKeys: "Enter = další pole · ↓ na posledním řádku = nový řádek · ↑/↓ = řádek výš/níž · Alt+↓ = nabídka · Ctrl+Shift+D = dimenze · datum: d = dnes, d+1, 15",
       Notice: "Upozornění",
       Notices: "Upozornění",
       NoticeRead: "Přečtení upozornění",
@@ -873,6 +908,18 @@ export default defineModule({
       Workspace: "Pracovní plocha",
     },
     en: {
+      NewLine: "New line",
+      DimsTitle: "Line financial dimensions",
+      DimsAccount: "Account",
+      DimsOffset: "Offset account",
+      DimsHint: "Type and pick with arrows, Enter = next dimension. Account dimensions prefill the offset account.",
+      DimsButton: "Dimensions",
+      DimsTab: "Dimensions",
+      DimsNone: "—",
+      Ok: "OK",
+      LastValue: "Last values",
+      Field: "Field",
+      Value: "Value",
       HeaderShow: "Header",
       HeaderHide: "Hide header",
       HeaderSaveOpen: "Click the number to save and open the lines",
@@ -897,7 +944,7 @@ export default defineModule({
       ClearSelection: "Clear selection",
       LinesUnbalanced: "Unbalanced vouchers (debit − credit): {list}",
       LinesBalanced: "All vouchers are balanced.",
-      LinesKeys: "Enter = save and next line · ↑/↓ = line up/down · Alt+↓ = options · date: d = today, d+1, 15, 1511",
+      LinesKeys: "Enter = next field · ↓ on last line = new line · ↑/↓ = line up/down · Alt+↓ = options · Ctrl+Shift+D = dimensions · date: d = today, d+1, 15",
       Notice: "Notification",
       Notices: "Notifications",
       NoticeRead: "Notification read",

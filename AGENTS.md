@@ -197,6 +197,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `src/server/mail.ts`): Odeslat e-mailem (akce `outside`) založí koncept `int.mail` s PDF dokladu
   v přílohách a otevře ho (akce smí vrátit `ActionOutcome.open`); Odeslat pošle napojením druhu
   „mail“, zapíše `int.log` a u faktury `emailedAt`. Příjemce = `docEmail` partnera, jinak e-mail subjektu.
+- SysLastValue: `FieldDef.rememberLast` — uložení uživatelem zapamatuje hodnotu (`sys.lastValue`, uživatel +
+  firma + objekt + pole), nový záznam ji nabídne (u odkazu jen pokud sedí `lookupFilter`). Nový záznam: kurzor
+  do prvního prázdného povinného pole; kompaktní hlavička nového dokladu ukazuje jen první skupinu polí.
+- Mřížka řádků: Enter = další pole (na posledním uloží řádek), ↓ na posledním řádku = uložit a nový řádek
+  (prázdný řádek se sám nepřidává), podrobnosti vybraného řádku pod mřížkou (`lines[].details`), dimenze účtu
+  a protiúčtu v dialogu Ctrl+Shift+D (`lines[].dims`; protiúčet `offsetDim1…6`, prázdné = jako účet).
 - Lišta formuláře (standard): Uložit + akce zpracování jako tlačítka; ostatní ve skupinách
   `Tisk ▾` (tisk, PDF, soubory, e-mail), `Zobrazit ▾` (související doklady, Náhled dokladu), `Další ▾`
   (Duplikovat). Skupina = `actions[].group` (výchozí: download → print, jinak process). Náhled dokladu =

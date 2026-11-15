@@ -159,6 +159,10 @@ const DimValue = defineEdt({ id: "DimValue", kind: "string", label: "@GL:Dimensi
 export const dimFields = () =>
   Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`dim${n}`, { edt: DimValue, dimSlot: n }])) as Record<string, { edt: typeof DimValue; dimSlot: number }>;
 export const DIM_NAMES = ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"];
+/** dimenze protiúčtu na řádku deníku */
+export const offsetDimFields = () =>
+  Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`offsetDim${n}`, { edt: DimValue, dimSlot: n }])) as Record<string, { edt: typeof DimValue; dimSlot: number }>;
+export const OFFSET_DIM_NAMES = ["offsetDim1", "offsetDim2", "offsetDim3", "offsetDim4", "offsetDim5", "offsetDim6"];
 
 export const dimension = defineObject({
   id: "gl.dimension",
@@ -459,7 +463,7 @@ export const journal = defineObject({
     journalNum: { edt: VoucherNum, label: "@GL:JournalNum", mandatory: true, readOnly: true },
     /** prázdné = výchozí název deníku (GEN, jinak první) — doplní se při uložení */
     // nabídka jen názvů deníku stejného druhu (obecný deník nenabízí bankovní a pokladní)
-    journalNameId: { edt: JournalNameRef, lookupFilter: { journalType: "journalType" } },
+    journalNameId: { edt: JournalNameRef, lookupFilter: { journalType: "journalType" }, rememberLast: true },
     /** druh z názvu deníku (deníky banky v Bance, pokladny v Pokladně…) */
     journalType: { edt: enumEdt(JournalType) },
     date: { edt: Edts.TransDate, mandatory: true, default: "$today" },
@@ -474,7 +478,7 @@ export const journal = defineObject({
   // hlavička jako řádek nahoře, řádky v upravitelné mřížce přes celou stránku
   compactHeader: true,
   form: [
-    { label: "@SYS:General", fields: ["journalNum", "journalNameId", "date", "description"] },
+    { label: "@SYS:General", fields: ["journalNum", "date", "journalNameId", "description"] },
     { label: "@GL:Status", fields: ["status", "voucherId", "checkResult"] },
   ],
   numberSeq: { field: "journalNum", seq: "GLJOURNAL" },
@@ -488,6 +492,9 @@ export const journal = defineObject({
       inherit: { date: "date" },
       carry: ["date", "text", "accountType", "offsetType"],
       balance: { group: "voucherNum", debit: "debit", credit: "credit", selfBalanced: "offsetType" },
+      // podrobnosti vybraného řádku pod mřížkou (záložky) a dialog dimenzí účtu / protiúčtu
+      details: [{ label: "@SYS:General", fields: ["vs", "currencyId"] }],
+      dims: { main: "dim", offset: "offsetDim", account: "accountId", offsetAccount: "offsetAccountId", offsetType: "offsetType" },
     },
   ],
   actions: [
@@ -530,6 +537,7 @@ export const journalLine = defineObject({
     /** variabilní symbol: platba odběratele / dodavateli se spáruje s fakturou */
     vs: { edt: defineEdt({ id: "GlLineVs", kind: "string", label: "@GL:Vs", maxLength: 10, pattern: /^\d{0,10}$/ }) },
     ...dimFields(),
+    ...offsetDimFields(),
     /** prázdné = účetní měna firmy */
     currencyId: { edt: CurrencyRef },
   },
@@ -553,14 +561,12 @@ export const journalLine = defineObject({
     "offsetVendorId",
     "offsetBankAccountId",
     "offsetCashDeskId",
-    "vs",
-    ...DIM_NAMES,
-    "currencyId",
   ],
   form: [
     { label: "@SYS:General", fields: ["journalId", "date", "voucherNum", "accountType", "accountId", "customerId", "vendorId", "bankAccountId", "cashDeskId", "text", "debit", "credit", "currencyId", "vs"] },
     { label: "@GL:Offset", fields: ["offsetType", "offsetAccountId", "offsetCustomerId", "offsetVendorId", "offsetBankAccountId", "offsetCashDeskId"] },
     { label: "@GL:Dimensions", fields: DIM_NAMES },
+    { label: "@GL:OffsetDimensions", fields: OFFSET_DIM_NAMES },
   ],
 });
 
@@ -607,6 +613,7 @@ export default defineModule({
   setup: glSetup,
   labels: {
     cs: {
+      OffsetDimensions: "Dimenze protiúčtu",
       JournalsDaily: "Obecné deníky",
       JournalsAll: "Všechny deníky",
       JournalsBank: "Bankovní deníky",
@@ -806,6 +813,7 @@ export default defineModule({
       AmountCur: "Částka v měně",
     },
     en: {
+      OffsetDimensions: "Offset dimensions",
       JournalsDaily: "General journals",
       JournalsAll: "All journals",
       JournalsBank: "Bank journals",

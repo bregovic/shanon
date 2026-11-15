@@ -11,7 +11,7 @@
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { allocateVoucher, checkText, convertLines, postVoucher, resolveJournalName, type PostingLine } from "./posting";
-import { dimsOf } from "./dimensions";
+import { dimsOf, offsetDimsOf } from "./dimensions";
 
 const zero = BigInt(0);
 
@@ -37,6 +37,8 @@ interface Leg {
   amountCur: string | null;
   viaSubledger: boolean;
   partner: { kind: "customer" | "vendor"; rec: RecordData } | null;
+  /** dimenze strany (protiúčet může mít vlastní) */
+  dims?: ReturnType<typeof dimsOf>;
 }
 
 /** Účet hlavní knihy pro druh a odkaz (plus partner pro saldo). */
@@ -124,7 +126,7 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
       const ok = String(l.offsetType) as Kind;
       const off = await resolveLeg(data, ok, (l[REF[ok]?.offset] as string) ?? null);
       if (!off) errors.push({ ref: "@GL:LineAccountMissing", params: { line: String(n) } });
-      else legs.push({ ...off, line: l, lineNo: n, amount: -amount, currencyId, amountCur: neg(amountCur) });
+      else legs.push({ ...off, line: l, lineNo: n, amount: -amount, currencyId, amountCur: neg(amountCur), dims: offsetDimsOf(l) });
     }
     legsByLine.push(legs);
   }
@@ -193,7 +195,7 @@ function postingLines(g: Group): PostingLine[] {
     accountId: x.accountId,
     amount: fromCents(x.amount),
     text: (x.line.text as string) ?? null,
-    dims: dimsOf(x.line),
+    dims: x.dims ?? dimsOf(x.line),
     currencyId: x.currencyId,
     amountCur: x.amountCur,
     viaSubledger: x.viaSubledger,

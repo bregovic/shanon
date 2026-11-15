@@ -38,6 +38,11 @@ export async function activeDimensions(data: DataApi): Promise<DimDef[]> {
 
 /** Dimenze řádku (dim1…dim6) jako prosté hodnoty. */
 export const dimsOf = (r: RecordData): Dims => Object.fromEntries(DIM_SLOTS.map((n) => [dimField(n), (r[dimField(n)] as string) || null]));
+/** dimenze protiúčtu řádku deníku (offsetDim1…6); prázdné = jako účet */
+export const offsetDimsOf = (r: RecordData): Dims => {
+  const own = Object.fromEntries(DIM_SLOTS.map((n) => [dimField(n), (r[`offsetDim${n}`] as string) || null])) as Dims;
+  return Object.values(own).some(Boolean) ? own : dimsOf(r);
+};
 
 /** Nastavení dimenzí pro účet podle pravidel (nejdelší shoda začátku čísla). */
 export async function requirementsFor(data: DataApi, accountNum: string, dims?: DimDef[]): Promise<Record<string, string>> {

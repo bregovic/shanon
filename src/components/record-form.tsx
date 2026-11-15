@@ -86,7 +86,7 @@ export function RecordForm({
           <div className={s.groupTitle}>{g.label}</div>
           <div className={s.grid} style={columns === 1 ? { gridTemplateColumns: "1fr" } : columns === 4 ? { gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "4px 16px" } : undefined}>
             {g.fields.filter((f) => shown(f.visibleWhen, values)).map((f) => (
-              <div key={f.name} className={f.kind === "text" || f.image ? s.wide : undefined}>
+              <div key={f.name} data-field={f.name} className={f.kind === "text" || f.image ? s.wide : undefined}>
                 {f.image ? (
                   <ImageField f={f} value={values[f.name] as string | null} record={record} disabled={readOnly} onChange={onChange} />
                 ) : fieldAction?.name === f.name && values[f.name] ? (

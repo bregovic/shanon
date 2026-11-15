@@ -220,6 +220,7 @@ model SysCompany {
   sysNumberSeqFree_company        SysNumberSeqFree[]     @relation("SysNumberSeqFree_company")
   sysNotification_company         SysNotification[]      @relation("SysNotification_company")
   sysNotificationRead_company     SysNotificationRead[]  @relation("SysNotificationRead_company")
+  sysLastValue_company            SysLastValue[]         @relation("SysLastValue_company")
   prtTemplate_company             PrtTemplate[]          @relation("PrtTemplate_company")
   orgEntity_company               OrgEntity[]            @relation("OrgEntity_company")
   orgSite_company                 OrgSite[]              @relation("OrgSite_company")
@@ -656,6 +657,29 @@ model SysNotificationRead {
   @@index([tenantId, companyId])
   @@index([notificationId])
   @@map("sys_notification_read")
+}
+
+/// sys.lastValue — generováno z definice objektu
+model SysLastValue {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  userId    String   @map("user_id") @db.VarChar(80)
+  objectId  String   @map("object_id") @db.VarChar(80)
+  field     String   @db.VarChar(80)
+  value     String?  @db.VarChar(255)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("SysLastValue_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, userId, objectId, field])
+  @@index([tenantId, companyId])
+  @@map("sys_last_value")
 }
 
 /// prt.template — generováno z definice objektu
@@ -1299,6 +1323,12 @@ model GlJournalLine {
   dim4                String?   @db.VarChar(20)
   dim5                String?   @db.VarChar(20)
   dim6                String?   @db.VarChar(20)
+  offsetDim1          String?   @map("offset_dim1") @db.VarChar(20)
+  offsetDim2          String?   @map("offset_dim2") @db.VarChar(20)
+  offsetDim3          String?   @map("offset_dim3") @db.VarChar(20)
+  offsetDim4          String?   @map("offset_dim4") @db.VarChar(20)
+  offsetDim5          String?   @map("offset_dim5") @db.VarChar(20)
+  offsetDim6          String?   @map("offset_dim6") @db.VarChar(20)
   currencyId          String?   @map("currency_id") @db.Uuid
   ext                 Json      @default("{}")
   version             Int       @default(1)

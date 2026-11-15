@@ -5,7 +5,7 @@ import type { RecordData } from "@/core/module";
 import { coerce } from "@/core/validate";
 import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
-import { getRecord, listRecords } from "@/server/data";
+import { inTenant, getRecord, listRecords } from "@/server/data";
 import { duplicateRecord } from "@/server/duplicate";
 import { printableObjectIds } from "@/server/print";
 import { getT } from "@/server/i18n";
@@ -41,12 +41,18 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
     // Duplikovat: hodnoty zdrojového záznamu bez klíče
     const dup = copy ? await duplicateRecord(s.ctx, def.id, copy) : null;
     if (dup && "values" in dup) record = { ...record, ...dup.values, _titles: dup.titles };
-    // hodnoty z filtru seznamu (?set.pole=hodnota) — jen jednoduchá upravitelná pole
+    // hodnoty z filtru seznamu (?set.pole=hodnota) — jen jednoduchá upravitelná pole (poslední hodnoty až po nich)
     for (const [k, v] of Object.entries(sp)) {
       const f = k.startsWith("set.") ? def.fields[k.slice(4)] : undefined;
       if (!f || f.readOnly || !v || ["ref", "text"].includes(String(f.edt.kind))) continue;
       const [val, err] = coerce(f.edt, v, registry);
       if (!err) record[k.slice(4)] = val;
+    }
+    // poslední použité hodnoty uživatele (název deníku…)
+    if (!dup && Object.values(def.fields).some((f) => f.rememberLast)) {
+      const titles = { ...((record._titles as Record<string, string>) ?? {}) };
+      await inTenant(s.ctx, (sess) => sess.applyLastValues(def, record)).catch(() => undefined);
+      record._titles = { ...((record._titles as Record<string, string>) ?? {}), ...titles };
     }
   }
   else {
@@ -61,6 +67,11 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
   const recordTitle = isNew ? `${t("@SYS:New")} · ${t(def.label)}` : String(record[def.titleField] ?? t(def.label));
   const mod = registry.modules.get(module)!;
 
+  // aktivní finanční dimenze (dialog dimenzí v mřížce řádků)
+  const dimDefs =
+    !isNew && (def.lines ?? []).some((l) => l.dims)
+      ? (await inTenant(s.ctx, (sess) => sess.sys().find("gl.dimension", { active: true }, 6, { position: "asc" })).catch(() => [])).map((d) => ({ slot: Number(d.position), name: String(d.name), id: String(d.id) }))
+      : [];
   const lines: LineSpec[] = isNew
     ? []
     : await Promise.all(
@@ -80,6 +91,8 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               defaults: { ...defaults(ld), ...Object.fromEntries(Object.entries(l.inherit ?? {}).map(([lf, pf]) => [lf, record[pf] ?? null])) },
               carry: l.carry,
               balance: l.balance,
+              details: (l.details ?? []).map((d) => ({ label: t(d.label), fields: d.fields.filter((f) => lm[f] && !hiddenFields(s.ctx, ld).includes(f)).map((f) => lm[f]) })).filter((d) => d.fields.length),
+              dims: l.dims && dimDefs.length ? { ...l.dims, defs: dimDefs } : undefined,
               // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít
               overview: l.owned === false || !!ld.systemOnly,
               inline: !!l.inline,

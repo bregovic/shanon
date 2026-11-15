@@ -82,3 +82,31 @@ describe("deník: pořizování řádků", () => {
     expect((await getRecord(D, "gl.journal", String(j2.id), client))!.checkResult).toMatch(/^V pořádku: 2 dokladů/);
   });
 });
+
+describe("deník: dimenze protiúčtu a poslední název deníku", () => {
+  it("protiúčet má vlastní dimenze; nový deník nabídne poslední název stejného druhu", async () => {
+    const { inTenant, getObject } = await import("@/server/data");
+    const D = (await provisionTenant(client, { code: `t-jd-${run}`, name: "JD", adminEmail: `jd-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "bank", "cash"], company: { code: "J", name: "J" } })).ctx;
+    const acc = async (n: string) => String((await listRecords(D, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
+    const dim = (await listRecords(D, "gl.dimension", {}, client)).rows.find((d) => Number(d.position) === 1) ?? (await saveRecord(D, "gl.dimension", null, { code: "STR", name: "Středisko", position: 1, source: "custom", active: true }, undefined, client));
+    for (const c of ["VYR", "OBC"]) await saveRecord(D, "gl.dimensionValue", null, { dimensionId: dim.id, code: c, name: c }, undefined, client);
+    const D2 = { ...D, dims: undefined };
+    const j = await saveRecord(D2, "gl.journal", null, { date: "2026-11-15", description: "Přeúčtování" }, undefined, client);
+    await saveRecord(D2, "gl.journalLine", null, { journalId: j.id, accountId: await acc("518000"), debit: "100", dim1: "VYR", offsetType: "ledger", offsetAccountId: await acc("548000"), offsetDim1: "OBC" }, undefined, client);
+    await runAction(D2, "gl.journal", String(j.id), "post", client);
+    const trans = (await listRecords(D2, "gl.trans", { pageSize: 10 }, client)).rows;
+    const by = (n: string) => trans.find((t) => String((t._titles as Record<string, string>).accountId).startsWith(n))?.dim1;
+    expect([by("518000"), by("548000")]).toEqual(["VYR", "OBC"]);
+
+    // poslední název deníku: uložený uživatelem se nabídne u nového deníku stejného druhu
+    const bankName = (await listRecords(D2, "gl.journalName", { filter: { code: "BANKA" } }, client)).rows[0];
+    await saveRecord(D2, "gl.journal", null, { journalNameId: bankName.id, date: "2026-11-15", description: "Výpis" }, undefined, client);
+    const rec1: Record<string, unknown> = { journalType: "bank" };
+    await inTenant(D2, (s) => s.applyLastValues(getObject("gl.journal"), rec1), client);
+    expect(rec1.journalNameId).toBe(bankName.id);
+    // obecný deník bankovní název nedostane
+    const rec2: Record<string, unknown> = { journalType: "daily" };
+    await inTenant(D2, (s) => s.applyLastValues(getObject("gl.journal"), rec2), client);
+    expect(rec2.journalNameId).toBeUndefined();
+  }, 120_000);
+});

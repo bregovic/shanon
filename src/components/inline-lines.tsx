@@ -13,14 +13,15 @@
  * výš/níž ve stejném sloupci, Tab přeskakuje pole, která se plní sama.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Checkbox, Input, makeStyles, Select, Text, Tooltip, tokens } from "@fluentui/react-components";
-import { Delete20Regular } from "@fluentui/react-icons";
+import { Button, Checkbox, Input, makeStyles, Select, Tab, TabList, Text, Tooltip, tokens } from "@fluentui/react-components";
+import { Add20Regular, Delete20Regular, Tag20Regular } from "@fluentui/react-icons";
+import { DimsDialog, type LineDims } from "./dims-dialog";
 import { deleteRecordsAction, listAction, previewRecordAction, saveRecordAction } from "@/app/actions";
 import { triggersPreview } from "./use-preview";
 import type { FieldMeta } from "@/lib/meta";
 import { formatDateInput } from "@/lib/date-input";
 import { DateInput } from "./date-input";
-import { RefCombobox, type Values } from "./record-form";
+import { RecordForm, RefCombobox, type Values } from "./record-form";
 
 type Row = Record<string, unknown>;
 
@@ -68,6 +69,8 @@ const useStyles = makeStyles({
   ok: { color: tokens.colorPaletteGreenForeground1, fontWeight: tokens.fontWeightRegular },
   hint: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase100, padding: "4px 8px" },
   picked: { backgroundColor: tokens.colorNeutralBackground1Selected },
+  current: { outline: `1px solid ${tokens.colorBrandStroke2}`, outlineOffset: "-1px" },
+  details: { marginTop: "8px", border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1, padding: "4px 12px 12px" },
 });
 
 interface Column {
@@ -111,6 +114,8 @@ export function InlineLines({
   onChanged,
   carry,
   balance,
+  details,
+  dims,
 }: {
   objectId: string;
   parentField: string;
@@ -121,10 +126,28 @@ export function InlineLines({
   sortField?: string;
   readOnly: boolean;
   lang: string;
-  labels: { open: string; remove: string; total: string; empty: string; unbalanced?: string; balanced?: string; keys?: string; select?: string; selectAll?: string; removeSelected?: string; clearSelection?: string };
+  labels: {
+    open: string;
+    remove: string;
+    total: string;
+    empty: string;
+    unbalanced?: string;
+    balanced?: string;
+    keys?: string;
+    select?: string;
+    selectAll?: string;
+    removeSelected?: string;
+    clearSelection?: string;
+    newLine?: string;
+    dims?: { title: string; account: string; offset: string; ok: string; cancel: string; hint: string; button: string; tab: string; none: string };
+  };
   onChanged?: () => void;
   carry?: string[];
   balance?: LineBalance;
+  /** podrobnosti vybraného řádku pod mřížkou (záložky) */
+  details?: { label: string; fields: FieldMeta[] }[];
+  /** dimenze účtu / protiúčtu a jejich dialog (Ctrl+Shift+D) */
+  dims?: LineDims;
 }) {
   const s = useStyles();
   const nf = useMemo(() => new Intl.NumberFormat(lang === "en" ? "en-GB" : "cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), [lang]);
@@ -156,7 +179,7 @@ export function InlineLines({
 
   const [rows, setRows] = useState<EditRow[]>(() => {
     const saved = initial.map(toEdit);
-    return [...saved, ...(readOnly ? [] : [blankFor(saved)])];
+    return [...saved, ...(readOnly || saved.length ? [] : [blankFor(saved)])];
   });
   // poslední stav pro obsluhu kláves (hodnota z pole data se zapíše až těsně před uložením)
   const rowsRef = useRef(rows);
@@ -196,7 +219,9 @@ export function InlineLines({
       const pending = cur.filter((x) => x.dirty);
       const saved = r.data.rows.map(toEdit).map((x) => pending.find((p) => p.id === x.id) ?? x);
       const fresh = pending.filter((p) => !p.id);
-      return [...saved, ...fresh, ...(readOnly || fresh.length ? [] : [blankFor(saved)])];
+      // rozpracovaný prázdný řádek nechat; nový se přidá až šipkou ↓ / tlačítkem (prázdný doklad má jeden hned)
+      const keepBlank = cur.filter((x) => !x.id && !x.dirty);
+      return [...saved, ...fresh, ...(readOnly || fresh.length ? [] : keepBlank.length ? keepBlank.slice(0, 1) : saved.length ? [] : [blankFor(saved)])];
     });
   }, [objectId, parentField, parentId, sortField, readOnly, blankFor]);
 
@@ -256,6 +281,9 @@ export function InlineLines({
     if (!row || !row.dirty || readOnly) return true;
     const values: Values = {};
     for (const c of columns) for (const f of c.fields) if (!f.readOnly) values[f.name] = typeof row.values[f.name] === "string" && f.kind === "decimal" ? String(row.values[f.name]).replace(/\s/g, "").replace(",", ".") || null : (row.values[f.name] ?? null);
+    // pole z podrobností a dimenze (nejsou ve sloupcích mřížky)
+    for (const d of details ?? []) for (const f of d.fields) if (!f.readOnly) values[f.name] = row.values[f.name] ?? null;
+    for (const d of dims?.defs ?? []) for (const p of [dims!.main, dims!.offset]) values[`${p}${d.slot}`] = row.values[`${p}${d.slot}`] || null;
     // předběžné číslo dokladu z náhledu neposílat — přidělí ho uložení (posune řadu)
     for (const k of pre.current.get(row.key)?.prov ?? []) delete values[k];
     values[parentField] = parentId;
@@ -293,14 +321,33 @@ export function InlineLines({
     const t = e.target as HTMLElement;
     const combo = t.getAttribute("role") === "combobox";
     const expanded = combo && t.getAttribute("aria-expanded") === "true";
-    // Enter: ve výběru s otevřenou nabídkou vybírá, jinak uloží řádek a jde na další
+    // Ctrl+Shift+D = dialog dimenzí řádku
+    if (dims && e.ctrlKey && e.shiftKey && (e.key === "D" || e.key === "d")) {
+      e.preventDefault();
+      setDimRow(row.key);
+      return;
+    }
+    // Enter: ve výběru s otevřenou nabídkou vybírá, jinak další pole řádku (na posledním uloží řádek)
     if (e.key === "Enter" && !expanded) {
       e.preventDefault();
       // hodnota pole (datum se převádí při Enteru) se do stavu propíše až po vykreslení
       await new Promise((r) => requestAnimationFrame(() => r(null)));
-      const idx = rowIndex(row.key);
-      if (!(await save(row.key))) return;
-      focusCell(idx + 1, entryCol);
+      const tr = (e.target as HTMLElement).closest("tr");
+      const inputs = [...(tr?.querySelectorAll<HTMLElement>("input:not([type=checkbox]), select") ?? [])].filter((x) => x.tabIndex !== -1);
+      const at = inputs.findIndex((x) => x === e.target || x.contains(e.target as Node));
+      if (at >= 0 && at + 1 < inputs.length) {
+        inputs[at + 1].focus();
+        if (inputs[at + 1] instanceof HTMLInputElement) (inputs[at + 1] as HTMLInputElement).select();
+      } else await save(row.key);
+      return;
+    }
+    // ↓ na posledním řádku: uložit a přidat nový řádek (číslo dokladu podle vyrovnanosti)
+    if (e.key === "ArrowDown" && !e.altKey && !expanded && (t.tagName !== "SELECT" || e.ctrlKey) && rowIndex(row.key) === rows.length - 1) {
+      e.preventDefault();
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      if (!row.id && !rowsRef.current.find((x) => x.key === row.key)?.dirty) return;
+      // nový řádek začíná účtem (první pole, které se nepřebírá)
+      await addRow(row.key);
       return;
     }
     // Alt+šipka nechat výběru (rozbalí nabídku), jinak šipky = o řádek výš / níž
@@ -310,6 +357,34 @@ export function InlineLines({
       focusCell(rowIndex(row.key) + (e.key === "ArrowDown" ? 1 : -1), colIdx);
     }
   };
+
+  /** Uložit řádek (pokud je rozpracovaný) a přidat nový pod něj. */
+  const addRow = async (fromKey?: string, colIdx?: number) => {
+    if (fromKey && !(await save(fromKey))) return;
+    await new Promise((r) => setTimeout(r, 0));
+    setRows((cur) => (cur.some((x) => !x.id && !x.dirty) ? cur : [...cur, blankFor(cur)]));
+    requestAnimationFrame(() => focusCell(rowsRef.current.length, colIdx ?? entryCol));
+  };
+
+  // vybraný (aktivní) řádek: podrobnosti pod mřížkou
+  const [active, setActive] = useState<string | null>(null);
+  const activeRow = rows.find((r) => r.key === active) ?? null;
+  const [tab, setTab] = useState("0");
+  const [dimRow, setDimRow] = useState<string | null>(null);
+  const dimTarget = rows.find((r) => r.key === dimRow) ?? null;
+  const patchRow = (key: string, patch: Values) =>
+    setRows((cur) => cur.map((r) => (r.key === key ? { ...r, values: { ...r.values, ...patch }, dirty: true, error: undefined } : r)));
+  const applyDims = async (key: string, patch: Values) => {
+    patchRow(key, patch);
+    setDimRow(null);
+    await new Promise((r) => setTimeout(r, 0));
+    await save(key);
+  };
+  const dimSummary = (r: EditRow, prefix: string) =>
+    (dims?.defs ?? [])
+      .map((d) => r.values[`${prefix}${d.slot}`] && `${d.name}: ${r.values[`${prefix}${d.slot}`]}`)
+      .filter(Boolean)
+      .join(", ");
 
   const totals = useMemo(() => {
     const t: Record<string, number> = {};
@@ -424,12 +499,12 @@ export function InlineLines({
                   {c.label}
                 </th>
               ))}
-              <th className={s.th} style={{ width: 40 }} />
+              <th className={s.th} style={{ width: dims ? 72 : 40 }} />
             </tr>
           </thead>
           <tbody ref={tbody}>
             {rows.map((r) => (
-              <RowView key={r.key} row={r} s={s} open={groupOpen(r)} picked={!!r.id && selected.has(r.id)} onLeave={() => void save(r.key)}>
+              <RowView key={r.key} row={r} s={s} open={groupOpen(r)} picked={!!r.id && selected.has(r.id)} current={r.key === active} onEnter={() => setActive(r.key)} onLeave={() => void save(r.key)}>
                 {!readOnly && (
                   <td className={s.td} style={{ textAlign: "center" }}>
                     {r.id && (
@@ -450,7 +525,12 @@ export function InlineLines({
                     {cell(r, c, i)}
                   </td>
                 ))}
-                <td className={s.td}>
+                <td className={s.td} style={{ whiteSpace: "nowrap" }}>
+                  {!readOnly && dims && labels.dims && (
+                    <Tooltip content={`${labels.dims.button} (Ctrl+Shift+D)`} relationship="label">
+                      <Button size="small" appearance="subtle" tabIndex={-1} icon={<Tag20Regular />} onClick={() => setDimRow(r.key)} />
+                    </Tooltip>
+                  )}
                   {!readOnly && (r.id || r.dirty) && (
                     <Tooltip content={labels.remove} relationship="label">
                       <Button size="small" appearance="subtle" tabIndex={-1} icon={<Delete20Regular />} onClick={() => void remove(r)} />
@@ -501,17 +581,75 @@ export function InlineLines({
           {!readOnly && labels.keys ? <span> · {labels.keys}</span> : null}
         </div>
       )}
+      {!readOnly && rows.some((r) => r.id) && !rows.some((r) => !r.id) && (
+        <div className={s.hint}>
+          <Button size="small" appearance="subtle" icon={<Add20Regular />} onClick={() => void addRow()}>
+            {labels.newLine ?? "Nový řádek"} (↓)
+          </Button>
+        </div>
+      )}
+      {(details?.length || dims) && activeRow && (
+        <div
+          className={s.details}
+          onBlur={(e) => {
+            // odchod z podrobností = uložit řádek
+            if (!e.currentTarget.contains(e.relatedTarget as Node) && activeRow.dirty) void save(activeRow.key);
+          }}
+        >
+          <TabList size="small" selectedValue={tab} onTabSelect={(_, d) => setTab(String(d.value))}>
+            {(details ?? []).map((d, i) => (
+              <Tab key={i} value={String(i)}>
+                {d.label}
+              </Tab>
+            ))}
+            {dims && labels.dims && <Tab value="dims">{labels.dims.tab}</Tab>}
+          </TabList>
+          {tab !== "dims" && details?.[Number(tab)] && (
+            <RecordForm
+              groups={[{ label: "", fields: details[Number(tab)].fields }]}
+              columns={4}
+              values={activeRow.values}
+              titles={activeRow.titles}
+              errors={{}}
+              readOnly={readOnly}
+              openLabel={labels.open}
+              onChange={(name, value, title) =>
+                update(activeRow.key, { values: { ...activeRow.values, [name]: value }, titles: title !== undefined ? { ...activeRow.titles, [name]: title } : activeRow.titles, dirty: true, error: undefined })
+              }
+            />
+          )}
+          {tab === "dims" && dims && labels.dims && (
+            <div style={{ display: "flex", gap: 24, alignItems: "center", paddingTop: 8, flexWrap: "wrap" }}>
+              <Text>
+                <b>{labels.dims.account}:</b> {dimSummary(activeRow, dims.main) || labels.dims.none}
+              </Text>
+              <Text>
+                <b>{labels.dims.offset}:</b> {dimSummary(activeRow, dims.offset) || labels.dims.none}
+              </Text>
+              {!readOnly && (
+                <Button size="small" icon={<Tag20Regular />} onClick={() => setDimRow(activeRow.key)}>
+                  {labels.dims.button} (Ctrl+Shift+D)
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {dims && labels.dims && dimTarget && (
+        <DimsDialog open dims={dims} values={dimTarget.values} labels={labels.dims} onOk={(patch) => void applyDims(dimTarget.key, patch)} onCancel={() => setDimRow(null)} />
+      )}
     </div>
   );
 }
 
 /** Řádek: uloží se, když z něj odejde fokus (klik jinam, Tab za poslední pole, šipka). */
-function RowView({ row, s, open, picked, onLeave, children }: { row: EditRow; s: ReturnType<typeof useStyles>; open: boolean; picked?: boolean; onLeave: () => void; children: React.ReactNode }) {
+function RowView({ row, s, open, picked, current, onEnter, onLeave, children }: { row: EditRow; s: ReturnType<typeof useStyles>; open: boolean; picked?: boolean; current?: boolean; onEnter?: () => void; onLeave: () => void; children: React.ReactNode }) {
   return (
     <>
       <tr
         data-row={row.key}
-        className={[row.error ? s.bad : row.dirty ? s.dirty : !row.id ? s.newRow : "", open ? s.open : "", picked ? s.picked : ""].join(" ").trim() || undefined}
+        className={[row.error ? s.bad : row.dirty ? s.dirty : !row.id ? s.newRow : "", open ? s.open : "", picked ? s.picked : "", current ? s.current : ""].join(" ").trim() || undefined}
+        onFocus={onEnter}
         onBlur={(e) => {
           const to = e.relatedTarget as Node | null;
           // přechod do vyskakovacího výběru (combobox) není opuštění řádku

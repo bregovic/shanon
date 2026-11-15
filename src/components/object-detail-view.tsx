@@ -29,6 +29,7 @@ import {
 } from "@fluentui/react-components";
 import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, DocumentSearch24Regular, Edit24Regular, Eye24Regular, MoreHorizontal24Regular, Open24Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
 import { PostingPreviewDrawer } from "./posting-preview";
+import type { LineDims } from "./dims-dialog";
 import { ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons";
 import { deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
@@ -62,6 +63,8 @@ export interface LineSpec {
   inline?: boolean;
   carry?: string[];
   balance?: { group: string; debit: string; credit: string; selfBalanced?: string };
+  details?: { label: string; fields: FieldMeta[] }[];
+  dims?: LineDims;
   /** řádek má akce — dvojklik otevře jeho stránku */
   openInPage?: boolean;
   sortField?: string;
@@ -189,8 +192,10 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           readOnly={!spec.editable}
           carry={spec.carry}
           balance={spec.balance}
+          details={spec.details}
+          dims={spec.dims}
           lang={lang}
-          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys, select: labels.grid.select, selectAll: labels.grid.selectAll, removeSelected: labels.grid.removeSelected, clearSelection: labels.grid.clearSelection }}
+          labels={{ open: labels.drawer.open, remove: labels.actions.delete, total: labels.grid.total ?? "Σ", empty: labels.grid.empty ?? "", unbalanced: labels.grid.linesUnbalanced, balanced: labels.grid.linesBalanced, keys: labels.grid.linesKeys, select: labels.grid.select, selectAll: labels.grid.selectAll, removeSelected: labels.grid.removeSelected, clearSelection: labels.grid.clearSelection, newLine: labels.grid.newLine, dims: labels.dims }}
           onChanged={() => router.refresh()}
         />
       ) : (
@@ -288,6 +293,16 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   const applyPreview = useCallback((vals: Values, t: Record<string, string>) => {
     setValues((v) => ({ ...v, ...vals }));
     setTitles((x) => ({ ...x, ...t }));
+  }, []);
+  // nový záznam: kurzor do prvního prázdného povinného pole (deník: Popis), ať jde rovnou psát
+  useEffect(() => {
+    if (p.id || p.readOnly) return;
+    const f = allFields.find((x) => x.mandatory && !x.readOnly && (p.values[x.name] === null || p.values[x.name] === undefined || p.values[x.name] === ""));
+    if (!f) return;
+    const t = setTimeout(() => document.querySelector<HTMLElement>(`[data-field="${f.name}"] input, [data-field="${f.name}"] textarea`)?.focus(), 150);
+    return () => clearTimeout(t);
+    // jen při otevření nového záznamu
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (!p.id && !p.readOnly) pv.run(p.values, applyPreview, 0);
@@ -525,7 +540,8 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           )}
           <RecordForm
             // kompaktní hlavička: všechna pole v jednom bloku, víc sloupců
-            groups={p.compactHeader ? [{ label: "", fields: p.groups.flatMap((g) => g.fields) }] : p.groups}
+            // nový doklad s kompaktní hlavičkou: jen první skupina (deník: číslo, datum, název, popis)
+            groups={p.compactHeader ? [{ label: "", fields: (p.id ? p.groups : p.groups.slice(0, 1)).flatMap((g) => g.fields) }] : p.groups}
             columns={p.compactHeader ? 4 : undefined}
             values={values}
             titles={titles}

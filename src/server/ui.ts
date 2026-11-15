@@ -79,6 +79,17 @@ export function formGroups(ctx: Ctx, def: ObjectDef, t: T, meta: Record<string, 
 export function uiLabels(t: T) {
   return {
     header: { show: t("@SYS:HeaderShow"), hide: t("@SYS:HeaderHide"), saveOpen: t("@SYS:HeaderSaveOpen") },
+    dims: {
+      title: t("@SYS:DimsTitle"),
+      account: t("@SYS:DimsAccount"),
+      offset: t("@SYS:DimsOffset"),
+      ok: t("@SYS:Ok"),
+      cancel: t("@SYS:Cancel"),
+      hint: t("@SYS:DimsHint"),
+      button: t("@SYS:DimsButton"),
+      tab: t("@SYS:DimsTab"),
+      none: t("@SYS:DimsNone"),
+    },
     groups: { print: t("@SYS:GroupPrint"), inquiry: t("@SYS:GroupInquiry"), more: t("@SYS:GroupMore") },
     posting: {
       preview: t("@SYS:PostingPreview"),
@@ -115,6 +126,7 @@ export function uiLabels(t: T) {
       selectAll: t("@SYS:SelectAll"),
       removeSelected: t("@SYS:RemoveSelected"),
       clearSelection: t("@SYS:ClearSelection"),
+      newLine: t("@SYS:NewLine"),
       help: FILTER_HELP.map(([code, label]) => [code, t(label)] as [string, string]),
     },
     drawer: {

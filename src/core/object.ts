@@ -39,6 +39,8 @@ export interface FieldDef {
    * (název deníku jen druhu deníku; prázdná hodnota = bez omezení)
    */
   lookupFilter?: Record<string, string>;
+  /** nový záznam nabídne hodnotu, kterou uživatel naposledy uložil (SysLastValue v AX) */
+  rememberLast?: boolean;
   /**
    * tajný údaj (heslo, API klíč, certifikát): v databázi šifrovaně, uživateli
    * se nevrací (jen maska), logika modulu ho čte přes revealSecret()
@@ -118,6 +120,13 @@ export interface ObjectDef {
     carry?: string[];
     /** vyrovnanost skupin řádků (doklad deníku): rozdíl MD − D po skupinách, dorovnání nového řádku */
     balance?: { group: string; debit: string; credit: string; selfBalanced?: string };
+    /** podrobnosti vybraného řádku pod mřížkou (záložky s poli, která se do mřížky nevejdou) */
+    details?: { label: LabelRef; fields: string[] }[];
+    /**
+     * dimenze účtu a protiúčtu (pole <main>1…6 a <offset>1…6) + dialog pro jejich zadání;
+     * `account` / `offsetAccount` = pole účtu (relevantní dimenze), `offsetType` = je-li protiúčet
+     */
+    dims?: { main: string; offset: string; account: string; offsetAccount: string; offsetType?: string };
   }[];
   /**
    * související doklady (faktury a zálohy objednávky): tlačítko v horní liště
