@@ -6,7 +6,7 @@
  */
 import { aresByIco, splitPersonName } from "@/modules/gab/ares";
 import { Edts, defineEdt, defineEnum, enumEdt } from "@/core/edt";
-import { UserError, defineModule, type DataApi, type ObjectHandlers } from "@/core/module";
+import { UserError, defineModule, type DataApi, type ObjectHandlers, type ValidationErrors } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { isPublicSlug } from "@/lib/reserved-paths";
 
@@ -28,6 +28,59 @@ const Zip = Str("OrgZip", "@ORG:ZipCode", 10, /^\d{3}\s?\d{2}$|^[A-Z0-9 -]{3,10}
 
 const NATURAL = { field: "legalForm", in: ["natural"] };
 
+/** Rejstříkové soudy (kód jako ve spisové značce „…/MSPH“). */
+export const RegisterCourt = defineEnum({
+  id: "OrgRegisterCourt",
+  label: "@ORG:RegisterCourt",
+  values: ["MSPH", "KSPH", "KSCB", "KSPL", "KSUL", "KSHK", "KSBR", "KSOS"].map((v) => ({ value: v, label: `@ORG:Court${v}` })),
+});
+/** Soud v 7. pádě pro text zápisu („vedeném Městským soudem v Praze“). */
+const COURT_BY: Record<string, string> = {
+  MSPH: "Městským soudem v Praze",
+  KSPH: "Krajským soudem v Praze",
+  KSCB: "Krajským soudem v Českých Budějovicích",
+  KSPL: "Krajským soudem v Plzni",
+  KSUL: "Krajským soudem v Ústí nad Labem",
+  KSHK: "Krajským soudem v Hradci Králové",
+  KSBR: "Krajským soudem v Brně",
+  KSOS: "Krajským soudem v Ostravě",
+};
+const COURT_NAMES: [RegExp, string][] = [
+  [/m[ěe]stsk\S* soud\S* v praze/i, "MSPH"],
+  [/krajsk\S* soud\S* v praze/i, "KSPH"],
+  [/[čc]esk\S* bud[ěe]jovic/i, "KSCB"],
+  [/plzn/i, "KSPL"],
+  [/[úu]st\S* nad labem/i, "KSUL"],
+  [/hradc\S* kr[áa]lov/i, "KSHK"],
+  [/brn/i, "KSBR"],
+  [/ostrav/i, "KSOS"],
+];
+/** Rejstřík podle oddílu (A, B, C, Dr = obchodní; L spolkový; N nadační; U ústavů; O o. p. s.; S SVJ). */
+const REGISTER_OF: Record<string, string> = {
+  L: "ve spolkovém rejstříku",
+  N: "v nadačním rejstříku",
+  U: "v rejstříku ústavů",
+  O: "v rejstříku obecně prospěšných společností",
+  S: "v rejstříku společenství vlastníků jednotek",
+};
+
+/** „C 327865/MSPH Městský soud v Praze“ → { fileNumber: "C 327865", court: "MSPH" }; null = neplatná značka. */
+export function parseFileNumber(raw: string): { fileNumber: string; court: string | null } | null {
+  const m = /^\s*([A-Za-z]{1,2})\s*(\d{1,7})\s*(?:\/\s*([A-Za-z]{4}))?\s*(.*)$/.exec(raw);
+  if (!m) return null;
+  const section = m[1].length === 2 ? m[1][0].toUpperCase() + m[1][1].toLowerCase() : m[1].toUpperCase();
+  let court = m[3] && COURT_BY[m[3].toUpperCase()] ? m[3].toUpperCase() : null;
+  if (!court && m[4]) court = COURT_NAMES.find(([re]) => re.test(m[4]))?.[1] ?? null;
+  return { fileNumber: `${section} ${m[2]}`, court };
+}
+
+/** Text zápisu na doklady: „Zapsáno v obchodním rejstříku vedeném Městským soudem v Praze, oddíl C, vložka 327865“. */
+export function registrationText(fileNumber: string, court: string | null | undefined): string | null {
+  const m = /^([A-Za-z]{1,2}) (\d+)$/.exec(fileNumber);
+  if (!m || !court || !COURT_BY[court]) return null;
+  return `Zapsáno ${REGISTER_OF[m[1]] ?? "v obchodním rejstříku"} vedeném ${COURT_BY[court]}, oddíl ${m[1]}, vložka ${m[2]}`;
+}
+
 export const entity = defineObject({
   id: "org.entity",
   table: "org_entity",
@@ -43,7 +96,10 @@ export const entity = defineObject({
     regNo: { edt: Edts.RegNo },
     vatId: { edt: Edts.VatId },
     vatPayer: { edt: Edts.NoYes, label: "@ORG:VatPayer", default: true },
-    registration: { edt: Edts.Description, label: "@ORG:Registration" },
+    // zápis ve veřejném rejstříku: spisová značka (oddíl + vložka) a rejstříkový soud → text na dokladech
+    fileNumber: { edt: Str("OrgFileNumber", "@ORG:FileNumber", 60), help: "@ORG:FileNumberHelp" },
+    registerCourt: { edt: enumEdt(RegisterCourt), help: "@ORG:RegisterCourtHelp" },
+    registration: { edt: Edts.Description, label: "@ORG:Registration", help: "@ORG:RegistrationHelp" },
     street: { edt: Str("OrgStreet", "@ORG:Street", 120) },
     houseNo: { edt: Str("OrgHouseNo", "@ORG:HouseNo", 10) },
     orientNo: { edt: Str("OrgOrientNo", "@ORG:OrientNo", 10) },
@@ -70,7 +126,7 @@ export const entity = defineObject({
     { id: "simplifyVat", label: "@ORG:SimplifyVat", module: "tax", group: "more" as const, when: { field: "vatPayer", equals: false } },
   ],
   form: [
-    { label: "@ORG:Identity", fields: ["legalName", "tradeName", "legalForm", "firstName", "lastName", "regNo", "vatId", "vatPayer", "registration"] },
+    { label: "@ORG:Identity", fields: ["legalName", "tradeName", "legalForm", "firstName", "lastName", "regNo", "vatId", "vatPayer", "fileNumber", "registerCourt", "registration"] },
     { label: "@ORG:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode", "country"] },
     { label: "@ORG:Contacts", fields: ["email", "phone", "web", "dataBoxId", "publicSlug"] },
     { label: "@ORG:Bank", fields: ["bankAccount", "iban", "bic"] },
@@ -177,11 +233,25 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
           city: a.city,
           zipCode: a.zipCode,
           country: a.country,
+          // spisová značka z ARES (veřejný rejstřík), jen když chybí — beforeSave ji rozloží a sestaví text
+          ...(a.fileRef && !rec.fileNumber ? { fileNumber: a.fileRef } : {}),
         });
       },
     },
-    async beforeSave(ctx, d, isNew) {
+    async beforeSave(ctx, d, isNew): Promise<ValidationErrors | void> {
       if (isNew && (await ctx.data.find("org.entity", {}, { take: 1 })).length) throw new UserError("@ORG:OneEntity");
+      // spisová značka: „C 327865/MSPH Městský soud v Praze“ → C 327865 + soud; text zápisu na doklady
+      if (d.fileNumber) {
+        const fr = parseFileNumber(String(d.fileNumber));
+        if (!fr) return { fileNumber: "@ORG:FileNumberInvalid" };
+        const before = !isNew && d.id ? await ctx.data.get("org.entity", String(d.id)) : null;
+        d.fileNumber = fr.fileNumber;
+        if (fr.court && (!d.registerCourt || before?.fileNumber !== d.fileNumber)) d.registerCourt = fr.court;
+        const text = registrationText(fr.fileNumber, d.registerCourt as string | null);
+        const oldText = before?.fileNumber ? registrationText(String(before.fileNumber), before.registerCourt as string | null) : null;
+        // text se přepíše, jen když ho uživatel nezměnil ručně (prázdný nebo dřív sestavený)
+        if (text && (!d.registration || d.registration === oldText)) d.registration = text;
+      }
       if (d.legalForm === "natural" && (!d.firstName || !d.lastName)) return { [d.firstName ? "lastName" : "firstName"]: "@SYS:Required" };
       if (d.publicSlug) d.publicSlug = String(d.publicSlug).trim().toLowerCase();
       if (d.publicSlug && !isPublicSlug(String(d.publicSlug))) return { publicSlug: "@ORG:PublicSlugHelp" };
@@ -212,7 +282,7 @@ export default defineModule({
   description: "@ORG:ModuleDesc",
   icon: "Building",
   dependsOn: ["sys"],
-  enums: [LegalForm],
+  enums: [LegalForm, RegisterCourt],
   objects: [entity, site],
   menu: [
     { label: "@ORG:Module", items: [{ object: "org.entity" }, { object: "org.site" }] },
@@ -239,7 +309,21 @@ export default defineModule({
       FirstName: "Jméno",
       LastName: "Příjmení",
       VatPayer: "Plátce DPH",
-      Registration: "Zápis v rejstříku",
+      Registration: "Zápis v rejstříku (text na dokladech)",
+      RegistrationHelp: "Sestaví se sám ze spisové značky a soudu. Jiný zápis (živnostenský rejstřík…) napište ručně, např. „Podnikatel zapsaný v živnostenském rejstříku.“",
+      FileNumber: "Spisová značka",
+      FileNumberHelp: "Oddíl a vložka, např. C 327865 (s.r.o. = C, a.s. = B, družstvo = Dr, spolek = L). Lze vložit i celou značku z rejstříku „C 327865/MSPH Městský soud v Praze“ — soud se doplní sám.",
+      FileNumberInvalid: "Spisová značka je oddíl a číslo vložky, např. C 327865.",
+      RegisterCourt: "Rejstříkový soud",
+      RegisterCourtHelp: "Soud, který rejstřík vede (je ve výpisu z obchodního rejstříku).",
+      CourtMSPH: "Městský soud v Praze",
+      CourtKSPH: "Krajský soud v Praze",
+      CourtKSCB: "Krajský soud v Českých Budějovicích",
+      CourtKSPL: "Krajský soud v Plzni",
+      CourtKSUL: "Krajský soud v Ústí nad Labem",
+      CourtKSHK: "Krajský soud v Hradci Králové",
+      CourtKSBR: "Krajský soud v Brně",
+      CourtKSOS: "Krajský soud v Ostravě",
       Identity: "Identifikace",
       Address: "Sídlo",
       Street: "Ulice",
@@ -286,7 +370,21 @@ export default defineModule({
       FirstName: "First name",
       LastName: "Last name",
       VatPayer: "VAT payer",
-      Registration: "Register entry",
+      Registration: "Register entry (text on documents)",
+      RegistrationHelp: "Built from the file number and court. For another register (trade licence…) write it manually.",
+      FileNumber: "File number",
+      FileNumberHelp: "Section and insert, e.g. C 327865 (s.r.o. = C, a.s. = B, cooperative = Dr, association = L). You can paste the full reference „C 327865/MSPH Městský soud v Praze“ — the court is filled in automatically.",
+      FileNumberInvalid: "The file number is a section and insert number, e.g. C 327865.",
+      RegisterCourt: "Registry court",
+      RegisterCourtHelp: "The court keeping the register (see the commercial register extract).",
+      CourtMSPH: "Municipal Court in Prague",
+      CourtKSPH: "Regional Court in Prague",
+      CourtKSCB: "Regional Court in České Budějovice",
+      CourtKSPL: "Regional Court in Plzeň",
+      CourtKSUL: "Regional Court in Ústí nad Labem",
+      CourtKSHK: "Regional Court in Hradec Králové",
+      CourtKSBR: "Regional Court in Brno",
+      CourtKSOS: "Regional Court in Ostrava",
       Identity: "Identification",
       Address: "Registered address",
       Street: "Street",

@@ -250,7 +250,7 @@ function FieldInput({
       );
   }
   return (
-    <Field label={f.label} required={f.mandatory && !disabled} validationMessage={error}>
+    <Field label={f.label} required={f.mandatory && !disabled} validationMessage={error} hint={f.help}>
       {control}
     </Field>
   );

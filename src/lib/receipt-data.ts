@@ -10,6 +10,7 @@ export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: st
       address: r.company.address ?? "",
       regNo: r.company.regNo ?? "",
       vatId: r.company.vatId ?? "",
+      registration: r.company.registration ?? "",
       // logo: v kase odkaz na přílohu, tisk na serveru ho nahradí data: URL (printJob)
       logoId: r.company.logoId ?? "",
       logo: r.company.logoId ? `/api/files/${r.company.logoId}` : "",

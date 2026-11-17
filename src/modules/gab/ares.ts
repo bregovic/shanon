@@ -24,6 +24,8 @@ export interface AresSubject {
   zipCode: string | null;
   country: string;
   closed: boolean;
+  /** spisová značka ve veřejném rejstříku („C 327865/MSPH“), když ji ARES uvádí */
+  fileRef?: string | null;
 }
 
 /** Kódy právních forem fyzických osob (číselník ČSÚ 149). */
@@ -47,6 +49,7 @@ function toSubject(d: RecordData): AresSubject {
     zipCode: psc ? `${psc.slice(0, 3)} ${psc.slice(3)}` : null,
     country: String(s.kodStatu ?? "CZ"),
     closed: !!d.datumZaniku,
+    fileRef: (((d.dalsiUdaje ?? []) as RecordData[]).find((x) => x.spisovaZnacka)?.spisovaZnacka as string) ?? null,
   };
 }
 

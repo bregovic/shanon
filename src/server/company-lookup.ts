@@ -77,6 +77,8 @@ export function createCompanyFromRegistry(
           city: hit.city,
           zipCode: hit.zipCode,
           country: hit.country,
+          // spisová značka z ARES → soud a text zápisu na doklady sestaví organizace sama
+          ...(hit.fileRef ? { fileNumber: hit.fileRef } : {}),
         };
         // bankovní účty zveřejněné v registru plátců DPH
         const published = vatStatus?.accounts ?? [];

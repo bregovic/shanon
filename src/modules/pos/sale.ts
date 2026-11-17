@@ -339,7 +339,7 @@ export interface ReceiptPrint {
   issuedAt: string;
   register: string;
   /** tradeName = název provozovny/značka nad obchodním jménem (jen když se liší) */
-  company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null; logoId?: string | null };
+  company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null; logoId?: string | null; registration?: string | null };
   /** plátce DPH (neplátce: účtenka / faktura bez DPH, ne daňový doklad) */
   vatPayer?: boolean;
   /** známý odběratel — účtenka je pak faktura – daňový doklad */
@@ -420,6 +420,8 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
       regNo: ((org?.regNo ?? company?.regNo) as string) ?? null,
       vatId: ((org?.vatId ?? company?.vatId) as string) ?? null,
       address: addr,
+      // zápis ve veřejném rejstříku (spisová značka), když ho organizace má
+      registration: (org?.registration as string) || null,
     },
     customer,
     vatPayer: await vatPayer(data),

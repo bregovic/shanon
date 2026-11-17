@@ -8,6 +8,8 @@ type RecordData = Record<string, unknown>;
 export interface FieldMeta {
   name: string;
   label: string;
+  /** nápověda pod polem (jak vyplnit) */
+  help?: string;
   kind: FieldKind;
   mandatory: boolean;
   readOnly: boolean;

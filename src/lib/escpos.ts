@@ -95,6 +95,8 @@ export function receiptEscPos(
   else p.bold(true).line(r.company.name).bold(false);
   if (r.company.address) p.line(r.company.address);
   p.line([r.company.regNo && `IČO ${r.company.regNo}`, r.company.vatId && `DIČ ${r.company.vatId}`].filter(Boolean).join("  "));
+  // zápis v rejstříku (spisová značka) — dlouhý text po řádcích šířky papíru
+  if (r.company.registration) for (let i = 0; i < r.company.registration.length; i += opts.width) p.line(r.company.registration.slice(i, i + opts.width));
   p.align("left").sep();
   p.pair(r.vatPayer === false ? (r.customer ? L.InvoiceNonPayer : L.Receipt) : r.customer ? L.InvoiceDoc : L.SimplifiedDoc, r.receiptNum);
   p.pair(r.register, new Date(r.issuedAt).toLocaleString(opts.locale));

@@ -17,6 +17,7 @@ function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
   return {
     name,
     label: t(f.label ?? e.label),
+    help: f.help ?? e.help ? t((f.help ?? e.help)!) : undefined,
     kind: e.kind,
     mandatory: !!f.mandatory,
     readOnly: !!f.readOnly,

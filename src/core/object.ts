@@ -66,6 +66,8 @@ export interface FieldDef {
   gridColumn?: string;
   /** pole patří funkci jiného modulu (položka „v e-shopu“): bez zapnutého modulu se v UI nezobrazuje */
   module?: string;
+  /** nápověda pod polem ve formuláři (jak vyplnit, příklad) */
+  help?: LabelRef;
 }
 
 export interface VisibleWhen {

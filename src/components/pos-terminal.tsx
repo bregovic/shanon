@@ -1621,6 +1621,7 @@ function Receipt({
       <div className={st.rCenter}>
         {r.company.regNo && `IČO ${r.company.regNo}`} {r.company.vatId && `DIČ ${r.company.vatId}`}
       </div>
+      {r.company.registration && <div className={st.rCenter} style={{ fontSize: "0.85em" }}>{r.company.registration}</div>}
       <div className={st.rSep} />
       <div className={st.rRow}>
         <span>{r.vatPayer === false ? (r.customer ? L.InvoiceNonPayer : L.Receipt) : r.customer ? L.InvoiceDoc : L.SimplifiedDoc}</span>

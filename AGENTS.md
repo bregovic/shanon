@@ -87,6 +87,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Neplátce DPH (`vatPayer()` v `tax/orders.ts`: organizace, jinak firma): výchozí nastavení jen kódy BEZ / P0 (`NP_CODES`), skupiny
   a doprava na ně; tisk bez daňového dokladu (`doc.title`, účtenka v4 bez rekapitulace DPH, faktura v7). Stane-li se plátcem,
   `setup-all` doplní plnou sadu. Zbytečné kódy stávajících firem se nemažou.
+- Nápověda pod polem formuláře: `FieldDef.help` (label) → `FieldMeta.help` → `Field hint`. Spisová značka organizace
+  (`parseFileNumber` / `registrationText` v `org/index.ts`, z ARES `dalsiUdaje[].spisovaZnacka`) sestaví `registration`
+  (tiskne se na faktuře v bloku dodavatele a na účtence); ručně změněný text se nepřepisuje.
 - Párování plateb se nesmí hádat: automat páruje jen jednoznačnou shodu VS,
   víc kandidátů = ručně. Import výpisu se uloží jen když součty sedí na hlavičku.
 - Pokladna (`src/modules/pos`): ceny a DPH počítá vždy server z položek

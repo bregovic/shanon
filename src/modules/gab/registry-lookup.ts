@@ -23,6 +23,8 @@ export interface RegistryHit {
   city: string | null;
   zipCode: string | null;
   country: string;
+  /** ARES: spisová značka ve veřejném rejstříku („C 94735/MSPH“) */
+  fileRef?: string | null;
   /** subjekt se stejným IČO / DIČ už v adresáři je */
   existingId: string | null;
 }
@@ -48,7 +50,7 @@ export async function lookupRegistry(data: DataApi, query: string, target: "subj
   let hit: Omit<RegistryHit, "existingId"> | null = null;
   if (ico) {
     const a = await aresByIco(ico, data);
-    if (a) hit = { source: "ares", name: a.name, regNo: a.ico, vatId: a.vatId, person: a.person, street: a.street, streetName: a.streetName, houseNo: a.houseNo, orientNo: a.orientNo, city: a.city, zipCode: a.zipCode, country: a.country };
+    if (a) hit = { source: "ares", name: a.name, regNo: a.ico, vatId: a.vatId, person: a.person, street: a.street, streetName: a.streetName, houseNo: a.houseNo, orientNo: a.orientNo, city: a.city, zipCode: a.zipCode, country: a.country, fileRef: a.fileRef ?? null };
   } else {
     const m = /^([A-Z]{2})([0-9A-Z+*.]{2,14})$/.exec(q);
     if (!m) throw new UserError("@GAB:LookupFormat");
