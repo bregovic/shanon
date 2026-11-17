@@ -91,8 +91,15 @@ export interface PartnerLedgerSpec {
   advanceAccount: string;
   /** u přijatých faktur číslo dokladu dodavatele */
   externalNum?: boolean;
-  /** výchozí účtovací profil darů (přijaté doklady typu Dar) — syntetika účtu závazků */
-  donationProfile?: { code: string; name: string; summary: string };
+  /**
+   * výchozí účtovací profily (zakládají se jen chybějící kódy): účet = syntetika („321“ → 321000)
+   * nebo celé číslo účtu; bez účtu = profil bez řádků (účet ze skupiny partnera)
+   */
+  profiles?: { code: string; name: string; account?: string }[];
+  /** kód výchozího profilu faktur, profilu darů a profilu finančního úřadu (Daňové parametry → dodavatel FÚ) */
+  defaultProfile?: string;
+  donationProfile?: string;
+  taxOfficeProfile?: string;
 }
 
 export function partnerLedger(sp: PartnerLedgerSpec) {
@@ -215,6 +222,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       /** výchozí účet pro platby (z bankovních účtů subjektu) */
       bankAccountId: { edt: refEdt("gab.bankAccount", "@GAB:BankAccount") },
       paymentMethodId: { edt: refEdt("bank.paymentMethod", "@TAX:PaymentMethod"), optionalRef: true },
+      /** výchozí účtovací profil dokladů partnera (prázdné = z parametrů) */
+      postingProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfile") },
       /** kam posílat doklady e-mailem (prázdné = e-mail subjektu v adresáři) */
       docEmail: { edt: Edts.Email, label: "@TAX:DocEmail" },
       blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
@@ -222,7 +231,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     titleField: "accountNum",
     list: ["accountNum", "subjectId", "regNo", "groupId", "currencyId", "paymentDays", "blocked"],
     form: [
-      { label: "@SYS:General", fields: ["accountNum", "subjectId", "regNo", "groupId", "taxGroupId", "blocked"] },
+      { label: "@SYS:General", fields: ["accountNum", "subjectId", "regNo", "groupId", "taxGroupId", "postingProfileId", "blocked"] },
       { label: L("Terms"), fields: ["currencyId", "paymentDays", "paymentMethodId", "bankAccountId", "docEmail"] },
       { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
@@ -602,22 +611,39 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
         // skupina DPH Tuzemsko skupinám partnerů, které žádnou nemají
         const [tuz] = await data.find("tax.taxGroup", { code: "TUZ" }, { take: 1 });
         if (tuz) for (const g of await data.find(group.id, { taxGroupId: null }, { take: 500 })) await data.update(group.id, String(g.id), { taxGroupId: tuz.id });
-        // profil darů (závazek 379) a jeho nastavení v parametrech (jen chybějící)
-        if (sp.donationProfile) {
-          const dp = sp.donationProfile;
-          let [prof] = await data.find(profile.id, { code: dp.code }, { take: 1 });
+        // výchozí účtovací profily (jen chybějící kódy; firma si je může upravit nebo smazat)
+        const profileIds = new Map<string, string>();
+        for (const pd of sp.profiles ?? []) {
+          let [prof] = await data.find(profile.id, { code: pd.code }, { take: 1 });
           if (!prof) {
-            const acc = await postingAccount(data, dp.summary);
-            if (acc) {
-              prof = await data.create(profile.id, { code: dp.code, name: dp.name });
-              await data.create(profileLine.id, { profileId: prof.id, accountCode: "all", summaryAccountId: acc });
+            let acc: string | null = null;
+            if (pd.account) {
+              const [exact] = pd.account.length === 6 ? await data.find("gl.account", { accountNum: pd.account }, { take: 1 }) : [];
+              acc = exact ? String(exact.id) : await postingAccount(data, pd.account);
+              if (!acc) continue; // účet v rozvrhu chybí — profil nezakládat
             }
+            prof = await data.create(profile.id, { code: pd.code, name: pd.name });
+            if (acc) await data.create(profileLine.id, { profileId: prof.id, accountCode: "all", summaryAccountId: acc });
           }
-          if (prof) {
-            const [p] = await data.find(params.id, {}, { take: 1 });
-            if (!p) await data.create(params.id, { invoiceNumCheck: "reject", donationProfileId: prof.id });
-            else if (!p.donationProfileId) await data.update(params.id, String(p.id), { donationProfileId: prof.id });
+          profileIds.set(pd.code, String(prof.id));
+        }
+        // parametry: výchozí profil a profil darů (jen nevyplněné)
+        const want: RecordData = {};
+        if (sp.defaultProfile && profileIds.has(sp.defaultProfile)) want.postingProfileId = profileIds.get(sp.defaultProfile);
+        if (sp.donationProfile && profileIds.has(sp.donationProfile)) want.donationProfileId = profileIds.get(sp.donationProfile);
+        if (Object.keys(want).length) {
+          const [p] = await data.find(params.id, {}, { take: 1 });
+          if (!p) await data.create(params.id, { invoiceNumCheck: "reject", ...want });
+          else {
+            const fill = Object.fromEntries(Object.entries(want).filter(([k]) => !p[k]));
+            if (Object.keys(fill).length) await data.update(params.id, String(p.id), fill);
           }
+        }
+        // dodavatel Finanční úřad (Daňové parametry) dostane profil FÚ, když žádný nemá
+        if (sp.taxOfficeProfile && profileIds.has(sp.taxOfficeProfile)) {
+          const [tp] = await data.find("tax.parameters", {}, { take: 1 }).catch(() => [] as RecordData[]);
+          const fu = tp?.taxOfficeVendorId ? await data.get(partner.id, String(tp.taxOfficeVendorId)) : null;
+          if (fu && !fu.postingProfileId) await data.update(partner.id, String(fu.id), { postingProfileId: profileIds.get(sp.taxOfficeProfile) });
         }
         if ((await data.find(group.id, {}, { take: 1 })).length) return;
         const acc = (num: string) => postingAccount(data, num);

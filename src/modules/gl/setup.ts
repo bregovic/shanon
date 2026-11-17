@@ -63,6 +63,7 @@ export const DEFAULT_ACCOUNTS: Acc[] = [
   ["341000", "Daň z příjmů", "liability"],
   ["342000", "Ostatní přímé daně", "liability"],
   ["343000", "Daň z přidané hodnoty", "liability", "vat", true],
+  ["343900", "DPH – zúčtování s finančním úřadem", "liability", "vendor", true],
   ["345000", "Ostatní daně a poplatky", "liability"],
   ["365000", "Ostatní závazky ke společníkům", "liability"],
   ["378000", "Jiné pohledávky", "asset"],
@@ -128,7 +129,7 @@ export const DEFAULT_ACCOUNTS: Acc[] = [
  * Analytiky, které osnova dostala později — stávajícím firmám se doplní, když chybí
  * (ostatní analytiky si firma mohla smazat záměrně, ty se nevrací).
  */
-const ADDED_ACCOUNTS = ["543100", "543900"];
+const ADDED_ACCOUNTS = ["543100", "543900", "343900"];
 
 /**
  * Účet syntetiky, na který se účtuje: xxx000, jinak první účet té syntetiky.

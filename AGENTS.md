@@ -238,7 +238,7 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   není jedinečné kvůli opravným deníkům). Typ přijatého dokladu `ap.invoice.docType` (faktura / účtenka / dar): účtenka = zjednodušený doklad, `tax.trans.simplified`;
   dar = bez DPH, řádek 543100, profil darů z `ap.parameters.donationProfileId` (DAR → 379).
 - Účtovací profily (`<ar|ap>.postingProfile` + řádky partner / skupina / všechny → účet salda): faktura nese `postingProfileId`
-  (výchozí z parametrů podle typu), `summaryAccountOf` v `tax/document.ts`; bez profilu účet skupiny. Položka salda si účet
+  (dar → profil darů, jinak profil partnera, jinak parametry; výchozí sada STANDARD/ZAM/FU/DAR/OST v `profiles` spec, FU dostane dodavatel FÚ z `tax.parameters`, platba DPH podle něj), `summaryAccountOf` v `tax/document.ts`; bez profilu účet skupiny. Položka salda si účet
   pamatuje (`trans.accountId`) a úhrada (banka `summaryAccount`, deník s VS v `planJournal`) jde proti němu.
 - Platba DPH (`src/modules/tax/vat-payment.ts`, druh `vatPayment` přiznání, akce `postPayment`, obsluha `vatPaymentHandlers` zvlášť
   kvůli importům): zúčtování účtů DPH z `tax.trans` období proti dodavateli FÚ (`tax.parameters.taxOfficeVendorId`), položka

@@ -94,12 +94,12 @@ export async function summaryAccountOf(data: DataApi, cfg: InvoiceConfig, profil
   return String(group[cfg.groupSummaryField]);
 }
 
-/** Výchozí účtovací profil podle typu dokladu (dar → profil darů, jinak výchozí profil z parametrů). */
-async function defaultProfile(data: DataApi, cfg: InvoiceConfig, docType: unknown): Promise<string | null> {
-  if (!cfg.parameters) return null;
-  const [p] = await data.find(cfg.parameters, {}, { take: 1 });
-  if (!p) return null;
-  return ((docType === "donation" ? p.donationProfileId : p.postingProfileId) as string) ?? null;
+/** Výchozí účtovací profil: dar → profil darů, jinak profil partnera, jinak výchozí profil z parametrů. */
+async function defaultProfile(data: DataApi, cfg: InvoiceConfig, docType: unknown, partnerId: unknown): Promise<string | null> {
+  const [p] = cfg.parameters ? await data.find(cfg.parameters, {}, { take: 1 }) : [];
+  if (docType === "donation" && p?.donationProfileId) return String(p.donationProfileId);
+  const partner = partnerId ? await data.get(cfg.partnerObject, String(partnerId)) : null;
+  return ((partner?.postingProfileId ?? p?.postingProfileId) as string) ?? null;
 }
 
 /** Výchozí účet nákladů daru: 543100 (odčitatelné dary), jinak první účet syntetiky 543. */
@@ -161,9 +161,10 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         if (data.docType === "donation") data.taxGroupId = null;
         // účtovací profil podle typu dokladu (nový doklad, jiný typ; ručně zvolený profil zůstane)
         if (cfg.profileLine) {
-          const typeChanged = !!before && (before.docType ?? null) !== (data.docType ?? null);
-          const wasDefault = !before || !data.postingProfileId || data.postingProfileId === (await defaultProfile(ctx.data, cfg, before.docType));
-          if (isNew ? !data.postingProfileId : typeChanged && wasDefault) data.postingProfileId = await defaultProfile(ctx.data, cfg, data.docType);
+          // jiný typ nebo partner: profil se přepne, jen když byl výchozí (ručně zvolený zůstane)
+          const changed = !!before && ((before.docType ?? null) !== (data.docType ?? null) || before[cfg.partnerField] !== data[cfg.partnerField]);
+          const wasDefault = !data.postingProfileId || (!!before && data.postingProfileId === (await defaultProfile(ctx.data, cfg, before.docType, before[cfg.partnerField])));
+          if (isNew ? !data.postingProfileId : changed && wasDefault) data.postingProfileId = await defaultProfile(ctx.data, cfg, data.docType, data[cfg.partnerField]);
         }
         // jiná skupina DPH na hlavičce: řádky se starou skupinou ji po uložení převezmou (afterSave)
         if (before && (before.taxGroupId ?? null) !== (data.taxGroupId ?? null)) groupChanged.set(String(data.id), (before.taxGroupId as string) ?? null);

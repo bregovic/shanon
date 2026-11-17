@@ -1,13 +1,25 @@
 ---
 title: Účtovací profily a dary
 module: ap
-objects: ap.postingProfile, ap.postingProfileLine, ar.postingProfile, ar.postingProfileLine, ap.parameters, ar.parameters, ap.invoice
+objects: ap.vendor, ar.customer, ap.postingProfile, ap.postingProfileLine, ar.postingProfile, ar.postingProfileLine, ap.parameters, ar.parameters, ap.invoice
 order: 40
 summary: Na jaký účet jde závazek nebo pohledávka dokladu (zaměstnanci, finanční úřad, dary) a jak evidovat poskytnutý dar.
 ---
 ## Účtovací profil
 
-Profil určuje **účet závazků** (u odběratelů účet pohledávek), na který se doklad zaúčtuje. Bez profilu platí účet ze **skupiny** partnera, jako dřív.
+Profil určuje **účet závazků** (u odběratelů účet pohledávek), na který se doklad zaúčtuje. Bez profilu (nebo bez vhodného řádku) platí účet ze **skupiny** partnera.
+
+Výchozí profily (firma si je může upravit):
+
+| Kód | Závazky | Pohledávky |
+|---|---|---|
+| STANDARD | účet ze skupiny dodavatelů | účet ze skupiny odběratelů |
+| ZAM – Zaměstnanci | 333000 | 335000 |
+| FU – Finanční úřad | 343900 | 343900 |
+| DAR – Dary | 379000 | – |
+| OST – Ostatní | 325000 | 315000 |
+
+Profil se na faktuře vyplní sám: u daru profil darů, jinak **profil partnera** (karta dodavatele / odběratele), jinak výchozí profil z Parametrů (STANDARD). Dodavatel nastavený v [Daňových parametrech](/tax/parameters) jako finanční úřad dostane profil FU — platba DPH se pak zaúčtuje MD 343 / D 343900 a úhrada z výpisu jde proti 343900.
 
 1. [Účtovací profily dodavatelů](/ap/postingProfile) → **Nový**, kód a název (např. ZAM – Zaměstnanci).
 2. Řádky profilu – **Platí pro**:

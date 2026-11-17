@@ -18,6 +18,13 @@ export const ar = partnerLedger({
   orderSeq: "ARORD",
   advanceSeq: "ARADV",
   advanceAccount: "324",
+  profiles: [
+    { code: "STANDARD", name: "Standardní (účet ze skupiny odběratelů)" },
+    { code: "ZAM", name: "Zaměstnanci", account: "335" },
+    { code: "FU", name: "Finanční úřad", account: "343900" },
+    { code: "OST", name: "Ostatní pohledávky", account: "315" },
+  ],
+  defaultProfile: "STANDARD",
 });
 
 export default defineModule({

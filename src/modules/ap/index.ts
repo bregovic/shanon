@@ -19,7 +19,16 @@ export const ap = partnerLedger({
   advanceSeq: "APADV",
   advanceAccount: "314",
   externalNum: true,
-  donationProfile: { code: "DAR", name: "Dary", summary: "379" },
+  profiles: [
+    { code: "STANDARD", name: "Standardní (účet ze skupiny dodavatelů)" },
+    { code: "ZAM", name: "Zaměstnanci", account: "333" },
+    { code: "FU", name: "Finanční úřad", account: "343900" },
+    { code: "DAR", name: "Dary", account: "379" },
+    { code: "OST", name: "Ostatní závazky", account: "325" },
+  ],
+  defaultProfile: "STANDARD",
+  donationProfile: "DAR",
+  taxOfficeProfile: "FU",
 });
 
 export default defineModule({

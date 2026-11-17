@@ -426,6 +426,14 @@ export const vatReturnHandlers: Record<string, ObjectHandlers> = {
       if (isNew && (await ctx.data.find("tax.parameters", {}, { take: 1 })).length) throw new UserError("@TAX:OneParameters");
       if (data.subjectType === "F" && (!data.firstName || !data.lastName)) return { firstName: "@SYS:Required" };
     },
+    // dodavatel Finanční úřad bez účtovacího profilu dostane profil FU (závazek DPH na 343900), je-li založený
+    async afterSave(ctx, data) {
+      if (!data.taxOfficeVendorId || !ctx.modules?.has("ap")) return;
+      const fu = await ctx.data.get("ap.vendor", String(data.taxOfficeVendorId));
+      if (!fu || fu.postingProfileId) return;
+      const [prof] = await ctx.data.find("ap.postingProfile", { code: "FU" }, { take: 1 });
+      if (prof) await ctx.data.update("ap.vendor", String(fu.id), { postingProfileId: prof.id });
+    },
   },
   "tax.return": {
     beforeSave(_ctx, data) {

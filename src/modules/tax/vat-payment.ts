@@ -37,6 +37,13 @@ export async function postVatPayment(data: DataApi, companyId: string | null, re
   if (!vendor) throw new UserError("@TAX:NoTaxOfficeVendor");
   const group = await data.get("ap.group", String(vendor.groupId));
   if (!group?.payableAccountId) throw new UserError("@TAX:NoTaxOfficeVendor");
+  // účet závazku: profil dodavatele FÚ (řádek pro partnera → skupinu → všechny), jinak účet skupiny
+  let payable = String(group.payableAccountId);
+  if (vendor.postingProfileId) {
+    const pl = await data.find("ap.postingProfileLine", { profileId: String(vendor.postingProfileId) }, { take: 500 });
+    const hit = pl.find((l) => l.accountCode === "partner" && l.vendorId === vendor.id) ?? pl.find((l) => l.accountCode === "group" && l.groupId === group.id) ?? pl.find((l) => l.accountCode === "all");
+    if (hit?.summaryAccountId) payable = String(hit.summaryAccountId);
+  }
   const company = companyId ? await data.get("sys.company", companyId) : null;
 
   const period = periodRange(ret);
@@ -61,7 +68,7 @@ export async function postVatPayment(data: DataApi, companyId: string | null, re
   const lines: PostingLine[] = [...byAccount].filter(([, v]) => v !== BigInt(0)).map(([accountId, v]) => ({ accountId, amount: fromCents(v), text: t("@TAX:VatPaymentText", { period: period.code }) }));
   const raw = [...byAccount.values()].reduce((a, v) => a + v, BigInt(0));
   // závazek vůči FÚ (D), nadměrný odpočet = pohledávka (MD)
-  lines.push({ accountId: String(group.payableAccountId), amount: fromCents(-result), viaSubledger: true, text: t("@TAX:VatPaymentText", { period: period.code }) });
+  lines.push({ accountId: payable, amount: fromCents(-result), viaSubledger: true, text: t("@TAX:VatPaymentText", { period: period.code }) });
   // zaokrouhlení na celé koruny
   const diff = result - raw;
   if (diff !== BigInt(0)) lines.push({ accountId: await systemAccount(data, diff > BigInt(0) ? "roundingLoss" : "roundingGain"), amount: fromCents(diff), text: null });
@@ -90,6 +97,7 @@ export async function postVatPayment(data: DataApi, companyId: string | null, re
       amountCur: fromCents(result),
       paidAmount: "0",
       closed: false,
+      accountId: payable,
     });
   await data.update("tax.return", String(ret.id), { voucherId: voucher.id, dueDate, paymentVs: vs, paymentAmount: fromCents(result) });
 }

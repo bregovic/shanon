@@ -50,6 +50,10 @@ describe("platba DPH", () => {
     expect(tr.map((t) => t.amount).sort()).toEqual(["-1680.00", "1680.00"]);
     const [open] = (await listRecords(T, "ap.trans", { filter: { vendorId: String(fu.id) } }, client)).rows;
     expect([open.amount, open.vs, open.closed, open.kind]).toEqual(["1680.00", "12345678", false, "invoice"]);
+    // FÚ dostal profil FU → závazek i položka salda na 343900
+    const [a3439] = (await listRecords(T, "gl.account", { filters: { accountNum: "343900" } }, client)).rows;
+    expect(tr.find((t) => t.amount === "-1680.00")?.accountId).toBe(a3439.id);
+    expect(open.accountId).toBe(a3439.id);
     // podruhé zaúčtovat nejde
     await expect(runAction(T, "tax.return", String(ret.id), "postPayment", client)).rejects.toBeTruthy();
     // tisk: částka, účet FÚ, QR platba

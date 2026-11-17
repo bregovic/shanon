@@ -106,19 +106,26 @@ describe("zrušit zaúčtování faktury", () => {
 
     // běžná faktura téhož dodavatele dál na 321 (bez profilu = účet skupiny)
     const inv2 = await saveRecord(T, "ap.invoice", null, { vendorId: v.id, externalNum: "F1", invoiceDate: "2026-11-10" }, undefined, client);
-    expect(inv2.postingProfileId ?? null).toBe(null);
+    const [std] = (await listRecords(T, "ap.postingProfile", { filter: { code: "STANDARD" } }, client)).rows;
+    expect(inv2.postingProfileId).toBe(std.id);
     // přepnutí na dar převezme profil darů, zpět na fakturu ho zase vrátí
     const sw = await saveRecord(T, "ap.invoice", String(inv2.id), { ...inv2, docType: "donation" }, undefined, client);
     expect(sw.postingProfileId).toBe(dar.id);
     const back = await saveRecord(T, "ap.invoice", String(inv2.id), { ...sw, docType: "invoice" }, undefined, client);
-    expect(back.postingProfileId ?? null).toBe(null);
+    expect(back.postingProfileId).toBe(std.id);
+    // výchozí profily závazků
+    expect((await listRecords(T, "ap.postingProfile", {}, client)).rows.map((r) => r.code).sort()).toEqual(["DAR", "FU", "OST", "STANDARD", "ZAM"]);
 
     // profil pro konkrétního dodavatele (např. zaměstnanec → 333) má přednost před „Všechny“
-    const prof = await saveRecord(T, "ap.postingProfile", null, { code: "ZAM", name: "Zaměstnanci" }, undefined, client);
+    const prof = await saveRecord(T, "ap.postingProfile", null, { code: "ZAM2", name: "Zaměstnanci 2" }, undefined, client);
     const [a333] = (await listRecords(T, "gl.account", { filters: { accountNum: "333000" } }, client)).rows;
     await saveRecord(T, "ap.postingProfileLine", null, { profileId: prof.id, accountCode: "all", summaryAccountId: acc["321000"] }, undefined, client);
     await saveRecord(T, "ap.postingProfileLine", null, { profileId: prof.id, accountCode: "partner", vendorId: v.id, summaryAccountId: a333.id }, undefined, client);
-    const inv3 = await saveRecord(T, "ap.invoice", null, { vendorId: v.id, externalNum: "CP1", invoiceDate: "2026-11-10", postingProfileId: prof.id }, undefined, client);
+    // profil u dodavatele → nová faktura ho převezme
+    const vv = (await getRecord(T, "ap.vendor", String(v.id), client))!;
+    await saveRecord(T, "ap.vendor", String(v.id), { ...vv, postingProfileId: prof.id }, undefined, client);
+    const inv3 = await saveRecord(T, "ap.invoice", null, { vendorId: v.id, externalNum: "CP1", invoiceDate: "2026-11-10" }, undefined, client);
+    expect(inv3.postingProfileId).toBe(prof.id);
     await saveRecord(T, "ap.invoiceLine", null, { invoiceId: inv3.id, description: "Cestovné", qty: "1", unitPrice: "300", taxCodeId: null }, undefined, client);
     await runAction(T, "ap.invoice", String(inv3.id), "post", client);
     const [tr3] = (await listRecords(T, "ap.trans", { filter: { invoiceId: String(inv3.id) } }, client)).rows;
