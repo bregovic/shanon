@@ -98,6 +98,8 @@ export const DEFAULT_ACCOUNTS: Acc[] = [
   ["531000", "Daň silniční", "expense"],
   ["538000", "Ostatní daně a poplatky", "expense"],
   ["543000", "Dary", "expense"],
+  ["543100", "Dary – odčitatelné od základu daně", "expense"],
+  ["543900", "Dary – ostatní", "expense"],
   ["544000", "Smluvní pokuty a úroky z prodlení", "expense"],
   ["545000", "Ostatní pokuty a penále", "expense"],
   ["546000", "Odpis pohledávky", "expense"],
@@ -121,6 +123,12 @@ export const DEFAULT_ACCOUNTS: Acc[] = [
   ["702000", "Konečný účet rozvažný", "equity"],
   ["710000", "Účet zisků a ztrát", "equity"],
 ];
+
+/**
+ * Analytiky, které osnova dostala později — stávajícím firmám se doplní, když chybí
+ * (ostatní analytiky si firma mohla smazat záměrně, ty se nevrací).
+ */
+const ADDED_ACCOUNTS = ["543100", "543900"];
 
 /**
  * Účet syntetiky, na který se účtuje: xxx000, jinak první účet té syntetiky.
@@ -154,6 +162,11 @@ export async function glSetup(data: DataApi): Promise<void> {
       if (!postingType) continue;
       const [a] = await data.find("gl.account", { accountNum }, { take: 1 });
       if (a && !a.postingType) await data.update("gl.account", String(a.id), { postingType });
+    }
+    for (const num of ADDED_ACCOUNTS) {
+      const def = DEFAULT_ACCOUNTS.find((d) => d[0] === num);
+      if (!def || (await data.find("gl.account", { accountNum: num }, { take: 1 })).length) continue;
+      await data.create("gl.account", { accountNum: def[0], name: def[1], type: def[2], postingType: def[3] ?? null, noManualEntry: !!def[4] });
     }
   }
   // fiskální rok = aktuální kalendářní rok s měsíčními obdobími
