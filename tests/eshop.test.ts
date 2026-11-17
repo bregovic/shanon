@@ -27,9 +27,9 @@ describe("e-shop", () => {
     const g = (await listRecords(S, "inv.itemGroup", { filter: { code: "ZBOZI" } }, client)).rows[0];
     const ks = (await listRecords(S, "inv.unit", { filter: { code: "KS" } }, client)).rows[0];
     const kg = (await listRecords(S, "inv.unit", { filter: { code: "KG" } }, client)).rows[0];
-    const cat = await saveRecord(S, "shop.category", null, { name: "Uzeniny", slug: "uzeniny" }, undefined, client);
+    const cat = await saveRecord(S, "inv.category", null, { code: "UZ", name: "Uzeniny" }, undefined, client);
     ids.cat = String(cat.id);
-    ids.a = String((await saveRecord(S, "inv.item", null, { itemNum: "A1", name: "Klobása", groupId: g.id, unitId: ks.id, salesPrice: "100", priceInclTax: true, eshop: true, shopCategoryId: cat.id }, undefined, client)).id);
+    ids.a = String((await saveRecord(S, "inv.item", null, { itemNum: "A1", name: "Klobása", groupId: g.id, unitId: ks.id, salesPrice: "100", priceInclTax: true, eshop: true, categoryId: cat.id }, undefined, client)).id);
     ids.w = String((await saveRecord(S, "inv.item", null, { itemNum: "W1", name: "Šunka od kosti", groupId: g.id, unitId: kg.id, salesPrice: "400", priceInclTax: true, weighed: true, eshop: true }, undefined, client)).id);
     ids.x = String((await saveRecord(S, "inv.item", null, { itemNum: "X1", name: "Mimo obchod", groupId: g.id, unitId: ks.id, salesPrice: "50", priceInclTax: true }, undefined, client)).id);
   }, 120_000);
@@ -54,6 +54,23 @@ describe("e-shop", () => {
     const [a1] = await api((a) => listProducts(a, shop, { q: "klob" }));
     expect([a1.price, a1.regularPrice]).toEqual(["90.00", "100.00"]);
   });
+
+  it("kategorie položek = kategorie e-shopu (adresa z názvu, jen s položkou v obchodě); převod dřívějších kategorií e-shopu", async () => {
+    const empty = await saveRecord(S, "inv.category", null, { code: "NAP", name: "Nápoje" }, undefined, client);
+    expect((await getRecord(S, "inv.category", ids.cat, client))!.slug).toBe("uzeniny");
+    expect(empty.slug).toBe("napoje");
+    // dřívější kategorie e-shopu se při výchozím nastavení převede a položka ji převezme
+    const old = await saveRecord(S, "shop.category", null, { name: "Sýry", slug: "syry", description: "Zrající" }, undefined, client);
+    const g = (await listRecords(S, "inv.itemGroup", { pageSize: 1 }, client)).rows[0];
+    const ks = (await listRecords(S, "inv.unit", { filter: { code: "KS" } }, client)).rows[0];
+    const it2 = await saveRecord(S, "inv.item", null, { itemNum: "S1", name: "Eidam", groupId: g.id, unitId: ks.id, salesPrice: "50", eshop: true, shopCategoryId: old.id }, undefined, client);
+    await inTenant(S, (s) => import("@/modules/shop/setup").then((m) => m.shopSetup(s.sys().api())), client);
+    const conv = (await listRecords(S, "inv.category", { filter: { slug: "syry" } }, client)).rows[0];
+    expect([conv?.name, conv?.description, conv?.eshop]).toEqual(["Sýry", "Zrající", true]);
+    const it2b = (await getRecord(S, "inv.item", String(it2.id), client))!;
+    expect([it2b.categoryId, it2b.shopCategoryId]).toEqual([conv.id, null]);
+    expect((await getRecord(S, "shop.category", String(old.id), client))!.active).toBe(false);
+  }, 60_000);
 
   it("košík: ceny ze serveru, vážené zboží, doprava a povolené platby", async () => {
     const odber = await dl("ODBER");

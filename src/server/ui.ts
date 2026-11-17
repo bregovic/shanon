@@ -159,6 +159,7 @@ export function uiLabels(t: T) {
       title: t("@SYS:ImportTitle"),
       help: t("@SYS:ImportHelp"),
       template: t("@SYS:ImportTemplate"),
+      templateData: t("@SYS:ImportTemplateData"),
       check: t("@SYS:ImportCheck"),
       run: t("@SYS:ImportRun"),
       columns: t("@SYS:ImportColumns"),

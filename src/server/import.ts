@@ -451,8 +451,36 @@ async function storeImage(s: Session, objectId: string, recordId: string, field:
 }
 
 /** Šablona CSV: hlavička z popisků polí, která lze importovat. */
-export function importTemplate(def: ObjectDef, lang: Lang, hidden: string[] = []): string {
-  const cols = Object.entries(def.fields).filter(([n, f]) => (!f.readOnly || f.image) && !hidden.includes(n));
-  const cell = (s: string) => (/[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-  return "﻿" + cols.map(([, f]) => cell(fieldLabel(f, lang))).join(";") + "\r\n";
+export function importTemplate(def: ObjectDef, lang: Lang, hidden: string[] = [], rows?: RecordData[]): string {
+  // tajné údaje nikdy; obrázek jen v prázdné šabloně (s daty zůstane prázdný = beze změny)
+  const cols = Object.entries(def.fields).filter(([n, f]) => (!f.readOnly || (f.image && !rows)) && !f.secret && !hidden.includes(n));
+  const cell = (s: string) => (/[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  const head = cols.map(([, f]) => cell(fieldLabel(f, lang))).join(";");
+  const body = (rows ?? []).map((r) => cols.map(([n, f]) => cell(templateCell(f, r, n, lang))).join(";"));
+  return "\uFEFF" + [head, ...body].join("\r\n") + "\r\n";
+}
+
+/** Hodnota záznamu do šablony s daty — v tom tvaru, který import přijme zpět (odkaz „kód · název“, výčet popiskem). */
+function templateCell(f: FieldDef, r: RecordData, name: string, lang: Lang): string {
+  const v = r[name];
+  if (v === null || v === undefined || v === "") return "";
+  switch (f.edt.kind) {
+    case "ref":
+      return String((r._titles as Record<string, string> | undefined)?.[name] ?? v);
+    case "enum": {
+      const e = registry.enums.get(f.edt.enumId!);
+      const hit = e?.values.find((x) => x.value === v);
+      return hit ? resolveLabel(labelTable, hit.label, lang) : String(v);
+    }
+    case "bool":
+      return v === true ? (lang === "cs" ? "ano" : "yes") : lang === "cs" ? "ne" : "no";
+    case "date": {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v instanceof Date ? v.toISOString() : String(v));
+      return m ? `${Number(m[3])}.${Number(m[2])}.${m[1]}` : String(v);
+    }
+    case "decimal":
+      return lang === "cs" ? String(v).replace(".", ",") : String(v);
+    default:
+      return v instanceof Date ? v.toISOString() : String(v);
+  }
 }

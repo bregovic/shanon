@@ -1,4 +1,78 @@
 ﻿Nasazeno;Druh;Oblast;Stručně;Požadavek;Commit;Popis
+2026-11-12;feature;Základ;Nový Shanon: objekty, moduly, hlavní kniha;;f5323d5;"První verze nového Shanonu na Railway.
+
+- Moduly a objekty s jednotnými seznamy, formuláři, oprávněními, přílohami, historií změn, oblíbenými a exportem do Excelu.
+- Vzhled a ovládání převzaté ze Shanonu 1 (Fluent UI).
+- Číselné řady s Použitím, výchozí nastavení modulů, názvy deníků, uživatelé a jejich firmy."
+2026-11-13;feature;Hlavní kniha;Účtový rozvrh, účetní období, dimenze, výkazy;;fb8d3e8;"- 6místný účtový rozvrh (syntetika + analytika, řízení účtů).
+- Účetní období, měny a kurzy ČNB / ECB, systémové účty a zaokrouhlení podle měny.
+- Finanční dimenze místo střediska, výchozí dimenze a hodnoty z adresáře (CR-001).
+- Výkazy hlavní knihy, parametry hlavní knihy."
+2026-11-13;feature;Odběratelé, Dodavatelé, Banka;Odběratelé, dodavatelé a banka;;b6b5b24;"- Odběratelé a dodavatelé, faktury s DPH, saldo.
+- Bankovní účty, import výpisů GPC, párování a úhrady.
+- Adresář: založení subjektu z ARES / VIES, dodavatel a odběratel ze subjektu."
+2026-11-13;feature;DPH;Přiznání k DPH a kontrolní hlášení (XML pro EPO);;dbf30fb;Přiznání k DPH a kontrolní hlášení z daňových transakcí, XML pro podání přes EPO.
+2026-11-13;feature;Položky;Položky, slevy, obrázky a import ze souborů;;f8ba3b7;"- Položky s dodavatelem, marží, slevami a obrázky (nahrání, přetažení, import se složkou obrázků).
+- Obecný import z CSV, XML a Excelu u každého seznamu; import a export řádků dokladů."
+2026-11-13;feature;Pokladna;Pokladna s dotykovým terminálem;;cbc50c1;"- Dotykový terminál, směny a uzávěrka se zaúčtováním.
+- Kategorie prodeje, rychlé hledání, vážení v dkg, odložené nákupy v boxech s QR.
+- Pokladní kniha: hotovostní pokladny, PPD / VPD, report."
+2026-11-13;feature;Integrace;Integrace: EET 2.0, tiskárna, terminál, REST API;;26a2e26;"- EET 2.0, tiskárna účtenek, platební terminál.
+- REST API s klíčem omezeným na moduly.
+- Testovací prostředí jedním krokem, datové služby ARES / ČNB / ECB."
+2026-11-13;feature;Systém;Organizace, moduly, dávky, nápověda v menu;;134ea74;"- Modul Organizace, vypínání modulů i se závislými.
+- Hledání v menu (Ctrl+K), plocha modulu se sloupci Funkce a Reporty.
+- Dávkové úlohy, Duplikovat u všech objektů, založení firmy z ARES / VIES, uživatel se jménem."
+2026-11-13;feature;Tisk;Tiskové sestavy: návrhář, faktura s QR, účtenka;;e75b7a4;Návrhář tiskových sestav, faktura s QR platbou, účtenka.
+2026-11-13;feature;Testování a vývoj;Modul Testování a vývoj;;ec6d89e;Klíčové funkce se stavem, scénáře FAT / UAT, požadavky na změny a chyby s diskuzí.
+2026-11-14;feature;Hlavní kniha;Deníky jako v AX;;aad7e92;Mřížka řádků, druhy účtů (hlavní kniha, odběratel, dodavatel, banka, pokladna), číslování dokladů, Ověřit a Zaúčtovat.
+2026-11-14;feature;Systém;Oddělení firem a virtuální společnosti;;3f2e71d;"Firmy jsou nezávislé subjekty; netransakční číselníky lze sdílet přes virtuální společnost."
+2026-11-14;feature;Odběratelé, Dodavatelé;Objednávky a zálohové faktury;;000676c;Prodejní a nákupní objednávky (Potvrdit → Vystavit zálohu → Vytvořit fakturu), zálohové faktury, daňový doklad k platbě zálohy.
+2026-11-14;feature;Integrace;Vytěžování dokladů;;5e57abb;Nahrané doklady se vytěží do Dokladů ke zpracování, po kontrole se zalistují do agendy s přiloženým souborem.
+2026-11-14;feature;Tisk;Faktura v PDF, logo, účtenka podle zákona, ISDOC;;68acfaf;"- Faktura jako PDF v novém vzhledu s logem, rekapitulací DPH a QR.
+- Účtenka podle náležitostí zjednodušeného daňového dokladu.
+- ISDOC: export vydané faktury, ISDOC v PDF, import .isdoc / .isdocx."
+2026-11-14;feature;Sklad;Modul Sklad;;0c854c9;"Sklady, lokace v 6 úrovních, deníky (příjemka, inventura, vyřazení, přesun), rezervace; ocenění průměrnou cenou a účtování způsobem A."
+2026-11-14;feature;Banka;Platební příkazy a hromadný import výpisů;;042a254;Platební příkazy (ABO, SEPA), Transformace, hromadný import výpisů, deníky hlavní knihy z výpisů.
+2026-11-14;feature;Systém;Nápověda, upozornění a odesílání e-mailem;;8e089cf;"- Nápověda: návody k agendám, „?“ u modulů a formulářů, návody v Ctrl+K.
+- Zvoneček upozornění (chyby dávek, doklady ke kontrole, nespolehlivý plátce, neodeslané EET).
+- Odesílání dokladů e-mailem přes napojení pošty."
+2026-11-14;feature;Pokladna;Výběr pokladny, PIN a zamknutí;;f0f15f6;Výběr pokladny jako dlaždice se stavem směny, PIN a zamknutí pokladny bez uzávěrky.
+2026-11-14;fix;Systém;Opravy: chyba 500 u zakládání účtu a firmy, správa uživatelů;;bc7de98;"- Chyba 500 při zakládání účtu a firmy v produkci.
+- Správa uživatelů: tlačítko Upravit, výběr řádku, jméno jako odkaz.
+- Nosná firma virtuální společnosti bez výchozího nastavení a dávek."
+2026-11-15;feature;Hlavní kniha;Deník: rychlé pořizování a výchozí dimenze;;6eb8f21;"Souhrn úprav deníku hlavní knihy:
+
+- Číslo dokladu hned, datum z hlavičky, zkratky data, deníky po modulech.
+- Enter po polích, Shift+Enter zpět, nový řádek šipkou, podrobnosti řádku, zapamatované hodnoty.
+- Dialog a záložka Dimenze, výchozí dimenze řádku (účet, partner, banka, deník) i protiúčtu, výchozí protiúčet z názvu a hlavičky deníku.
+- Záložky Řádky / Obecné / Dimenze nad mřížkou.
+
+Návod: Nápověda → Ovládání a klávesové zkratky."
+2026-11-15;feature;Systém;Náhled před uložením, lišta formuláře, neuložené změny;;0c45e60;"- Náhled hodnot před uložením (cena z položky, číslo dokladu).
+- Lišta formuláře se skupinami Tisk ▾ / Zobrazit ▾ / Další ▾, Náhled dokladu a DPH před zaúčtováním.
+- Dotaz Uložit / Neukládat při odchodu z formuláře s neuloženými změnami."
+2026-11-15;feature;DPH;DPH přes skupiny, samovyměření, platba DPH;;c29d23d;"- Skupina DPH × položka DPH na fakturách, objednávkách i v deníku.
+- Samovyměření (PDP, EU, služby ze zahraničí).
+- Platba DPH: závazek vůči finančnímu úřadu z přiznání s QR platbou.
+- Faktura v cizí měně s DPH v Kč kurzem k DUZP, zaokrouhlení vydaných faktur."
+2026-11-15;feature;Banka;Výpisy v CSV, pořadí párování, předkontace;;044382f;"- Import výpisů v CSV podle specifikace (výchozí KB).
+- Pořadí párování (VS faktura, VS záloha, účet protistrany, předkontace), deník z vybraných řádků výpisu.
+- Platební metody patří bankovnímu účtu, výchozí účet pro měnu, IBAN z čísla účtu."
+2026-11-15;feature;Integrace;Dodavatelský portál;;06df9c9;Veřejná stránka pro nahrání dokladů dodavateli na adrese /<zkratka organizace>/<portál>, kontrola souborů, limity, sdílení odkazu.
+2026-11-15;feature;Odběratelé, Dodavatelé;Faktury: hromadné zaúčtování, zrušení zaúčtování, duplicity;;9779177;"- Hromadné zaúčtování faktur a hromadné vytěžení / zalistování dokladů.
+- Zrušit zaúčtování faktury (superuživatel).
+- Kontrola duplicity čísla faktury a dokladu, účtenka v přijatých fakturách.
+- Import dodavatelů / odběratelů podle IČO, import vydaných faktur z ISDOC."
+2026-11-15;feature;Tisk;Faktura v4 podle zpětné vazby;;cc00809;Číslo dokladu výrazně, účet a VS pohromadě, vzdušná tabulka, souhrn pod tabulkou, větší QR.
+2026-11-15;feature;Testování a vývoj;Souhrnné požadavky a kontrolní seznam oprav;;ffa8939;Dílčí požadavky a kontrolní seznam oprav (Čeká / Opraveno – k ověření / Funguje / Stále nefunguje).
+2026-11-15;fix;DPH, Systém;Opravy: věta D přiznání, mazání firmy, stažení souboru;;1139d3d;"- Věta D přiznání k DPH (k_uladis) přijatá EPO.
+- Smazání zkušební firmy i s odkazy, srozumitelná hláška místo chyby 500.
+- Stažení souboru ukáže chybu v aplikaci."
+2026-11-16;feature;Odběratelé;Účet pro platbu a platební metoda na faktuře;;91602c6;Vydaná faktura s účtem pro platbu (výchozí podle měny) a platební metodou na tisku, zaokrouhlení navržené podle měny.
+2026-11-16;fix;DPH;Opravy KH a přiznání k DPH;;53f6012;"- Oddíl KH podle dokladu (pod 10 000 Kč nebo bez DIČ souhrnně).
+- Věta D přiznání trans=A, když přiznání obsahuje údaje.
+- Tisk platby DPH vysvětlí, proč chybí QR."
 2026-11-17;feature;Dodavatelé, Odběratelé;Účtovací profily a typ dokladu Dar;CR-074;c4f15ad;"Účtovací profil určuje účet závazků / pohledávek dokladu (partner → skupina → všechny). Výchozí profily STANDARD, ZAM (333/335), FU (343900), DAR (379), OST.
 
 - Profil na kartě dodavatele / odběratele se převezme na fakturu, výchozí je v Parametrech.
@@ -38,3 +112,13 @@ Evidence je v Deníku vývoje (datum nasazení, oblast, požadavek, popis)."
 2026-11-17;fix;Integrace;Vytěžování v testovacím režimu bere TEST-OCR;;79c4929;"Když měla organizace vedle testovacího napojení TEST-OCR i ostré napojení bez API klíče, vytěžení dokladu skončilo chybou klíče. Testovací napojení má teď přednost a napojení bez klíče se přeskočí; když žádné nejde použít, hláška řekne, kterému napojení klíč chybí."
 2026-11-17;fix;Správa systému;Po přepnutí organizace se seznamy načtou znovu;;321b84f;Po změně organizace v hlavičce zůstávaly v otevřeném seznamu (např. faktur) nebo na stránce Moduly údaje předchozí organizace. Obsah stránky se teď po přepnutí vždy načte znovu.
 2026-11-17;change;Správa systému;Firmy → Organizace;;321b84f;Ve Správě systému se Firmy jmenují Organizace (seznam, Organizace a role u uživatele, virtuální společnosti, Moduly organizace).
+2026-11-17;change;Položky, E-shop;Kategorie položek jsou zároveň kategoriemi e-shopu;;;"Pokladna i e-shop mají jeden strom kategorií (Položky → Kategorie), položka se zařazuje jen jednou.
+
+- U kategorie v části E-shop: Zobrazit v e-shopu, adresa (prázdná se doplní z názvu), popis a obrázek — jen se zapnutým e-shopem.
+- V obchodě se ukáže jen kategorie, ve které je aspoň jedna položka v e-shopu.
+- Dřívější kategorie e-shopu se při nasazení samy převedly a položky je převzaly."
+2026-11-17;feature;Systém;Šablona CSV s daty k úpravě a importu zpět;;;"V dialogu Import u každého seznamu je vedle prázdné šablony **Šablona s daty**: stáhne záznamy podle aktuálních filtrů a řazení seznamu ve tvaru pro import (odkazy „kód · název“, výčty popiskem, ano/ne).
+
+Postup: stáhnout, upravit v Excelu, uložit jako CSV a naimportovat zpět — záznamy se aktualizují podle kódu. Prázdná buňka hodnotu nemění; obrázky a tajné údaje se v šabloně nepřenáší."
+2026-11-17;fix;Systém;"Filtr """" a !"""" u zaškrtávacích polí";;;"U zaškrtávacího pole (V e-shopu, Na váhu, Blokováno…) znamená ve filtru sloupce `""""` nezaškrtnuté a `!""""` zaškrtnuté. Platí ve všech seznamech, stejně jako ano / ne."
+2026-11-17;change;Testování a vývoj;Deník vývoje se plní sám a obsahuje i historii;;;"Zápisy deníku se do aplikace nahrají samy při každém nasazení na TEST i PROD. Doplněna historie od 12. 11. 2026; víc úprav jedné oblasti v jednom vydání je jeden zápis."

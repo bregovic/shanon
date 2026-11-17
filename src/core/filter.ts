@@ -7,7 +7,7 @@
  *   A, B        nebo           !text  není        ""     prázdné
  *   > 100  < 100  10..20  10..  ..20               čísla a data
  *   15  1512  15.12  15.12.2026  15.12..  ..31.12  data (den, den+měsíc…)
- *   ano / ne                                       zaškrtávací pole
+ *   ano / ne  (u zaškrtávacího pole i "" = ne, !"" = ano)  zaškrtávací pole
  */
 import type { FieldKind } from "./edt";
 
@@ -67,7 +67,8 @@ export function parseFilter(kind: FieldKind, expr: string, today = new Date()): 
       part = part.slice(1).trim();
     }
     if (part === '""' || part === "''") {
-      out.push({ op: "empty", not });
+      // zaškrtávací pole nemá prázdnou hodnotu: "" = nezaškrtnuté, !"" = zaškrtnuté
+      out.push(kind === "bool" ? { op: "bool", value: not } : { op: "empty", not });
       continue;
     }
 

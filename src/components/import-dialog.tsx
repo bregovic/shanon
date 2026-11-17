@@ -50,6 +50,7 @@ export function ImportButton({
   onDone,
   hasImages = false,
   fixed,
+  dataQuery,
 }: {
   objectId: string;
   labels: L;
@@ -57,6 +58,8 @@ export function ImportButton({
   hasImages?: boolean;
   /** pevné hodnoty každého řádku (řádky dokladu: odkaz na rodiče) */
   fixed?: Record<string, string>;
+  /** šablona s daty: filtry a řazení seznamu (bez = jen prázdná šablona) */
+  dataQuery?: () => string;
 }) {
   const st = useStyles();
   const [open, setOpen] = useState(false);
@@ -130,6 +133,7 @@ export function ImportButton({
                   }}
                 />
                 <Link href={`/api/import-template/${objectId}`}>{labels.template}</Link>
+                {dataQuery && <Link href={`/api/import-template/${objectId}?data=1&${dataQuery()}`}>{labels.templateData}</Link>}
               </div>
               {hasImages && (
                 <div className={st.file}>

@@ -1,7 +1,7 @@
 ---
 title: E-shop
 module: shop
-objects: shop.shop, shop.category, shop.delivery, shop.page, shop.order, inv.item, bank.paymentMethod, int.connection
+objects: shop.shop, inv.category, shop.delivery, shop.page, shop.order, inv.item, bank.paymentMethod, int.connection
 order: 10
 summary: Veřejný obchod z položek a údajů firmy — nastavení, zboží, doprava, platby a vyřízení objednávek.
 ---
@@ -16,7 +16,7 @@ summary: Veřejný obchod z položek a údajů firmy — nastavení, zboží, do
 
 ## Zboží
 
-U [položky](/inv/item) zaškrtněte **V e-shopu** a vyberte **kategorii e-shopu**. Obchod bere název, popis, obrázek, cenu a slevy z položky; zboží na váhu se objednává po desetinách a cena je za měrnou jednotku. [Kategorie](/shop/category) mají adresu (např. `uzeniny`), pořadí a mohou být vnořené.
+U [položky](/inv/item) zaškrtněte **V e-shopu** a vyberte **kategorii** — kategorie e-shopu jsou stejné jako [kategorie položek](/inv/category) (záložky pokladny). Obchod bere název, popis, obrázek, cenu a slevy z položky; zboží na váhu se objednává po desetinách a cena je za měrnou jednotku. U kategorie je v části E-shop adresa (např. `uzeniny`, prázdná se doplní z názvu), popis, obrázek a **Zobrazit v e-shopu**; v obchodě se ukáže jen kategorie, ve které je aspoň jedna položka v e-shopu.
 
 Se zapnutým Skladem obchod ukazuje „Skladem“ / „Na objednávku“ podle volné zásoby (zásoba − rezervace). Bez **Prodávat i bez zásoby** nejde objednat víc, než je volné.
 

@@ -10,22 +10,12 @@ import { UserError, type DataApi, type RecordData } from "@/core/module";
 import { accountingCurrencyId, convertPrice } from "@/modules/gl/posting";
 import { bestDiscount, itemPrices } from "@/modules/inv/handlers";
 import { notify } from "@/modules/sys/notify";
+import { slugify } from "@/lib/slug";
 
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** Část adresy z názvu: bez diakritiky, malá písmena, pomlčky. */
-export function slugify(s: string): string {
-  return (
-    s
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "polozka"
-  );
-}
+export { slugify };
 
 export interface ShopProduct {
   id: string;
@@ -87,7 +77,7 @@ async function toProduct(data: DataApi, shop: RecordData, item: RecordData, curr
     weighed: !!item.weighed,
     price: fromCents(p.price),
     regularPrice: p.regular !== null ? fromCents(p.regular) : null,
-    categoryId: (item.shopCategoryId as string) ?? null,
+    categoryId: (item.categoryId as string) ?? null,
     image: (item.image as string) || null,
     stock,
     orderable: shop.sellOutOfStock !== false || stock === null || stock > 0,
@@ -100,7 +90,7 @@ export async function listProducts(data: DataApi, shop: RecordData, opts: { cate
   const date = today();
   let items = await data.find("inv.item", { eshop: true, blocked: false }, { take: 2000, orderBy: { name: "asc" } });
   if (opts.categoryId) {
-    const cats = await data.find("shop.category", {}, { take: 1000 });
+    const cats = await data.find("inv.category", {}, { take: 2000 });
     const ids = new Set([opts.categoryId]);
     for (let grew = true; grew; ) {
       grew = false;
@@ -110,7 +100,7 @@ export async function listProducts(data: DataApi, shop: RecordData, opts: { cate
           grew = true;
         }
     }
-    items = items.filter((i) => i.shopCategoryId && ids.has(String(i.shopCategoryId)));
+    items = items.filter((i) => i.categoryId && ids.has(String(i.categoryId)));
   }
   const q = (opts.q ?? "").trim().toLowerCase();
   if (q) items = items.filter((i) => `${i.name} ${i.itemNum} ${i.brand ?? ""}`.toLowerCase().includes(q));

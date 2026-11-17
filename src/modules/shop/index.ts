@@ -222,7 +222,7 @@ export default defineModule({
   enums: [ShopLayout, DeliveryKind, ShopOrderStatus],
   objects: [shop, category, delivery, page, order],
   menu: [
-    { label: "@SHOP:Module", items: [{ object: "shop.order" }, { object: "inv.item", href: "/inv/item?filter.eshop=true", label: "@SHOP:Products", module: "inv" }, { object: "shop.category" }] },
+    { label: "@SHOP:Module", items: [{ object: "shop.order" }, { object: "inv.item", href: "/inv/item?filter.eshop=true", label: "@SHOP:Products", module: "inv" }, { object: "inv.category", label: "@SHOP:Categories" }] },
     { label: "@SYS:Setup", items: [{ object: "shop.shop" }, { object: "shop.delivery" }, { object: "shop.page" }, { object: "bank.paymentMethod", href: "/bank/paymentMethod?filter.eshop=true", label: "@SHOP:PaymentMethods", module: "bank" }] },
   ],
   numberSeqs: [{ code: "SHOPORD", name: "@SHOP:Orders", format: "E{YY}{#####}", usedFor: "shop.order" }],

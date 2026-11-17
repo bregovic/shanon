@@ -4,6 +4,7 @@
  * druhá cena se dopočítá ze sazby daňového kódu.
  */
 import { fromCents, percentOf, toCents, toScaled } from "@/core/money";
+import { slugify } from "@/lib/slug";
 import type { DataApi, ObjectHandlers, RecordData, ValidationErrors } from "@/core/module";
 
 /** cena s DPH → bez DPH (zaokrouhleno na haléře) */
@@ -66,6 +67,13 @@ export const invHandlers: Record<string, ObjectHandlers> = {
         if (p === d.id) return { parentId: "@INV:CategoryLoop" };
         p = ((await ctx.data.get("inv.category", p))?.parentId as string) ?? null;
       }
+      // adresa v e-shopu: prázdná = z názvu, jedinečná ve firmě
+      if (!d.slug || ("name" in d && !d.slug)) {
+        const base = slugify(String(d.name ?? d.code ?? ""), "kategorie");
+        let slug = base;
+        for (let n = 2; (await ctx.data.find("inv.category", { slug }, { take: 2 })).some((c) => c.id !== d.id); n++) slug = `${base.slice(0, 55)}-${n}`;
+        d.slug = slug;
+      } else if ((await ctx.data.find("inv.category", { slug: d.slug }, { take: 2 })).some((c) => c.id !== d.id)) return { slug: "@SYS:Duplicate" };
     },
   },
   "inv.discount": {

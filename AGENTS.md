@@ -423,6 +423,8 @@ ta používá stejné komponenty a akce.
   Na PROD až po schválení releasu uživatelem: `git push origin next:release`. Větev `main` je stará PHP verze.
 - **Deník vývoje:** každý release na PROD = řádek(y) v `docs/qa/4-denik-vyvoje.csv` (datum nasazení, druh feature/change/fix,
   oblast, stručně, CR, commit, popis o co jde a jak se to používá) → `qa.changelog`, přehled Aktuality `/qa/aktuality`.
+  Zápis se do aplikace dostane sám při nasazení (`scripts/changelog-sync.ts` v `db:deploy`, tenanti s modulem qa, klíč datum + nadpis).
+  Víc úprav jedné oblasti v jednom releasu = jeden zápis s odrážkami (ne zápis za commit).
 - GitHub Issues se štítky Analysis → Development → Testing → Done.
 - Commity: `feat(gl): … [#123]`, `fix(gab): …`, `docs: …`.
 - Před pushem: `npm run lint && npm run typecheck && npm test && npm run schema:check`

@@ -85,6 +85,9 @@ export const itemGroup = defineObject({
  * členění v pokladně a e-shopu — nezávislý na skupinách položek (ty řídí
  * DPH a účty). Hlavní kategorie = záložky kasy, podřízené = druhá řada.
  */
+/** Adresa kategorie v e-shopu: malá písmena, číslice, pomlčka. */
+const CategorySlug = defineEdt({ id: "InvCategorySlug", kind: "string", label: "@INV:Slug", maxLength: 60, pattern: /^[a-z0-9][a-z0-9-]{0,59}$/, patternMessage: "@INV:SlugHelp", transform: "lower" });
+
 export const category = defineObject({
   id: "inv.category",
   table: "inv_category",
@@ -98,10 +101,18 @@ export const category = defineObject({
     parentId: { edt: refEdt("inv.category", "@INV:ParentCategory"), aliases: ["nadřazená", "nadrazena", "parent"] },
     sortOrder: { edt: Edts.Int, label: "@INV:SortOrder", default: 100, aliases: ["pořadí", "poradi"] },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+    // e-shop (jen se zapnutým modulem E-shop): kategorie pokladny = kategorie obchodu
+    eshop: { edt: Edts.NoYes, label: "@INV:CategoryEshop", default: true, module: "shop", help: "@INV:CategoryEshopHelp", aliases: ["v eshopu", "eshop"] },
+    slug: { edt: CategorySlug, module: "shop", help: "@INV:SlugAuto", aliases: ["adresa"] },
+    description: { edt: Edts.Notes, label: "@SYS:Description", module: "shop", aliases: ["popis"] },
+    image: { edt: defineEdt({ id: "CategoryImageRef", kind: "string", label: "@SYS:Image", maxLength: 36 }), image: true, readOnly: true, module: "shop", aliases: ["obrazek", "obrázek"] },
   },
   titleField: "code",
-  list: ["code", "name", "parentId", "sortOrder", "blocked"],
-  form: [{ label: "@SYS:General", fields: ["code", "name", "parentId", "sortOrder", "blocked"] }],
+  list: ["code", "name", "parentId", "sortOrder", "eshop", "blocked"],
+  form: [
+    { label: "@SYS:General", fields: ["code", "name", "parentId", "sortOrder", "blocked"] },
+    { label: "@INV:Eshop", fields: ["eshop", "slug", "description", "image"] },
+  ],
   unique: [["code"]],
   defaultSort: { field: "sortOrder", dir: "asc" },
   lines: [
@@ -157,7 +168,7 @@ export const item = defineObject({
     { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName", "brand"] },
     { label: "@SYS:Image", fields: ["image"] },
     { label: "@INV:Description", fields: ["description"] },
-    { label: "@INV:Eshop", fields: ["eshop", "shopCategoryId"] },
+    { label: "@INV:Eshop", fields: ["eshop"] },
   ],
   unique: [["itemNum"]],
   numberSeq: { field: "itemNum", seq: "INVITEM" },
@@ -309,6 +320,11 @@ export default defineModule({
       PurchasePrice: "Nákupní cena",
       Weighed: "Prodej na váhu",
       Eshop: "V e-shopu",
+      CategoryEshop: "Zobrazit v e-shopu",
+      CategoryEshopHelp: "Kategorie se v obchodě ukáže, jen když v ní (nebo v podkategorii) je položka v e-shopu.",
+      Slug: "Adresa v e-shopu",
+      SlugHelp: "Jen malá písmena bez diakritiky, číslice a pomlčka, např. uzeniny.",
+      SlugAuto: "Prázdné = doplní se z názvu.",
       ShopCategory: "Kategorie e-shopu",
       Description: "Popis",
       Prices: "Ceny",
@@ -366,6 +382,11 @@ export default defineModule({
       PurchasePrice: "Purchase price",
       Weighed: "Sold by weight",
       Eshop: "In the e-shop",
+      CategoryEshop: "Show in the e-shop",
+      CategoryEshopHelp: "The category appears in the shop only when it (or a subcategory) has an e-shop item.",
+      Slug: "E-shop address",
+      SlugHelp: "Lowercase letters without accents, digits and hyphen only, e.g. sausages.",
+      SlugAuto: "Empty = filled in from the name.",
       ShopCategory: "Shop category",
       Description: "Description",
       Prices: "Prices",

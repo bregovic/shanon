@@ -87,7 +87,16 @@ export interface ShopMeta {
 async function meta(l: Loaded, org: string, api: DataApi): Promise<ShopMeta> {
   const s = l.shop;
   const e = l.entity;
-  const cats = await api.find("shop.category", { active: true }, { take: 500, orderBy: { position: "asc" } });
+  // kategorie = kategorie položek (Zobrazit v e-shopu), jen ty, ve kterých (i v podkategorii) je zboží obchodu
+  const all = await api.find("inv.category", { eshop: true, blocked: false }, { take: 2000, orderBy: { sortOrder: "asc" } });
+  const byId = new Map(all.map((c) => [String(c.id), c]));
+  const used = new Set<string>();
+  for (const i of await api.find("inv.item", { eshop: true, blocked: false }, { take: 5000 }))
+    for (let p = i.categoryId ? String(i.categoryId) : null, n = 0; p && byId.has(p) && !used.has(p) && n < 20; n++) {
+      used.add(p);
+      p = byId.get(p)!.parentId ? String(byId.get(p)!.parentId) : null;
+    }
+  const cats = all.filter((c) => used.has(String(c.id)));
   const pages = await api.find("shop.page", { active: true, inFooter: true }, { take: 50, orderBy: { position: "asc" } });
   const cur = await api.find("gl.parameters", {}, { take: 1 }).then(async ([p]) => (p?.accountingCurrencyId ? await api.get("sys.currency", String(p.accountingCurrencyId)) : null));
   const street = [e?.street, [e?.houseNo, e?.orientNo].filter(Boolean).join("/")].filter(Boolean).join(" ");
@@ -109,7 +118,7 @@ async function meta(l: Loaded, org: string, api: DataApi): Promise<ShopMeta> {
       address: [street, [e?.zipCode, e?.city].filter(Boolean).join(" ")].filter(Boolean).join(", "),
       registration: String(e?.registration ?? ""),
     },
-    categories: cats.map((c) => ({ id: String(c.id), name: String(c.name), slug: String(c.slug), parentId: (c.parentId as string) ?? null, description: String(c.description ?? ""), image: !!c.image })),
+    categories: cats.map((c) => ({ id: String(c.id), name: String(c.name), slug: String(c.slug || c.id), parentId: c.parentId && used.has(String(c.parentId)) ? String(c.parentId) : null, description: String(c.description ?? ""), image: !!c.image })),
     pages: pages.map((p) => ({ title: String(p.title), slug: String(p.slug) })),
     currency: String(cur?.code ?? "CZK"),
   };
@@ -348,8 +357,8 @@ export async function shopImage(org: string, kind: string, id: string, client: P
         return item?.eshop && !item.blocked ? ((item.image as string) ?? null) : null;
       }
       if (kind === "c" && /^[0-9a-f-]{36}$/i.test(id)) {
-        const c = await api.get("shop.category", id);
-        return c?.active ? ((c.image as string) ?? null) : null;
+        const c = await api.get("inv.category", id);
+        return c?.eshop && !c.blocked ? ((c.image as string) ?? null) : null;
       }
       if (kind === "logo") return ((l.shop.logo ?? l.entity?.logo) as string) ?? null;
       if (kind === "hero") return (l.shop.heroImage as string) ?? null;

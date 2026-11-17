@@ -71,11 +71,12 @@ export function ObjectListView(p: ObjectListProps) {
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string>();
   const [view, setView] = useState<{ filters: Record<string, string>; sort?: string; dir: "asc" | "desc" }>({ filters: {}, dir: "asc" });
-  const exportHref = () => {
+  const viewQuery = () => {
     const q = new URLSearchParams({ filters: JSON.stringify(view.filters), dir: view.dir });
     if (view.sort) q.set("sort", view.sort);
-    return `/api/export/${p.objectId}?${q}`;
+    return q.toString();
   };
+  const exportHref = () => `/api/export/${p.objectId}?${viewQuery()}`;
 
   // nový záznam ze seznamu s filtrem z menu (např. deníky banky) dostane hodnoty filtru
   const preset = useMemo((): Record<string, string> => Object.fromEntries(Object.entries(p.initialFilters ?? {}).filter(([, v]) => /^[\p{L}\d_.-]+$/u.test(v))), [p.initialFilters]);
@@ -195,7 +196,7 @@ export function ObjectListView(p: ObjectListProps) {
           recordTitle={selected.length === 1 ? String(selected[0][p.titleField] ?? p.label) : ""}
           labels={p.labels.history}
         />
-        {p.canCreate && <ImportButton objectId={p.objectId} labels={p.labels.importer} hasImages={p.columns.some((c) => c.image) || p.groups.some((g) => g.fields.some((f) => f.image))} onDone={() => setReload((n) => n + 1)} />}
+        {p.canCreate && <ImportButton objectId={p.objectId} labels={p.labels.importer} hasImages={p.columns.some((c) => c.image) || p.groups.some((g) => g.fields.some((f) => f.image))} onDone={() => setReload((n) => n + 1)} dataQuery={viewQuery} />}
         <Button appearance="subtle" icon={<ArrowDownload24Regular />} title={p.labels.export} aria-label={p.labels.export} onClick={() => (window.location.href = exportHref())} />
         <Button appearance="subtle" icon={<ArrowClockwise24Regular />} title={`${p.labels.actions.refresh} (Shift+R)`} onClick={() => setReload((n) => n + 1)}>
           {p.labels.actions.refresh}

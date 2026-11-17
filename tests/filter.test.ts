@@ -34,6 +34,10 @@ describe("filtry sloupců", () => {
     expect(parseFilter("date", "..15", today)).toEqual([{ op: "range", from: undefined, to: "2026-11-15" }]);
     expect(parseFilter("int", "abc")).toEqual([]);
     expect(parseFilter("bool", "ano")).toEqual([{ op: "bool", value: true }]);
+    // zaškrtávací pole: "" = nezaškrtnuté, !"" = zaškrtnuté (prázdná hodnota u něj neexistuje)
+    expect(parseFilter("bool", '""')).toEqual([{ op: "bool", value: false }]);
+    expect(parseFilter("bool", '!""')).toEqual([{ op: "bool", value: true }]);
+    expect(parseFilter("bool", "!ano")).toEqual([{ op: "bool", value: false }]);
   });
 });
 

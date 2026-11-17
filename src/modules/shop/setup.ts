@@ -27,7 +27,42 @@ async function ensureCustomer(data: DataApi): Promise<string | null> {
   return String((await data.create("ar.customer", { subjectId: subj.id, groupId: group.id })).id);
 }
 
+/**
+ * Kategorie e-shopu jsou kategorie položek. Dřívější `shop.category` se převedou: kategorie položek podle adresy / názvu
+ * (jinak nová), položkám bez kategorie se doplní, původní se vypnou (tabulka zanikne v dalším vydání).
+ */
+async function convertShopCategories(data: DataApi): Promise<void> {
+  // převádí se jen aktivní (převedené se vypnou, převod se neopakuje)
+  const old = await data.find("shop.category", { active: true }, { take: 2000 });
+  if (!old.length) return;
+  const map = new Map<string, string>();
+  const invCats = await data.find("inv.category", {}, { take: 5000 });
+  for (const c of old) {
+    const slug = String(c.slug);
+    const hit = invCats.find((x) => x.slug === slug) ?? invCats.find((x) => String(x.name).toLowerCase() === String(c.name).toLowerCase());
+    if (hit) {
+      await data.update("inv.category", String(hit.id), { eshop: true, slug: hit.slug ?? slug, description: hit.description ?? c.description ?? null, image: hit.image ?? c.image ?? null });
+      map.set(String(c.id), String(hit.id));
+    } else {
+      let code = slug.toUpperCase().replace(/-/g, "").slice(0, 16) || "KAT";
+      for (let n = 2; invCats.some((x) => x.code === code); n++) code = `${code.slice(0, 14)}${n}`;
+      const made = await data.create("inv.category", { code, name: c.name, slug, sortOrder: c.position ?? 100, eshop: c.active !== false, description: c.description ?? null, image: c.image ?? null });
+      invCats.push(made);
+      map.set(String(c.id), String(made.id));
+    }
+  }
+  for (const c of old) if (c.parentId && map.has(String(c.parentId))) {
+    const target = invCats.find((x) => x.id === map.get(String(c.id)));
+    if (target && !target.parentId) await data.update("inv.category", String(target.id), { parentId: map.get(String(c.parentId)) });
+  }
+  for (const i of await data.find("inv.item", { shopCategoryId: { in: [...map.keys()] } }, { take: 10000 })) {
+    await data.update("inv.item", String(i.id), { shopCategoryId: null, ...(i.categoryId ? {} : { categoryId: map.get(String(i.shopCategoryId)) }) });
+  }
+  for (const c of old) await data.update("shop.category", String(c.id), { active: false });
+}
+
 export async function shopSetup(data: DataApi): Promise<void> {
+  await convertShopCategories(data);
   if (!(await data.find("shop.shop", {}, { take: 1 })).length) {
     const customerId = await ensureCustomer(data);
     if (customerId) {
