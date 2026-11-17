@@ -7,7 +7,7 @@
 import { ToastHost } from "./toast";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   Avatar,
   Button,
@@ -46,6 +46,8 @@ interface Props {
   labels: { home: string; settings: string; signOut: string; search: string; noResults: string; recent: string; noRecent: string; help: string; lang: string; notices: { title: string; empty: string; allRead: string; showRead: string } };
   menu: MenuHit[];
   children: React.ReactNode;
+  /** logo organizace aktuální firmy (/api/files/<id>), jinak logo Shanon */
+  logoSrc?: string | null;
 }
 
 const useStyles = makeStyles({
@@ -74,7 +76,11 @@ const useStyles = makeStyles({
   muted: { color: tokens.colorNeutralForeground3, marginLeft: "8px" },
 });
 
-export function AppShell({ modules, companies, companyId, user, labels, menu, children }: Props) {
+export function AppShell({ modules, companies, companyId, logoSrc, user, labels, menu, children }: Props) {
+  // klíč = adresa loga: po přepnutí firmy se chyba načtení zapomene
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const logoFailed = !!logoSrc && failedSrc === logoSrc;
+  const setLogoFailed = (v: boolean) => setFailedSrc(v ? (logoSrc ?? null) : null);
   const s = useStyles();
   const path = usePathname();
   // historie cest v aplikaci pro Esc „zpět, odkud jsem přišel“
@@ -100,8 +106,14 @@ export function AppShell({ modules, companies, companyId, user, labels, menu, ch
       <ToastHost />
       <header className={s.header}>
         <Link href={current?.href ?? "/"} className={s.logo} aria-label="Shanon">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-header.png" alt="Shanon" height={28} />
+          {/* logo organizace aktuální firmy (soubor za přihlášením); nenačte-li se, zůstane Shanon */}
+          {logoSrc && !logoFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoSrc} alt="" height={32} style={{ maxWidth: 140, objectFit: "contain" }} onError={() => setLogoFailed(true)} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/logo-header.png" alt="Shanon" height={28} />
+          )}
         </Link>
 
         <Menu>

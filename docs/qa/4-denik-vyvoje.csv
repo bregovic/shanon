@@ -148,3 +148,4 @@ Návod: Nápověda → Ovládání a klávesové zkratky."
 - **Dokončit a vyfakturovat**: faktura podle skutečnosti (zaúčtovaná, s QR), e-mail zákazníkovi, objednávka Připraveno k vyzvednutí.
 
 Návod: Nápověda → E-shop."
+2026-11-17;change;Systém;Logo organizace v hlavičce;;;Má-li organizace vybrané firmy nahrané logo (Organizace → Logo), ukazuje se v hlavičce aplikace místo loga Shanon. Po přepnutí na firmu bez loga se vrátí logo Shanon.

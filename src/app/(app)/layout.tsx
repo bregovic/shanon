@@ -6,6 +6,7 @@ import { canSeeModule } from "@/core/security";
 import { FavoritesProvider } from "@/components/favorites";
 import { prisma } from "@/server/db";
 import { menuIndex } from "@/server/menu";
+import { inTenant } from "@/server/data";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireSession();
@@ -20,6 +21,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  // logo organizace aktuální firmy (Organizace → Logo) místo loga Shanon; bez loga nebo modulu zůstane Shanon
+  const orgLogo =
+    s.ctx.companyId && s.ctx.modules.has("org")
+      ? await inTenant(s.ctx, async (sess) => ((await sess.sys().api().find("org.entity", {}, { take: 1 }))[0]?.logo as string) ?? null).catch(() => null)
+      : null;
 
   const favorites = await prisma.sysFavorite.findMany({
     where: { userId: s.user.id },
@@ -47,6 +54,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       modules={modules}
       companies={s.companies}
       companyId={s.ctx.companyId}
+      logoSrc={orgLogo ? `/api/files/${orgLogo}` : null}
       user={{ name: s.user.name, email: s.user.email, initials, admin: s.superUser }}
       labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults"), recent: t("@SYS:Recent"), noRecent: t("@SYS:NoRecent"), help: t("@SYS:Help"), lang: s.lang, notices: { title: t("@SYS:Notices"), empty: t("@SYS:NoticesEmpty"), allRead: t("@SYS:NoticesAllRead"), showRead: t("@SYS:NoticesShowRead") } }}
       menu={menuIndex(s, t)}
