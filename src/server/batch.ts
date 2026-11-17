@@ -11,10 +11,10 @@ import { notify } from "@/modules/sys/notify";
 import type { EventContext, JobDef, RecordData } from "@/core/module";
 import { moduleOf } from "@/core/object";
 import { ADMIN } from "@/core/security";
-import { dependencyClosure } from "@/core/module";
-import { modules, registry } from "@/registry";
+import { modules } from "@/registry";
 import { inTenant, type Ctx } from "./data";
 import { prisma, withTenant } from "./db";
+import { companyModules } from "./modules";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 export const jobDefs = (): Map<string, JobDef> => new Map(modules.flatMap((m) => (m.jobs ?? []).map((j) => [j.id, j] as const)));
@@ -115,7 +115,8 @@ export async function recordRun(ctx: EventContext, job: RecordData, started: num
 export async function runDueJobs(now = new Date(), client: PrismaClient = prisma): Promise<number> {
   let count = 0;
   for (const t of await client.sysTenant.findMany({ include: { modules: true, users: { where: { role: "admin" }, take: 1 } } })) {
-    const enabled = new Set([...dependencyClosure(registry, ["sys", ...t.modules.map((m) => m.moduleId)])].filter((x) => registry.modules.has(x)));
+    const tenantModules = t.modules.map((m) => m.moduleId);
+    const byCompany = new Map<string, Set<string>>();
     const due = await withTenant(
       t.id,
       // úlohy jen skutečných firem (ne nosných firem virtuálních společností)
@@ -123,6 +124,9 @@ export async function runDueJobs(now = new Date(), client: PrismaClient = prisma
       client,
     );
     for (const job of due) {
+      // moduly firmy úlohy (agenda firmy)
+      if (!byCompany.has(job.companyId)) byCompany.set(job.companyId, await companyModules(t.id, job.companyId, tenantModules, client));
+      const enabled = byCompany.get(job.companyId)!;
       const ctx: Ctx = {
         tenantId: t.id,
         companyId: job.companyId,

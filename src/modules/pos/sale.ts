@@ -21,6 +21,7 @@ import { addressLine, orgOf } from "@/modules/org";
 import { closeBasket } from "./basket";
 import { ar } from "@/modules/ar";
 import { postInvoice } from "@/modules/tax/document";
+import { vatPayer } from "@/modules/tax/orders";
 
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -339,6 +340,8 @@ export interface ReceiptPrint {
   register: string;
   /** tradeName = název provozovny/značka nad obchodním jménem (jen když se liší) */
   company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null; logoId?: string | null };
+  /** plátce DPH (neplátce: účtenka / faktura bez DPH, ne daňový doklad) */
+  vatPayer?: boolean;
   /** známý odběratel — účtenka je pak faktura – daňový doklad */
   customer?: { name: string; regNo: string | null; vatId: string | null; address: string | null; email: string | null } | null;
   lines: { description: string; qty: string; unit: string; unitPrice: string; amount: string; rate: string; originalPrice?: string | null }[];
@@ -419,6 +422,7 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
       address: addr,
     },
     customer,
+    vatPayer: await vatPayer(data),
     lines: out,
     vat: [...vat].map(([rate, v]) => ({ rate, base: fromCents(v.base), tax: fromCents(v.tax) })),
     gross: String(r.amountGross),

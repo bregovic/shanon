@@ -6,11 +6,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { DEFAULT_LANG, type Lang } from "@/core/labels";
-import { dependencyClosure } from "@/core/module";
 import { ADMIN, mergePerms, type Perms } from "@/core/security";
 import { registry } from "@/registry";
 import type { Ctx } from "./data";
 import { prisma, withTenant } from "./db";
+import { companyModules } from "./modules";
 
 const COOKIE = "shanon_session";
 const TTL_DAYS = 14;
@@ -82,19 +82,6 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   const { user } = session;
   const { tenant } = user;
 
-  // moduly: zapnuté + jejich závislosti, jen ty, které v kódu existují
-  const modules = new Set(
-    [...dependencyClosure(registry, ["sys", ...tenant.modules.map((m) => m.moduleId)])].filter((m) => registry.modules.has(m)),
-  );
-  const extensions = new Set(
-    tenant.extensions
-      .map((e) => e.extensionId)
-      .filter((id) => {
-        const x = registry.extensions.get(id);
-        return x && (x.visibility === "public" || x.owner === tenant.id) && x.dependsOn.every((d) => modules.has(d));
-      }),
-  );
-
   // firmy: superuživatel všechny, ostatní jen přiřazené
   const superUser = user.role === "admin";
   const assigned = new Map(user.companies.filter((a) => a.tenantId === tenant.id).map((a) => [a.companyId, a]));
@@ -104,6 +91,17 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   );
   const companies = superUser ? allCompanies : allCompanies.filter((c) => assigned.has(c.id));
   const companyId = companies.find((c) => c.id === session.companyId)?.id ?? companies[0]?.id ?? null;
+
+  // moduly aktuální firmy (agenda firmy) + jejich závislosti
+  const modules = await companyModules(tenant.id, companyId, tenant.modules.map((m) => m.moduleId));
+  const extensions = new Set(
+    tenant.extensions
+      .map((e) => e.extensionId)
+      .filter((id) => {
+        const x = registry.extensions.get(id);
+        return x && (x.visibility === "public" || x.owner === tenant.id) && x.dependsOn.every((d) => modules.has(d));
+      }),
+  );
 
   // oprávnění platí pro aktuální firmu (role a správce se přiřazují po firmách)
   const here = companyId ? assigned.get(companyId) : undefined;

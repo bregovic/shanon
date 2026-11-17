@@ -9,7 +9,7 @@ import { UserError, type DataApi, type EventContext, type ObjectHandlers, type R
 import { defineObject, type ObjectDef } from "@/core/object";
 import { DIM_NAMES, DupCheck, JournalStatus, dimFields } from "@/modules/gl";
 import { documentLineHandlers, invoiceHandlers, type InvoiceConfig } from "./document";
-import { orderHandlers, releaseOrder } from "./orders";
+import { orderHandlers, releaseOrder, vatPayer } from "./orders";
 import { postingAccount } from "@/modules/gl/setup";
 import { fillFromAres } from "@/modules/gab/ares";
 import { createFromRegistry } from "@/modules/gab/registry-lookup";
@@ -654,7 +654,9 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
         const acc = (num: string) => postingAccount(data, num);
         const summary = await acc(groupDefaults.summary);
         if (!summary) return;
-        const [tc] = await data.find("tax.taxCode", { code: groupDefaults.taxCode }, { take: 1 });
+        // neplátce DPH: prodej / nákup bez DPH
+        const tcCode = (await vatPayer(data)) ? groupDefaults.taxCode : sp.side === 1 ? "BEZ" : "P0";
+        const [tc] = await data.find("tax.taxCode", { code: tcCode }, { take: 1 });
         await data.create(group.id, {
           code: groupDefaults.code,
           name: groupDefaults.name,

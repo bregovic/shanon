@@ -7,10 +7,9 @@
  * Vše jde přes datovou službu (RLS, validace, události, historie změn).
  */
 import "server-only";
-import { dependencyClosure } from "@/core/module";
 import type { Perms } from "@/core/security";
-import { registry } from "@/registry";
 import { prisma, withTenant } from "./db";
+import { companyModules } from "./modules";
 import type { Ctx } from "./data";
 import { tokenHash } from "./api-token";
 
@@ -25,7 +24,7 @@ export async function apiContext(authorization: string | null): Promise<{ ctx: C
   if (!conn) return null;
   const tenant = await prisma.sysTenant.findUnique({ where: { id: tenantId }, include: { modules: true } });
   if (!tenant) return null;
-  const modules = new Set([...dependencyClosure(registry, ["sys", ...tenant.modules.map((x) => x.moduleId)])].filter((x) => registry.modules.has(x)));
+  const modules = await companyModules(tenantId, conn.companyId, tenant.modules.map((x) => x.moduleId));
   const scopes = String(conn.scopes ?? "")
     .split(/[,\s]+/)
     .map((s) => s.trim())

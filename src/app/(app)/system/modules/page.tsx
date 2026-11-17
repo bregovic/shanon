@@ -48,7 +48,8 @@ export default async function ModulesPage() {
     <FeatureList
       crumbs={[{ label: t("@SYS:Module"), href: "/sys" }, { label: t("@SYS:Modules") }]}
       sections={[
-        { title: t("@SYS:Modules"), rows: modules },
+        // moduly = agenda aktuální firmy (přepínač firmy v hlavičce)
+        { title: `${t("@SYS:ModulesOfCompany")} ${s.companies.find((c) => c.id === s.ctx.companyId)?.name ?? ""}`.trim(), rows: modules },
         { title: t("@SYS:Extensions"), rows: extensions },
       ]}
       labels={{

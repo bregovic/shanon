@@ -8,12 +8,11 @@
 import "dotenv/config";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
-import { dependencyClosure } from "../src/core/module";
 import { ADMIN } from "../src/core/security";
-import { registry } from "../src/registry";
 import { inTenant, type Ctx } from "../src/server/data";
 import { createPrisma, withTenant } from "../src/server/db";
 import { importRecords, readTable } from "../src/server/import";
+import { companyModules } from "../src/server/modules";
 import { fillFromAres } from "../src/modules/gab/ares";
 
 async function main() {
@@ -21,7 +20,7 @@ async function main() {
   const client = createPrisma();
   const t = await client.sysTenant.findUniqueOrThrow({ where: { code: tenantCode }, include: { modules: true, users: { where: { role: "admin" }, take: 1 } } });
   const c = await withTenant(t.id, (tx) => tx.sysCompany.findFirstOrThrow({ where: { tenantId: t.id, code: companyCode } }), client);
-  const modules = dependencyClosure(registry, ["sys", ...t.modules.map((m) => m.moduleId)]);
+  const modules = await companyModules(t.id, c.id, t.modules.map((m) => m.moduleId), client);
   const ctx: Ctx = { tenantId: t.id, userId: t.users[0].id, companyId: c.id, role: "admin", perms: ADMIN, modules, extensions: new Set(), lang: "cs" };
 
   if (objectId === "--ares") {

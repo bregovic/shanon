@@ -16,7 +16,7 @@ export interface ProvisionInput {
   adminEmail: string;
   adminPassword: string;
   modules: string[];
-  company: { code: string; name: string; regNo?: string; vatId?: string };
+  company: { code: string; name: string; regNo?: string; vatId?: string; vatPayer?: boolean };
 }
 
 export async function provisionTenant(client: PrismaClient, input: ProvisionInput) {

@@ -1623,7 +1623,7 @@ function Receipt({
       </div>
       <div className={st.rSep} />
       <div className={st.rRow}>
-        <span>{r.customer ? L.InvoiceDoc : L.SimplifiedDoc}</span>
+        <span>{r.vatPayer === false ? (r.customer ? L.InvoiceNonPayer : L.Receipt) : r.customer ? L.InvoiceDoc : L.SimplifiedDoc}</span>
         <span>{r.receiptNum}</span>
       </div>
       {r.customer && (
@@ -1672,8 +1672,9 @@ function Receipt({
         </div>
       )}
       <div className={st.rSep} />
-      <div>{L.VatRecap}</div>
-      {r.vat.map((v) => (
+      {r.vatPayer === false && <div>{L.NonPayerNote}</div>}
+      {r.vatPayer !== false && <div>{L.VatRecap}</div>}
+      {r.vatPayer !== false && r.vat.map((v) => (
         <div key={v.rate} className={st.rRow}>
           <span>
             {v.rate} % · {L.Base} {fmt(v.base)}

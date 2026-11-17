@@ -87,6 +87,7 @@ export async function deleteCompanyWithData(ctx: Ctx, companyId: string, client:
       await q.$executeRawUnsafe("RESET ROLE");
       await q.$executeRawUnsafe("UPDATE sys_session SET company_id = NULL WHERE company_id = $1::uuid", companyId);
       await q.$executeRawUnsafe("DELETE FROM sys_user_company WHERE company_id = $1::uuid", companyId);
+      await q.$executeRawUnsafe("DELETE FROM sys_company_module WHERE company_id = $1::uuid", companyId);
       await q.$executeRawUnsafe("DELETE FROM sys_global_key WHERE company_id = $1::uuid", companyId);
       // ostatní odkazy na firmu (členství ve virtuální společnosti…): nepovinné vynulovat, povinné vazby smazat
       for (const fk of fks) {

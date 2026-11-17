@@ -7,6 +7,7 @@ import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { postingAccount } from "@/modules/gl/setup";
+import { vatPayer } from "@/modules/tax/orders";
 
 export const DiscountKind = defineEnum({
   id: "InvDiscountKind",
@@ -204,6 +205,7 @@ const UNITS: [string, string, number][] = [
   ["L", "litr", 3],
   ["BAL", "balení", 0],
   ["HOD", "hodina", 2],
+  ["NEURC", "neurčeno", 3],
 ];
 
 /** Účty, které položky potřebují a ve výchozí osnově nejsou. */
@@ -219,29 +221,36 @@ async function invSetup(data: DataApi) {
   }
   if (!(await data.find("inv.unit", {}, { take: 1 })).length) {
     for (const [code, name, decimals] of UNITS) await data.create("inv.unit", { code, name, decimals });
+  } else if (!(await data.find("inv.unit", { code: "NEURC" }, { take: 1 })).length) {
+    // jednotka „neurčeno“ i stávajícím firmám
+    await data.create("inv.unit", { code: "NEURC", name: "neurčeno", decimals: 3 });
   }
+  // neplátce DPH: prodej a nákup bez DPH, položka DPH Bez DPH
+  const payer = await vatPayer(data);
+  const SALES = payer ? "V21" : "BEZ";
+  const PURCHASE = payer ? "P21" : "P0";
   const acc = (n: string) => postingAccount(data, n);
   const tax = async (c: string) => (await data.find("tax.taxCode", { code: c }, { take: 1 }))[0]?.id ?? null;
   if (!(await data.find("inv.itemGroup", {}, { take: 1 })).length) {
     await data.create("inv.itemGroup", {
       code: "ZBOZI",
       name: "Zboží",
-      taxCodeId: await tax("V21"),
+      taxCodeId: await tax(SALES),
       revenueAccountId: await acc("604"),
-      purchaseTaxCodeId: await tax("P21"),
+      purchaseTaxCodeId: await tax(PURCHASE),
       costAccountId: await acc("504"),
     });
   }
   // služby (i ve stávajících firmách): tržby 602, náklady 518, položka DPH Služby 21 % (EU / třetí země se liší od zboží)
   if (!(await data.find("inv.itemGroup", { code: "SLUZBY" }, { take: 1 })).length) {
-    const s21 = (await data.find("tax.itemTaxGroup", { code: "S21" }, { take: 1 }))[0]?.id ?? null;
+    const s21 = (await data.find("tax.itemTaxGroup", { code: payer ? "S21" : "BEZ" }, { take: 1 }))[0]?.id ?? null;
     await data.create("inv.itemGroup", {
       code: "SLUZBY",
       name: "Služby",
       itemTaxGroupId: s21,
-      taxCodeId: await tax("V21"),
+      taxCodeId: await tax(SALES),
       revenueAccountId: await acc("602"),
-      purchaseTaxCodeId: await tax("P21"),
+      purchaseTaxCodeId: await tax(PURCHASE),
       costAccountId: await acc("518"),
     });
   }
@@ -250,7 +259,7 @@ async function invSetup(data: DataApi) {
   for (const g of await data.find("inv.itemGroup", { itemTaxGroupId: null }, { take: 500 })) {
     const code = g.taxCodeId ? await data.get("tax.taxCode", String(g.taxCodeId)) : null;
     const rate = Number(code?.rate ?? 21);
-    const id = await itg(rate >= 20 ? "Z21" : rate >= 11 ? "Z12" : "OSV");
+    const id = await itg(!payer ? "BEZ" : rate >= 20 ? "Z21" : rate >= 11 ? "Z12" : "OSV");
     if (id) await data.update("inv.itemGroup", String(g.id), { itemTaxGroupId: id });
   }
 }

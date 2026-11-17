@@ -23,6 +23,7 @@ model SysTenant {
 
   users      SysUser[]
   modules    SysTenantModule[]
+  companyModules SysCompanyModule[]
   extensions SysTenantExtension[]
   labels     SysLabelOverride[]
 
@@ -72,6 +73,20 @@ model SysSession {
 }
 
 /// Zapnuté moduly tenanta (obdoba konfiguračních klíčů v AX).
+/// Moduly zapnuté ve firmě (agenda firmy); sys_tenant_module = souhrn přes firmy (src/server/modules.ts).
+model SysCompanyModule {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  moduleId  String   @map("module_id") @db.VarChar(40)
+  enabledAt DateTime @default(now()) @map("enabled_at")
+
+  tenant SysTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, moduleId])
+  @@index([tenantId])
+  @@map("sys_company_module")
+}
+
 model SysTenantModule {
   tenantId  String   @map("tenant_id") @db.Uuid
   moduleId  String   @map("module_id") @db.VarChar(40)

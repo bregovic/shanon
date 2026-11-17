@@ -10,15 +10,15 @@ import "server-only";
 import { randomBytes, createHash } from "node:crypto";
 import QRCode from "qrcode";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { UserError, dependencyClosure, type DataApi, type RecordData } from "@/core/module";
+import { UserError, type DataApi, type RecordData } from "@/core/module";
 import { ADMIN } from "@/core/security";
 import { czIban, spayd } from "@/core/print";
-import { registry } from "@/registry";
 import { gatewayConnection, listProducts, markGatewayPaid, orderView, placeOrder, productByNum, quote, type OrderInput, type OrderResult, type OrderView, type Quote, type QuoteInput, type ShopProduct } from "@/modules/shop/catalog";
 import { comgateCreate, comgateStatus } from "@/modules/int/comgate";
 import { paymentRedirectOf, writeLog } from "@/modules/int/drivers";
 import { toCents } from "@/core/money";
 import { prisma, withTenant } from "./db";
+import { companyModules } from "./modules";
 import { inTenant, type Ctx } from "./data";
 import { readFile } from "./docuref";
 import { getT } from "./i18n";
@@ -40,7 +40,8 @@ async function load(org: string, client: PrismaClient): Promise<Loaded | null> {
   if (!tenant || !tenant.modules.some((m) => m.moduleId === "shop")) return null;
   const ent = await withTenant(k.tenantId, (tx) => tx.orgEntity.findFirst({ where: { tenantId: k.tenantId, id: k.ownerId } }), client);
   if (!ent?.companyId) return null;
-  const modules = new Set([...dependencyClosure(registry, ["sys", ...tenant.modules.map((m) => m.moduleId)])].filter((x) => registry.modules.has(x)));
+  const modules = await companyModules(k.tenantId, String(ent.companyId), tenant.modules.map((m) => m.moduleId), client);
+  if (!modules.has("shop")) return null; // e-shop není v agendě této firmy
   const ctx: Ctx = {
     tenantId: k.tenantId,
     companyId: String(ent.companyId),

@@ -8,6 +8,7 @@ import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { postingAccount } from "@/modules/gl/setup";
+import { vatPayer } from "./orders";
 
 export const TaxDirection = defineEnum({
   id: "TaxDirection",
@@ -172,21 +173,30 @@ const CZ_MATRIX: Record<string, Record<string, [string, string]>> = {
   NEPL: { Z21: ["V21", "P0"], Z12: ["V12", "P0"], S21: ["V21", "P0"], S12: ["V12", "P0"], OSV: ["VOSV", "P0"], MIMO: ["VMIMO", "P0"] },
 };
 
+/** Neplátce DPH: jen prodej a nákup bez DPH (plátcem se stane → další nasazení doplní plnou sadu). */
+const NP_CODES: (typeof CZ_CODES)[number][] = [
+  ["BEZ", "Bez DPH (neplátce)", 0, "output", false, "-", "", "", ""],
+  ["P0", "Nákup bez DPH (neplátce, osvobozeno, mimo předmět)", 0, "input", false, "-", "", "", ""],
+];
+const NP_ITEMS: [string, string][] = [["BEZ", "Bez DPH"]];
+const NP_MATRIX: Record<string, Record<string, [string, string]>> = { TUZ: { BEZ: ["BEZ", "P0"] } };
+
 async function taxSetup(data: DataApi) {
   const vatId = await postingAccount(data, "343");
   if (!vatId) return;
+  const payer = await vatPayer(data);
   const byCode = async (obj: string, code: string) => (await data.find(obj, { code }, { take: 1 }))[0] ?? null;
   const codes = new Map<string, string>();
-  for (const [code, name, rate, direction, reverseCharge, reportLine, deductLine, khSection, khItemCode] of CZ_CODES) {
+  for (const [code, name, rate, direction, reverseCharge, reportLine, deductLine, khSection, khItemCode] of payer ? CZ_CODES : NP_CODES) {
     const have = await byCode("tax.taxCode", code);
     const rec = have ?? (await data.create("tax.taxCode", { code, name, rate: String(rate), direction, reverseCharge, accountId: vatId, reportLine, deductLine: deductLine || null, khSection: khSection || null, khItemCode: khItemCode || null }));
     codes.set(code, String(rec.id));
   }
   const groups = new Map<string, string>();
-  for (const [code, name, description] of CZ_GROUPS) groups.set(code, String((await byCode("tax.taxGroup", code))?.id ?? (await data.create("tax.taxGroup", { code, name, description })).id));
+  for (const [code, name, description] of payer ? CZ_GROUPS : CZ_GROUPS.filter((x) => x[0] === "TUZ")) groups.set(code, String((await byCode("tax.taxGroup", code))?.id ?? (await data.create("tax.taxGroup", { code, name, description })).id));
   const items = new Map<string, string>();
-  for (const [code, name] of CZ_ITEMS) items.set(code, String((await byCode("tax.itemTaxGroup", code))?.id ?? (await data.create("tax.itemTaxGroup", { code, name })).id));
-  for (const [g, row] of Object.entries(CZ_MATRIX))
+  for (const [code, name] of payer ? CZ_ITEMS : NP_ITEMS) items.set(code, String((await byCode("tax.itemTaxGroup", code))?.id ?? (await data.create("tax.itemTaxGroup", { code, name })).id));
+  for (const [g, row] of Object.entries(payer ? CZ_MATRIX : NP_MATRIX))
     for (const [it, [sales, purchase]] of Object.entries(row)) {
       const where = { taxGroupId: groups.get(g)!, itemTaxGroupId: items.get(it)! };
       if ((await data.find("tax.taxGroupCode", where, { take: 1 })).length) continue;

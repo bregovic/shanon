@@ -145,7 +145,10 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
 /** Je firma plátce DPH (Organizace; bez ní ano). */
 export async function vatPayer(data: DataApi): Promise<boolean> {
   const [org] = await data.find("org.entity", {}, { take: 1 }).catch(() => [] as RecordData[]);
-  return org ? org.vatPayer !== false : true;
+  if (org) return org.vatPayer !== false;
+  // bez organizace (výchozí nastavení nové firmy): příznak firmy
+  const company = data.companyId ? await data.get("sys.company", data.companyId).catch(() => null) : null;
+  return company?.vatPayer !== false;
 }
 
 /** DPH obsažená v částce s daní (zaokrouhleno na haléře). */

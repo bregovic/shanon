@@ -11,11 +11,10 @@ import { createHash } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { UserError, type RecordData } from "@/core/module";
 import { ADMIN } from "@/core/security";
-import { dependencyClosure } from "@/core/module";
-import { registry } from "@/registry";
 import { notify } from "@/modules/sys/notify";
 import { sniffPortalFile, PORTAL_CAPS } from "@/modules/int/portal";
 import { prisma, withTenant } from "./db";
+import { companyModules } from "./modules";
 import { inTenant, type Ctx } from "./data";
 import { addFile } from "./docuref";
 import { getT } from "./i18n";
@@ -74,7 +73,8 @@ async function load(tenantIdOrEntity: string, tokenOrPath: string, client: Prism
     client,
   );
   if (!found) return null;
-  const modules = new Set([...dependencyClosure(registry, ["sys", ...tenant.modules.map((m) => m.moduleId)])].filter((x) => registry.modules.has(x)));
+  const modules = await companyModules(tenantId, String(found.p.companyId), tenant.modules.map((m) => m.moduleId), client);
+  if (!modules.has("int")) return null; // Integrace není v agendě firmy portálu
   const ctx: Ctx = {
     tenantId,
     companyId: String(found.p.companyId),

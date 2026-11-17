@@ -24,6 +24,7 @@ import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
 import { openShiftOf, quote, receiptPrint, sell, sellOnInvoice, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
 import { sendDocumentNow } from "@/server/mail";
+import { disableCompanyModules, enableCompanyModules } from "@/server/modules";
 import { assertPaid, connectionsFor, eetRegisterReceipt, eetResendPending, paymentCancel, paymentStart, paymentStatus, type PaymentState } from "@/modules/int/drivers";
 import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
@@ -145,27 +146,27 @@ async function requireAdmin() {
   return s;
 }
 
+/** Zapnutí / vypnutí modulu v aktuální firmě (agenda firmy); ostatní firmy tenanta se nemění. */
 export async function toggleModuleAction(form: FormData) {
   const s = await requireAdmin();
   const id = String(form.get("module"));
   const mod = registry.modules.get(id);
-  if (!mod || mod.core) return;
+  if (!mod || mod.core || !s.ctx.companyId) return;
   const tenantId = s.ctx.tenantId;
+  const companyId = s.ctx.companyId;
   if (form.get("enable") === "1") {
     const all = [...dependencyClosure(registry, [id])].filter((m) => !s.ctx.modules.has(m));
-    await prisma.sysTenantModule.createMany({ data: all.map((moduleId) => ({ tenantId, moduleId })), skipDuplicates: true });
-    // výchozí nastavení nově zapnutých modulů ve všech firmách
+    // firma bez vlastního nastavení (starší data): nejdřív její dosavadní moduly, pak nové
+    await enableCompanyModules(tenantId, companyId, [...s.ctx.modules, ...all]);
+    // výchozí nastavení nově zapnutých modulů v této firmě
     const enabled = new Set([...s.ctx.modules, ...all]);
-    for (const c of s.companies) {
-      await inTenant({ ...s.ctx, companyId: c.id, modules: enabled }, (sess) =>
-        setupCompany(sess.sys().api(), new Set(all), s.lang),
-      );
-    }
+    await inTenant({ ...s.ctx, modules: enabled }, (sess) => setupCompany(sess.sys().api(), new Set(all), s.lang));
   } else {
     // vypnout i zapnuté moduly, které na něm stojí (uživatel je potvrdil v náhledu);
     // data zůstávají a po opětovném zapnutí se vrátí
     const off = [id, ...dependents(registry, id).filter((d) => s.ctx.modules.has(d))].filter((m) => !registry.modules.get(m)?.core);
-    await prisma.sysTenantModule.deleteMany({ where: { tenantId, moduleId: { in: off } } });
+    await enableCompanyModules(tenantId, companyId, s.ctx.modules); // starší data bez vlastního nastavení
+    await disableCompanyModules(tenantId, companyId, off);
   }
   revalidatePath("/", "layout");
 }
@@ -180,7 +181,7 @@ export async function moduleDisablePreviewAction(id: string): Promise<{ id: stri
     const mod = registry.modules.get(m);
     if (!mod || mod.core) continue;
     let records = 0;
-    for (const o of mod.objects) records += await countAllRecords(s.ctx.tenantId, o.id);
+    for (const o of mod.objects) records += await countAllRecords(s.ctx.tenantId, o.id, undefined, s.ctx.companyId);
     out.push({ id: m, label: t(mod.label), records });
   }
   return out;

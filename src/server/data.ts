@@ -627,6 +627,9 @@ export class Session {
     for (const h of handlersFor(this.ctx, objectId)) await h.afterSave?.(ectx, result, isNew);
     // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
     if (isNew && def.id === "sys.company" && !result.virtual) {
+      // agenda nové firmy = moduly firmy, ze které vzniká (pak jde upravit ve Správě systému → Moduly)
+      const ids = [...this.ctx.modules].filter((m) => registry.modules.has(m));
+      await this.tx.sysCompanyModule.createMany({ data: ids.map((moduleId) => ({ tenantId: this.ctx.tenantId, companyId: String(result.id), moduleId })), skipDuplicates: true });
       await setupCompany(new Session(this.tx, { ...this.ctx, companyId: String(result.id) }, true).api(), this.ctx.modules);
     }
     return result;
@@ -759,9 +762,16 @@ export const setImageField = (ctx: Ctx, objectId: string, id: string, field: str
     client,
   );
 
-/** Počet záznamů objektu v celém tenantovi (všechny firmy) — pro správu modulů. */
-export const countAllRecords = (tenantId: string, objectId: string, client?: PrismaClient) =>
-  withTenant(tenantId, (tx) => delegate(tx, getObject(objectId)).count({ where: { tenantId } }), client ?? prisma);
+/** Počet záznamů objektu v tenantovi, u objektů firmy volitelně jen v jedné firmě — pro správu modulů. */
+export const countAllRecords = (tenantId: string, objectId: string, client?: PrismaClient, companyId?: string | null) =>
+  withTenant(
+    tenantId,
+    (tx) => {
+      const def = getObject(objectId);
+      return delegate(tx, def).count({ where: { tenantId, ...(companyId && def.scope === "company" ? { companyId } : {}) } });
+    },
+    client ?? prisma,
+  );
 
 export const listRecords = (ctx: Ctx, objectId: string, p: ListParams, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.list(objectId, p), client);

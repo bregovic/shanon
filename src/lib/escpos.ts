@@ -96,7 +96,7 @@ export function receiptEscPos(
   if (r.company.address) p.line(r.company.address);
   p.line([r.company.regNo && `IČO ${r.company.regNo}`, r.company.vatId && `DIČ ${r.company.vatId}`].filter(Boolean).join("  "));
   p.align("left").sep();
-  p.pair(r.customer ? L.InvoiceDoc : L.SimplifiedDoc, r.receiptNum);
+  p.pair(r.vatPayer === false ? (r.customer ? L.InvoiceNonPayer : L.Receipt) : r.customer ? L.InvoiceDoc : L.SimplifiedDoc, r.receiptNum);
   p.pair(r.register, new Date(r.issuedAt).toLocaleString(opts.locale));
   if (r.customer) {
     // odběratel (faktura – daňový doklad)
@@ -117,8 +117,11 @@ export function receiptEscPos(
   p.bold(true).big(true).pair(L.Total, fmt(r.paid)).big(false).bold(false);
   p.pair(r.payment === "cash" ? L.Cash : L.Card, fmt(r.cashGiven ?? r.paid));
   if (r.change && Number(r.change) > 0) p.pair(L.ChangeDue, fmt(r.change));
-  p.sep().line(L.VatRecap);
-  for (const v of r.vat) p.pair(`${v.rate} % ${L.Base} ${fmt(v.base)}`, `${L.Vat} ${fmt(v.tax)}`);
+  if (r.vatPayer === false) p.sep().line(L.NonPayerNote);
+  else {
+    p.sep().line(L.VatRecap);
+    for (const v of r.vat) p.pair(`${v.rate} % ${L.Base} ${fmt(v.base)}`, `${L.Vat} ${fmt(v.tax)}`);
+  }
   if (r.eet) {
     p.sep();
     if (r.eet.pok) p.line(`POK: ${r.eet.pok}`);

@@ -10,6 +10,7 @@ import { registry } from "../src/registry";
 import { inTenant, type Ctx } from "../src/server/data";
 import { createPrisma, withTenant } from "../src/server/db";
 import { setupCompany } from "../src/server/setup";
+import { companyModules } from "../src/server/modules";
 
 async function main() {
   const client = createPrisma();
@@ -26,8 +27,12 @@ async function main() {
     }, client);
     const companies = await withTenant(t.id, (tx) => tx.sysCompany.findMany({ where: { tenantId: t.id, virtual: false }, select: { id: true, code: true } }), client);
     for (const c of companies) {
-      const ctx: Ctx = { tenantId: t.id, userId: t.users[0]?.id ?? t.id, companyId: c.id, role: "admin", perms: ADMIN, modules, extensions: new Set() };
-      const created = await inTenant(ctx, (s) => setupCompany(s.sys().api(), modules), client);
+      // moduly po firmách: firma bez vlastního nastavení dostane dosavadní moduly tenanta (nic se nezmění)
+      if (!(await client.sysCompanyModule.count({ where: { tenantId: t.id, companyId: c.id } })))
+        await client.sysCompanyModule.createMany({ data: [...modules].map((moduleId) => ({ tenantId: t.id, companyId: c.id, moduleId })), skipDuplicates: true });
+      const own = await companyModules(t.id, c.id, t.modules.map((m) => m.moduleId), client);
+      const ctx: Ctx = { tenantId: t.id, userId: t.users[0]?.id ?? t.id, companyId: c.id, role: "admin", perms: ADMIN, modules: own, extensions: new Set() };
+      const created = await inTenant(ctx, (s) => setupCompany(s.sys().api(), own), client);
       const n = Object.values(created).reduce((a, b) => a + b, 0);
       if (n) console.log(`${t.code}/${c.code}: doplněno ${JSON.stringify(created)}`);
     }

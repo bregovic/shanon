@@ -22,6 +22,7 @@ import { registry } from "../src/registry";
 import { inTenant, type Ctx } from "../src/server/data";
 import { createPrisma, withTenant } from "../src/server/db";
 import { setupCompany } from "../src/server/setup";
+import { companyModules, enableCompanyModules } from "../src/server/modules";
 
 interface Profile {
   company?: RecordData;
@@ -44,11 +45,11 @@ async function main() {
   const p = JSON.parse(raw) as Profile;
 
   const tenant = await client.sysTenant.findUniqueOrThrow({ where: { code: tenantCode }, include: { modules: true, users: { where: { role: "admin" }, take: 1 } } });
-  // moduly: přidat chybějící (i se závislostmi), nic nevypínat
-  const have = new Set(tenant.modules.map((m) => m.moduleId));
-  const wanted = dependencyClosure(registry, ["sys", ...have, ...(p.modules ?? [])]);
-  for (const m of wanted) if (!have.has(m)) await client.sysTenantModule.create({ data: { tenantId: tenant.id, moduleId: m } });
   const company = await withTenant(tenant.id, (tx) => tx.sysCompany.findFirstOrThrow({ where: { tenantId: tenant.id, code: companyCode } }), client);
+  // moduly firmy: přidat chybějící (i se závislostmi), nic nevypínat
+  const have = await companyModules(tenant.id, company.id, tenant.modules.map((m) => m.moduleId), client);
+  const wanted = dependencyClosure(registry, ["sys", ...have, ...(p.modules ?? [])]);
+  await enableCompanyModules(tenant.id, company.id, wanted, client);
   const ctx: Ctx = { tenantId: tenant.id, userId: tenant.users[0]?.id ?? tenant.id, companyId: company.id, role: "admin", perms: ADMIN, modules: wanted, extensions: new Set() };
 
   await inTenant(

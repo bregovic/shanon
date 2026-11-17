@@ -6,10 +6,10 @@
  */
 import "server-only";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { dependencyClosure, type RecordData } from "@/core/module";
+import { type RecordData } from "@/core/module";
 import { ADMIN } from "@/core/security";
-import { registry } from "@/registry";
 import { prisma, withTenant } from "./db";
+import { companyModules } from "./modules";
 import { inTenant, type Ctx } from "./data";
 import { settleGatewayLog } from "./eshop";
 
@@ -28,7 +28,7 @@ async function load(tenantId: string, logId: string, client: PrismaClient): Prom
     userName: "Simulátor brány",
     role: "admin",
     perms: ADMIN,
-    modules: new Set([...dependencyClosure(registry, ["sys", ...tenant.modules.map((m) => m.moduleId)])].filter((x) => registry.modules.has(x))),
+    modules: await companyModules(tenantId, String(raw.companyId), tenant.modules.map((m) => m.moduleId), client),
     extensions: new Set(),
     lang: "cs",
   };

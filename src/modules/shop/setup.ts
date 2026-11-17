@@ -3,6 +3,7 @@
  * z webu, způsoby dopravy, stránky s podmínkami k doplnění a platební metody pro e-shop.
  */
 import type { DataApi, RecordData } from "@/core/module";
+import { vatPayer } from "@/modules/tax/orders";
 
 const PAGES: { slug: string; title: string; position: number }[] = [
   { slug: "obchodni-podminky", title: "Obchodní podmínky", position: 10 },
@@ -43,7 +44,8 @@ export async function shopSetup(data: DataApi): Promise<void> {
     }
   }
   if (!(await data.find("shop.delivery", {}, { take: 1 })).length) {
-    const [v21] = await data.find("tax.taxCode", { code: "V21" }, { take: 1 });
+    // neplátce DPH: doprava bez DPH
+    const [v21] = await data.find("tax.taxCode", { code: (await vatPayer(data)) ? "V21" : "BEZ" }, { take: 1 });
     await data.create("shop.delivery", { code: "ODBER", name: "Osobní odběr", kind: "pickup", price: "0", taxCodeId: v21?.id ?? null, position: 10 });
     await data.create("shop.delivery", { code: "ADRESA", name: "Doručení na adresu", kind: "address", price: "99", taxCodeId: v21?.id ?? null, allowCod: true, position: 20 });
   }

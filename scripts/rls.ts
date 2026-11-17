@@ -24,6 +24,8 @@ export function rlsStatements(): string[] {
     `GRANT USAGE ON SCHEMA public TO ${APP_ROLE};`,
     // jedinečné klíče napříč tenanty (veřejné zkratky adres) — bez RLS, kód mění jen klíče svého tenanta
     `GRANT SELECT, INSERT, UPDATE, DELETE ON "sys_global_key" TO ${APP_ROLE};`,
+    // moduly po firmách — bez RLS (čte se i před výběrem tenanta při přihlášení), kód filtruje tenant_id
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON "sys_company_module" TO ${APP_ROLE};`,
   ];
   for (const t of tables) {
     sql.push(

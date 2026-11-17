@@ -22,7 +22,10 @@ export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: st
       ids: [r.customer?.regNo ? `IČO ${r.customer.regNo}` : "", r.customer?.vatId ? `DIČ ${r.customer.vatId}` : ""].filter(Boolean).join("   "),
     },
     doc: {
-      title: r.customer ? "Faktura – daňový doklad" : "Zjednodušený daňový doklad",
+      // neplátce DPH nevystavuje daňový doklad
+      title: r.vatPayer === false ? (r.customer ? "Faktura" : "Účtenka") : r.customer ? "Faktura – daňový doklad" : "Zjednodušený daňový doklad",
+      vatPayer: r.vatPayer === false ? "" : "1",
+      nonPayerNote: r.vatPayer === false ? "Nejsme plátci DPH." : "",
       number: r.receiptNum,
       date: r.issuedAt,
       dateTime: new Date(r.issuedAt).toLocaleString("cs-CZ"),
