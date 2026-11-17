@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import { createPrisma } from "@/server/db";
 import { getObject, listRecords, saveRecord } from "@/server/data";
-import { importRecords, readTable } from "@/server/import";
+import { cellValue, importRecords, readTable } from "@/server/import";
 import { provisionTenant } from "@/server/provision";
 import { fieldsMeta, hiddenFields } from "@/server/ui";
 import { getT } from "@/server/i18n";
@@ -54,4 +54,10 @@ describe("export do Excelu a import zpět", () => {
       ["A2", true, false, true, 100],
     ]);
   }, 120_000);
+
+  it("výčet: kód, popisek i jeho část bez diakritiky („Zboží / výrobek“ ← ZBOZI, Zboží, výrobek)", () => {
+    const f = getObject("inv.item").fields.itemType;
+    for (const v of ["item", "ZBOZI", "Zboží", "výrobek", "Zboží / výrobek", "Služba"]) expect(cellValue(f, v, "cs")[0]).toBe(v === "Služba" ? "service" : "item");
+    expect(cellValue(f, "nesmysl", "cs")[1]).toBe("@SYS:InvalidValue");
+  });
 });

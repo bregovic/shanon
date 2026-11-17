@@ -149,3 +149,4 @@ Návod: Nápověda → Ovládání a klávesové zkratky."
 
 Návod: Nápověda → E-shop."
 2026-11-17;change;Systém;Logo organizace v hlavičce;;;Má-li organizace vybrané firmy nahrané logo (Organizace → Logo), ukazuje se v hlavičce aplikace místo loga Shanon. Po přepnutí na firmu bez loga se vrátí logo Shanon.
+2026-11-17;fix;Systém;Import: hodnoty číselníku i bez diakritiky a části popisku;;;Sloupec s pevným výběrem (např. Druh položky „Zboží / výrobek“) přijme při importu kód, celý popisek i jeho část, bez ohledu na diakritiku a velká písmena — „ZBOZI“, „Zboží“ i „výrobek“.

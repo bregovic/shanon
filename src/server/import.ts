@@ -226,7 +226,14 @@ export function cellValue(f: FieldDef, raw: string, lang: Lang): [unknown, strin
     }
     case "enum": {
       const e = registry.enums.get(f.edt.enumId!)!;
-      const hit = e.values.find((x) => norm(x.value) === norm(v) || (["cs", "en"] as Lang[]).some((l) => norm(resolveLabel(labelTable, x.label, l)) === norm(v)));
+      // kód hodnoty, popisek (cs / en) i jeho část: „Zboží / výrobek“ přijme „ZBOZI“, „Zboží“ i „výrobek“
+      const n = norm(v);
+      const names = (x: (typeof e.values)[number]) =>
+        (["cs", "en"] as Lang[]).flatMap((l) => {
+          const label = resolveLabel(labelTable, x.label, l);
+          return [label, ...label.split(/[/,]/)];
+        });
+      const hit = e.values.find((x) => norm(x.value) === n || names(x).some((t) => norm(t) === n));
       return hit ? [hit.value, null] : [v, "@SYS:InvalidValue"];
     }
     default:
