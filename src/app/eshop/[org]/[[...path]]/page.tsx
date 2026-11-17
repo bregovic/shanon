@@ -20,6 +20,9 @@ const STATUS: Record<string, string> = {
   new: "Přijata",
   awaitingPayment: "Čeká na platbu",
   paid: "Přijata, připravujeme",
+  toPick: "Přijata, připravujeme",
+  picking: "Připravujeme",
+  ready: "Připraveno k vyzvednutí",
   shipped: "Vyřízena",
   cancelled: "Zrušena",
 };
@@ -153,6 +156,15 @@ export default async function ShopPage({ params, searchParams }: Props) {
                 <span className={s.status}>{STATUS[view.order.status] ?? view.order.status}</span>
               </p>
               <p className={s.lead}>Děkujeme, {view.order.buyerName}. Potvrzení objednávky posíláme na {view.order.email}.</p>
+              {view.order.pickupDate && (
+                <p className={s.lead}>
+                  Vyzvednutí: <strong>{new Date(`${view.order.pickupDate}T12:00:00`).toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "numeric" })}</strong>
+                  {view.order.pickupHour !== null ? `, kolem ${view.order.pickupHour}:00` : ""}
+                </p>
+              )}
+              {view.order.estimated && view.order.totalMax && (
+                <p className={s.lead}>Zboží na váhu připravíme a zvážíme, cena se upřesní podle skutečné váhy — nejvýše {money(view.order.totalMax, view.order.currency)}. Fakturu pošleme e-mailem.</p>
+              )}
               {view.order.cardPending && (
                 <div className={s.panel} style={{ marginBottom: 16 }}>
                   <h2>Platba kartou, Google Pay nebo Apple Pay</h2>

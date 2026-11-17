@@ -128,6 +128,9 @@ export interface QuoteInput {
   lines: CartLineInput[];
   deliveryId?: string | null;
   paymentMethodId?: string | null;
+  /** den vyzvednutí RRRR-MM-DD a požadovaná hodina (volitelná) */
+  pickupDate?: string | null;
+  pickupHour?: number | null;
 }
 export interface QuoteLine {
   itemId: string;
@@ -139,6 +142,9 @@ export interface QuoteLine {
   price: string;
   amount: string;
   image: string | null;
+  /** vážené zboží: rezerva v % a cena nejvýše */
+  bufferPct?: string;
+  maxAmount?: string;
   error?: string;
 }
 export interface Quote {
@@ -151,16 +157,44 @@ export interface Quote {
   paymentMethodId: string | null;
   deliveryPrice: string;
   total: string;
+  /** obsahuje vážené zboží: částka se upřesní po zvážení, nejvýše `totalMax` */
+  estimated: boolean;
+  totalMax: string;
+  /** vyzvednutí: nabízené dny a hodiny */
+  pickup: { minDate: string; maxDate: string; fromHour: number | null; toHour: number | null };
   /** chyby celé objednávky (minimální objednávka, nedostupná platba…) jako labely */
   errors: string[];
 }
 
 /** Platby pro e-shop povolené u dopravy: převod vždy, dobírka jen u dopravy s dobírkou, hotově jen při odběru, karta jen s bránou. */
-function paymentAllowed(pm: RecordData, delivery: RecordData | null, gateway: boolean): boolean {
+function paymentAllowed(pm: RecordData, delivery: RecordData | null, gateway: boolean, estimated = false): boolean {
   if (pm.kind === "transfer") return true;
   if (pm.kind === "cod") return !!delivery?.allowCod;
   if (pm.kind === "cash") return delivery?.kind === "pickup";
-  return pm.kind === "card" && gateway;
+  // vážené zboží zatím bez platby kartou předem (cena se upřesní po zvážení)
+  return pm.kind === "card" && gateway && !estimated;
+}
+
+const addDays = (iso: string, n: number) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Nabídka vyzvednutí podle obchodu: dny od–do, hodiny od–do (bez hodin = jen den). */
+export function pickupWindow(shop: RecordData, date = today()) {
+  const lead = Math.max(0, Number(shop.pickupLeadDays ?? 1));
+  const span = Math.max(lead, Number(shop.pickupMaxDays ?? 14));
+  const from = shop.pickupFrom === null || shop.pickupFrom === undefined || shop.pickupFrom === "" ? null : Number(shop.pickupFrom);
+  const to = shop.pickupTo === null || shop.pickupTo === undefined || shop.pickupTo === "" ? null : Number(shop.pickupTo);
+  return { minDate: addDays(date, lead), maxDate: addDays(date, span), fromHour: from, toHour: to };
+}
+
+/** Rezerva ceny váženého zboží v %: položka, jinak obchod (výchozí 10). */
+export function bufferOf(item: RecordData, shop: RecordData): number {
+  const own = item.weighBufferPct;
+  const v = own !== null && own !== undefined && own !== "" ? Number(own) : Number(shop.weighBufferPct ?? 10);
+  return Number.isFinite(v) && v >= 0 ? Math.min(v, 100) : 10;
 }
 
 /** Aktivní platební brána pro e-shop (Comgate), nebo null. */
@@ -185,6 +219,7 @@ export async function quote(data: DataApi, shop: RecordData, input: QuoteInput):
   const lines: QuoteLine[] = [];
   const units = new Map<string, string>();
   let itemsTotal = zero;
+  let itemsMax = zero;
   const seen = new Map<string, QuoteLine>();
   for (const l of input.lines.slice(0, 100)) {
     const item = l.itemId && /^[0-9a-f-]{36}$/i.test(String(l.itemId)) ? await data.get("inv.item", String(l.itemId)) : null;
@@ -199,22 +234,30 @@ export async function quote(data: DataApi, shop: RecordData, input: QuoteInput):
     if (prev) qty = Math.min(QTY_MAX, Number(prev.qty) + qty);
     const amount = mulCents(String(qty), 4, p.price, 2);
     const line: QuoteLine = { itemId: p.id, itemNum: p.itemNum, name: p.name, unit: p.unit, weighed: p.weighed, qty: String(qty), price: p.price, amount: fromCents(amount), image: p.image };
+    if (p.weighed) {
+      const buf = bufferOf(item, shop);
+      line.bufferPct = String(buf);
+      line.maxAmount = fromCents(mulCents(String(Math.round(qty * (1 + buf / 100) * 1000) / 1000), 4, p.price, 2));
+    }
     if (shop.sellOutOfStock === false && p.stock !== null && qty > p.stock) line.error = "@SHOP:ErrStock";
     if (prev) {
       itemsTotal -= toCents(prev.amount);
+      itemsMax -= toCents(prev.maxAmount ?? prev.amount);
       Object.assign(prev, line);
     } else {
       lines.push(line);
       seen.set(p.id, line);
     }
     itemsTotal += amount;
+    itemsMax += toCents(line.maxAmount ?? line.amount);
   }
+  const estimated = lines.some((l) => l.weighed);
   const deliveries = await data.find("shop.delivery", { active: true }, { take: 50, orderBy: { position: "asc" } });
   const delivery = deliveries.find((d) => d.id === input.deliveryId) ?? deliveries[0] ?? null;
   const free = shop.freeShippingFrom !== null && shop.freeShippingFrom !== undefined && shop.freeShippingFrom !== "" && itemsTotal >= toCents(shop.freeShippingFrom);
   const deliveryPrice = delivery && !free ? toCents(delivery.price ?? 0) : zero;
   const gateway = !!(await gatewayConnection(data));
-  const allPm = (await data.find("bank.paymentMethod", { eshop: true, blocked: false }, { take: 50, orderBy: { code: "asc" } })).filter((pm) => paymentAllowed(pm, delivery, gateway));
+  const allPm = (await data.find("bank.paymentMethod", { eshop: true, blocked: false }, { take: 50, orderBy: { code: "asc" } })).filter((pm) => paymentAllowed(pm, delivery, gateway, estimated));
   const pm = allPm.find((x) => x.id === input.paymentMethodId) ?? allPm[0] ?? null;
   if (!lines.length) errors.push("@SHOP:ErrEmpty");
   if (!delivery) errors.push("@SHOP:ErrNoDelivery");
@@ -237,6 +280,9 @@ export async function quote(data: DataApi, shop: RecordData, input: QuoteInput):
     paymentMethodId: pm ? String(pm.id) : null,
     deliveryPrice: fromCents(deliveryPrice),
     total: fromCents(itemsTotal + deliveryPrice),
+    estimated,
+    totalMax: fromCents(itemsMax + deliveryPrice),
+    pickup: pickupWindow(shop, date),
     errors,
   };
 }
@@ -300,6 +346,13 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
   const pm = (await data.get("bank.paymentMethod", String(q.paymentMethodId)))!;
   const fieldErrors = checkBuyer(input.buyer, delivery.kind === "address");
   if (!input.terms) fieldErrors.terms = "@SHOP:ErrTerms";
+  // vyzvednutí: den v nabízeném rozmezí, hodina v otevírací době (volitelná)
+  const win = q.pickup;
+  const pickupDate = /^\d{4}-\d{2}-\d{2}$/.test(String(input.pickupDate ?? "")) ? String(input.pickupDate) : null;
+  if (delivery.kind === "pickup" && (!pickupDate || pickupDate < win.minDate || pickupDate > win.maxDate)) fieldErrors.pickupDate = "@SHOP:ErrPickupDate";
+  const hour = input.pickupHour === null || input.pickupHour === undefined || String(input.pickupHour) === "" ? null : Math.trunc(Number(input.pickupHour));
+  if (hour !== null && (!Number.isFinite(hour) || (win.fromHour !== null && hour < win.fromHour) || (win.toHour !== null && hour > win.toHour))) fieldErrors.pickupHour = "@SHOP:ErrPickupHour";
+  if (q.estimated && pm.kind === "card") fieldErrors._ = "@SHOP:ErrCardWeighed";
   if (Object.keys(fieldErrors).length) return { ok: false, errors: fieldErrors };
   // limit z jedné adresy
   const hourAgo = new Date(Date.now() - 3600_000).toISOString();
@@ -322,6 +375,10 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
     zip: clip(b.zip, 10) || null,
     country: /^[A-Za-z]{2}$/.test(clip(b.country, 2)) ? clip(b.country, 2).toUpperCase() : "CZ",
     note: clip(b.note, 2000) || null,
+    pickupDate: delivery.kind === "pickup" ? pickupDate : null,
+    pickupHour: delivery.kind === "pickup" ? hour : null,
+    estimated: q.estimated,
+    amountMax: q.estimated ? q.totalMax : null,
     deliveryId: delivery.id,
     paymentMethodId: pm.id,
     currencyId,
@@ -339,14 +396,20 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
     ...(shop.warehouseId ? { warehouseId: shop.warehouseId } : {}),
     description: clip(`${num} · ${so.buyerName}${so.companyName ? ` (${so.companyName})` : ""}`, 255),
   });
-  for (const l of q.lines) await data.create("ar.orderLine", { orderId: o.id, itemId: l.itemId, description: l.name, qty: l.qty, unitPrice: l.price });
+  for (const l of q.lines) {
+    const ol = await data.create("ar.orderLine", { orderId: o.id, itemId: l.itemId, description: l.name, qty: l.qty, unitPrice: l.price });
+    // řádek vychystání: objednáno, nejvýše (rezerva váženého zboží)
+    const max = l.weighed ? Math.round(Number(l.qty) * (1 + Number(l.bufferPct ?? 0) / 100) * 1000) / 1000 : Number(l.qty);
+    await data.create("shop.pick", { shopOrderId: so.id, orderLineId: ol.id, itemId: l.itemId, name: clip(l.name, 255), unit: l.unit || null, weighed: l.weighed, orderedQty: l.qty, maxQty: String(max) });
+  }
   if (toCents(q.deliveryPrice) > zero || q.lines.length)
     await data.create("ar.orderLine", { orderId: o.id, description: String(delivery.name), qty: "1", unitPrice: q.deliveryPrice, taxCodeId: delivery.taxCodeId ?? null });
   // potvrzení = rezervace zásoby (modul Sklad)
   await data.update("ar.order", String(o.id), { status: "confirmed" });
   const order = (await data.get("ar.order", String(o.id)))!;
   let advanceId: string | null = null;
-  if (pm.kind === "transfer") {
+  // převod: záloha s QR; vážené zboží se platí až fakturou po zvážení
+  if (pm.kind === "transfer" && !q.estimated) {
     const adv = await data.create("ar.advance", { customerId: shop.customerId, orderId: o.id, currencyId, amount: order.amountGross, description: clip(`E-shop ${num}`, 255) });
     advanceId = String(adv.id);
   }
@@ -354,8 +417,9 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
     arOrderId: o.id,
     advanceId,
     amountGross: order.amountGross,
-    // převod a karta čekají na platbu (záloha / brána), dobírka a hotově jdou rovnou k vyřízení
-    status: pm.kind === "transfer" || pm.kind === "card" ? "awaitingPayment" : "paid",
+    // převod a karta čekají na platbu (záloha / brána), dobírka a hotově jdou rovnou k vyřízení;
+    // vážené zboží převodem: k vychystání, zaplatí se faktura po zvážení
+    status: q.estimated && pm.kind === "transfer" ? "toPick" : pm.kind === "transfer" || pm.kind === "card" ? "awaitingPayment" : "paid",
   });
   await notify(data, {
     kind: "info",
@@ -392,6 +456,11 @@ export interface OrderView {
   transfer: { account: string; iban: string; vs: string; amount: string; dueDate: string | null } | null;
   /** platba bránou čeká (tlačítko Zaplatit) */
   cardPending: boolean;
+  pickupDate: string | null;
+  pickupHour: number | null;
+  /** cena se upřesní po zvážení (nejvýše `totalMax`) */
+  estimated: boolean;
+  totalMax: string | null;
 }
 
 /** Stav objednávky pro kupujícího (odkaz s tajným klíčem). */
@@ -431,6 +500,10 @@ export async function orderView(data: DataApi, token: string): Promise<OrderView
     total: String(so.amountGross ?? "0"),
     transfer,
     cardPending: pm?.kind === "card" && so.status === "awaitingPayment",
+    pickupDate: so.pickupDate ? String(so.pickupDate).slice(0, 10) : null,
+    pickupHour: so.pickupHour === null || so.pickupHour === undefined ? null : Number(so.pickupHour),
+    estimated: !!so.estimated && !["ready", "shipped"].includes(String(so.status)),
+    totalMax: so.amountMax ? String(so.amountMax) : null,
   };
 }
 

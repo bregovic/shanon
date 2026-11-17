@@ -7,6 +7,7 @@ import { createPrisma } from "@/server/db";
 import { getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { listProducts, orderView, placeOrder, quote, slugify, type OrderInput } from "@/modules/shop/catalog";
+import { completePick, pickBoard, setPick } from "@/modules/shop/picking";
 import type { DataApi, RecordData } from "@/core/module";
 
 const client = createPrisma();
@@ -87,7 +88,7 @@ describe("e-shop", () => {
   });
 
   it("objednávka převodem: prodejní objednávka s cenami s DPH, záloha s VS, uhrazení, stav pro kupujícího", async () => {
-    const input: OrderInput = { lines: [{ itemId: ids.a, qty: 2 }, { itemId: ids.w, qty: "0.5" }], deliveryId: await dl("ADRESA"), paymentMethodId: await pm("WEB-PREVOD"), buyer, terms: true };
+    const input: OrderInput = { lines: [{ itemId: ids.a, qty: 2 }], deliveryId: await dl("ADRESA"), paymentMethodId: await pm("WEB-PREVOD"), buyer, terms: true };
     // bez souhlasu s podmínkami a bez adresy ne
     const bad = await api((a) => placeOrder(a, shop, { ...input, terms: false, buyer: { name: "X", email: "x@example.test" } }, "ip1", "t".repeat(24)));
     expect(bad.ok).toBe(false);
@@ -95,16 +96,16 @@ describe("e-shop", () => {
     const r = await api((a) => placeOrder(a, shop, input, "ip1", "a".repeat(32)));
     expect(r.ok).toBe(true);
     const [so] = (await listRecords(S, "shop.order", { filter: { orderNum: String(r.orderNum) } }, client)).rows;
-    // 2 × 90 + 0,5 × 400 + doprava 99 = 479 — součet objednávky sedí na košík (ceny s DPH)
-    expect([so.status, so.amountGross]).toEqual(["awaitingPayment", "479.00"]);
+    // 2 × 90 + doprava 99 = 279 — součet objednávky sedí na košík (ceny s DPH)
+    expect([so.status, so.amountGross]).toEqual(["awaitingPayment", "279.00"]);
     const o = (await getRecord(S, "ar.order", String(so.arOrderId), client))!;
-    expect([o.status, o.pricesInclTax, o.amountGross, o.externalRef]).toEqual(["confirmed", true, "479.00", r.orderNum]);
+    expect([o.status, o.pricesInclTax, o.amountGross, o.externalRef]).toEqual(["confirmed", true, "279.00", r.orderNum]);
     const adv = (await getRecord(S, "ar.advance", String(so.advanceId), client))!;
-    expect(adv.amount).toBe("479.00");
+    expect(adv.amount).toBe("279.00");
     const v = (await api((a) => orderView(a, "a".repeat(32))))!;
-    expect([v.total, v.transfer?.vs, v.transfer?.amount, v.lines.length]).toEqual(["479.00", adv.vs, "479.00", 3]);
+    expect([v.total, v.transfer?.vs, v.transfer?.amount, v.lines.length]).toEqual(["279.00", adv.vs, "279.00", 2]);
     // uhrazená záloha → objednávka k vyřízení
-    await api((a) => a.update("ar.advance", String(adv.id), { status: "paid", paidAmount: "479.00" }));
+    await api((a) => a.update("ar.advance", String(adv.id), { status: "paid", paidAmount: "279.00" }));
     expect((await getRecord(S, "shop.order", String(so.id), client))!.status).toBe("paid");
     // zrušit uhrazenou nejde, vyřídit ano
     await expect(runAction(S, "shop.order", String(so.id), "cancel", client)).rejects.toMatchObject({ label: "@SHOP:CancelPaid" });
@@ -113,8 +114,48 @@ describe("e-shop", () => {
     // faktura z objednávky převezme ceny s DPH
     await runAction(S, "ar.order", String(o.id), "createInvoice", client);
     const [inv] = (await listRecords(S, "ar.invoice", { filter: { orderId: String(o.id) } }, client)).rows;
-    expect([inv.pricesInclTax, inv.amountGross]).toEqual([true, "479.00"]);
+    expect([inv.pricesInclTax, inv.amountGross]).toEqual([true, "279.00"]);
   }, 120_000);
+
+  it("vážené zboží: den vyzvednutí, cena nejvýše, bez zálohy, vychystání podle skutečné váhy, faktura", async () => {
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const base: OrderInput = { lines: [{ itemId: ids.w, qty: "1" }, { itemId: ids.a, qty: 1 }], deliveryId: await dl("ODBER"), paymentMethodId: await pm("WEB-PREVOD"), buyer, terms: true };
+    // košík: odhad 400 + 90, nejvýše 440 + 90 (rezerva 10 %), karta se nenabízí
+    const q = await api((a) => quote(a, shop, base));
+    expect([q.estimated, q.total, q.totalMax, q.payments.some((x) => x.kind === "card")]).toEqual([true, "490.00", "530.00", false]);
+    // bez dne / den mimo rozmezí / hodina mimo otevírací dobu
+    const noDay = await api((a) => placeOrder(a, shop, base, "ip-w", "w".repeat(30)));
+    expect(Object.keys(noDay.errors ?? {})).toContain("pickupDate");
+    const badHour = await api((a) => placeOrder(a, shop, { ...base, pickupDate: tomorrow, pickupHour: 23 }, "ip-w", "w".repeat(30)));
+    expect(Object.keys(badHour.errors ?? {})).toContain("pickupHour");
+    const r = await api((a) => placeOrder(a, shop, { ...base, pickupDate: tomorrow, pickupHour: 10 }, "ip-w", "w".repeat(32)));
+    expect(r.ok).toBe(true);
+    const [so] = (await listRecords(S, "shop.order", { filter: { orderNum: String(r.orderNum) } }, client)).rows;
+    expect([so.status, so.advanceId ?? null, String(so.pickupDate).slice(0, 10), so.pickupHour, so.estimated, so.amountMax]).toEqual(["toPick", null, tomorrow, 10, true, "530.00"]);
+
+    // vychystávání: den, souhrn položek, váha
+    const board = await api((a) => pickBoard(a, tomorrow));
+    const mine = board.orders.find((o) => o.id === so.id)!;
+    expect(mine.picks.map((p) => [p.name, p.orderedQty, p.maxQty, p.status])).toEqual([["Šunka od kosti", "1", "1.1", "pending"], ["Klobása", "1", "1", "pending"]]);
+    expect(board.items.find((i) => i.name === "Šunka od kosti")!.ordered).toBe("1");
+    await expect(api((a) => completePick(a, String(so.id)))).rejects.toMatchObject({ label: "@SHOP:PickNotDone" });
+    const ham = mine.picks[0];
+    const sausage = mine.picks[1];
+    await api((a) => setPick(a, ham.id, "1,045", false));
+    await api((a) => setPick(a, sausage.id, null, true)); // klobása chybí
+    expect((await getRecord(S, "shop.order", String(so.id), client))!.status).toBe("picking");
+    const invId = await api((a) => completePick(a, String(so.id)));
+    const inv = (await getRecord(S, "ar.invoice", invId, client))!;
+    // 1,045 kg × 400 = 418 Kč, klobása pryč, doprava (osobní odběr 0)
+    expect([inv.status, inv.amountGross]).toEqual(["posted", "418.00"]);
+    const after = (await getRecord(S, "shop.order", String(so.id), client))!;
+    expect([after.status, after.amountGross, after.estimated]).toEqual(["ready", "418.00", false]);
+    const lines = (await listRecords(S, "ar.invoiceLine", { filter: { invoiceId: invId } }, client)).rows.filter((l) => l.itemId);
+    expect(lines.map((l) => Number(l.qty))).toEqual([1.045]);
+    // vyřízeno = předáno zákazníkovi
+    await runAction(S, "shop.order", String(so.id), "ship", client);
+    expect((await getRecord(S, "shop.order", String(so.id), client))!.status).toBe("shipped");
+  }, 180_000);
 
   it("dobírka bez zálohy, zrušení, limit objednávek z adresy", async () => {
     const input: OrderInput = { lines: [{ itemId: ids.a, qty: 1 }], deliveryId: await dl("ADRESA"), paymentMethodId: await pm("WEB-DOBIRKA"), buyer, terms: true };

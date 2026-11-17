@@ -87,7 +87,7 @@ describe("Comgate", () => {
     const q = await api((a) => quote(a, s2, { lines: [{ itemId: String(item.id), qty: 2 }], deliveryId: String(odber.id) }));
     expect(q.payments.map((p) => p.kind)).toContain("card");
 
-    const res = (await shopOrder(slug, { lines: [{ itemId: String(item.id), qty: 2 }], deliveryId: String(odber.id), paymentMethodId: String(karta.id), terms: true, buyer: { name: "Petr Kupec", email: "petr@example.test" } }, "1.2.3.4", "https://shop.example", client))!;
+    const res = (await shopOrder(slug, { lines: [{ itemId: String(item.id), qty: 2 }], deliveryId: String(odber.id), paymentMethodId: String(karta.id), pickupDate: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), terms: true, buyer: { name: "Petr Kupec", email: "petr@example.test" } }, "1.2.3.4", "https://shop.example", client))!;
     expect(res.ok).toBe(true);
     expect(res.url).toMatch(/^https:\/\/payments\.comgate\.cz\//);
     const create = calls.at(-1)!;

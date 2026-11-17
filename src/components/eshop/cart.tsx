@@ -108,6 +108,8 @@ export function CartCheckout({ base, org, termsHref }: { base: string; org: stri
   const [buyer, setBuyer] = useState<Buyer>(EMPTY);
   const [company, setCompany] = useState(false);
   const [terms, setTerms] = useState(false);
+  const [pickupDate, setPickupDate] = useState("");
+  const [pickupHour, setPickupHour] = useState("");
   const [website, setWebsite] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -152,7 +154,16 @@ export function CartCheckout({ base, org, termsHref }: { base: string; org: stri
       const r = await fetch(`/api/eshop/${org}/order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, deliveryId: selDelivery, paymentMethodId: selPayment, terms, website, buyer: company ? buyer : { ...buyer, companyName: "", regNo: "", vatId: "" } }),
+        body: JSON.stringify({
+          lines,
+          deliveryId: selDelivery,
+          paymentMethodId: selPayment,
+          pickupDate: pickupDate || null,
+          pickupHour: pickupHour === "" ? null : Number(pickupHour),
+          terms,
+          website,
+          buyer: company ? buyer : { ...buyer, companyName: "", regNo: "", vatId: "" },
+        }),
       });
       const data = await r.json();
       if (data.ok) {
@@ -193,6 +204,7 @@ export function CartCheckout({ base, org, termsHref }: { base: string; org: stri
                 <a href={`${base}/p/${encodeURIComponent(l.itemNum)}`}>{l.name}</a>
                 <div className={s.note}>
                   {money(l.price, cur)} / {l.unit}
+                  {l.weighed && l.maxAmount ? ` · váží se, nejvýše ${money(l.maxAmount, cur)}` : ""}
                 </div>
                 {l.error && <div className={s.lineErr}>{l.error}</div>}
               </div>
@@ -217,6 +229,29 @@ export function CartCheckout({ base, org, termsHref }: { base: string; org: stri
               <strong>{Number(d.price) ? money(d.price, cur) : "zdarma"}</strong>
             </label>
           ))}
+          {delivery?.kind === "pickup" && q?.pickup && (
+            <div className={s.fields} style={{ marginTop: 12 }}>
+              <label className={s.field}>
+                <span>Den vyzvednutí *</span>
+                <input type="date" min={q.pickup.minDate} max={q.pickup.maxDate} value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} />
+                {errors.pickupDate && <span className={s.fieldErr}>{errors.pickupDate}</span>}
+              </label>
+              {q.pickup.fromHour !== null && q.pickup.toHour !== null && (
+                <label className={s.field}>
+                  <span>Kolik hodin (nepovinné)</span>
+                  <select value={pickupHour} onChange={(e) => setPickupHour(e.target.value)}>
+                    <option value="">Kdykoli během dne</option>
+                    {Array.from({ length: Math.max(0, q.pickup.toHour - q.pickup.fromHour + 1) }, (_, i) => q.pickup.fromHour! + i).map((h) => (
+                      <option key={h} value={h}>
+                        {h}:00
+                      </option>
+                    ))}
+                  </select>
+                  {errors.pickupHour && <span className={s.fieldErr}>{errors.pickupHour}</span>}
+                </label>
+              )}
+            </div>
+          )}
           <h2 style={{ marginTop: 16 }}>Platba</h2>
           {q?.payments.map((p) => (
             <label key={p.id} className={`${s.choice} ${p.id === selPayment ? s.choiceOn : ""}`}>
@@ -269,9 +304,14 @@ export function CartCheckout({ base, org, termsHref }: { base: string; org: stri
           <span>{money(q?.deliveryPrice ?? 0, cur)}</span>
         </div>
         <div className={`${s.sum} ${s.total}`}>
-          <span>Celkem s DPH</span>
+          <span>{q?.estimated ? "Celkem s DPH (odhad)" : "Celkem s DPH"}</span>
           <span>{money(q?.total ?? 0, cur)}</span>
         </div>
+        {q?.estimated && (
+          <p className={s.note} style={{ margin: "6px 0 10px" }}>
+            Zboží na váhu krájíme a vážíme až při přípravě, cena se upřesní podle skutečné váhy — nejvýše {money(q.totalMax, cur)}. Zaplatíte až fakturu po zvážení, nebo při převzetí.
+          </p>
+        )}
         <label className={s.check}>
           <input
             type="checkbox"

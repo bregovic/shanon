@@ -267,6 +267,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `bank.paymentMethod.eshop`. Ceny/košík/objednávka jen v `catalog.ts` (server): objednávka → `shop.order` + `ar.order` s `pricesInclTax`
   (daň z ceny s DPH, faktura převezme, tisk ukáže cenu/MJ bez DPH) potvrzená = rezervace, převod → `ar.advance` (VS, QR); úhrada zálohy
   (handler `ar.advance`) → stav K vyřízení. Vzhled obchodu = vlastní CSS (`components/eshop`, šablony `data-layout`), ne Fluent.
+- Vážené zboží a vychystávání (`src/modules/shop/picking.ts`, stránka `/shop/vychystani`): rezerva `inv.item.weighBufferPct` → jinak
+  `shop.shop.weighBufferPct`; objednávka s váženým zbožím = `shop.order.estimated` + `amountMax`, kartou předem ne (CR-094 předautorizace),
+  převodem bez zálohy (stav toPick, faktura po zvážení). Den / hodina vyzvednutí `pickupDate` / `pickupHour` (`pickupWindow`). Řádky
+  `shop.pick` (systemOnly) vznikají s objednávkou; `setPick` (skutečné / Chybí, varování nad rezervou), `completePick` = řádky
+  ar.order podle skutečnosti (chybějící smazat, odkaz pick vynulovat) → faktura + `postInvoice` → stav ready → e-mail (akce mimo transakci).
 - Platební brána Comgate (`src/modules/int/comgate.ts`, ovladač `comgate` druhu payment): REST v2, `Authorization: Basic merchant:secret`,
   `testMode` = testovací platby. Stav se nikdy nebere z oznámení — `/api/pay/comgate/<tenant>/<napojení>` (`src/server/payment-push.ts`)
   i návrat kupujícího ověří stav dotazem u brány (`settleGatewayLog` v `src/server/eshop.ts`) a zapíší ho do `int.log` (payment.start,

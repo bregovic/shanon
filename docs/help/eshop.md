@@ -1,7 +1,7 @@
 ---
 title: E-shop
 module: shop
-objects: shop.shop, inv.category, shop.delivery, shop.page, shop.order, inv.item, bank.paymentMethod, int.connection
+objects: shop.shop, shop.pick, inv.category, shop.delivery, shop.page, shop.order, inv.item, bank.paymentMethod, int.connection
 order: 10
 summary: Veřejný obchod z položek a údajů firmy — nastavení, zboží, doprava, platby a vyřízení objednávek.
 ---
@@ -48,3 +48,15 @@ Kupující po odeslání objednávky přejde na platební stránku Comgate a vr�
 
 - s ostrým napojením Comgate vytvoří kopii **TEST-COMGATE** s testovacími platbami (na platební stránce Comgate si zvolíte výsledek, peníze se nestrhávají; ostré napojení je po dobu testu pozastavené),
 - bez Comgate založí **TEST-GATEWAY – simulátor platební brány**: místo stránky Comgate se otevře testovací stránka s tlačítky **Zaplatit** / **Zrušit platbu**, po volbě se kupující vrátí do obchodu. Nepotřebuje žádné přístupy. Pro pokladnu zaškrtněte u napojení **Platba QR kódem na pokladně** — QR otevře stejnou testovací stránku v telefonu.
+
+## Zboží na váhu a vychystávání
+
+Zboží na váhu (u položky **Prodej na váhu**) se objednává odhadem, třeba 1 kg šunky. Zákazník vidí cenu „nejvýše“ = odhad + **rezerva** (E-shop → Obchod → Vyzvednutí a vážené zboží, výchozí 10 %; položka může mít vlastní **Rezervu při vážení %**). Objednávku s váženým zbožím zaplatí převodem až podle faktury po zvážení, nebo při převzetí — kartou předem zatím ne.
+
+U osobního odběru zákazník vybere **den vyzvednutí** (nejdřív a nejpozději za kolik dní nastavíte v obchodě) a volitelně hodinu v otevírací době.
+
+[Vychystávání](/shop/vychystani) (E-shop → Funkce) ukazuje objednávky podle dne vyzvednutí:
+
+- **Podle objednávek** — u každého řádku zadejte skutečné množství, nebo **Zvážit** na připojené váze; zboží, které není, označte **Chybí**. Překročení rezervy aplikace upozorní.
+- **Podle položek** — stejné zboží ze všech objednávek dne pohromadě (kolik šunky nakrájet, komu), vážit jde i odtud.
+- **Dokončit a vyfakturovat** — řádky objednávky se upraví podle skutečnosti, vznikne zaúčtovaná faktura (převodem s QR platbou), zákazníkovi odejde e-mailem a objednávka je **Připraveno k vyzvednutí**. Po předání zvolte u objednávky **Vyřízeno**.

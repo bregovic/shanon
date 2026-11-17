@@ -351,6 +351,7 @@ model SysCompany {
   shopDelivery_company             ShopDelivery[]             @relation("ShopDelivery_company")
   shopPage_company                 ShopPage[]                 @relation("ShopPage_company")
   shopOrder_company                ShopOrder[]                @relation("ShopOrder_company")
+  shopPick_company                 ShopPick[]                 @relation("ShopPick_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1884,6 +1885,7 @@ model InvItem {
   blocked        Boolean  @default(false)
   image          String?  @db.VarChar(36)
   eshop          Boolean  @default(false)
+  weighBufferPct Decimal? @map("weigh_buffer_pct") @db.Decimal(7, 4)
   shopCategoryId String?  @map("shop_category_id") @db.Uuid
   ext            Json     @default("{}")
   version        Int      @default(1)
@@ -1913,6 +1915,7 @@ model InvItem {
   whsReservation_item WhsReservation[] @relation("WhsReservation_item")
   whsJournalLine_item WhsJournalLine[] @relation("WhsJournalLine_item")
   whsItemCost_item    WhsItemCost[]    @relation("WhsItemCost_item")
+  shopPick_item       ShopPick[]       @relation("ShopPick_item")
 
   @@unique([tenantId, companyId, itemNum])
   @@index([tenantId, companyId])
@@ -2221,14 +2224,15 @@ model ArOrderLine {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company        SysCompany    @relation("ArOrderLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  order          ArOrder       @relation("ArOrderLine_order", fields: [orderId], references: [id], onDelete: Restrict)
-  item           InvItem?      @relation("ArOrderLine_item", fields: [itemId], references: [id], onDelete: Restrict)
-  unit           InvUnit?      @relation("ArOrderLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
-  revenueAccount GlAccount?    @relation("ArOrderLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
-  taxGroup       TaxGroup?     @relation("ArOrderLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  itemTaxGroup   TaxItemGroup? @relation("ArOrderLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
-  taxCode        TaxCode?      @relation("ArOrderLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  company            SysCompany    @relation("ArOrderLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  order              ArOrder       @relation("ArOrderLine_order", fields: [orderId], references: [id], onDelete: Restrict)
+  item               InvItem?      @relation("ArOrderLine_item", fields: [itemId], references: [id], onDelete: Restrict)
+  unit               InvUnit?      @relation("ArOrderLine_unit", fields: [unitId], references: [id], onDelete: Restrict)
+  revenueAccount     GlAccount?    @relation("ArOrderLine_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxGroup           TaxGroup?     @relation("ArOrderLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup       TaxItemGroup? @relation("ArOrderLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  taxCode            TaxCode?      @relation("ArOrderLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  shopPick_orderLine ShopPick[]    @relation("ShopPick_orderLine")
 
   @@index([tenantId, companyId])
   @@index([orderId])
@@ -4306,6 +4310,11 @@ model ShopShop {
   contactEmail     String?  @map("contact_email") @db.VarChar(254)
   contactPhone     String?  @map("contact_phone") @db.VarChar(30)
   orderHourLimit   Int?     @default(5) @map("order_hour_limit")
+  pickupLeadDays   Int?     @default(1) @map("pickup_lead_days")
+  pickupMaxDays    Int?     @default(14) @map("pickup_max_days")
+  pickupFrom       Int?     @default(8) @map("pickup_from")
+  pickupTo         Int?     @default(17) @map("pickup_to")
+  weighBufferPct   Decimal? @default(10) @map("weigh_buffer_pct") @db.Decimal(7, 4)
   ext              Json     @default("{}")
   version          Int      @default(1)
   createdAt        DateTime @default(now()) @map("created_at")
@@ -4428,6 +4437,10 @@ model ShopOrder {
   zip             String?   @db.VarChar(10)
   country         String?   @default("CZ") @db.VarChar(2)
   note            String?
+  pickupDate      DateTime? @map("pickup_date") @db.Date
+  pickupHour      Int?      @map("pickup_hour")
+  estimated       Boolean   @default(false)
+  amountMax       Decimal?  @map("amount_max") @db.Decimal(18, 2)
   deliveryId      String?   @map("delivery_id") @db.Uuid
   paymentMethodId String?   @map("payment_method_id") @db.Uuid
   amountGross     Decimal?  @map("amount_gross") @db.Decimal(18, 2)
@@ -4444,13 +4457,14 @@ model ShopOrder {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy       String?   @map("updated_by") @db.Uuid
 
-  company       SysCompany         @relation("ShopOrder_company", fields: [companyId], references: [id], onDelete: Restrict)
-  delivery      ShopDelivery?      @relation("ShopOrder_delivery", fields: [deliveryId], references: [id], onDelete: Restrict)
-  paymentMethod BankPaymentMethod? @relation("ShopOrder_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
-  currency      SysCurrency?       @relation("ShopOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  arOrder       ArOrder?           @relation("ShopOrder_arOrder", fields: [arOrderId], references: [id], onDelete: Restrict)
-  advance       ArAdvance?         @relation("ShopOrder_advance", fields: [advanceId], references: [id], onDelete: Restrict)
-  paymentLog    IntLog?            @relation("ShopOrder_paymentLog", fields: [paymentLogId], references: [id], onDelete: Restrict)
+  company            SysCompany         @relation("ShopOrder_company", fields: [companyId], references: [id], onDelete: Restrict)
+  delivery           ShopDelivery?      @relation("ShopOrder_delivery", fields: [deliveryId], references: [id], onDelete: Restrict)
+  paymentMethod      BankPaymentMethod? @relation("ShopOrder_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  currency           SysCurrency?       @relation("ShopOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  arOrder            ArOrder?           @relation("ShopOrder_arOrder", fields: [arOrderId], references: [id], onDelete: Restrict)
+  advance            ArAdvance?         @relation("ShopOrder_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  paymentLog         IntLog?            @relation("ShopOrder_paymentLog", fields: [paymentLogId], references: [id], onDelete: Restrict)
+  shopPick_shopOrder ShopPick[]         @relation("ShopPick_shopOrder")
 
   @@index([tenantId, companyId])
   @@index([deliveryId])
@@ -4460,6 +4474,41 @@ model ShopOrder {
   @@index([advanceId])
   @@index([paymentLogId])
   @@map("shop_order")
+}
+
+/// shop.pick — generováno z definice objektu
+model ShopPick {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  shopOrderId String    @map("shop_order_id") @db.Uuid
+  orderLineId String?   @map("order_line_id") @db.Uuid
+  itemId      String?   @map("item_id") @db.Uuid
+  name        String?   @db.VarChar(255)
+  unit        String?   @db.VarChar(20)
+  weighed     Boolean   @default(false)
+  orderedQty  Decimal?  @map("ordered_qty") @db.Decimal(18, 4)
+  maxQty      Decimal?  @map("max_qty") @db.Decimal(18, 4)
+  pickedQty   Decimal?  @map("picked_qty") @db.Decimal(18, 4)
+  status      String    @default("pending") @db.VarChar(40)
+  pickedAt    DateTime? @map("picked_at")
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company   SysCompany   @relation("ShopPick_company", fields: [companyId], references: [id], onDelete: Restrict)
+  shopOrder ShopOrder    @relation("ShopPick_shopOrder", fields: [shopOrderId], references: [id], onDelete: Restrict)
+  orderLine ArOrderLine? @relation("ShopPick_orderLine", fields: [orderLineId], references: [id], onDelete: Restrict)
+  item      InvItem?     @relation("ShopPick_item", fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([shopOrderId])
+  @@index([orderLineId])
+  @@index([itemId])
+  @@map("shop_pick")
 }
 
 /// qa.feature — generováno z definice objektu

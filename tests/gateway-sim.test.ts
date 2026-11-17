@@ -43,7 +43,7 @@ describe("simulátor platební brány", () => {
     const item = await saveRecord(C, "inv.item", null, { itemNum: "S1", name: "Salám", groupId: g.id, unitId: ks.id, salesPrice: "150", priceInclTax: true, eshop: true }, undefined, client);
     const [odber] = (await listRecords(C, "shop.delivery", { filter: { code: "ODBER" } }, client)).rows;
     const [karta] = (await listRecords(C, "bank.paymentMethod", { filter: { code: "WEB-KARTA" } }, client)).rows;
-    const order = (lines: number) => shopOrder(slug, { lines: [{ itemId: String(item.id), qty: lines }], deliveryId: String(odber.id), paymentMethodId: String(karta.id), terms: true, buyer: { name: "Eva Testová", email: "eva@example.test" } }, `ip-${lines}`, "http://localhost:3100", client);
+    const order = (lines: number) => shopOrder(slug, { lines: [{ itemId: String(item.id), qty: lines }], deliveryId: String(odber.id), paymentMethodId: String(karta.id), pickupDate: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), terms: true, buyer: { name: "Eva Testová", email: "eva@example.test" } }, `ip-${lines}`, "http://localhost:3100", client);
 
     const r = (await order(2))!;
     const m = /\/pay-sim\/([0-9a-f-]{36})\/([0-9a-f-]{36})$/.exec(String(r.url));

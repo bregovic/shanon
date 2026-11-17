@@ -288,6 +288,57 @@ export async function deleteRecordsAction(objectId: string, ids: string[]): Prom
   }
 }
 
+/** Vychystávání: přehled dne. */
+export async function pickBoardAction(date: string | null): Promise<ActionResult<import("@/modules/shop/picking").PickBoard>> {
+  const s = await requireSession();
+  try {
+    const { pickBoard } = await import("@/modules/shop/picking");
+    if (!can(s.ctx.perms, "shop.order", "read")) throw new UserError("@SYS:NoAccess");
+    return { ok: true, data: await inTenant(s.ctx, (sess) => pickBoard(sess.sys().api(), date)) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Vychystávání: skutečné množství řádku / Chybí / vrátit (prázdné). Vrací varování (víc než rezerva). */
+export async function pickSetAction(pickId: string, qty: string | null, missing: boolean): Promise<ActionResult<{ warnings: string[] }>> {
+  const s = await requireSession();
+  try {
+    if (!can(s.ctx.perms, "shop.order", "write")) throw new UserError("@SYS:NoAccess");
+    const { setPick } = await import("@/modules/shop/picking");
+    const wctx = { ...s.ctx, warnings: [] as string[] };
+    await inTenant(wctx, (sess) => setPick(sess.sys().api(), pickId, qty, missing));
+    return { ok: true, data: { warnings: wctx.warnings } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Vychystávání: dokončit objednávku (faktura podle skutečnosti) a poslat fakturu zákazníkovi e-mailem. */
+export async function pickCompleteAction(shopOrderId: string): Promise<ActionResult<{ message: string; warnings: string[] }>> {
+  const s = await requireSession();
+  try {
+    if (!can(s.ctx.perms, "shop.order", "write") || !can(s.ctx.perms, "ar.invoice", "write")) throw new UserError("@SYS:NoAccess");
+    const { completePick } = await import("@/modules/shop/picking");
+    const invoiceId = await inTenant(s.ctx, (sess) => completePick(sess.sys().api(), shopOrderId));
+    const t = await getT(s.lang, s.ctx.tenantId);
+    const so = await getRecord(s.ctx, "shop.order", shopOrderId);
+    const inv = await getRecord(s.ctx, "ar.invoice", invoiceId);
+    const warnings: string[] = [];
+    // e-mail mimo transakci; nevyjde-li (bez napojení pošty), faktura zůstane a pošle se ručně
+    try {
+      const { sendDocumentNow } = await import("@/server/mail");
+      if (so?.email) await sendDocumentNow(s.ctx, "ar.invoice", invoiceId, String(so.email));
+    } catch {
+      warnings.push(t("@SHOP:PickMailFailed"));
+    }
+    revalidatePath("/shop/vychystani");
+    return { ok: true, data: { message: t("@SHOP:PickCompleted", { num: String(so?.orderNum ?? ""), invoice: String(inv?.invoiceNum ?? "") }), warnings } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
 /** Sloučit vybrané záznamy (`ObjectDef.mergeable`) — jedna transakce. */
 export async function mergeRecordsAction(objectId: string, ids: string[]): Promise<ActionResult<{ id: string; title: string }>> {
   const s = await requireSession();

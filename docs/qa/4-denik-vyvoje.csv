@@ -140,3 +140,11 @@ Návod: Nápověda → Ovládání a klávesové zkratky."
 2026-11-17;change;Systém;Seznamy: filtr odkazů podle kódu i názvu, dodavatel jen názvem;;;"- Sloupec s odkazem (kategorie, skupina, dodavatel, odběratel…) jde filtrovat podle kódu i podle názvu, např. `*novák*`.
 - V seznamech je u dodavatele a odběratele jen název (bez interního čísla).
 - Sloupec obrázku je bez nadpisu."
+2026-11-17;feature;E-shop;Zboží na váhu: den vyzvednutí, rezerva ceny a Vychystávání;CR-093;;"Prodej zboží na váhu přes e-shop (např. 1 kg šunky):
+
+- Zákazník vybere **den vyzvednutí** (a volitelně hodinu) a vidí cenu „nejvýše“ = odhad + rezerva (výchozí 10 %, u položky může být vlastní).
+- Platí převodem až podle faktury po zvážení, nebo při převzetí.
+- **E-shop → Vychystávání**: objednávky podle dne, **Podle položek** = stejné zboží ze všech objednávek pohromadě (krájení najednou), skutečné množství ručně nebo **Zvážit** na váze, **Chybí**.
+- **Dokončit a vyfakturovat**: faktura podle skutečnosti (zaúčtovaná, s QR), e-mail zákazníkovi, objednávka Připraveno k vyzvednutí.
+
+Návod: Nápověda → E-shop."

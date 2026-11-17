@@ -231,3 +231,35 @@ export function opensInPage(objectId: string): boolean {
   const d = registry.objects.get(objectId);
   return !d || !!d.lines?.length || !!d.actions?.length || !!d.systemOnly;
 }
+
+/** Popisky obrazovky Vychystávání (e-shop). */
+export function pickingLabels(t: T) {
+  return {
+    byOrder: t("@SHOP:PickByOrder"),
+    byItem: t("@SHOP:PickByItem"),
+    noDate: t("@SHOP:PickNoDate"),
+    none: t("@SHOP:PickNone"),
+    ordered: t("@SHOP:OrderedQty"),
+    max: t("@SHOP:MaxQty"),
+    actual: t("@SHOP:PickedQty"),
+    weigh: t("@SHOP:Weigh"),
+    missing: t("@SHOP:PickMissing"),
+    undo: t("@SHOP:PickUndo"),
+    complete: t("@SHOP:PickComplete"),
+    completed: t("@SHOP:PickCompleted"),
+    total: t("@SHOP:PickTotal"),
+    inOrders: t("@SHOP:PickInOrders"),
+    connectScale: t("@SHOP:ConnectScale"),
+    scaleNotStable: t("@SHOP:ScaleNotStable"),
+    refresh: t("@SYS:Refresh"),
+    status: {
+      paid: t("@SHOP:StatusPaid"),
+      toPick: t("@SHOP:StatusToPick"),
+      picking: t("@SHOP:StatusPicking"),
+      pending: t("@SHOP:PickPending"),
+      picked: t("@SHOP:PickPicked"),
+      missingS: t("@SHOP:PickMissing"),
+    },
+  };
+}
+export type PickingLabels = ReturnType<typeof pickingLabels>;

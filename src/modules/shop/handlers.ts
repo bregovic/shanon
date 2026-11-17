@@ -28,7 +28,7 @@ export const shopHandlers: Record<string, ObjectHandlers> = {
   "shop.order": {
     actions: {
       async ship(ctx, so) {
-        if (so.status !== "paid") throw new UserError("@GL:Locked");
+        if (so.status !== "paid" && so.status !== "ready") throw new UserError("@GL:Locked");
         await ctx.data.update("shop.order", String(so.id), { status: "shipped" });
       },
       async cancel(ctx, so) {
