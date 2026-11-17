@@ -41,6 +41,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
   const { meta, view } = r;
   const img = (kind: string, id: string) => `/api/eshop/${org}/img/${kind}/${id}`;
   const top = meta.categories.filter((c) => !c.parentId);
+  const headline = meta.headline.trim().toLowerCase() === meta.name.trim().toLowerCase() ? "" : meta.headline.trim();
   const current = view.kind === "category" ? view.category.id : view.kind === "product" ? view.product.categoryId : null;
   const terms = meta.pages.find((p) => p.slug === "obchodni-podminky");
 
@@ -75,10 +76,11 @@ export default async function ShopPage({ params, searchParams }: Props) {
         <div className={s.wrap}>
           {view.kind === "home" && (
             <>
-              {!view.q && (meta.headline || meta.intro || meta.hero) && (
+              {!view.q && (headline || meta.intro || meta.hero) && (
                 <section className={`${s.hero} ${meta.hero ? s.heroWithImage : ""}`}>
                   <div>
-                    <h1>{meta.headline || meta.name}</h1>
+                    {/* název obchodu je v hlavičce — v banneru jen vlastní nadpis */}
+                    {headline ? <h1>{headline}</h1> : <h1 className={s.srOnly}>{meta.name}</h1>}
                     {meta.intro && <p>{meta.intro}</p>}
                   </div>
                   {meta.hero && <img src={img("hero", "x")} alt="" />}
