@@ -263,6 +263,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   s `doc.title`/`customer.*`), uzávěrka dá účtenku s CZ DIČ od 10 000 Kč do KH jednotlivě (A.4, `sourceObject` pos.receipt);
   `sellOnInvoice` = vydaná faktura `pricesInclTax` zaúčtovaná přes `ar.cfg` + `postInvoice`. E-mail z pokladny `sendDocumentNow`
   (`src/server/mail.ts`, koncept s PDF + odeslání). Kód firmy z ARES = `companyCodeFromName` (4 znaky, jedinečný).
+- Pokladní váha (`src/lib/scale.ts`, napojení druhu `scale`: `scaleSerial` / `scaleSim`): Web Serial v kase, protokoly toledo8217 /
+  casEcr / continuous (`parseScale`, testy bez hardwaru), bere se jen ustálená kladná hmotnost; port váhy zapamatovaný v localStorage
+  (`pos.port.scale`), tiskárna ho přeskočí (`grantedPort`). Automatické zvážení po otevření dialogu `ScaleAutoStart`. Dialog 06 zatím ne.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

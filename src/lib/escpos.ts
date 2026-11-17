@@ -13,6 +13,8 @@ const CP852: Record<string, number> = {
 };
 const REPLACE: Record<string, string> = { "×": "x", "–": "-", "—": "-", " ": " ", " ": " ", "„": '"', "“": '"', "€": "EUR", "•": "*" };
 
+import { isScalePort } from "./scale";
+
 export type CodePage = "cp852" | "ascii";
 
 export function encodeText(s: string, cp: CodePage): number[] {
@@ -135,6 +137,7 @@ interface SerialPortLike {
   open(o: { baudRate: number }): Promise<void>;
   close(): Promise<void>;
   writable: WritableStream<Uint8Array> | null;
+  getInfo?(): { usbVendorId?: number; usbProductId?: number };
 }
 interface SerialLike {
   getPorts(): Promise<SerialPortLike[]>;
@@ -146,7 +149,8 @@ export const serialSupported = () => !!serial();
 
 /** Dříve povolený port (bez dotazu); null = nutno připojit tlačítkem. */
 export async function grantedPort(): Promise<SerialPortLike | null> {
-  return (await serial()?.getPorts())?.[0] ?? null;
+  // port pokladní váhy tiskárna nepoužije (src/lib/scale.ts si ho pamatuje)
+  return (await serial()?.getPorts())?.find((p) => !isScalePort(p)) ?? null;
 }
 
 export async function requestPort(): Promise<SerialPortLike | null> {

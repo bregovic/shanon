@@ -68,6 +68,7 @@ import { PrintDocument } from "@/lib/print-render";
 import { receiptData } from "@/lib/receipt-data";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
+import { connectScalePort, readScale, readScaleSim, scalePort, type ScaleConfig, type ScaleReading } from "@/lib/scale";
 
 export interface PosItem {
   id: string;
@@ -89,6 +90,17 @@ export interface PosItem {
 interface Line {
   item: PosItem;
   qty: number;
+}
+
+/** Spustí čtení váhy jednou po otevření dialogu hmotnosti (připojená váha zadá hmotnost sama). */
+function ScaleAutoStart({ onStart }: { onStart: () => void }) {
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    onStart();
+  }, [onStart]);
+  return null;
 }
 
 /** Známý odběratel nákupu (Odběratelé). */
@@ -236,6 +248,7 @@ const useStyles = makeStyles({
   lineAmt: { textAlign: "right", fontWeight: tokens.fontWeightSemibold, alignSelf: "center" },
   empty: { color: tokens.colorNeutralForeground3, padding: "24px 8px", textAlign: "center" },
   custName: { marginLeft: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  scaleRow: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px", fontSize: tokens.fontSizeBase400 },
   custList: { display: "flex", flexDirection: "column", gap: "4px", marginTop: "12px", maxHeight: "50vh", overflowY: "auto" },
   custRow: {
     display: "flex",
@@ -299,6 +312,8 @@ export function PosTerminal(p: {
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
+  /** pokladní váha (Integrace): sériový port v prohlížeči nebo simulátor */
+  scale?: ({ driver: string } & ScaleConfig) | null;
   /** zapnuté Odběratele: prodej známému odběrateli a na fakturu */
   customers?: boolean;
   /** zapnutá Integrace: odeslání dokladu e-mailem */
@@ -324,7 +339,7 @@ export function PosTerminal(p: {
   const [lines, setLines] = useState<Line[]>([]);
 
   // zadání množství / hmotnosti: nový řádek (idx = null) nebo úprava řádku nákupu
-  const [weigh, setWeigh] = useState<{ item: PosItem; value: string; idx?: number | null } | null>(null);
+  const [weigh, setWeigh] = useState<{ item: PosItem; value: string; idx?: number | null; auto?: boolean } | null>(null);
   // jednotka zadání hmotnosti u položek na kg (30 dkg = 0,3 kg); poslední volba se pamatuje
   const [wUnit, setWUnitState] = useState<WeightUnit>(() => {
     try {
@@ -343,6 +358,14 @@ export function PosTerminal(p: {
     }
   };
   const isKg = (i?: PosItem) => !!i && i.weighed && i.unit.toUpperCase() === "KG";
+  // pokladní váha: port (zapamatovaný), stav čtení v dialogu hmotnosti
+  const scaleSim = p.scale?.driver === "scaleSim";
+  const [scaleReady, setScaleReady] = useState(false);
+  const [scaleState, setScaleState] = useState<{ busy: boolean; reading: ScaleReading | null; error?: string } | null>(null);
+  const scaleLoop = useRef(0);
+  useEffect(() => {
+    if (p.scale && !scaleSim) void scalePort().then((port) => setScaleReady(!!port));
+  }, [p.scale, scaleSim]);
   /** zadané množství přepočtené na jednotku položky */
   const qtyOf = (w: { item: PosItem; value: string } | null) => {
     const n = Number(w?.value.replace(",", ".")) || 0;
@@ -522,6 +545,38 @@ export function PosTerminal(p: {
     await writeToPort(port, bytes, pr.baudRate || 9600).catch((e) => setError(String(e)));
   };
   const printReceipt = (r: ReceiptPrint) => (serialPrinter ? escpos(r) : window.print());
+  const connectScale = async () => {
+    if (!serialSupported()) return setError(L.PrinterUnsupported);
+    setScaleReady(!!(await connectScalePort()));
+  };
+  /** Zvážit: čte váhu, dokud není hmotnost ustálená (nejvýš ~10 s); ustálenou zapíše do dialogu. */
+  const weighNow = async () => {
+    if (!p.scale) return;
+    const loop = ++scaleLoop.current;
+    setScaleState({ busy: true, reading: null });
+    const port = scaleSim ? null : await scalePort();
+    if (!scaleSim && !port) return setScaleState({ busy: false, reading: null, error: L.ScaleNotConnected });
+    for (let i = 0; i < 20; i++) {
+      if (scaleLoop.current !== loop) return;
+      let r: ScaleReading;
+      try {
+        r = scaleSim ? await readScaleSim(i) : await readScale(port as Parameters<typeof readScale>[0], p.scale);
+      } catch (e) {
+        return setScaleState({ busy: false, reading: null, error: String((e as Error).message ?? e) });
+      }
+      if (scaleLoop.current !== loop) return;
+      if (r.status === "overload") return setScaleState({ busy: false, reading: r, error: L.ScaleOverload });
+      if (r.stable && r.kg !== null && r.kg > 0) {
+        // hmotnost v kg → zvolená jednotka zadání (dkg, g)
+        const v = Math.round((r.kg / W_FACTOR[wUnit]) * 1000) / 1000;
+        setWeigh((w) => (w ? { ...w, value: num.format(v).replace(/\s/g, "") } : w));
+        return setScaleState({ busy: false, reading: r });
+      }
+      setScaleState({ busy: true, reading: r });
+      await new Promise((res) => setTimeout(res, 400));
+    }
+    setScaleState({ busy: false, reading: null, error: L.ScaleNotStable });
+  };
   const connectPrinter = async () => {
     if (!serialSupported()) return setError(L.PrinterUnsupported);
     const port = await requestPort().catch(() => null);
@@ -611,6 +666,12 @@ export function PosTerminal(p: {
     if (id) setFlash((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   };
   const remove = (idx: number) => setLines((ls) => ls.filter((_, j) => j !== idx));
+  /** zavřít dialog množství (a ukončit čtení váhy) */
+  const closeWeigh = () => {
+    scaleLoop.current++;
+    setScaleState(null);
+    setWeigh(null);
+  };
   /** potvrzení dialogu množství */
   const confirmQty = () => {
     if (!weigh) return;
@@ -618,13 +679,16 @@ export function PosTerminal(p: {
     if (!(v >= 0)) return;
     if (weigh.idx !== undefined && weigh.idx !== null) setQty(weigh.idx, v);
     else if (v > 0) add(weigh.item, v);
-    setWeigh(null);
+    closeWeigh();
   };
 
   const pick = (item: PosItem) => {
     setError(undefined);
-    if (item.weighed) setWeigh({ item, value: "" });
-    else add(item);
+    if (item.weighed) {
+      // připojená váha (nebo simulátor): hmotnost se po otevření dialogu načte sama (ScaleAutoStart)
+      setWeigh({ item, value: "", auto: !!p.scale && isKg(item) && (scaleSim || scaleReady) });
+      setScaleState(null);
+    } else add(item);
   };
   /** podržení dlaždice: zadat množství rovnou */
   const pickQty = (item: PosItem) => {
@@ -809,6 +873,11 @@ export function PosTerminal(p: {
         {eetPending > 0 && (
           <Button icon={<CloudArrowUp24Regular />} onClick={resendEet} disabled={busy} title={L.EetPendingInfo.replace("{n}", String(eetPending))}>
             {L.EetResend} ({eetPending})
+          </Button>
+        )}
+        {p.scale && !scaleSim && !scaleReady && (
+          <Button icon={<Scales24Regular />} onClick={connectScale}>
+            {L.ConnectScale}
           </Button>
         )}
         {serialPrinter && !portReady && (
@@ -1010,7 +1079,7 @@ export function PosTerminal(p: {
       )}
 
       {/* hmotnost */}
-      <Dialog open={!!weigh} onOpenChange={(_, d) => !d.open && setWeigh(null)}>
+      <Dialog open={!!weigh} onOpenChange={(_, d) => !d.open && closeWeigh()}>
         <DialogSurface>
           <DialogBody>
             <DialogTitle>{weigh?.item.name}</DialogTitle>
@@ -1030,6 +1099,18 @@ export function PosTerminal(p: {
                   ))}
                 </div>
               )}
+              {weigh?.auto && <ScaleAutoStart key={weigh.item.id} onStart={weighNow} />}
+              {p.scale && isKg(weigh?.item) && (
+                <div className={st.scaleRow}>
+                  <Button appearance="primary" icon={<Scales24Regular />} disabled={scaleState?.busy} onClick={() => void weighNow()}>
+                    {scaleState?.busy ? L.ScaleWaiting : L.Weigh}
+                  </Button>
+                  <span>
+                    {scaleState?.error ??
+                      (scaleState?.reading?.kg != null ? `${num.format(scaleState.reading.kg)} kg${scaleState.reading.stable ? "" : ` · ${L.ScaleUnstable}`}` : "")}
+                  </span>
+                </div>
+              )}
               <Input
                 value={weigh?.value ?? ""}
                 onChange={(_, d) => setWeigh((w) => (w ? { ...w, value: d.value } : w))}
@@ -1046,7 +1127,7 @@ export function PosTerminal(p: {
               <Numpad st={st} set={(f) => setWeigh((w) => (w ? { ...w, value: f(w.value) } : w))} />
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setWeigh(null)}>{L.Cancel}</Button>
+              <Button onClick={closeWeigh}>{L.Cancel}</Button>
               <Button
                 appearance="primary"
                 // úprava řádku smí i 0 (= odebrat), nový řádek jen kladné množství

@@ -44,6 +44,7 @@ export const DRIVERS: Record<string, string[]> = {
   eet: ["eet2", "eetSimulator"],
   printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator", "comgate", "gatewaySim"],
+  scale: ["scaleSerial", "scaleSim"],
   api: ["rest"],
   service: ["ares", "cnb", "ecb", "vies", "dphreg"],
 };
@@ -86,12 +87,12 @@ async function setCheck(data: DataApi, conn: RecordData, result: string) {
 export async function connectionsFor(
   data: DataApi,
   registerId: string,
-): Promise<Partial<Record<"eet" | "printer" | "payment", RecordData>>> {
+): Promise<Partial<Record<"eet" | "printer" | "payment" | "scale", RecordData>>> {
   const all = (
     await data.find("int.connection", { active: true }, { take: 200 })
   ).filter((c) => !c.registerId || c.registerId === registerId);
-  const out: Partial<Record<"eet" | "printer" | "payment", RecordData>> = {};
-  for (const kind of ["eet", "printer", "payment"] as const) {
+  const out: Partial<Record<"eet" | "printer" | "payment" | "scale", RecordData>> = {};
+  for (const kind of ["eet", "printer", "payment", "scale"] as const) {
     // brána Comgate jen s volbou Platba QR na pokladně (jinak slouží e-shopu)
     const gateway = (c: RecordData) => c.driver === "comgate" || c.driver === "gatewaySim";
     const list = all.filter((c) => c.kind === kind && (!gateway(c) || c.posQr));
@@ -756,6 +757,8 @@ export const intHandlers: Record<string, ObjectHandlers> = {
           return setCheck(ctx.data, conn, ctx.t("@INT:ManualOk"));
         if (conn.driver === "simulator" || conn.driver === "gatewaySim")
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
+        // váha je u pokladny (port v prohlížeči) — test se dělá tam
+        if (conn.kind === "scale") return setCheck(ctx.data, conn, ctx.t("@INT:ScaleTestInfo"));
         if (conn.driver === "comgate") {
           const methods = await comgateTestCall(conn).catch(async (e) => {
             await writeLog(ctx.data, conn, "payment.test", "error", { message: ctx.t((e as UserError).label ?? "@INT:StatusError", (e as UserError).params) });

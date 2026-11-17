@@ -118,6 +118,18 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           : null
       }
       payment={data.conns.payment ? { driver: String(data.conns.payment.driver) } : null}
+      scale={
+        data.conns.scale
+          ? {
+              driver: String(data.conns.scale.driver),
+              protocol: (["toledo8217", "casEcr", "continuous"].includes(String(data.conns.scale.scaleProtocol)) ? data.conns.scale.scaleProtocol : "toledo8217") as "toledo8217",
+              baudRate: Number(data.conns.scale.baudRate ?? 9600),
+              dataBits: Number(data.conns.scale.dataBits) === 7 ? 7 : 8,
+              parity: (["even", "odd"].includes(String(data.conns.scale.parity)) ? data.conns.scale.parity : "none") as "none",
+              stopBits: Number(data.conns.scale.stopBits) === 2 ? 2 : 1,
+            }
+          : null
+      }
       eet={data.conns.eet ? { pending: data.eetPending } : null}
       customers={s.ctx.modules.has("ar")}
       mail={s.ctx.modules.has("int")}

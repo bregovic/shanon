@@ -1,7 +1,7 @@
 ---
 title: Pokladna – směna, prodej, zamknutí, uzávěrka
 module: pos
-objects: pos.register, pos.shift, pos.receipt, pos.box
+objects: pos.register, pos.shift, pos.receipt, pos.box, int.connection
 order: 10
 video: 06-pokladna
 summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a uzávěrka do účetnictví.
@@ -38,4 +38,19 @@ summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a 
 - Zaplaceno hned (hotově, kartou): účtenka se vytiskne jako **Faktura – daňový doklad** s údaji odběratele. Do účetnictví jde uzávěrkou směny jako ostatní účtenky; doklad od 10 000 Kč s českým DIČ odběratele jde do kontrolního hlášení jednotlivě.
 - **Na fakturu** (zaplatí později): vystaví se zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele — je v saldu odběratele, zaplacení se spáruje z výpisu. **Tisk faktury** otevře PDF.
 - **Odeslat e-mailem**: účtenku i fakturu jde poslat jako PDF (adresa se předvyplní z odběratele). Potřebuje napojení pošty v Integraci.
+
+## Pokladní váha
+
+Váha se připojuje k počítači pokladny kabelem RS-232 nebo USB (převodník na sériový port) a čte se přímo z prohlížeče (Chrome nebo Edge).
+
+1. [Integrace → Napojení](/int/connection) → **Nový**: druh **Pokladní váha**, ovladač **Váha na sériovém portu**. Vyberte **protokol** a parametry portu podle nastavení na váze:
+   - **Mettler Toledo 8217 a kompatibilní** — pokladna pošle „W“, váha vrátí hmotnost,
+   - **CAS ECR a kompatibilní** — dotaz ENQ / DC1 (u vah CAS typ rozhraní ECR, obvykle 9600 baud, 7 bitů, sudá parita),
+   - **Plynulé posílání** — váha sama stále posílá hmotnost (řádky ST/US).
+2. Na pokladně **Připojit váhu** a v nabídce prohlížeče vyberte port váhy (pokladna si ho pamatuje, tiskárna ho nepoužije).
+3. U zboží na váhu se po klepnutí hmotnost načte sama — vezme se jen **ustálená** kladná hmotnost. **Zvážit** čtení zopakuje; hmotnost jde vždy zadat i ručně. Tárování a nulování se dělá na váze.
+
+**Testovací prostředí** založí **TEST-SCALE – simulátor váhy**: pokladna se chová, jako by byla váha připojená (chvíli kolísá, pak se ustálí náhodná hmotnost).
+
+**Ověřená váha (stanovené měřidlo):** při prodeji podle hmotnosti musí být váha ověřená a její displej viditelný pro zákazníka. Když pokladna přebírá hmotnost z váhy, posuzuje ČMI celou sestavu váha + pokladna (prohlášení výrobce o shodě sestavy, případně informativní štítek, že ověření platí jen pro váhu) — postup konzultujte s dodavatelem váhy. Protokol Dialog 06 (ověřený přenos ceny mezi pokladnou a váhou) zatím Shanon neumí.
 
