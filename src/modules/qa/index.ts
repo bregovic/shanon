@@ -89,6 +89,47 @@ export const ItemStatus = defineEnum({
 
 const Text = (id: string, label: string, max = 120) => defineEdt({ id, kind: "string", label, maxLength: max, transform: "trim" });
 
+/** Druh změny v deníku vývoje. */
+export const ChangeKind = defineEnum({
+  id: "QaChangeKind",
+  label: "@QA:ChangeKind",
+  values: [
+    { value: "feature", label: "@QA:KindFeature", color: "brand" },
+    { value: "change", label: "@QA:KindChange", color: "informative" },
+    { value: "fix", label: "@QA:KindFix", color: "warning" },
+  ],
+});
+
+/**
+ * Deník vývoje: co se nasadilo na PROD a kdy — stručný nadpis, při rozkliknutí popis a použití.
+ * Výchozí obsah v docs/qa/4-denik-vyvoje.csv (každé nasazení = řádek), přehled Aktuality /qa/aktuality.
+ */
+export const changelog = defineObject({
+  id: "qa.changelog",
+  table: "qa_changelog",
+  label: "@QA:ChangelogEntry",
+  labelPlural: "@QA:Changelog",
+  scope: "tenant",
+  fields: {
+    releasedAt: { edt: Edts.TransDate, label: "@QA:ReleasedAt", mandatory: true, default: "$today", aliases: ["nasazeno", "datum"] },
+    kind: { edt: enumEdt(ChangeKind), mandatory: true, default: "feature" },
+    area: { edt: Text("QaChangeArea", "@QA:Area", 60), aliases: ["oblast", "modul"] },
+    title: { edt: Edts.Description, label: "@QA:ChangeTitle", mandatory: true },
+    body: { edt: Edts.Notes, label: "@QA:ChangeBody", help: "@QA:ChangeBodyHelp", aliases: ["popis"] },
+    issueId: { edt: refEdt("qa.issue", "@QA:Issue"), aliases: ["požadavek", "pozadavek", "cr"] },
+    commit: { edt: Text("QaCommit", "@QA:Commit", 40), aliases: ["commit", "verze"] },
+    published: { edt: Edts.NoYes, label: "@QA:Published", default: true },
+  },
+  titleField: "title",
+  list: ["releasedAt", "kind", "area", "title", "issueId", "commit", "published"],
+  form: [
+    { label: "@SYS:General", fields: ["releasedAt", "kind", "area", "title", "issueId", "commit", "published"] },
+    { label: "@QA:ChangeBody", fields: ["body"] },
+  ],
+  unique: [["releasedAt", "title"]],
+  defaultSort: { field: "releasedAt", dir: "desc" },
+});
+
 export const feature = defineObject({
   id: "qa.feature",
   table: "qa_feature",
@@ -284,10 +325,11 @@ export default defineModule({
   description: "@QA:ModuleDesc",
   icon: "Beaker",
   dependsOn: ["sys"],
-  enums: [FeatureStatus, TestStage, TestResult, IssueType, Priority, IssueStatus, ItemStatus],
-  objects: [feature, scenario, issue, issueItem, comment],
+  enums: [FeatureStatus, TestStage, TestResult, IssueType, Priority, IssueStatus, ItemStatus, ChangeKind],
+  objects: [feature, scenario, issue, issueItem, comment, changelog],
   menu: [
-    { label: "@QA:Module", items: [{ object: "qa.issue" }, { object: "qa.scenario" }] },
+    { label: "@QA:Module", items: [{ object: "qa.issue" }, { object: "qa.scenario" }, { object: "qa.changelog" }] },
+    { label: "@QA:Module", kind: "functions", items: [{ href: "/qa/aktuality", label: "@QA:News" }] },
     { label: "@SYS:Setup", items: [{ object: "qa.feature" }] },
   ],
   // řada je per firma (číselné řady patří firmě); požadavky jsou sdílené v tenantovi
@@ -296,6 +338,23 @@ export default defineModule({
     cs: {
       Returned: "Vráceno do vývoje",
       Module: "Testování a vývoj",
+      ChangelogEntry: "Záznam deníku vývoje",
+      Changelog: "Deník vývoje",
+      News: "Aktuality",
+      NewsDesc: "Co je nového v aplikaci: nasazené funkce, změny a opravy.",
+      NewsSearch: "Hledat v aktualitách",
+      NewsAll: "Vše",
+      NewsEmpty: "Nic nenalezeno.",
+      ChangeKind: "Druh",
+      KindFeature: "Nová funkce",
+      KindChange: "Změna",
+      KindFix: "Oprava",
+      ReleasedAt: "Nasazeno na PROD",
+      ChangeTitle: "Stručně",
+      ChangeBody: "Popis a použití",
+      ChangeBodyHelp: "O co jde a jak se to používá. Odstavce oddělte prázdným řádkem, odrážka začíná „- “.",
+      Commit: "Verze / commit",
+      Published: "Zobrazit v Aktualitách",
       ModuleDesc: "Klíčové funkce a jejich stav, testovací scénáře FAT/UAT, požadavky na změny a chyby.",
       Feature: "Funkce",
       Features: "Klíčové funkce",
@@ -368,6 +427,23 @@ export default defineModule({
     en: {
       Returned: "Returned to development",
       Module: "Testing and development",
+      ChangelogEntry: "Development log entry",
+      Changelog: "Development log",
+      News: "What's new",
+      NewsDesc: "What's new in the app: released features, changes and fixes.",
+      NewsSearch: "Search the news",
+      NewsAll: "All",
+      NewsEmpty: "Nothing found.",
+      ChangeKind: "Kind",
+      KindFeature: "New feature",
+      KindChange: "Change",
+      KindFix: "Fix",
+      ReleasedAt: "Released to PROD",
+      ChangeTitle: "Summary",
+      ChangeBody: "Description and usage",
+      ChangeBodyHelp: "What it is and how to use it. Separate paragraphs with an empty line, bullets start with „- “.",
+      Commit: "Version / commit",
+      Published: "Show in What's new",
       ModuleDesc: "Key features and their status, FAT/UAT test scenarios, change requests and bugs.",
       Feature: "Feature",
       Features: "Key features",

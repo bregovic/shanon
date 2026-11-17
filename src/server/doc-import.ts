@@ -25,8 +25,13 @@ async function pickConnection(ctx: Ctx, client?: PrismaClient) {
     ctx,
     async (s) => {
       const api = s.sys().api();
-      const conns = (await api.find("int.connection", { kind: "ocr", active: true }, { take: 20 })).sort((a, b) => String(a.code).localeCompare(String(b.code)));
-      if (!conns.length) throw new UserError("@INT:OcrNoConnection");
+      // testovací napojení (TEST-OCR) má přednost; ostré bez klíče se přeskočí (jinak by zablokovalo vytěžování)
+      const all = (await api.find("int.connection", { kind: "ocr", active: true }, { take: 20 })).sort(
+        (a, b) => Number(!String(a.code).startsWith("TEST-")) - Number(!String(b.code).startsWith("TEST-")) || String(a.code).localeCompare(String(b.code)),
+      );
+      if (!all.length) throw new UserError("@INT:OcrNoConnection");
+      const conns = all.filter((c) => c.driver === "openaiTest" || !!c.apiKey);
+      if (!conns.length) throw new UserError("@INT:OcrNoKeyIn", { code: String(all[0].code) });
       // první s volným denním limitem
       const since = new Date();
       since.setHours(0, 0, 0, 0);

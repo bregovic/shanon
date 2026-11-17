@@ -4543,6 +4543,7 @@ model QaIssue {
   qaIssue_parent    QaIssue[]     @relation("QaIssue_parent")
   qaIssueItem_issue QaIssueItem[] @relation("QaIssueItem_issue")
   qaComment_issue   QaComment[]   @relation("QaComment_issue")
+  qaChangelog_issue QaChangelog[] @relation("QaChangelog_issue")
 
   @@unique([tenantId, issueNum])
   @@index([tenantId])
@@ -4597,4 +4598,31 @@ model QaComment {
   @@index([tenantId])
   @@index([issueId])
   @@map("qa_comment")
+}
+
+/// qa.changelog — generováno z definice objektu
+model QaChangelog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  releasedAt DateTime @default(now()) @map("released_at") @db.Date
+  kind       String   @default("feature") @db.VarChar(40)
+  area       String?  @db.VarChar(60)
+  title      String   @db.VarChar(255)
+  body       String?
+  issueId    String?  @map("issue_id") @db.Uuid
+  commit     String?  @db.VarChar(40)
+  published  Boolean  @default(true)
+  ext        Json     @default("{}")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String?  @map("created_by") @db.Uuid
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.Uuid
+
+  issue QaIssue? @relation("QaChangelog_issue", fields: [issueId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, releasedAt, title])
+  @@index([tenantId])
+  @@index([issueId])
+  @@map("qa_changelog")
 }

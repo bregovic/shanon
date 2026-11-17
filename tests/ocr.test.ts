@@ -62,6 +62,8 @@ describe("vytěžování dokladů", () => {
     const d0 = await newDoc(T);
     await expect(runAction(T, "int.document", String(d0.id), "extract", client)).rejects.toMatchObject({ label: "@INT:OcrNoConnection" });
     await saveRecord(T, "int.connection", null, { code: "TEST-OCR", name: "Test", kind: "ocr", driver: "openaiTest", dailyLimit: 2 }, undefined, client);
+    // ostré napojení bez klíče (založené po zapnutí testu) nesmí vytěžování zablokovat — TEST-OCR má přednost
+    await saveRecord(T, "int.connection", null, { code: "AOCR", name: "Ostré bez klíče", kind: "ocr", driver: "openai" }, undefined, client);
 
     const calls = fakeOpenAi(() => invoice());
     await runAction(T, "int.document", String(d0.id), "extract", client);

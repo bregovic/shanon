@@ -1,0 +1,34 @@
+﻿Nasazeno;Druh;Oblast;Stručně;Požadavek;Commit;Popis
+2026-11-17;feature;Dodavatelé, Odběratelé;Účtovací profily a typ dokladu Dar;CR-074;c4f15ad;"Účtovací profil určuje účet závazků / pohledávek dokladu (partner → skupina → všechny). Výchozí profily STANDARD, ZAM (333/335), FU (343900), DAR (379), OST.
+
+- Profil na kartě dodavatele / odběratele se převezme na fakturu, výchozí je v Parametrech.
+- Přijatá faktura má Typ dokladu: Faktura / Účtenka / Dar. Dar je bez DPH, náklad 543100, závazek 379.
+- Úhrada z banky i deníku s VS jde proti účtu, na kterém závazek vznikl.
+
+Návod: Nápověda → Účtovací profily a dary."
+2026-11-17;feature;E-shop;Modul E-shop: veřejný obchod z položek;CR-075;3fd6ada;"Veřejný obchod organizace na adrese /<zkratka organizace>.
+
+- Položky s příznakem V e-shopu a kategorií, ceny a slevy z položek, 3 vzhledy.
+- Košík, doprava, platby pro e-shop (převod s QR, dobírka, hotově), objednávka → prodejní objednávka s cenami s DPH a rezervací, převod → záloha s VS.
+- Stránky s obchodními podmínkami k doplnění.
+
+Návod: Nápověda → E-shop."
+2026-11-17;feature;Integrace, E-shop, Pokladna;Platební brána Comgate (karta, Google Pay);CR-078;a3742df;"Napojení Comgate: platba kartou, Google Pay a Apple Pay v e-shopu a QR platba v telefonu na pokladně.
+
+- Integrace → Napojení → druh Platba, ovladač Comgate (merchant, heslo), adresu oznámení zadat v portálu Comgate.
+- Stav platby se vždy ověřuje u Comgate. Comgate vyžaduje povolenou IP serveru."
+2026-11-17;feature;Pokladna;Prodej známému odběrateli, na fakturu, e-mail;CR-079;1b4098d;"- Odběratel v košíku: účtenka se tiskne jako faktura – daňový doklad s údaji odběratele.
+- Na fakturu: zaúčtovaná vydaná faktura se splatností, Tisk faktury.
+- Odeslat e-mailem: účtenka i faktura jako PDF (potřeba napojení pošty)."
+2026-11-17;change;Firmy;Kód nové firmy ze zkratky názvu;CR-080;1b4098d;"Firma založená z ARES / VIES dostane kód ze zkratky názvu (4 znaky, např. UHCZ) místo IČO; obsazený kód dostane číslo."
+2026-11-17;feature;Integrace;Simulátor platební brány v testovacím prostředí;CR-081;a2a52c0;Bez Comgate založí testovací prostředí TEST-GATEWAY: místo platební stránky testovací stránka Zaplatit / Zrušit. Pro e-shop i QR na pokladně.
+2026-11-17;feature;Pokladna;Pokladní váha a simulátor váhy;CR-082;3a77c8a;"- Integrace → Napojení → druh Pokladní váha (sériový port, protokol Toledo 8217 / CAS ECR / plynulé posílání).
+- Na pokladně Připojit váhu; u zboží na váhu se ustálená hmotnost načte sama, Zvážit čtení zopakuje.
+- Testovací prostředí: TEST-SCALE simulátor váhy."
+2026-11-17;change;Správa systému;Zapnuté moduly po firmách;CR-083;0c5888c;"Správa systému → Moduly zapíná a vypíná moduly pro firmu vybranou v hlavičce; ostatní firmy se nemění. Nová firma převezme moduly firmy, ze které vzniká."
+2026-11-17;feature;DPH;Výchozí nastavení neplátce DPH, jednotka Neurčeno;CR-084;0c5888c;"- Neplátce DPH: jen kódy BEZ / P0; účtenka „Účtenka“ bez rekapitulace DPH s poznámkou, faktura „Faktura“.
+- Nová jednotka NEURC – neurčeno."
+2026-11-17;feature;DPH, Organizace;Zjednodušit DPH pro neplátce;CR-085;ac66043;Organizace → Další → Zjednodušit DPH pro neplátce (jen když je vypnuté Plátce DPH): přepojí výchozí nastavení na BEZ / P0 a smaže nepoužité daňové kódy, skupiny a položky DPH.
+2026-11-17;feature;Organizace, Tisk;Spisová značka a zápis v rejstříku na dokladech;CR-086;d716d10;"- Organizace: Spisová značka (lze vložit celou „C 327865/MSPH Městský soud v Praze“ nebo Doplnit z ARES) a Rejstříkový soud.
+- Text zápisu se tiskne na faktuře v bloku dodavatele a na účtence pod adresou.
+- Pod poli formuláře se nově ukazuje nápověda."

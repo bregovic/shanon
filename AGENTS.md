@@ -418,6 +418,11 @@ ta používá stejné komponenty a akce.
   kontrolní seznam `qa.issueItem` (Čeká / Opraveno – k ověření / Funguje / Stále nefunguje; datum opravy a ověření
   se doplní samo). „Stále nefunguje“ vrátí požadavek z testu do vývoje. Novou opravu k oblasti = nová položka
   souhrnného požadavku (stav Opraveno – k ověření), ne nový samostatný požadavek.
+- **TEST / PROD:** Railway projekt `shanon` má prostředí `test` (https://shanon-test.up.railway.app, vlastní databáze, nasazuje
+  z větve `next`) a `production` (https://shanon.up.railway.app, nasazuje z větve `release`). Vývoj = push do `next` → TEST.
+  Na PROD až po schválení releasu uživatelem: `git push origin next:release`. Větev `main` je stará PHP verze.
+- **Deník vývoje:** každý release na PROD = řádek(y) v `docs/qa/4-denik-vyvoje.csv` (datum nasazení, druh feature/change/fix,
+  oblast, stručně, CR, commit, popis o co jde a jak se to používá) → `qa.changelog`, přehled Aktuality `/qa/aktuality`.
 - GitHub Issues se štítky Analysis → Development → Testing → Done.
 - Commity: `feat(gl): … [#123]`, `fix(gab): …`, `docs: …`.
 - Před pushem: `npm run lint && npm run typecheck && npm test && npm run schema:check`
