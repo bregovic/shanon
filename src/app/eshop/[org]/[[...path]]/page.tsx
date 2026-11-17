@@ -6,7 +6,7 @@
 /* eslint-disable @next/next/no-img-element -- obrázky obchodu z úložiště tenanta, bez optimalizace Next */
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { AddToCart, CartBadge, CartCheckout } from "@/components/eshop/cart";
+import { AddToCart, CartBadge, CartCheckout, QuickAdd } from "@/components/eshop/cart";
 import { money } from "@/components/eshop/format";
 import s from "@/components/eshop/eshop.module.css";
 import type { ShopProduct } from "@/modules/shop/catalog";
@@ -128,12 +128,14 @@ export default async function ShopPage({ params, searchParams }: Props) {
                 )}
               </div>
               <div className={s.detail}>
-                <div className={s.detailImg}>{view.product.image ? <img src={img("i", view.product.id)} alt={view.product.name} /> : <Initial name={view.product.name} />}</div>
+                <div className={`${s.detailImg} ${view.product.image ? "" : s.detailPh}`}>
+                  {view.product.image ? <img src={img("i", view.product.id)} alt={view.product.name} /> : <Initial name={view.product.name} />}
+                </div>
                 <div>
                   <h1 className={s.h1}>{view.product.name}</h1>
                   <PriceLine p={view.product} currency={meta.currency} />
                   <Stock p={view.product} />
-                  <AddToCart base={meta.base} itemId={view.product.id} weighed={view.product.weighed} unit={view.product.unit} disabled={!view.product.orderable} />
+                  <AddToCart base={meta.base} itemId={view.product.id} name={view.product.name} weighed={view.product.weighed} unit={view.product.unit} disabled={!view.product.orderable} />
                   {view.product.weighed && <p className={s.note}>Zboží na váhu: cena je za {view.product.unit}, výsledná částka se může podle skutečné hmotnosti mírně lišit.</p>}
                   {view.product.description && <div className={s.desc}>{view.product.description}</div>}
                   <p className={s.note}>Kód: {view.product.itemNum}</p>
@@ -159,7 +161,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
               {view.order.pickupDate && (
                 <p className={s.lead}>
                   Vyzvednutí: <strong>{new Date(`${view.order.pickupDate}T12:00:00`).toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "numeric" })}</strong>
-                  {view.order.pickupHour !== null ? `, kolem ${view.order.pickupHour}:00` : ""}
+                  {view.order.pickupAsap ? ", co nejdřív" : view.order.pickupHour !== null ? `, kolem ${view.order.pickupHour}:00` : ""}
                 </p>
               )}
               {view.order.estimated && view.order.totalMax && (
@@ -242,16 +244,28 @@ function Products({ base, items, currency, img }: { base: string; items: ShopPro
   return (
     <div className={s.grid}>
       {items.map((p) => (
-        <a key={p.id} className={s.card} href={`${base}/p/${encodeURIComponent(p.itemNum)}/${p.slug}`}>
-          <div className={s.thumb}>{p.image ? <img src={img("i", p.id)} alt="" loading="lazy" /> : <Initial name={p.name} />}</div>
-          <div className={s.cardBody}>
-            <span className={s.cardName}>{p.name}</span>
-            <div className={s.cardFoot}>
-              <PriceLine p={p} currency={currency} />
-              <Stock p={p} />
+        <div key={p.id} className={s.card}>
+          <a className={s.cardMain} href={`${base}/p/${encodeURIComponent(p.itemNum)}/${p.slug}`}>
+            <div className={s.thumb}>{p.image ? <img src={img("i", p.id)} alt="" loading="lazy" /> : <Initial name={p.name} />}</div>
+            <div className={s.cardBody}>
+              <span className={s.cardName}>{p.name}</span>
+              <div className={s.cardFoot}>
+                <PriceLine p={p} currency={currency} />
+                <Stock p={p} />
+              </div>
             </div>
+          </a>
+          {/* kusové zboží rovnou do košíku, vážené přes detail (výběr množství) */}
+          <div className={s.cardAction}>
+            {p.orderable && !p.weighed ? (
+              <QuickAdd base={base} itemId={p.id} name={p.name} />
+            ) : p.orderable ? (
+              <a className={s.btnGhost} href={`${base}/p/${encodeURIComponent(p.itemNum)}/${p.slug}`}>
+                Vybrat množství
+              </a>
+            ) : null}
           </div>
-        </a>
+        </div>
       ))}
     </div>
   );

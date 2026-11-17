@@ -128,6 +128,11 @@ describe("e-shop", () => {
     expect(Object.keys(noDay.errors ?? {})).toContain("pickupDate");
     const badHour = await api((a) => placeOrder(a, shop, { ...base, pickupDate: tomorrow, pickupHour: 23 }, "ip-w", "w".repeat(30)));
     expect(Object.keys(badHour.errors ?? {})).toContain("pickupHour");
+    // dnes, co nejdřív (obchod dovoluje vyzvednutí ještě dnes): den = dnes, bez hodiny
+    const asap = await api((a) => placeOrder(a, shop, { ...base, pickupAsap: true, pickupHour: 23 }, "ip-a", "q".repeat(32)));
+    expect(asap.ok).toBe(true);
+    const [soA] = (await listRecords(S, "shop.order", { filter: { orderNum: String(asap.orderNum) } }, client)).rows;
+    expect([String(soA.pickupDate).slice(0, 10), soA.pickupHour, soA.pickupAsap]).toEqual([new Date().toISOString().slice(0, 10), null, true]);
     const r = await api((a) => placeOrder(a, shop, { ...base, pickupDate: tomorrow, pickupHour: 10 }, "ip-w", "w".repeat(32)));
     expect(r.ok).toBe(true);
     const [so] = (await listRecords(S, "shop.order", { filter: { orderNum: String(r.orderNum) } }, client)).rows;

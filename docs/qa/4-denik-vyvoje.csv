@@ -150,3 +150,10 @@ Návod: Nápověda → Ovládání a klávesové zkratky."
 Návod: Nápověda → E-shop."
 2026-11-17;change;Systém;Logo organizace v hlavičce;;;Má-li organizace vybrané firmy nahrané logo (Organizace → Logo), ukazuje se v hlavičce aplikace místo loga Shanon. Po přepnutí na firmu bez loga se vrátí logo Shanon.
 2026-11-17;fix;Systém;Import: hodnoty číselníku i bez diakritiky a části popisku;;;Sloupec s pevným výběrem (např. Druh položky „Zboží / výrobek“) přijme při importu kód, celý popisek i jeho část, bez ohledu na diakritiku a velká písmena — „ZBOZI“, „Zboží“ i „výrobek“.
+2026-11-18;change;E-shop;"Košík: Dnes, co nejdřív; rychlé přidání; návrat do přehledu";;;"- Vyzvednutí je přímo v košíku, výchozí **Dnes, co nejdřív** (nebo Vybrat den a čas). Obchod nově dovoluje vyzvednutí už dnes (nejdřív za 0 dní).
+- Kusové zboží jde do košíku rovnou z přehledu (+ Do košíku), vážené přes Vybrat množství.
+- Po přidání z detailu se obchod vrátí do přehledu a ukáže hlášku s odkazem do košíku.
+- Množství tlačítky − / +, detail zboží bez fotky s dlaždicí, upravený výběr hodiny."
+2026-11-18;change;E-shop;Vychystávání: Hotovo u kusů, vážení v dialogu;;;"- Kusové zboží: tlačítko **Hotovo** (vychystáno v objednaném množství).
+- Zboží na váhu: **Zvážit** otevře dialog — s připojenou váhou se hmotnost načte sama, jde ji i zadat ručně.
+- Objednávky „Dnes, co nejdřív“ jsou nahoře se štítkem."

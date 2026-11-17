@@ -33,6 +33,7 @@ export interface PickOrder {
   note: string;
   pickupDate: string | null;
   pickupHour: number | null;
+  pickupAsap: boolean;
   payment: string;
   estimated: boolean;
   picks: PickRow[];
@@ -67,7 +68,8 @@ export async function pickBoard(data: DataApi, date: string | null): Promise<Pic
   const sel = date && counts.has(date) ? date : date === "none" ? null : (days[0]?.date ?? null);
   const orders: PickOrder[] = [];
   const pms = new Map<string, string>();
-  for (const o of open.filter((x) => dayOf(x) === sel).sort((a, b) => Number(a.pickupHour ?? 99) - Number(b.pickupHour ?? 99))) {
+  // co nejdřív první, pak podle hodiny, bez hodiny na konec
+  for (const o of open.filter((x) => dayOf(x) === sel).sort((a, b) => Number(!a.pickupAsap) - Number(!b.pickupAsap) || Number(a.pickupHour ?? 99) - Number(b.pickupHour ?? 99))) {
     const pmId = String(o.paymentMethodId ?? "");
     if (pmId && !pms.has(pmId)) pms.set(pmId, String((await data.get("bank.paymentMethod", pmId))?.name ?? ""));
     const picks = await data.find("shop.pick", { shopOrderId: o.id }, { take: 200, orderBy: { createdAt: "asc" } });
@@ -80,6 +82,7 @@ export async function pickBoard(data: DataApi, date: string | null): Promise<Pic
       note: String(o.note ?? ""),
       pickupDate: dayOf(o),
       pickupHour: o.pickupHour === null || o.pickupHour === undefined ? null : Number(o.pickupHour),
+      pickupAsap: !!o.pickupAsap,
       payment: pms.get(pmId) ?? "",
       estimated: !!o.estimated,
       picks: picks.map((p) => ({

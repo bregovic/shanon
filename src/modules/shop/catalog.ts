@@ -131,6 +131,8 @@ export interface QuoteInput {
   /** den vyzvednutí RRRR-MM-DD a požadovaná hodina (volitelná) */
   pickupDate?: string | null;
   pickupHour?: number | null;
+  /** dnes, co nejdřív (den = dnes, bez hodiny) */
+  pickupAsap?: boolean;
 }
 export interface QuoteLine {
   itemId: string;
@@ -161,7 +163,7 @@ export interface Quote {
   estimated: boolean;
   totalMax: string;
   /** vyzvednutí: nabízené dny a hodiny */
-  pickup: { minDate: string; maxDate: string; fromHour: number | null; toHour: number | null };
+  pickup: { today: string; minDate: string; maxDate: string; fromHour: number | null; toHour: number | null };
   /** chyby celé objednávky (minimální objednávka, nedostupná platba…) jako labely */
   errors: string[];
 }
@@ -183,11 +185,11 @@ const addDays = (iso: string, n: number) => {
 
 /** Nabídka vyzvednutí podle obchodu: dny od–do, hodiny od–do (bez hodin = jen den). */
 export function pickupWindow(shop: RecordData, date = today()) {
-  const lead = Math.max(0, Number(shop.pickupLeadDays ?? 1));
+  const lead = Math.max(0, Number(shop.pickupLeadDays ?? 0));
   const span = Math.max(lead, Number(shop.pickupMaxDays ?? 14));
   const from = shop.pickupFrom === null || shop.pickupFrom === undefined || shop.pickupFrom === "" ? null : Number(shop.pickupFrom);
   const to = shop.pickupTo === null || shop.pickupTo === undefined || shop.pickupTo === "" ? null : Number(shop.pickupTo);
-  return { minDate: addDays(date, lead), maxDate: addDays(date, span), fromHour: from, toHour: to };
+  return { today: date, minDate: addDays(date, lead), maxDate: addDays(date, span), fromHour: from, toHour: to };
 }
 
 /** Rezerva ceny váženého zboží v %: položka, jinak obchod (výchozí 10). */
@@ -348,9 +350,10 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
   if (!input.terms) fieldErrors.terms = "@SHOP:ErrTerms";
   // vyzvednutí: den v nabízeném rozmezí, hodina v otevírací době (volitelná)
   const win = q.pickup;
-  const pickupDate = /^\d{4}-\d{2}-\d{2}$/.test(String(input.pickupDate ?? "")) ? String(input.pickupDate) : null;
+  const asap = !!input.pickupAsap && win.minDate === today();
+  const pickupDate = asap ? today() : /^\d{4}-\d{2}-\d{2}$/.test(String(input.pickupDate ?? "")) ? String(input.pickupDate) : null;
   if (delivery.kind === "pickup" && (!pickupDate || pickupDate < win.minDate || pickupDate > win.maxDate)) fieldErrors.pickupDate = "@SHOP:ErrPickupDate";
-  const hour = input.pickupHour === null || input.pickupHour === undefined || String(input.pickupHour) === "" ? null : Math.trunc(Number(input.pickupHour));
+  const hour = asap || input.pickupHour === null || input.pickupHour === undefined || String(input.pickupHour) === "" ? null : Math.trunc(Number(input.pickupHour));
   if (hour !== null && (!Number.isFinite(hour) || (win.fromHour !== null && hour < win.fromHour) || (win.toHour !== null && hour > win.toHour))) fieldErrors.pickupHour = "@SHOP:ErrPickupHour";
   if (q.estimated && pm.kind === "card") fieldErrors._ = "@SHOP:ErrCardWeighed";
   if (Object.keys(fieldErrors).length) return { ok: false, errors: fieldErrors };
@@ -377,6 +380,7 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
     note: clip(b.note, 2000) || null,
     pickupDate: delivery.kind === "pickup" ? pickupDate : null,
     pickupHour: delivery.kind === "pickup" ? hour : null,
+    pickupAsap: delivery.kind === "pickup" && asap,
     estimated: q.estimated,
     amountMax: q.estimated ? q.totalMax : null,
     deliveryId: delivery.id,
@@ -458,6 +462,7 @@ export interface OrderView {
   cardPending: boolean;
   pickupDate: string | null;
   pickupHour: number | null;
+  pickupAsap: boolean;
   /** cena se upřesní po zvážení (nejvýše `totalMax`) */
   estimated: boolean;
   totalMax: string | null;
@@ -502,6 +507,7 @@ export async function orderView(data: DataApi, token: string): Promise<OrderView
     cardPending: pm?.kind === "card" && so.status === "awaitingPayment",
     pickupDate: so.pickupDate ? String(so.pickupDate).slice(0, 10) : null,
     pickupHour: so.pickupHour === null || so.pickupHour === undefined ? null : Number(so.pickupHour),
+    pickupAsap: !!so.pickupAsap,
     estimated: !!so.estimated && !["ready", "shipped"].includes(String(so.status)),
     totalMax: so.amountMax ? String(so.amountMax) : null,
   };

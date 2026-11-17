@@ -32,6 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ org: st
       paymentMethodId: b.paymentMethodId ? str(b.paymentMethodId, 40) : null,
       pickupDate: /^\d{4}-\d{2}-\d{2}$/.test(str(b.pickupDate, 10)) ? str(b.pickupDate, 10) : null,
       pickupHour: b.pickupHour === null || b.pickupHour === undefined || b.pickupHour === "" ? null : Number(b.pickupHour),
+      pickupAsap: b.pickupAsap === true,
       terms: b.terms === true,
       buyer: {
         name: str(buyer.name, 120),

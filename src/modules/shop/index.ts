@@ -91,7 +91,7 @@ export const shop = defineObject({
     /** ochrana proti zahlcení: objednávek z jedné adresy za hodinu */
     orderHourLimit: { edt: Edts.Int, label: "@SHOP:OrderHourLimit", default: 5 },
     /** vyzvednutí: nejdřív za N dní, požadovaná hodina v rozmezí od–do (prázdné = bez výběru hodiny) */
-    pickupLeadDays: { edt: Edts.Int, label: "@SHOP:PickupLeadDays", default: 1, help: "@SHOP:PickupLeadDaysHelp" },
+    pickupLeadDays: { edt: Edts.Int, label: "@SHOP:PickupLeadDays", default: 0, help: "@SHOP:PickupLeadDaysHelp" },
     pickupMaxDays: { edt: Edts.Int, label: "@SHOP:PickupMaxDays", default: 14 },
     pickupFrom: { edt: Edts.Int, label: "@SHOP:PickupFrom", default: 8 },
     pickupTo: { edt: Edts.Int, label: "@SHOP:PickupTo", default: 17 },
@@ -204,6 +204,8 @@ export const order = defineObject({
     note: { edt: Edts.Notes, label: "@SHOP:CustomerNote" },
     pickupDate: { edt: Edts.TransDate, label: "@SHOP:PickupDate" },
     pickupHour: { edt: Edts.Int, label: "@SHOP:PickupHour" },
+    /** dnes, co nejdřív (bez hodiny) */
+    pickupAsap: { edt: Edts.NoYes, label: "@SHOP:PickupAsap" },
     /** obsahuje vážené zboží — částka je odhad, upřesní se po zvážení */
     estimated: { edt: Edts.NoYes, label: "@SHOP:Estimated", readOnly: true },
     amountMax: { edt: Edts.Price, label: "@SHOP:AmountMax", readOnly: true },
@@ -223,7 +225,7 @@ export const order = defineObject({
   titleField: "orderNum",
   list: ["orderNum", "orderedAt", "status", "pickupDate", "pickupHour", "buyerName", "email", "deliveryId", "paymentMethodId", "amountGross", "arOrderId"],
   form: [
-    { label: "@SHOP:Order", fields: ["orderNum", "orderedAt", "status", "pickupDate", "pickupHour", "deliveryId", "paymentMethodId", "amountGross", "estimated", "amountMax", "currencyId", "arOrderId", "advanceId", "paymentLogId"] },
+    { label: "@SHOP:Order", fields: ["orderNum", "orderedAt", "status", "pickupDate", "pickupHour", "pickupAsap", "deliveryId", "paymentMethodId", "amountGross", "estimated", "amountMax", "currencyId", "arOrderId", "advanceId", "paymentLogId"] },
     { label: "@SHOP:Buyer", fields: ["buyerName", "email", "phone", "companyName", "regNo", "vatId", "note"] },
     { label: "@SHOP:Address", fields: ["street", "city", "zip", "country"] },
   ],
@@ -364,6 +366,7 @@ export default defineModule({
       WeighBufferHelp: "O kolik smí skutečná váha překročit objednanou; zákazník vidí cenu „nejvýše“. Položka může mít vlastní.",
       PickupDate: "Den vyzvednutí",
       PickupHour: "Hodina",
+      PickupAsap: "Co nejdřív",
       Estimated: "Cena po zvážení",
       AmountMax: "Nejvýše",
       ErrPickupDate: "Vyberte den vyzvednutí v nabízeném rozmezí.",
@@ -377,6 +380,8 @@ export default defineModule({
       PickNoDate: "Bez termínu",
       PickNone: "Žádné objednávky k vychystání.",
       Weigh: "Zvážit",
+      PickDone: "Hotovo",
+      ReadScale: "Načíst z váhy",
       PickUndo: "Vrátit",
       PickComplete: "Dokončit a vyfakturovat",
       PickCompleted: "Objednávka {num} je připravená, faktura {invoice}.",
@@ -506,6 +511,7 @@ export default defineModule({
       WeighBufferHelp: "How much the actual weight may exceed the ordered one; the customer sees an “at most” price. An item may have its own.",
       PickupDate: "Pickup day",
       PickupHour: "Hour",
+      PickupAsap: "As soon as possible",
       Estimated: "Price after weighing",
       AmountMax: "At most",
       ErrPickupDate: "Choose a pickup day within the offered range.",
@@ -519,6 +525,8 @@ export default defineModule({
       PickNoDate: "No date",
       PickNone: "No orders to pick.",
       Weigh: "Weigh",
+      PickDone: "Done",
+      ReadScale: "Read the scale",
       PickUndo: "Undo",
       PickComplete: "Complete and invoice",
       PickCompleted: "Order {num} is ready, invoice {invoice}.",

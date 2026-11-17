@@ -4310,7 +4310,7 @@ model ShopShop {
   contactEmail     String?  @map("contact_email") @db.VarChar(254)
   contactPhone     String?  @map("contact_phone") @db.VarChar(30)
   orderHourLimit   Int?     @default(5) @map("order_hour_limit")
-  pickupLeadDays   Int?     @default(1) @map("pickup_lead_days")
+  pickupLeadDays   Int?     @default(0) @map("pickup_lead_days")
   pickupMaxDays    Int?     @default(14) @map("pickup_max_days")
   pickupFrom       Int?     @default(8) @map("pickup_from")
   pickupTo         Int?     @default(17) @map("pickup_to")
@@ -4439,6 +4439,7 @@ model ShopOrder {
   note            String?
   pickupDate      DateTime? @map("pickup_date") @db.Date
   pickupHour      Int?      @map("pickup_hour")
+  pickupAsap      Boolean   @default(false) @map("pickup_asap")
   estimated       Boolean   @default(false)
   amountMax       Decimal?  @map("amount_max") @db.Decimal(18, 2)
   deliveryId      String?   @map("delivery_id") @db.Uuid
