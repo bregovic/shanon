@@ -329,6 +329,11 @@ model SysCompany {
   intDocument_company              IntDocument[]              @relation("IntDocument_company")
   intDocumentLine_company          IntDocumentLine[]          @relation("IntDocumentLine_company")
   intMail_company                  IntMail[]                  @relation("IntMail_company")
+  shopShop_company                 ShopShop[]                 @relation("ShopShop_company")
+  shopCategory_company             ShopCategory[]             @relation("ShopCategory_company")
+  shopDelivery_company             ShopDelivery[]             @relation("ShopDelivery_company")
+  shopPage_company                 ShopPage[]                 @relation("ShopPage_company")
+  shopOrder_company                ShopOrder[]                @relation("ShopOrder_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -401,6 +406,7 @@ model SysCurrency {
   apTrans_currency                ApTrans[]              @relation("ApTrans_currency")
   bankAccount_currency            BankAccount[]          @relation("BankAccount_currency")
   bankPaymentOrderLine_currency   BankPaymentOrderLine[] @relation("BankPaymentOrderLine_currency")
+  shopOrder_currency              ShopOrder[]            @relation("ShopOrder_currency")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1498,6 +1504,7 @@ model TaxCode {
   apAdvance_taxCode            ApAdvance[]      @relation("ApAdvance_taxCode")
   cashVoucher_taxCode          CashVoucher[]    @relation("CashVoucher_taxCode")
   posReceiptLine_taxCode       PosReceiptLine[] @relation("PosReceiptLine_taxCode")
+  shopDelivery_taxCode         ShopDelivery[]   @relation("ShopDelivery_taxCode")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -1853,6 +1860,8 @@ model InvItem {
   description    String?
   blocked        Boolean  @default(false)
   image          String?  @db.VarChar(36)
+  eshop          Boolean  @default(false)
+  shopCategoryId String?  @map("shop_category_id") @db.Uuid
   ext            Json     @default("{}")
   version        Int      @default(1)
   createdAt      DateTime @default(now()) @map("created_at")
@@ -1868,6 +1877,7 @@ model InvItem {
   itemTaxGroup        TaxItemGroup?    @relation("InvItem_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
   taxCode             TaxCode?         @relation("InvItem_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   vendor              ApVendor?        @relation("InvItem_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  shopCategory        ShopCategory?    @relation("InvItem_shopCategory", fields: [shopCategoryId], references: [id], onDelete: Restrict)
   invDiscount_item    InvDiscount[]    @relation("InvDiscount_item")
   arOrderLine_item    ArOrderLine[]    @relation("ArOrderLine_item")
   arInvoiceLine_item  ArInvoiceLine[]  @relation("ArInvoiceLine_item")
@@ -1890,6 +1900,7 @@ model InvItem {
   @@index([itemTaxGroupId])
   @@index([taxCodeId])
   @@index([vendorId])
+  @@index([shopCategoryId])
   @@map("inv_item")
 }
 
@@ -2092,6 +2103,7 @@ model ArCustomer {
   arTrans_customer              ArTrans[]              @relation("ArTrans_customer")
   bankStatementLine_customer    BankStatementLine[]    @relation("BankStatementLine_customer")
   intDocument_customer          IntDocument[]          @relation("IntDocument_customer")
+  shopShop_customer             ShopShop[]             @relation("ShopShop_customer")
 
   @@unique([tenantId, companyId, accountNum])
   @@unique([tenantId, companyId, subjectId])
@@ -2109,29 +2121,30 @@ model ArCustomer {
 
 /// ar.order — generováno z definice objektu
 model ArOrder {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
-  companyId    String    @map("company_id") @db.Uuid
-  orderNum     String    @map("order_num") @db.VarChar(20)
-  externalRef  String?   @map("external_ref") @db.VarChar(20)
-  customerId   String    @map("customer_id") @db.Uuid
-  orderDate    DateTime  @default(now()) @map("order_date") @db.Date
-  deliveryDate DateTime? @map("delivery_date") @db.Date
-  warehouseId  String?   @map("warehouse_id") @db.Uuid
-  currencyId   String?   @map("currency_id") @db.Uuid
-  taxGroupId   String?   @map("tax_group_id") @db.Uuid
-  description  String?   @db.VarChar(255)
-  amountNet    Decimal?  @map("amount_net") @db.Decimal(18, 2)
-  taxAmount    Decimal?  @map("tax_amount") @db.Decimal(18, 2)
-  amountGross  Decimal?  @map("amount_gross") @db.Decimal(18, 2)
-  status       String    @default("open") @db.VarChar(40)
-  invoiceId    String?   @map("invoice_id") @db.Uuid
-  ext          Json      @default("{}")
-  version      Int       @default(1)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  createdBy    String?   @map("created_by") @db.Uuid
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy    String?   @map("updated_by") @db.Uuid
+  id            String    @id @default(uuid(7)) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  orderNum      String    @map("order_num") @db.VarChar(20)
+  externalRef   String?   @map("external_ref") @db.VarChar(20)
+  customerId    String    @map("customer_id") @db.Uuid
+  orderDate     DateTime  @default(now()) @map("order_date") @db.Date
+  deliveryDate  DateTime? @map("delivery_date") @db.Date
+  warehouseId   String?   @map("warehouse_id") @db.Uuid
+  currencyId    String?   @map("currency_id") @db.Uuid
+  taxGroupId    String?   @map("tax_group_id") @db.Uuid
+  pricesInclTax Boolean   @default(false) @map("prices_incl_tax")
+  description   String?   @db.VarChar(255)
+  amountNet     Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount     Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  amountGross   Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  status        String    @default("open") @db.VarChar(40)
+  invoiceId     String?   @map("invoice_id") @db.Uuid
+  ext           Json      @default("{}")
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     String?   @map("created_by") @db.Uuid
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?   @map("updated_by") @db.Uuid
 
   company           SysCompany    @relation("ArOrder_company", fields: [companyId], references: [id], onDelete: Restrict)
   customer          ArCustomer    @relation("ArOrder_customer", fields: [customerId], references: [id], onDelete: Restrict)
@@ -2142,6 +2155,7 @@ model ArOrder {
   arOrderLine_order ArOrderLine[] @relation("ArOrderLine_order")
   arInvoice_order   ArInvoice[]   @relation("ArInvoice_order")
   arAdvance_order   ArAdvance[]   @relation("ArAdvance_order")
+  shopOrder_arOrder ShopOrder[]   @relation("ShopOrder_arOrder")
 
   @@index([tenantId, companyId])
   @@index([customerId])
@@ -2210,6 +2224,7 @@ model ArInvoice {
   companyId        String    @map("company_id") @db.Uuid
   invoiceNum       String    @map("invoice_num") @db.VarChar(20)
   postingProfileId String?   @map("posting_profile_id") @db.Uuid
+  pricesInclTax    Boolean   @default(false) @map("prices_incl_tax")
   customerId       String    @map("customer_id") @db.Uuid
   invoiceDate      DateTime  @default(now()) @map("invoice_date") @db.Date
   taxDate          DateTime? @map("tax_date") @db.Date
@@ -2352,6 +2367,7 @@ model ArAdvance {
   arInvoice_advance                 ArInvoice[]         @relation("ArInvoice_advance")
   arTrans_advance                   ArTrans[]           @relation("ArTrans_advance")
   bankStatementLine_customerAdvance BankStatementLine[] @relation("BankStatementLine_customerAdvance")
+  shopOrder_advance                 ShopOrder[]         @relation("ShopOrder_advance")
 
   @@index([tenantId, companyId])
   @@index([customerId])
@@ -3179,6 +3195,7 @@ model BankPaymentMethod {
   kind             String   @default("transfer") @db.VarChar(40)
   bankAccountId    String?  @map("bank_account_id") @db.Uuid
   transformationId String?  @map("transformation_id") @db.Uuid
+  eshop            Boolean  @default(false)
   blocked          Boolean  @default(false)
   ext              Json     @default("{}")
   version          Int      @default(1)
@@ -3195,6 +3212,7 @@ model BankPaymentMethod {
   apVendor_paymentMethod          ApVendor[]          @relation("ApVendor_paymentMethod")
   bankAccountMethod_paymentMethod BankAccountMethod[] @relation("BankAccountMethod_paymentMethod")
   bankPaymentOrder_paymentMethod  BankPaymentOrder[]  @relation("BankPaymentOrder_paymentMethod")
+  shopOrder_paymentMethod         ShopOrder[]         @relation("ShopOrder_paymentMethod")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -3669,6 +3687,7 @@ model WhsWarehouse {
   whsReservation_warehouse WhsReservation[] @relation("WhsReservation_warehouse")
   whsJournal_warehouse     WhsJournal[]     @relation("WhsJournal_warehouse")
   whsJournal_toWarehouse   WhsJournal[]     @relation("WhsJournal_toWarehouse")
+  shopShop_warehouse       ShopShop[]       @relation("ShopShop_warehouse")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -4227,6 +4246,181 @@ model IntMail {
   @@index([tenantId, companyId])
   @@index([connectionId])
   @@map("int_mail")
+}
+
+/// shop.shop — generováno z definice objektu
+model ShopShop {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  name             String   @db.VarChar(120)
+  active           Boolean  @default(false)
+  publicUrl        String?  @map("public_url") @db.VarChar(120)
+  layout           String   @default("classic") @db.VarChar(40)
+  accentColor      String?  @default("#1f6f5c") @map("accent_color") @db.VarChar(7)
+  logo             String?  @db.VarChar(36)
+  headline         String?  @db.VarChar(255)
+  intro            String?
+  heroImage        String?  @map("hero_image") @db.VarChar(36)
+  customerId       String   @map("customer_id") @db.Uuid
+  warehouseId      String?  @map("warehouse_id") @db.Uuid
+  sellOutOfStock   Boolean  @default(true) @map("sell_out_of_stock")
+  minOrder         Decimal? @map("min_order") @db.Decimal(18, 2)
+  freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(18, 2)
+  contactEmail     String?  @map("contact_email") @db.VarChar(254)
+  contactPhone     String?  @map("contact_phone") @db.VarChar(30)
+  orderHourLimit   Int?     @default(5) @map("order_hour_limit")
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  company   SysCompany    @relation("ShopShop_company", fields: [companyId], references: [id], onDelete: Restrict)
+  customer  ArCustomer    @relation("ShopShop_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  warehouse WhsWarehouse? @relation("ShopShop_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([customerId])
+  @@index([warehouseId])
+  @@map("shop_shop")
+}
+
+/// shop.category — generováno z definice objektu
+model ShopCategory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String   @db.VarChar(120)
+  slug        String   @db.VarChar(60)
+  parentId    String?  @map("parent_id") @db.Uuid
+  position    Int?     @default(10)
+  active      Boolean  @default(true)
+  description String?
+  image       String?  @db.VarChar(36)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company              SysCompany     @relation("ShopCategory_company", fields: [companyId], references: [id], onDelete: Restrict)
+  parent               ShopCategory?  @relation("ShopCategory_parent", fields: [parentId], references: [id], onDelete: Restrict)
+  invItem_shopCategory InvItem[]      @relation("InvItem_shopCategory")
+  shopCategory_parent  ShopCategory[] @relation("ShopCategory_parent")
+
+  @@unique([tenantId, companyId, slug])
+  @@index([tenantId, companyId])
+  @@index([parentId])
+  @@map("shop_category")
+}
+
+/// shop.delivery — generováno z definice objektu
+model ShopDelivery {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  kind        String   @default("address") @db.VarChar(40)
+  price       Decimal? @default(0) @db.Decimal(18, 2)
+  taxCodeId   String?  @map("tax_code_id") @db.Uuid
+  allowCod    Boolean  @default(false) @map("allow_cod")
+  description String?  @db.VarChar(255)
+  position    Int?     @default(10)
+  active      Boolean  @default(true)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company            SysCompany  @relation("ShopDelivery_company", fields: [companyId], references: [id], onDelete: Restrict)
+  taxCode            TaxCode?    @relation("ShopDelivery_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  shopOrder_delivery ShopOrder[] @relation("ShopOrder_delivery")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@index([taxCodeId])
+  @@map("shop_delivery")
+}
+
+/// shop.page — generováno z definice objektu
+model ShopPage {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  title     String   @db.VarChar(120)
+  slug      String   @db.VarChar(60)
+  body      String?
+  position  Int?     @default(10)
+  inFooter  Boolean  @default(true) @map("in_footer")
+  active    Boolean  @default(true)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("ShopPage_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, slug])
+  @@index([tenantId, companyId])
+  @@map("shop_page")
+}
+
+/// shop.order — generováno z definice objektu
+model ShopOrder {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  orderNum        String    @map("order_num") @db.VarChar(20)
+  status          String    @default("new") @db.VarChar(40)
+  orderedAt       DateTime? @map("ordered_at")
+  buyerName       String    @map("buyer_name") @db.VarChar(120)
+  email           String    @db.VarChar(254)
+  phone           String?   @db.VarChar(30)
+  companyName     String?   @map("company_name") @db.VarChar(120)
+  regNo           String?   @map("reg_no") @db.VarChar(12)
+  vatId           String?   @map("vat_id") @db.VarChar(255)
+  street          String?   @db.VarChar(255)
+  city            String?   @db.VarChar(255)
+  zip             String?   @db.VarChar(10)
+  country         String?   @default("CZ") @db.VarChar(2)
+  note            String?
+  deliveryId      String?   @map("delivery_id") @db.Uuid
+  paymentMethodId String?   @map("payment_method_id") @db.Uuid
+  amountGross     Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  currencyId      String?   @map("currency_id") @db.Uuid
+  arOrderId       String?   @map("ar_order_id") @db.Uuid
+  advanceId       String?   @map("advance_id") @db.Uuid
+  token           String?   @db.VarChar(64)
+  ipHash          String?   @map("ip_hash") @db.VarChar(64)
+  ext             Json      @default("{}")
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  createdBy       String?   @map("created_by") @db.Uuid
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?   @map("updated_by") @db.Uuid
+
+  company       SysCompany         @relation("ShopOrder_company", fields: [companyId], references: [id], onDelete: Restrict)
+  delivery      ShopDelivery?      @relation("ShopOrder_delivery", fields: [deliveryId], references: [id], onDelete: Restrict)
+  paymentMethod BankPaymentMethod? @relation("ShopOrder_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  currency      SysCurrency?       @relation("ShopOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  arOrder       ArOrder?           @relation("ShopOrder_arOrder", fields: [arOrderId], references: [id], onDelete: Restrict)
+  advance       ArAdvance?         @relation("ShopOrder_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([deliveryId])
+  @@index([paymentMethodId])
+  @@index([currencyId])
+  @@index([arOrderId])
+  @@index([advanceId])
+  @@map("shop_order")
 }
 
 /// qa.feature — generováno z definice objektu

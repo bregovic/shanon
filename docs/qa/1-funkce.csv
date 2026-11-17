@@ -33,3 +33,4 @@ SYS-NOTICES;Upozornění (zvoneček);Správa systému;uat;;Zvoneček v hlavičce
 GL-JOURNAL-ENTRY;Rychlé pořizování deníku;Hlavní kniha;uat;;Číslo dokladu hned na řádku, datum z hlavičky / předchozího řádku, dorovnání nového řádku, klávesy Enter / šipky, zkratky data (d, d+1, 15, 1511), deníky po modulech.
 INT-PORTAL;Dodavatelský portál;Integrace;uat;;Veřejná stránka pro nahrání dokladů dodavateli, kontroly a limity, doklady ke zpracování.
 AP-POSTING-PROFILE;Účtovací profily a dary;Dodavatelé;uat;;Účtovací profil (partner / skupina / všechny → účet salda) u dodavatelů i odběratelů, typ přijatého dokladu Faktura / Účtenka / Dar, dar bez DPH na 543100 a 379, úhrada proti účtu vzniku.
+SHOP-ESHOP;E-shop;E-shop;uat;;Veřejný obchod organizace (/<zkratka>): katalog z položek v e-shopu, kategorie, 3 vzhledy, košík, doprava a platby pro e-shop, objednávka → prodejní objednávka s cenami s DPH + rezervace, záloha s QR, potvrzení e-mailem, stránky s podmínkami.

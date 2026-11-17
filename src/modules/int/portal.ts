@@ -4,6 +4,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { SHOP_PATHS } from "@/lib/reserved-paths";
 
 /** Nový tajný klíč odkazu (24 bajtů, base64url). */
 export const newPortalToken = () => randomBytes(24).toString("base64url");
@@ -49,6 +50,8 @@ export const portalHandlers: Record<string, ObjectHandlers> = {
     async beforeSave(ctx, d) {
       if (!d.token) d.token = newPortalToken();
       if (d.slug) d.slug = String(d.slug).trim().toLowerCase();
+      // adresy e-shopu (/<zkratka>/kosik…) portál obsadit nesmí
+      if (d.slug && SHOP_PATHS.has(String(d.slug))) return { slug: "@INT:SlugTaken" };
       const simple = await simplePath(ctx.data, d.slug);
       d.publicUrl = simple ? `/${simple}` : portalPath(ctx.tenantId, String(d.token));
       // limity v mezích platformy

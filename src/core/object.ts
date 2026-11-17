@@ -64,6 +64,8 @@ export interface FieldDef {
   aliases?: string[];
   /** mřížka řádků: pole se stejným sloupcem (vzájemně se vylučující přes visibleWhen) sdílí jeden sloupec */
   gridColumn?: string;
+  /** pole patří funkci jiného modulu (položka „v e-shopu“): bez zapnutého modulu se v UI nezobrazuje */
+  module?: string;
 }
 
 export interface VisibleWhen {

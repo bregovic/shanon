@@ -260,6 +260,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     ...(sp.side === -1 ? { docType: { edt: enumEdt(InvoiceDocType), mandatory: true, default: "invoice" } } : {}),
     /** účet závazků / pohledávek dokladu (prázdné = účet ze skupiny partnera) */
     postingProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfile") },
+    // vydaná: jednotkové ceny řádků včetně DPH (e-shop, maloobchod) — daň se počítá z ceny s DPH jako v pokladně
+    ...(sp.side === 1 ? { pricesInclTax: { edt: Edts.NoYes, label: "@TAX:PricesInclTax" } } : {}),
     [partnerId]: { edt: refEdt(id(sp.partner), L("Partner")), mandatory: true },
     invoiceDate: { edt: Edts.TransDate, label: "@TAX:InvoiceDate", mandatory: true, default: "$today" },
     taxDate: { edt: Edts.TransDate, label: "@TAX:TaxDate" },
@@ -291,7 +293,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     advanceAmount: { edt: Edts.Amount, label: "@TAX:AdvanceDeducted", readOnly: true },
     emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
   };
-  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType"] : []), partnerId, "taxGroupId", "postingProfileId", "description", "orderId", "advanceId"];
+  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType"] : []), partnerId, "taxGroupId", "postingProfileId", ...(sp.side === 1 ? ["pricesInclTax"] : []), "description", "orderId", "advanceId"];
   const invoice = defineObject({
     id: id("invoice"),
     table: `${m}_invoice`,
@@ -374,6 +376,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       warehouseId: { edt: refEdt("whs.warehouse", "@TAX:Warehouse"), optionalRef: true },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
       taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
+      ...(sp.side === 1 ? { pricesInclTax: { edt: Edts.NoYes, label: "@TAX:PricesInclTax" } } : {}),
       description: { edt: Edts.Description },
       amountNet: { edt: Edts.Amount, label: "@TAX:AmountNet", readOnly: true },
       taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
@@ -386,7 +389,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     list: ["orderNum", "externalRef", partnerId, "orderDate", "deliveryDate", "currencyId", "amountNet", "taxAmount", "amountGross", "status", "invoiceId"],
     form: [
       { label: "@TAX:Header", fields: ["orderNum", "externalRef", partnerId, "description"] },
-      { label: "@TAX:Dates", fields: ["orderDate", "deliveryDate", "warehouseId", "currencyId", "taxGroupId"] },
+      { label: "@TAX:Dates", fields: ["orderDate", "deliveryDate", "warehouseId", "currencyId", "taxGroupId", ...(sp.side === 1 ? ["pricesInclTax"] : [])] },
       { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "status", "invoiceId"] },
     ],
     numberSeq: { field: "orderNum", seq: sp.orderSeq },

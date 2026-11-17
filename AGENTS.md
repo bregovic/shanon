@@ -245,6 +245,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `ap.trans` (VS = DIČ, splatnost 25. den) → uhrazení párováním výpisu. Tisk `vatPaymentPrintable` (QR). Druh `incomeTax` zatím
   bez výpočtu. Faktura v cizí měně: kurz k DUZP, DPH v Kč ze základu v Kč (§ 37), tisk přepočtu (`doc.fx*`); zaokrouhlení
   vydaných faktur `sys.currency.invoiceRoundingUnit` (CZK = 1) → `roundingAmount`, systémové účty roundingGain/Loss.
+- E-shop (`src/modules/shop`, veřejně `src/server/eshop.ts` + `src/app/eshop/[org]/[[...path]]` + `/api/eshop/...`): jeden obchod na
+  firmu, adresa `/<org.entity.publicSlug>` (proxy přepíše `/<zkratka>` a `/<zkratka>/(p|k|kosik|objednavka|info)/…` na `/eshop/…`;
+  `SHOP_PATHS` nesmí být adresou portálu). Katalog = `inv.item.eshop` (pole s `FieldDef.module` = jen se zapnutým modulem), platby =
+  `bank.paymentMethod.eshop`. Ceny/košík/objednávka jen v `catalog.ts` (server): objednávka → `shop.order` + `ar.order` s `pricesInclTax`
+  (daň z ceny s DPH, faktura převezme, tisk ukáže cenu/MJ bez DPH) potvrzená = rezervace, převod → `ar.advance` (VS, QR); úhrada zálohy
+  (handler `ar.advance`) → stav K vyřízení. Vzhled obchodu = vlastní CSS (`components/eshop`, šablony `data-layout`), ne Fluent.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

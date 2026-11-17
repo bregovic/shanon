@@ -88,6 +88,7 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
             [pf]: o[pf],
             currencyId: o.currencyId ?? null,
             taxGroupId: o.taxGroupId ?? null,
+            ...("pricesInclTax" in o ? { pricesInclTax: !!o.pricesInclTax } : {}),
             description: o.description ?? null,
             orderId: o.id,
             advanceId: adv?.id ?? null,

@@ -2,7 +2,7 @@
  * Tisknutelné doklady: faktura vydaná (s QR platbou) a účtenka. Data pro
  * šablonu a výchozí rozvržení. Společná pole firmy pro všechny doklady.
  */
-import { fromCents, percentOf, toCents } from "@/core/money";
+import { fromCents, percentOf, toCents, toScaled } from "@/core/money";
 import type { DataApi, RecordData } from "@/core/module";
 import { czIban, spayd, type PrintField, type PrintLayout, type PrintableDef } from "@/core/print";
 import { paymentQrText } from "@/core/transform";
@@ -150,7 +150,10 @@ async function invoiceDataset(data: DataApi, companyId: string | null, id: strin
     v.base += net;
     v.tax += tax;
     vat.set(rate, v);
-    out.push({ description: l.description ?? "", qty: l.qty, unit: unit?.code ?? "", unitPrice: l.unitPrice, rate, net: fromCents(net), tax: fromCents(tax), gross: fromCents(net + tax) });
+    // ceny včetně DPH: na daňovém dokladu jednotková cena bez daně (§ 29) = základ řádku / množství
+    const q = toScaled(l.qty ?? 1, 4);
+    const unitPrice = inv.pricesInclTax && q > zero ? fromCents((net * BigInt(10000) + q / BigInt(2)) / q) : l.unitPrice;
+    out.push({ description: l.description ?? "", qty: l.qty, unit: unit?.code ?? "", unitPrice, rate, net: fromCents(net), tax: fromCents(tax), gross: fromCents(net + tax) });
   }
   const due = toCents(inv.amountGross ?? 0) - toCents(inv.paidAmount ?? 0);
   // faktura v cizí měně: DPH a celkem v Kč kurzem ČNB k DUZP (§ 29 ZDPH), jako při zaúčtování

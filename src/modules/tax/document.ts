@@ -12,6 +12,7 @@ import { accountingCurrencyId, assertOpenPeriod, checkDuplicate, convertPrice, c
 import { dimsOf } from "@/modules/gl/dimensions";
 import { postingAccount } from "@/modules/gl/setup";
 import { partnerTaxGroup, resolveLineCode, taxTransParts } from "./tax-groups";
+import { netFromGross } from "@/modules/inv/handlers";
 
 export interface InvoiceConfig {
   /** hlavička a řádky, např. ar.invoice / ar.invoiceLine */
@@ -325,11 +326,19 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         data.taxCodeId ??= legacy;
         // dar: bez DPH (nevzniká daňová transakce, nejde do přiznání ani KH)
         if (donation) Object.assign(data, { taxCodeId: null, taxGroupId: null, itemTaxGroupId: null });
-        const net = mulCents(data.qty ?? "1", 4, data.unitPrice ?? "0", 2);
+        const amount = mulCents(data.qty ?? "1", 4, data.unitPrice ?? "0", 2);
         const code = data.taxCodeId ? await ctx.data.get("tax.taxCode", String(data.taxCodeId)) : null;
-        data.amountNet = fromCents(net);
-        // samovyměření (přenesená povinnost, EU): daň se nefakturuje, přizná ji příjemce při zaúčtování
-        data.taxAmount = fromCents(code && !code.reverseCharge ? percentOf(net, code.rate) : BigInt(0));
+        const taxed = !!code && !code.reverseCharge;
+        if (h.pricesInclTax) {
+          // ceny s DPH (e-shop): základ z ceny s DPH, daň = rozdíl (celkem sedí na zobrazenou cenu)
+          const net = taxed ? netFromGross(amount, code!.rate) : amount;
+          data.amountNet = fromCents(net);
+          data.taxAmount = fromCents(amount - net);
+        } else {
+          data.amountNet = fromCents(amount);
+          // samovyměření (přenesená povinnost, EU): daň se nefakturuje, přizná ji příjemce při zaúčtování
+          data.taxAmount = fromCents(taxed ? percentOf(amount, code!.rate) : BigInt(0));
+        }
       },
       async afterSave(ctx, data) {
         await recalcHeader(ctx.data, cfg, String(data[cfg.lineHeaderField]));

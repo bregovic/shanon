@@ -46,6 +46,8 @@ export const hiddenFields = (ctx: Ctx, def: ObjectDef) =>
     .filter(
       ([, f]) =>
         (f.edt.refObject && !f.dimSlot && !ctx.modules.has(f.edt.refObject.split(".")[0])) ||
+        // pole funkce jiného modulu (položka v e-shopu) jen se zapnutým modulem
+        (f.module && !ctx.modules.has(f.module)) ||
         // dimenze bez aktivní dimenze na daném pořadí se nezobrazuje
         (f.dimSlot && !ctx.dims?.some((d) => d.slot === f.dimSlot)),
     )

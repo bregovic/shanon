@@ -6,10 +6,16 @@
 export const RESERVED_PATHS = new Set([
   // systémové cesty
   "api", "login", "logout", "portal", "help", "settings", "system", "report", "print", "kasa", "_next", "favicon.ico", "icon.png", "logo",
-  "admin", "app", "static", "public", "www", "shanon",
+  "admin", "app", "static", "public", "www", "shanon", "eshop",
   // moduly
-  "sys", "gl", "gab", "tax", "ar", "ap", "bank", "cash", "inv", "pos", "whs", "int", "prt", "org", "qa",
+  "sys", "gl", "gab", "tax", "ar", "ap", "bank", "cash", "inv", "pos", "whs", "int", "prt", "org", "qa", "shop",
 ]);
+
+/**
+ * Druhá část adresy e-shopu (/<zkratka>/<část>/…): položka, kategorie, košík, objednávka, stránka.
+ * Adresa dodavatelského portálu nesmí být jedna z nich.
+ */
+export const SHOP_PATHS = new Set(["p", "k", "kosik", "objednavka", "info"]);
 
 /** Zkratka pro veřejné odkazy: malá písmena, číslice, pomlčka, 2–40 znaků, ne vyhrazené slovo. */
 export const PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]{1,39}$/;

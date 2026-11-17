@@ -39,9 +39,11 @@ import { vatReturnHandlers } from "@/modules/tax/vat-return";
 import { vatPaymentHandlers } from "@/modules/tax/vat-payment";
 import { journalTaxHandlers } from "@/modules/tax/journal-tax";
 import { portalHandlers } from "@/modules/int/portal";
+import shop from "@/modules/shop";
+import { shopHandlers } from "@/modules/shop/handlers";
 import subjectRating from "@/extensions/subject-rating";
 
-export const modules = [sys, prt, org, gab, gl, tax, inv, ar, ap, bank, cash, pos, whs, int, qa];
+export const modules = [sys, prt, org, gab, gl, tax, inv, ar, ap, bank, cash, pos, whs, int, shop, qa];
 export const extensions = [subjectRating];
 
 // dávkové úlohy modulů (definice vedle logiky, ke které patří)
@@ -69,7 +71,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, vatPaymentHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, vatPaymentHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers, shopHandlers]);
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 
