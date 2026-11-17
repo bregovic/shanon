@@ -15,7 +15,7 @@ describe("deník vývoje", () => {
     for (const n of [74, 75, 78, 79, 80, 81, 82, 83, 84, 85, 86]) await saveRecord(T, "qa.issue", null, { issueNum: `CR-0${n}`, type: "change", title: `Požadavek ${n}` }, undefined, client);
     const file = "docs/qa/4-denik-vyvoje.csv";
     const r = await importRecords(T, "qa.changelog", await readTable(file, readFileSync(file)), { dryRun: false, lang: "cs" }, client);
-    expect([r.errors, r.applied, r.created]).toEqual([[], true, 11]);
+    expect([r.errors, r.applied, r.created]).toEqual([[], true, 15]);
     expect(r.columns.filter((c) => c.status !== "mapped").map((c) => c.header)).toEqual([]);
     const rows = (await listRecords(T, "qa.changelog", { pageSize: 50, sort: "releasedAt", dir: "desc" }, client)).rows;
     const sz = rows.find((x) => x.title === "Spisová značka a zápis v rejstříku na dokladech")!;

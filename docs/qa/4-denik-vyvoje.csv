@@ -32,3 +32,9 @@ Návod: Nápověda → E-shop."
 2026-11-17;feature;Organizace, Tisk;Spisová značka a zápis v rejstříku na dokladech;CR-086;d716d10;"- Organizace: Spisová značka (lze vložit celou „C 327865/MSPH Městský soud v Praze“ nebo Doplnit z ARES) a Rejstříkový soud.
 - Text zápisu se tiskne na faktuře v bloku dodavatele a na účtence pod adresou.
 - Pod poli formuláře se nově ukazuje nápověda."
+2026-11-17;feature;Testování a vývoj;Deník vývoje a Aktuality;;79c4929;"Testování a vývoj → Aktuality: co se kdy nasadilo na produkci, po dnech, s hledáním a filtrem Nová funkce / Změna / Oprava. Klepnutím na nadpis se rozbalí popis a návod.
+
+Evidence je v Deníku vývoje (datum nasazení, oblast, požadavek, popis)."
+2026-11-17;fix;Integrace;Vytěžování v testovacím režimu bere TEST-OCR;;79c4929;"Když měla organizace vedle testovacího napojení TEST-OCR i ostré napojení bez API klíče, vytěžení dokladu skončilo chybou klíče. Testovací napojení má teď přednost a napojení bez klíče se přeskočí; když žádné nejde použít, hláška řekne, kterému napojení klíč chybí."
+2026-11-17;fix;Správa systému;Po přepnutí organizace se seznamy načtou znovu;;321b84f;Po změně organizace v hlavičce zůstávaly v otevřeném seznamu (např. faktur) nebo na stránce Moduly údaje předchozí organizace. Obsah stránky se teď po přepnutí vždy načte znovu.
+2026-11-17;change;Správa systému;Firmy → Organizace;;321b84f;Ve Správě systému se Firmy jmenují Organizace (seznam, Organizace a role u uživatele, virtuální společnosti, Moduly organizace).
