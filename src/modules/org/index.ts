@@ -64,7 +64,11 @@ export const entity = defineObject({
   },
   titleField: "legalName",
   list: ["legalName", "regNo", "vatId", "city", "email", "phone"],
-  actions: [{ id: "ares", label: "@ORG:FromAres" }],
+  actions: [
+    { id: "ares", label: "@ORG:FromAres" },
+    // neplátce DPH: jen kódy bez DPH, nepoužité kódy smazat (obsluha v modulu DPH)
+    { id: "simplifyVat", label: "@ORG:SimplifyVat", module: "tax", group: "more" as const, when: { field: "vatPayer", equals: false } },
+  ],
   form: [
     { label: "@ORG:Identity", fields: ["legalName", "tradeName", "legalForm", "firstName", "lastName", "regNo", "vatId", "vatPayer", "registration"] },
     { label: "@ORG:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode", "country"] },
@@ -259,6 +263,7 @@ export default defineModule({
       Sites: "Provozovny",
       OpeningHours: "Otevírací doba",
       FromAres: "Doplnit z ARES",
+      SimplifyVat: "Zjednodušit DPH pro neplátce",
       RegNoFirst: "Vyplňte a uložte IČO, pak doplňte z ARES.",
       AresNotFound: "IČO v ARES nenalezeno.",
       OneEntity: "Firma už údaje organizace má — upravte stávající záznam.",
@@ -305,6 +310,7 @@ export default defineModule({
       Sites: "Sites",
       OpeningHours: "Opening hours",
       FromAres: "Fill from ARES",
+      SimplifyVat: "Simplify VAT for non-payer",
       RegNoFirst: "Fill in and save the company ID, then fill from ARES.",
       AresNotFound: "Company ID not found in ARES.",
       OneEntity: "The company already has organization details — edit the existing record.",

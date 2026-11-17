@@ -181,7 +181,7 @@ const NP_CODES: (typeof CZ_CODES)[number][] = [
 const NP_ITEMS: [string, string][] = [["BEZ", "Bez DPH"]];
 const NP_MATRIX: Record<string, Record<string, [string, string]>> = { TUZ: { BEZ: ["BEZ", "P0"] } };
 
-async function taxSetup(data: DataApi) {
+export async function taxSetup(data: DataApi) {
   const vatId = await postingAccount(data, "343");
   if (!vatId) return;
   const payer = await vatPayer(data);
@@ -582,6 +582,8 @@ export default defineModule({
       Receipt: "Účtenka (zjednodušený doklad)",
       DocType: "Typ dokladu",
       DocTypeInvoice: "Faktura",
+      SimplifyPayer: "Firma je plátce DPH — nejdřív v Organizaci vypněte Plátce DPH.",
+      SimplifyDone: "DPH zjednodušeno. Smazáno: {deleted}. Ponecháno (použité v dokladech): {kept}.",
       PricesInclTax: "Ceny včetně DPH",
       DocTypeDonation: "Dar",
       DonationWithTax: "Dar je bez DPH — řádek „{line}“ má daňový kód nebo daň.",
@@ -793,6 +795,8 @@ export default defineModule({
       Receipt: "Receipt (simplified tax document)",
       DocType: "Document type",
       DocTypeInvoice: "Invoice",
+      SimplifyPayer: "The company is VAT registered — first turn off VAT payer in Organisation.",
+      SimplifyDone: "VAT simplified. Deleted: {deleted}. Kept (used in documents): {kept}.",
       PricesInclTax: "Prices include VAT",
       DocTypeDonation: "Donation",
       DonationWithTax: "A donation has no VAT — line \"{line}\" has a tax code or tax.",

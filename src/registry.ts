@@ -41,6 +41,7 @@ import { journalTaxHandlers } from "@/modules/tax/journal-tax";
 import { portalHandlers } from "@/modules/int/portal";
 import shop from "@/modules/shop";
 import { shopHandlers } from "@/modules/shop/handlers";
+import { nonPayerHandlers, taxRefs } from "@/modules/tax/non-payer";
 import subjectRating from "@/extensions/subject-rating";
 
 export const modules = [sys, prt, org, gab, gl, tax, inv, ar, ap, bank, cash, pos, whs, int, shop, qa];
@@ -71,7 +72,15 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, vatPaymentHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers, shopHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, vatPaymentHandlers, invHandlers, posHandlers, intHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers, shopHandlers, nonPayerHandlers]);
+
+// odkazy na daňové kódy, skupiny DPH a položky DPH (zjednodušení DPH pro neplátce maže jen nepoužité)
+for (const o of registry.objects.values())
+  for (const [name, f] of Object.entries(o.fields)) {
+    if (f.edt.refObject === "tax.taxCode") taxRefs.codes.push([o.id, name]);
+    if (f.edt.refObject === "tax.taxGroup") taxRefs.groups.push([o.id, name]);
+    if (f.edt.refObject === "tax.itemTaxGroup") taxRefs.items.push([o.id, name]);
+  }
 
 for (const o of registry.objects.values()) if (o.adminOnly) ADMIN_ONLY.add(o.id);
 
