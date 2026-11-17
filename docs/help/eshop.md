@@ -44,4 +44,7 @@ Kupující po odeslání objednávky přejde na platební stránku Comgate a vr�
 
 **Pokladna:** se zaškrtnutou volbou **Platba QR kódem na pokladně** nabídne pokladna u platby kartou QR kód — zákazník ho naskenuje telefonem a zaplatí kartou, Google Pay nebo Apple Pay; účtenka se vystaví po potvrzení platby. Pro pokladnu musí být v Organizaci vyplněný e-mail (Comgate ho vyžaduje).
 
-**Testovací prostředí** (Integrace → Funkce → Testovací prostředí) vytvoří z ostrého napojení kopii **TEST-COMGATE** s testovacími platbami: na platební stránce si zvolíte výsledek (zaplaceno / zrušeno), peníze se nestrhávají. Ostré napojení je po dobu testu pozastavené.
+**Testovací prostředí** (Integrace → Funkce → Testovací prostředí):
+
+- s ostrým napojením Comgate vytvoří kopii **TEST-COMGATE** s testovacími platbami (na platební stránce Comgate si zvolíte výsledek, peníze se nestrhávají; ostré napojení je po dobu testu pozastavené),
+- bez Comgate založí **TEST-GATEWAY – simulátor platební brány**: místo stránky Comgate se otevře testovací stránka s tlačítky **Zaplatit** / **Zrušit platbu**, po volbě se kupující vrátí do obchodu. Nepotřebuje žádné přístupy. Pro pokladnu zaškrtněte u napojení **Platba QR kódem na pokladně** — QR otevře stejnou testovací stránku v telefonu.

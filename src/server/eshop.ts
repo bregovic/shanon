@@ -206,6 +206,21 @@ async function startGateway(l: Loaded, org: string, token: string, origin: strin
   const reuse = log && log.status === "pending" && log.connectionId === conn.id ? paymentRedirectOf(log) : null;
   if (reuse) return reuse;
   const cents = toCents(so.amountGross ?? 0);
+  const back = `${origin}/${org}/objednavka/${token}`;
+  if (conn.driver === "gatewaySim") {
+    // simulátor brány: testovací platební stránka, po volbě zpět na objednávku
+    return run(
+      l,
+      async (api) => {
+        const lg = await writeLog(api, conn, "payment.start", "pending", { reference: String(so.orderNum), externalId: `SIMG-${String(so.orderNum)}`.slice(0, 40), detail: `amount=${cents}` });
+        const url = `${origin}/pay-sim/${l.ctx.tenantId}/${lg.id}`;
+        await api.update("int.log", String(lg.id), { detail: `amount=${cents} redirect=${url} return=${back}` });
+        await api.update("shop.order", String(so.id), { paymentLogId: lg.id });
+        return url;
+      },
+      client,
+    );
+  }
   try {
     const res = await comgateCreate(conn, {
       amountCents: cents,
@@ -215,7 +230,7 @@ async function startGateway(l: Loaded, org: string, token: string, origin: strin
       email: String(so.email),
       phone: (so.phone as string) || null,
       fullName: String(so.buyerName),
-      returnUrl: `${origin}/${org}/objednavka/${token}`,
+      returnUrl: back,
     });
     await run(
       l,
@@ -267,7 +282,13 @@ export async function settleGatewayLog(ctx: Ctx, conn: RecordData, log: RecordDa
     return "paid";
   }
   if (log.status !== "pending" || !log.externalId) return String(log.status);
-  const st = await comgateStatus(conn, String(log.externalId));
+  // simulátor brány: výsledek zvolený na testovací stránce (sim=PAID / sim=CANCELLED v protokolu)
+  const sim = /sim=(PAID|CANCELLED)/.exec(String(log.detail))?.[1];
+  const cents0 = BigInt(/amount=(-?\d+)/.exec(String(log.detail))?.[1] ?? "-1");
+  const st =
+    conn.driver === "gatewaySim"
+      ? { state: sim === "PAID" ? ("paid" as const) : sim === "CANCELLED" ? ("cancelled" as const) : ("pending" as const), message: "Zrušeno (simulace)", priceCents: cents0 }
+      : await comgateStatus(conn, String(log.externalId));
   const cents = BigInt(/amount=(-?\d+)/.exec(String(log.detail))?.[1] ?? "-1");
   const paid = st.state === "paid" && (st.priceCents === null || st.priceCents === cents);
   if (st.state === "pending") return "pending";

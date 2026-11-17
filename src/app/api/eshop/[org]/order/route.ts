@@ -51,6 +51,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ org: st
   if (!res) return Response.json({ ok: false, error: "Obchod nenalezen." }, { status: 404 });
   if (!res.ok) return Response.json({ ok: false, errors: res.errorText }, { status: 400 });
   // platba bránou → adresa platební stránky, jinak stránka objednávky
-  const url = res.url && /^https:\/\/[^/]*comgate\./.test(res.url) ? res.url : `/${org}/objednavka/${res.token}`;
+  const url = res.url && (/^https:\/\/[^/]*comgate\./.test(res.url) || /\/pay-sim\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/.test(res.url)) ? res.url : `/${org}/objednavka/${res.token}`;
   return Response.json({ ok: true, orderNum: res.orderNum, url });
 }

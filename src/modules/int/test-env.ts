@@ -57,6 +57,11 @@ export async function enableTestEnv(data: DataApi, t: (ref: string) => string, w
     const [have] = await data.find("int.connection", { code: "TEST-COMGATE" }, { take: 1 });
     if (have) await data.update("int.connection", String(have.id), copy);
     else await data.create("int.connection", { code: "TEST-COMGATE", name: t("@INT:TestComgate"), kind: "payment", driver: "comgate", ...copy });
+  } else {
+    // bez Comgate: simulátor platební brány (testovací stránka Zaplatit / Zrušit, žádné přístupy)
+    const [have] = await data.find("int.connection", { code: "TEST-GATEWAY" }, { take: 1 });
+    if (have) await data.update("int.connection", String(have.id), { active: true, driver: "gatewaySim" });
+    else await data.create("int.connection", { code: "TEST-GATEWAY", name: t("@INT:TestGateway"), kind: "payment", driver: "gatewaySim", posQr: false, active: true });
   }
   // testovací data: boxy pro odložené nákupy
   if (withPos && !(await data.find("pos.box", {}, { take: 1 })).length) {

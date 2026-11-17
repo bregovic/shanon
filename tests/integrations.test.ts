@@ -720,7 +720,7 @@ describe("testovací prostředí a datové služby (CR-036)", () => {
       const api = s.sys().api();
       await enableTestEnv(api, (x) => x, true);
       const st = await testEnvState(api);
-      expect([st.active, st.connections.map((c) => c.code).sort(), st.paused]).toEqual([true, ["TEST-EET", "TEST-MAIL", "TEST-OCR", "TEST-PAY", "TEST-PRINT"], ["SUMUP"]]);
+      expect([st.active, st.connections.map((c) => c.code).sort(), st.paused]).toEqual([true, ["TEST-EET", "TEST-GATEWAY", "TEST-MAIL", "TEST-OCR", "TEST-PAY", "TEST-PRINT"], ["SUMUP"]]);
       expect((await api.find("pos.box", {}, { take: 10 })).length).toBe(5);
       const conns = await connectionsFor(api, reg);
       expect([conns.eet?.driver, conns.eet?.environment, conns.eet?.certSubject, conns.payment?.driver, conns.printer?.driver]).toEqual(["eet2", "playground", "CZ8551015704", "simulator", "browser"]);

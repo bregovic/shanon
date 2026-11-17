@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
 import { createCompanyFromRegistry } from "@/server/company-lookup";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
@@ -489,6 +490,9 @@ function saleInput(input: SaleInput): SaleInput {
 /** Platba kartou na terminálu: zahájení (částku spočítá server z položek). */
 export async function posCardStartAction(input: SaleInput): Promise<ActionResult<PaymentState>> {
   const s = await requireSession();
+  // simulátor brány: odkaz na testovací platební stránku (QR do telefonu)
+  const h = await headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost"}`;
   try {
     assertCan(s.ctx.perms, "pos.receipt", "write");
     const sale = { ...saleInput(input), payment: "card" as const };
@@ -497,7 +501,7 @@ export async function posCardStartAction(input: SaleInput): Promise<ActionResult
       const conn = (await connectionsFor(api, sale.registerId)).payment;
       if (!conn) throw new UserError("@INT:NoConnection");
       const q = await quote(api, sale);
-      return paymentStart(api, conn, q.paid, `${q.reg.code}`);
+      return paymentStart(api, conn, q.paid, `${q.reg.code}`, { origin, tenantId: s.ctx.tenantId });
     });
     return { ok: true, data };
   } catch (e) {

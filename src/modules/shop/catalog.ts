@@ -176,9 +176,9 @@ function paymentAllowed(pm: RecordData, delivery: RecordData | null, gateway: bo
 /** Aktivní platební brána pro e-shop (Comgate), nebo null. */
 export async function gatewayConnection(data: DataApi): Promise<RecordData | null> {
   try {
-    const list = await data.find("int.connection", { kind: "payment", driver: "comgate", active: true }, { take: 20, orderBy: { code: "asc" } });
-    // testovací prostředí: testovací kopie má přednost (ostrá je pozastavená)
-    return list.find((c) => String(c.code).startsWith("TEST-")) ?? list[0] ?? null;
+    const list = (await data.find("int.connection", { kind: "payment", active: true }, { take: 50, orderBy: { code: "asc" } })).filter((c) => c.driver === "comgate" || c.driver === "gatewaySim");
+    // testovací prostředí: testovací kopie Comgate, pak simulátor brány, pak ostrá brána
+    return list.find((c) => c.code === "TEST-COMGATE") ?? list.find((c) => String(c.code).startsWith("TEST-")) ?? list[0] ?? null;
   } catch {
     return null; // modul Integrace vypnutý
   }

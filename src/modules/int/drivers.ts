@@ -43,7 +43,7 @@ export const DRIVERS: Record<string, string[]> = {
   mail: ["smtp", "mailTest"],
   eet: ["eet2", "eetSimulator"],
   printer: ["browser", "escposSerial"],
-  payment: ["manual", "sumup", "simulator", "comgate"],
+  payment: ["manual", "sumup", "simulator", "comgate", "gatewaySim"],
   api: ["rest"],
   service: ["ares", "cnb", "ecb", "vies", "dphreg"],
 };
@@ -93,8 +93,9 @@ export async function connectionsFor(
   const out: Partial<Record<"eet" | "printer" | "payment", RecordData>> = {};
   for (const kind of ["eet", "printer", "payment"] as const) {
     // brána Comgate jen s volbou Platba QR na pokladně (jinak slouží e-shopu)
-    const list = all.filter((c) => c.kind === kind && (c.driver !== "comgate" || c.posQr));
-    const pick = list.find((c) => c.registerId === registerId) ?? list.find((c) => c.driver === "comgate") ?? list[0];
+    const gateway = (c: RecordData) => c.driver === "comgate" || c.driver === "gatewaySim";
+    const list = all.filter((c) => c.kind === kind && (!gateway(c) || c.posQr));
+    const pick = list.find((c) => c.registerId === registerId) ?? list.find(gateway) ?? list[0];
     if (pick) out[kind] = pick;
   }
   return out;
@@ -345,7 +346,16 @@ export async function paymentStart(
   conn: RecordData,
   amountCents: bigint,
   reference: string,
+  /** simulátor brány: adresa aplikace a tenant (odkaz na testovací platební stránku) */
+  opts: { origin?: string; tenantId?: string } = {},
 ): Promise<PaymentState> {
+  if (conn.driver === "gatewaySim") {
+    // simulátor brány: testovací platební stránka (Zaplatit / Zrušit), na pokladně jako QR do telefonu
+    const log = await writeLog(data, conn, "payment.start", "pending", { reference, externalId: `SIMG-${randomUUID().slice(0, 8)}`, detail: `amount=${amountCents}` });
+    const url = `${opts.origin ?? ""}/pay-sim/${opts.tenantId ?? ""}/${log.id}`;
+    await data.update("int.log", String(log.id), { detail: `amount=${amountCents} redirect=${url}` });
+    return { state: "pending", ref: String(log.id), qr: await QRCode.toString(url, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) };
+  }
   if (conn.driver === "simulator") {
     const log = await writeLog(data, conn, "payment.start", "pending", {
       reference,
@@ -426,7 +436,15 @@ export async function paymentStatus(
     };
   let state: PaymentState["state"] = "pending";
   let message: string | undefined;
-  if (conn.driver === "comgate") {
+  if (conn.driver === "gatewaySim") {
+    // simulátor brány: výsledek zvolený na testovací stránce
+    const sim = /sim=(PAID|CANCELLED)/.exec(String(log.detail))?.[1];
+    if (sim === "PAID") state = "successful";
+    else if (sim === "CANCELLED") {
+      state = "failed";
+      message = "Zrušeno (simulace)";
+    }
+  } else if (conn.driver === "comgate") {
     // brána: zaplaceno jen PAID a na stejnou částku
     const st = await comgateStatus(conn, String(log.externalId));
     const cents = BigInt(/amount=(-?\d+)/.exec(String(log.detail))?.[1] ?? "0");
@@ -736,7 +754,7 @@ export const intHandlers: Record<string, ObjectHandlers> = {
           return setCheck(ctx.data, conn, ctx.t("@INT:PrinterTestInfo"));
         if (conn.driver === "manual")
           return setCheck(ctx.data, conn, ctx.t("@INT:ManualOk"));
-        if (conn.driver === "simulator")
+        if (conn.driver === "simulator" || conn.driver === "gatewaySim")
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
         if (conn.driver === "comgate") {
           const methods = await comgateTestCall(conn).catch(async (e) => {
