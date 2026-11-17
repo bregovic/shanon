@@ -10,7 +10,7 @@ import { AddToCart, CartBadge, CartCheckout } from "@/components/eshop/cart";
 import { money } from "@/components/eshop/format";
 import s from "@/components/eshop/eshop.module.css";
 import type { ShopProduct } from "@/modules/shop/catalog";
-import { shopPage, type ShopMeta } from "@/server/eshop";
+import { shopPage, shopRefreshPayment, type ShopMeta } from "@/server/eshop";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,8 @@ export default async function ShopPage({ params, searchParams }: Props) {
   const { org, path = [] } = await params;
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.slice(0, 80) : "";
+  // návrat z platební brány: ověřit stav platby dřív, než se stránka objednávky vykreslí
+  if (path[0] === "objednavka" && path[1]) await shopRefreshPayment(org, path[1]).catch(() => undefined);
   const r = await shopPage(org, path, q);
   if (!r) notFound();
   const { meta, view } = r;
@@ -149,6 +151,15 @@ export default async function ShopPage({ params, searchParams }: Props) {
                 <span className={s.status}>{STATUS[view.order.status] ?? view.order.status}</span>
               </p>
               <p className={s.lead}>Děkujeme, {view.order.buyerName}. Potvrzení objednávky posíláme na {view.order.email}.</p>
+              {view.order.cardPending && (
+                <div className={s.panel} style={{ marginBottom: 16 }}>
+                  <h2>Platba kartou, Google Pay nebo Apple Pay</h2>
+                  <p className={s.note}>Objednávka čeká na zaplacení. Platba proběhne na zabezpečené stránce platební brány Comgate.</p>
+                  <a className={s.btn} href={`/api/eshop/${org}/pay/${path[1]}`} style={{ display: "inline-block", textDecoration: "none" }}>
+                    Zaplatit {money(view.order.total, view.order.currency)}
+                  </a>
+                </div>
+              )}
               {view.order.transfer && (
                 <div className={s.panel} style={{ marginBottom: 16 }}>
                   <h2>Platba převodem</h2>

@@ -35,6 +35,7 @@ export const Driver = defineEnum({
     { value: "manual", label: "@INT:DrvManual" },
     { value: "sumup", label: "@INT:DrvSumup" },
     { value: "simulator", label: "@INT:DrvSimulator" },
+    { value: "comgate", label: "@INT:DrvComgate" },
     { value: "rest", label: "@INT:DrvRest" },
     { value: "eetSimulator", label: "@INT:DrvEetSimulator" },
     { value: "ares", label: "@INT:DrvAres" },
@@ -154,6 +155,7 @@ const Secret = (id: string, label: string, kind: "string" | "text" = "string") =
 const EET = { field: "kind", in: ["eet"] };
 const PRINTER = { field: "kind", in: ["printer"] };
 const SUMUP = { field: "driver", in: ["sumup"] };
+const COMGATE = { field: "driver", in: ["comgate"] };
 const SERIAL = { field: "driver", in: ["escposSerial"] };
 const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
@@ -192,8 +194,14 @@ export const connection = defineObject({
     openDrawer: { edt: Edts.NoYes, label: "@INT:OpenDrawer", visibleWhen: SERIAL },
     autoPrint: { edt: Edts.NoYes, label: "@INT:AutoPrint", visibleWhen: PRINTER },
     // platební terminál SumUp (Cloud API, čtečka Solo)
-    merchantCode: { edt: Str("SumupMerchant", "@INT:MerchantCode", 20), visibleWhen: SUMUP },
-    apiKey: { edt: Secret("SumupApiKey", "@INT:ApiKey"), secret: true, visibleWhen: { field: "driver", in: ["sumup", "openai"] } },
+    merchantCode: { edt: Str("SumupMerchant", "@INT:MerchantCode", 20), visibleWhen: { field: "driver", in: ["sumup", "comgate"] } },
+    apiKey: { edt: Secret("SumupApiKey", "@INT:ApiKey"), secret: true, visibleWhen: { field: "driver", in: ["sumup", "openai", "comgate"] } },
+    // platební brána Comgate: testovací platby, povolené metody (ALL, GOOGLEPAY_REDIRECT + CARD_ALL…), QR na pokladně
+    testMode: { edt: Edts.NoYes, label: "@INT:TestMode", visibleWhen: COMGATE },
+    payMethods: { edt: Str("ComgateMethods", "@INT:PayMethods", 200), visibleWhen: COMGATE },
+    posQr: { edt: Edts.NoYes, label: "@INT:PosQr", visibleWhen: COMGATE },
+    /** adresa pro oznámení o zaplacení (zadat v klientském portálu Comgate) */
+    pushUrl: { edt: Str("ComgatePushUrl", "@INT:PushUrl", 200), readOnly: true, visibleWhen: COMGATE },
     affiliateAppId: { edt: Str("SumupAppId", "@INT:AffiliateAppId", 120), visibleWhen: SUMUP },
     affiliateKey: { edt: Secret("SumupAffKey", "@INT:AffiliateKey"), secret: true, visibleWhen: SUMUP },
     pairingCode: { edt: Str("SumupPairing", "@INT:PairingCode", 20), visibleWhen: SUMUP },
@@ -228,6 +236,7 @@ export const connection = defineObject({
     { label: "@INT:EetSettings", fields: ["environment", "unitId", "posId", "certPassword", "certSubject", "certValidTo"], visibleWhen: EET },
     { label: "@INT:PrinterSettings", fields: ["paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
+    { label: "@INT:ComgateSettings", fields: ["merchantCode", "apiKey", "testMode", "payMethods", "posQr", "pushUrl"], visibleWhen: COMGATE },
     { label: "@INT:ApiSettings", fields: ["scopes", "tokenPrefix"], visibleWhen: API },
     { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "autoList"], visibleWhen: OCR },
     { label: "@INT:MailSettings", fields: ["smtpHost", "smtpPort", "smtpSecurity", "smtpUser", "smtpPassword", "fromEmail", "fromName", "replyTo", "bccSelf", "signature"], visibleWhen: MAIL },
@@ -744,6 +753,17 @@ export default defineModule({
       DrvManual: "Ruční potvrzení na terminálu",
       DrvSumup: "SumUp Solo (Cloud API)",
       DrvSimulator: "Simulátor (zkoušení)",
+      DrvComgate: "Comgate (platební brána, Google Pay)",
+      ComgateSettings: "Platební brána Comgate",
+      TestMode: "Testovací režim (platby se nestrhávají)",
+      PayMethods: "Platební metody (prázdné = všechny)",
+      PosQr: "Platba QR kódem na pokladně",
+      PushUrl: "Adresa pro oznámení o zaplacení",
+      ComgateMissing: "Vyplňte identifikátor e-shopu (merchant) a heslo z portálu Comgate.",
+      ComgateError: "Platební brána odmítla požadavek: {reason}",
+      ComgateNoEmail: "Pro platbu bránou vyplňte e-mail v Organizaci.",
+      ComgateTestOk: "Spojení s Comgate funguje. Metody: {methods}",
+      TestComgate: "Comgate – testovací platby",
       Register: "Pokladna",
       Active: "Aktivní",
       Environment: "Prostředí",
@@ -1046,6 +1066,17 @@ export default defineModule({
       DrvManual: "Manual confirmation on terminal",
       DrvSumup: "SumUp Solo (Cloud API)",
       DrvSimulator: "Simulator (testing)",
+      DrvComgate: "Comgate (payment gateway, Google Pay)",
+      ComgateSettings: "Comgate payment gateway",
+      TestMode: "Test mode (no money is charged)",
+      PayMethods: "Payment methods (empty = all)",
+      PosQr: "QR payment at the cash register",
+      PushUrl: "Payment notification URL",
+      ComgateMissing: "Fill in the shop identifier (merchant) and password from the Comgate portal.",
+      ComgateError: "The payment gateway rejected the request: {reason}",
+      ComgateNoEmail: "To pay via the gateway, fill in the e-mail in Organisation.",
+      ComgateTestOk: "Connection to Comgate works. Methods: {methods}",
+      TestComgate: "Comgate – test payments",
       Register: "Register",
       Active: "Active",
       Environment: "Environment",

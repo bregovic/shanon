@@ -157,7 +157,9 @@ export function CartCheckout({ base, org, termsHref }: { base: string; org: stri
       const data = await r.json();
       if (data.ok) {
         writeCart(base, []);
-        router.push(data.url);
+        // platba bránou: platební stránka Comgate (mimo obchod)
+        if (/^https?:\/\//.test(data.url)) window.location.assign(data.url);
+        else router.push(data.url);
         return;
       }
       setErrors(data.errors ?? { _: data.error ?? "Objednávku se nepodařilo odeslat." });

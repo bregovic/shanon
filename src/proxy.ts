@@ -27,6 +27,6 @@ export const config = {
   // api/files: nahrávání souborů (proxy by omezilo velikost těla); relaci ověřuje route
   // api/v1: REST API s vlastní autorizací klíčem (bez přihlášení)
   // portal, api/portal: dodavatelský portál (veřejný odkaz s tajným klíčem, limity v src/server/supplier-portal.ts)
-  // eshop, api/eshop: veřejný e-shop (src/server/eshop.ts)
-  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1|api/portal|portal/|api/eshop|eshop/).*)"],
+  // eshop, api/eshop: veřejný e-shop (src/server/eshop.ts); api/pay: oznámení platební brány
+  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1|api/portal|portal/|api/eshop|eshop/|api/pay/).*)"],
 };

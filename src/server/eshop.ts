@@ -14,7 +14,10 @@ import { UserError, dependencyClosure, type DataApi, type RecordData } from "@/c
 import { ADMIN } from "@/core/security";
 import { czIban, spayd } from "@/core/print";
 import { registry } from "@/registry";
-import { listProducts, orderView, placeOrder, productByNum, quote, type OrderInput, type OrderResult, type OrderView, type Quote, type QuoteInput, type ShopProduct } from "@/modules/shop/catalog";
+import { gatewayConnection, listProducts, markGatewayPaid, orderView, placeOrder, productByNum, quote, type OrderInput, type OrderResult, type OrderView, type Quote, type QuoteInput, type ShopProduct } from "@/modules/shop/catalog";
+import { comgateCreate, comgateStatus } from "@/modules/int/comgate";
+import { paymentRedirectOf, writeLog } from "@/modules/int/drivers";
+import { toCents } from "@/core/money";
 import { prisma, withTenant } from "./db";
 import { inTenant, type Ctx } from "./data";
 import { readFile } from "./docuref";
@@ -174,7 +177,112 @@ export async function shopOrder(org: string, input: OrderInput, ip: string, orig
   if (!res.ok) return { ...res, errorText: Object.fromEntries(Object.entries(res.errors ?? {}).map(([k, v]) => [k, t(v)])) };
   const url = `${origin}/${org}/objednavka/${token}`;
   await confirmationMail(l, token, url, client).catch(() => undefined); // pošta nesmí shodit objednávku
-  return { ...res, url };
+  // platba bránou: rovnou na platební stránku (nepovede-li se, stránka objednávky nabídne Zaplatit)
+  const pay = res.card ? await startGateway(l, org, token, origin, client).catch(() => null) : null;
+  return { ...res, url: pay ?? url };
+}
+
+/**
+ * Platba objednávky bránou (Comgate): čekající platbu použije znovu, jinak založí novou.
+ * Síť mimo transakci; v protokolu Integrace „payment.start“ s adresou platební stránky.
+ */
+async function startGateway(l: Loaded, org: string, token: string, origin: string, client: PrismaClient): Promise<string | null> {
+  const prep = await run(
+    l,
+    async (api) => {
+      const [so] = await api.find("shop.order", { token }, { take: 1 });
+      const conn = await gatewayConnection(api);
+      if (!so || !conn || so.status !== "awaitingPayment") return null;
+      const pm = so.paymentMethodId ? await api.get("bank.paymentMethod", String(so.paymentMethodId)) : null;
+      if (pm?.kind !== "card") return null;
+      const log = so.paymentLogId ? await api.get("int.log", String(so.paymentLogId)) : null;
+      const cur = so.currencyId ? await api.get("sys.currency", String(so.currencyId)) : null;
+      return { so, conn, log, currency: String(cur?.code ?? "CZK") };
+    },
+    client,
+  );
+  if (!prep) return null;
+  const { so, conn, log, currency } = prep;
+  const reuse = log && log.status === "pending" && log.connectionId === conn.id ? paymentRedirectOf(log) : null;
+  if (reuse) return reuse;
+  const cents = toCents(so.amountGross ?? 0);
+  try {
+    const res = await comgateCreate(conn, {
+      amountCents: cents,
+      currency,
+      label: String(l.shop.name),
+      refId: String(so.orderNum),
+      email: String(so.email),
+      phone: (so.phone as string) || null,
+      fullName: String(so.buyerName),
+      returnUrl: `${origin}/${org}/objednavka/${token}`,
+    });
+    await run(
+      l,
+      async (api) => {
+        const lg = await writeLog(api, conn, "payment.start", "pending", { reference: String(so.orderNum), externalId: res.transId, detail: `amount=${cents} redirect=${res.redirect}` });
+        await api.update("shop.order", String(so.id), { paymentLogId: lg.id });
+      },
+      client,
+    );
+    return res.redirect;
+  } catch (e) {
+    await run(l, (api) => writeLog(api, conn, "payment.start", "error", { reference: String(so.orderNum), message: String((e as UserError).params?.reason ?? (e as Error).message).slice(0, 240) }), client);
+    return null;
+  }
+}
+
+/** Tlačítko Zaplatit na stránce objednávky: adresa platební stránky (null = nejde). */
+export async function shopPay(org: string, token: string, origin: string, client: PrismaClient = prisma): Promise<string | null> {
+  const l = await load(org, client);
+  return l ? startGateway(l, org, token, origin, client) : null;
+}
+
+/** Návrat z brány / otevření objednávky: ověří stav platby u brány (oznámení může přijít později). */
+export async function shopRefreshPayment(org: string, token: string, client: PrismaClient = prisma): Promise<void> {
+  const l = await load(org, client);
+  if (!l || !/^[A-Za-z0-9_-]{20,64}$/.test(token)) return;
+  const prep = await run(
+    l,
+    async (api) => {
+      const [so] = await api.find("shop.order", { token }, { take: 1 });
+      if (!so || so.status !== "awaitingPayment" || !so.paymentLogId) return null;
+      const log = await api.get("int.log", String(so.paymentLogId));
+      const conn = log?.connectionId ? await api.get("int.connection", String(log.connectionId)) : null;
+      return log && conn ? { log, conn } : null;
+    },
+    client,
+  );
+  if (!prep) return;
+  await settleGatewayLog(l.ctx, prep.conn, prep.log, client);
+}
+
+/**
+ * Stav platby bránou podle brány (nikdy podle oznámení samotného): zaplaceno na celou částku →
+ * protokol OK a objednávka e-shopu k vyřízení; zrušeno → protokol chyba. Pokladna čte stav z protokolu.
+ */
+export async function settleGatewayLog(ctx: Ctx, conn: RecordData, log: RecordData, client: PrismaClient = prisma): Promise<string> {
+  if (log.status === "ok") {
+    await inTenant(ctx, (s) => markGatewayPaid(s.sys().api(), String(log.id)).catch(() => false), client);
+    return "paid";
+  }
+  if (log.status !== "pending" || !log.externalId) return String(log.status);
+  const st = await comgateStatus(conn, String(log.externalId));
+  const cents = BigInt(/amount=(-?\d+)/.exec(String(log.detail))?.[1] ?? "-1");
+  const paid = st.state === "paid" && (st.priceCents === null || st.priceCents === cents);
+  if (st.state === "pending") return "pending";
+  await inTenant(
+    ctx,
+    async (s) => {
+      const api = s.sys().api();
+      const fresh = await api.get("int.log", String(log.id));
+      if (fresh?.status !== "pending") return;
+      await api.update("int.log", String(log.id), { status: paid ? "ok" : "error", message: paid ? "PAID" : st.message.slice(0, 240) });
+      if (paid) await markGatewayPaid(api, String(log.id)).catch(() => false); // bez e-shopu (pokladna) nic
+    },
+    client,
+  );
+  return paid ? "paid" : "cancelled";
 }
 
 async function confirmationMail(l: Loaded, token: string, url: string, client: PrismaClient) {

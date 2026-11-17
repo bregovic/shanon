@@ -1,7 +1,7 @@
 ---
 title: E-shop
 module: shop
-objects: shop.shop, shop.category, shop.delivery, shop.page, shop.order, inv.item, bank.paymentMethod
+objects: shop.shop, shop.category, shop.delivery, shop.page, shop.order, inv.item, bank.paymentMethod, int.connection
 order: 10
 summary: Veřejný obchod z položek a údajů firmy — nastavení, zboží, doprava, platby a vyřízení objednávek.
 ---
@@ -31,3 +31,17 @@ Objednávka z webu založí:
 Spárovaná platba zálohy z výpisu přepne objednávku na **K vyřízení** (zvoneček upozorní). Fakturu vystavíte z prodejní objednávky (**Vytvořit fakturu**), zaúčtováním faktury se zboží vyskladní. Pak na objednávce z e-shopu **Vyřízeno**. **Zrušit objednávku** uvolní rezervaci a zruší neuhrazenou zálohu.
 
 Ochrana: z jedné adresy jen nastavený počet objednávek za hodinu, ceny a součty počítá vždy server.
+
+## Platba kartou, Google Pay a Apple Pay (Comgate)
+
+1. U Comgate si založte e-shop. V klientském portálu najdete **identifikátor e-shopu (merchant)** a **heslo** pro komunikaci na pozadí; mezi povolené IP adresy zadejte adresu serveru Shanonu.
+2. [Integrace → Napojení](/int/connection) → **Nový**: druh **Platba**, ovladač **Comgate**, vyplňte merchant a heslo. **Test napojení** ověří spojení a vypíše povolené platební metody.
+3. **Adresu pro oznámení o zaplacení** z napojení (doplňte před ni adresu aplikace, např. `https://…/api/pay/comgate/…`) zadejte v portálu Comgate jako „Result URL“ (adresa pro oznámení).
+4. **Platební metody** prázdné = všechny, které má e-shop u Comgate zapnuté; jen Google Pay a karty = `GOOGLEPAY_REDIRECT+CARD_ALL`.
+5. V e-shopu se platba „Kartou, Google Pay, Apple Pay“ nabídne sama, jakmile je napojení aktivní.
+
+Kupující po odeslání objednávky přejde na platební stránku Comgate a vrátí se na stránku objednávky. Zaplaceno je, až to potvrdí brána (oznámení se vždy ověřuje dotazem u Comgate) — objednávka pak přejde na **K vyřízení**. Nedokončenou platbu jde zopakovat tlačítkem **Zaplatit** na stránce objednávky. Peníze Comgate posílá souhrnně na bankovní účet (výplata se páruje ve výpisu ručně).
+
+**Pokladna:** se zaškrtnutou volbou **Platba QR kódem na pokladně** nabídne pokladna u platby kartou QR kód — zákazník ho naskenuje telefonem a zaplatí kartou, Google Pay nebo Apple Pay; účtenka se vystaví po potvrzení platby. Pro pokladnu musí být v Organizaci vyplněný e-mail (Comgate ho vyžaduje).
+
+**Testovací prostředí** (Integrace → Funkce → Testovací prostředí) vytvoří z ostrého napojení kopii **TEST-COMGATE** s testovacími platbami: na platební stránce si zvolíte výsledek (zaplaceno / zrušeno), peníze se nestrhávají. Ostré napojení je po dobu testu pozastavené.

@@ -165,12 +165,23 @@ export interface Quote {
   errors: string[];
 }
 
-/** Platby pro e-shop povolené u dopravy: převod vždy, dobírka jen u dopravy s dobírkou, hotově jen při odběru. */
-function paymentAllowed(pm: RecordData, delivery: RecordData | null): boolean {
+/** Platby pro e-shop povolené u dopravy: převod vždy, dobírka jen u dopravy s dobírkou, hotově jen při odběru, karta jen s bránou. */
+function paymentAllowed(pm: RecordData, delivery: RecordData | null, gateway: boolean): boolean {
   if (pm.kind === "transfer") return true;
   if (pm.kind === "cod") return !!delivery?.allowCod;
   if (pm.kind === "cash") return delivery?.kind === "pickup";
-  return false; // karta: až s platební bránou
+  return pm.kind === "card" && gateway;
+}
+
+/** Aktivní platební brána pro e-shop (Comgate), nebo null. */
+export async function gatewayConnection(data: DataApi): Promise<RecordData | null> {
+  try {
+    const list = await data.find("int.connection", { kind: "payment", driver: "comgate", active: true }, { take: 20, orderBy: { code: "asc" } });
+    // testovací prostředí: testovací kopie má přednost (ostrá je pozastavená)
+    return list.find((c) => String(c.code).startsWith("TEST-")) ?? list[0] ?? null;
+  } catch {
+    return null; // modul Integrace vypnutý
+  }
 }
 
 const QTY_MAX = 9999;
@@ -212,7 +223,8 @@ export async function quote(data: DataApi, shop: RecordData, input: QuoteInput):
   const delivery = deliveries.find((d) => d.id === input.deliveryId) ?? deliveries[0] ?? null;
   const free = shop.freeShippingFrom !== null && shop.freeShippingFrom !== undefined && shop.freeShippingFrom !== "" && itemsTotal >= toCents(shop.freeShippingFrom);
   const deliveryPrice = delivery && !free ? toCents(delivery.price ?? 0) : zero;
-  const allPm = (await data.find("bank.paymentMethod", { eshop: true, blocked: false }, { take: 50, orderBy: { code: "asc" } })).filter((pm) => paymentAllowed(pm, delivery));
+  const gateway = !!(await gatewayConnection(data));
+  const allPm = (await data.find("bank.paymentMethod", { eshop: true, blocked: false }, { take: 50, orderBy: { code: "asc" } })).filter((pm) => paymentAllowed(pm, delivery, gateway));
   const pm = allPm.find((x) => x.id === input.paymentMethodId) ?? allPm[0] ?? null;
   if (!lines.length) errors.push("@SHOP:ErrEmpty");
   if (!delivery) errors.push("@SHOP:ErrNoDelivery");
@@ -266,6 +278,8 @@ export interface OrderResult {
   errors?: Record<string, string>;
   orderNum?: string;
   token?: string;
+  /** platba bránou — po uložení se založí platba a kupující jde na platební stránku */
+  card?: boolean;
 }
 
 const clip = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
@@ -350,7 +364,8 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
     arOrderId: o.id,
     advanceId,
     amountGross: order.amountGross,
-    status: pm.kind === "transfer" ? "awaitingPayment" : "paid",
+    // převod a karta čekají na platbu (záloha / brána), dobírka a hotově jdou rovnou k vyřízení
+    status: pm.kind === "transfer" || pm.kind === "card" ? "awaitingPayment" : "paid",
   });
   await notify(data, {
     kind: "info",
@@ -359,7 +374,16 @@ export async function placeOrder(data: DataApi, shop: RecordData, input: OrderIn
     href: `/shop/order?focus=${so.id}`,
     key: `shop-order-${so.id}`,
   });
-  return { ok: true, orderNum: num, token };
+  return { ok: true, orderNum: num, token, card: pm.kind === "card" };
+}
+
+/** Zaplaceno bránou (ověřený stav u brány): objednávka k vyřízení + upozornění. Opakované volání nic nemění. */
+export async function markGatewayPaid(data: DataApi, logId: string): Promise<boolean> {
+  const [so] = await data.find("shop.order", { paymentLogId: logId }, { take: 1 });
+  if (!so || so.status !== "awaitingPayment") return false;
+  await data.update("shop.order", String(so.id), { status: "paid" });
+  await notify(data, { kind: "info", title: "@SHOP:NotifyPaid", params: { num: String(so.orderNum) }, href: `/shop/order?focus=${so.id}`, key: `shop-paid-${so.id}` });
+  return true;
 }
 
 export interface OrderView {
@@ -376,6 +400,8 @@ export interface OrderView {
   total: string;
   /** platba převodem, dokud není uhrazená */
   transfer: { account: string; iban: string; vs: string; amount: string; dueDate: string | null } | null;
+  /** platba bránou čeká (tlačítko Zaplatit) */
+  cardPending: boolean;
 }
 
 /** Stav objednávky pro kupujícího (odkaz s tajným klíčem). */
@@ -414,6 +440,7 @@ export async function orderView(data: DataApi, token: string): Promise<OrderView
     lines: lines.map((l) => ({ name: String(l.description ?? ""), qty: String(Number(l.qty ?? 0)), amount: fromCents(toCents(l.amountNet ?? 0) + toCents(l.taxAmount ?? 0)) })),
     total: String(so.amountGross ?? "0"),
     transfer,
+    cardPending: pm?.kind === "card" && so.status === "awaitingPayment",
   };
 }
 
@@ -423,6 +450,8 @@ export async function cancelShopOrder(data: DataApi, so: RecordData) {
   if (so.status === "cancelled") return;
   const adv = so.advanceId ? await data.get("ar.advance", String(so.advanceId)) : null;
   if (adv && toCents(adv.paidAmount ?? 0) > zero) throw new UserError("@SHOP:CancelPaid");
+  // zaplaceno bránou (stav K vyřízení u platby kartou) — vrácení peněz jde přes portál brány
+  if (so.paymentLogId && so.status === "paid") throw new UserError("@SHOP:CancelGatewayPaid");
   if (adv && adv.status === "open") await data.update("ar.advance", String(adv.id), { status: "cancelled" });
   const o = so.arOrderId ? await data.get("ar.order", String(so.arOrderId)) : null;
   if (o && o.status !== "invoiced" && o.status !== "cancelled") await data.update("ar.order", String(o.id), { status: "cancelled" });

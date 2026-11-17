@@ -38,7 +38,7 @@ describe("e-shop", () => {
     expect([shop.active, shop.layout, !!shop.customerId]).toEqual([false, "classic", true]);
     expect((await listRecords(S, "shop.delivery", {}, client)).rows.map((d) => d.code).sort()).toEqual(["ADRESA", "ODBER"]);
     expect((await listRecords(S, "shop.page", {}, client)).total).toBe(5);
-    expect((await listRecords(S, "bank.paymentMethod", { filter: { eshop: "true" } }, client)).rows.map((p) => p.code).sort()).toEqual(["WEB-DOBIRKA", "WEB-HOTOVE", "WEB-PREVOD"]);
+    expect((await listRecords(S, "bank.paymentMethod", { filter: { eshop: "true" } }, client)).rows.map((p) => p.code).sort()).toEqual(["WEB-DOBIRKA", "WEB-HOTOVE", "WEB-KARTA", "WEB-PREVOD"]);
     // zveřejnit bez zkratky organizace nejde; druhý obchod taky ne
     await expect(saveRecord(S, "shop.shop", String(shop.id), { ...shop, active: true }, undefined, client)).rejects.toBeTruthy();
     await expect(saveRecord(S, "shop.shop", null, { name: "Druhý", customerId: shop.customerId }, undefined, client)).rejects.toBeTruthy();

@@ -312,7 +312,7 @@ export function PosTerminal(p: {
   const [summary, setSummary] = useState<Record<string, string | number> | null>(null);
   const search = useRef<HTMLInputElement>(null);
   // platební terminál: stav čekání na kartu
-  const [card, setCard] = useState<{ ref: string; state: "waiting" | "declined"; message?: string } | null>(null);
+  const [card, setCard] = useState<{ ref: string; state: "waiting" | "declined"; message?: string; qr?: string } | null>(null);
   // --- odložené nákupy: aktivní nákup se průběžně ukládá, volný prodej čeká stranou
   const [baskets, setBaskets] = useState<BasketView[]>(p.baskets);
   const [active, setActive] = useState<{ id: string; label: string; version: number } | null>(null);
@@ -640,13 +640,14 @@ export function PosTerminal(p: {
     if (!start.ok) return setError(start.message);
     const ref = start.data.ref;
     const loop = ++cardLoop.current;
-    setCard({ ref, state: "waiting" });
+    const qr = start.data.qr;
+    setCard({ ref, state: "waiting", qr });
     for (let i = 0; i < 150; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       if (cardLoop.current !== loop) return; // zrušeno
       const st = await posCardStatusAction(p.register.id, ref);
       if (cardLoop.current !== loop) return;
-      if (!st.ok) return setCard({ ref, state: "declined", message: st.message });
+      if (!st.ok) return setCard({ ref, state: "declined", message: st.message, qr });
       if (st.data?.state === "successful") return finishSale("card", ref);
       if (st.data?.state === "failed") return setCard({ ref, state: "declined", message: st.data.message });
     }
@@ -1025,8 +1026,13 @@ export function PosTerminal(p: {
               <div className={st.big}>{fmt(due)}</div>
               {card?.state === "waiting" ? (
                 <>
-                  <Spinner />
-                  <p style={{ textAlign: "center" }}>{L.CardWaitingInfo}</p>
+                  {card.qr ? (
+                    // platební brána: zákazník naskenuje QR a zaplatí v telefonu (QR generuje server)
+                    <div style={{ width: 240, maxWidth: "100%", margin: "0 auto", background: "#fff", padding: 8 }} dangerouslySetInnerHTML={{ __html: card.qr }} />
+                  ) : (
+                    <Spinner />
+                  )}
+                  <p style={{ textAlign: "center" }}>{card.qr ? L.CardQrInfo : L.CardWaitingInfo}</p>
                 </>
               ) : (
                 <MessageBar intent="error">

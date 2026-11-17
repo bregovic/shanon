@@ -49,6 +49,15 @@ export async function enableTestEnv(data: DataApi, t: (ref: string) => string, w
     if (have) await data.update("int.connection", String(have.id), { active: true, driver: def.driver, ...def.extra });
     else await data.create("int.connection", { code: def.code, name: t(def.name), kind: def.kind, driver: def.driver, active: true, ...def.extra });
   }
+  // platební brána Comgate: testovací kopie ostrého napojení (stejné přístupy, testovací platby —
+  // na platební stránce se zvolí výsledek, peníze se nepohybují); bez ostrého napojení není s čím testovat
+  const live = (await data.find("int.connection", { driver: "comgate" }, { take: 50 })).find((c) => !String(c.code).startsWith("TEST-") && (c.active || c.pausedByTest));
+  if (live) {
+    const copy = { merchantCode: live.merchantCode, apiKey: live.apiKey, payMethods: live.payMethods ?? null, posQr: !!live.posQr, testMode: true, active: true };
+    const [have] = await data.find("int.connection", { code: "TEST-COMGATE" }, { take: 1 });
+    if (have) await data.update("int.connection", String(have.id), copy);
+    else await data.create("int.connection", { code: "TEST-COMGATE", name: t("@INT:TestComgate"), kind: "payment", driver: "comgate", ...copy });
+  }
   // testovací data: boxy pro odložené nákupy
   if (withPos && !(await data.find("pos.box", {}, { take: 1 })).length) {
     for (let i = 1; i <= 5; i++) await data.create("pos.box", { code: `B${String(i).padStart(2, "0")}`, name: `Box ${i}` });

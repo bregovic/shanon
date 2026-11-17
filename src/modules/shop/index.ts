@@ -187,6 +187,8 @@ export const order = defineObject({
     currencyId: { edt: refEdt("sys.currency", "@SYS:Currency"), readOnly: true },
     arOrderId: { edt: refEdt("ar.order", "@SHOP:SalesOrder"), readOnly: true },
     advanceId: { edt: refEdt("ar.advance", "@SHOP:Advance"), readOnly: true },
+    /** platba bránou (karta, Google Pay): záznam protokolu zahájení platby v Integraci */
+    paymentLogId: { edt: refEdt("int.log", "@SHOP:GatewayPayment"), optionalRef: true, readOnly: true },
     /** odkaz pro kupujícího na stav objednávky (tajný) */
     token: { edt: Token, readOnly: true },
     /** otisk adresy (limit objednávek), ne adresa */
@@ -195,7 +197,7 @@ export const order = defineObject({
   titleField: "orderNum",
   list: ["orderNum", "orderedAt", "status", "buyerName", "email", "deliveryId", "paymentMethodId", "amountGross", "arOrderId"],
   form: [
-    { label: "@SHOP:Order", fields: ["orderNum", "orderedAt", "status", "deliveryId", "paymentMethodId", "amountGross", "currencyId", "arOrderId", "advanceId"] },
+    { label: "@SHOP:Order", fields: ["orderNum", "orderedAt", "status", "deliveryId", "paymentMethodId", "amountGross", "currencyId", "arOrderId", "advanceId", "paymentLogId"] },
     { label: "@SHOP:Buyer", fields: ["buyerName", "email", "phone", "companyName", "regNo", "vatId", "note"] },
     { label: "@SHOP:Address", fields: ["street", "city", "zip", "country"] },
   ],
@@ -308,6 +310,8 @@ export default defineModule({
       NotifyPaid: "Objednávka z e-shopu {num} je uhrazená",
       CancelShipped: "Vyřízenou objednávku zrušit nejde — vystavte dobropis.",
       CancelPaid: "Uhrazená záloha: nejdřív vraťte platbu, pak objednávku zrušte.",
+      GatewayPayment: "Platba bránou",
+      CancelGatewayPaid: "Objednávka je zaplacená bránou: nejdřív vraťte platbu v portálu Comgate, pak objednávku zrušte.",
       ErrStock: "Tolik kusů nemáme skladem.",
       ErrEmpty: "Košík je prázdný.",
       ErrNoDelivery: "Obchod zatím nemá způsob dopravy.",
@@ -402,6 +406,8 @@ export default defineModule({
       NotifyPaid: "Web order {num} is paid",
       CancelShipped: "A fulfilled order cannot be cancelled — issue a credit note.",
       CancelPaid: "Advance is paid: refund it first, then cancel the order.",
+      GatewayPayment: "Gateway payment",
+      CancelGatewayPaid: "The order was paid via the gateway: refund it in the Comgate portal first, then cancel the order.",
       ErrStock: "We do not have that many in stock.",
       ErrEmpty: "The cart is empty.",
       ErrNoDelivery: "The shop has no delivery method yet.",

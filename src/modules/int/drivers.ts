@@ -19,6 +19,8 @@ import {
 import { revealSecret } from "@/server/secrets";
 import { newToken } from "@/server/api-token";
 import { verifyMail } from "./mail";
+import QRCode from "qrcode";
+import { comgateCancel, comgateCreate, comgateStatus, comgateTestCall } from "./comgate";
 import { notify } from "@/modules/sys/notify";
 import { aresByIco } from "@/modules/gab/ares";
 import { viesLookup } from "@/modules/gab/registry-lookup";
@@ -41,7 +43,7 @@ export const DRIVERS: Record<string, string[]> = {
   mail: ["smtp", "mailTest"],
   eet: ["eet2", "eetSimulator"],
   printer: ["browser", "escposSerial"],
-  payment: ["manual", "sumup", "simulator"],
+  payment: ["manual", "sumup", "simulator", "comgate"],
   api: ["rest"],
   service: ["ares", "cnb", "ecb", "vies", "dphreg"],
 };
@@ -90,8 +92,9 @@ export async function connectionsFor(
   ).filter((c) => !c.registerId || c.registerId === registerId);
   const out: Partial<Record<"eet" | "printer" | "payment", RecordData>> = {};
   for (const kind of ["eet", "printer", "payment"] as const) {
-    const list = all.filter((c) => c.kind === kind);
-    const pick = list.find((c) => c.registerId === registerId) ?? list[0];
+    // brána Comgate jen s volbou Platba QR na pokladně (jinak slouží e-shopu)
+    const list = all.filter((c) => c.kind === kind && (c.driver !== "comgate" || c.posQr));
+    const pick = list.find((c) => c.registerId === registerId) ?? list.find((c) => c.driver === "comgate") ?? list[0];
     if (pick) out[kind] = pick;
   }
   return out;
@@ -328,7 +331,13 @@ export type PaymentState = {
   state: "pending" | "successful" | "failed";
   message?: string;
   ref: string;
+  /** platba v telefonu zákazníka (brána): QR kód s adresou platební stránky (SVG) */
+  qr?: string;
 };
+
+/** Adresa platební stránky brány uložená v protokolu zahájení platby. */
+const redirectOf = (log: RecordData | null) => /redirect=(\S+)/.exec(String(log?.detail ?? ""))?.[1] ?? null;
+export { redirectOf as paymentRedirectOf };
 
 /** Zahájení platby kartou na terminálu; vrací id záznamu protokolu jako odkaz. */
 export async function paymentStart(
@@ -344,6 +353,20 @@ export async function paymentStart(
       detail: `amount=${amountCents}`,
     });
     return { state: "pending", ref: String(log.id) };
+  }
+  if (conn.driver === "comgate") {
+    // pokladna: zákazník naskenuje QR a zaplatí v telefonu (karta, Google Pay, Apple Pay)
+    const [org] = await data.find("org.entity", {}, { take: 1 }).catch(() => [] as RecordData[]);
+    if (!org?.email) throw new UserError("@INT:ComgateNoEmail");
+    let res: { transId: string; redirect: string };
+    try {
+      res = await comgateCreate(conn, { amountCents, currency: "CZK", label: String(org.tradeName ?? org.legalName ?? reference), refId: reference, email: String(org.email), fullName: String(org.legalName ?? "Pokladna") });
+    } catch (e) {
+      await writeLog(data, conn, "payment.start", "error", { reference, message: clip(String((e as UserError).params?.reason ?? (e as Error).message), 200) });
+      throw e;
+    }
+    const log = await writeLog(data, conn, "payment.start", "pending", { reference, externalId: res.transId, detail: `amount=${amountCents} redirect=${res.redirect}` });
+    return { state: "pending", ref: String(log.id), qr: await QRCode.toString(res.redirect, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) };
   }
   if (conn.driver !== "sumup") throw new UserError("@INT:WrongDriver");
   if (!conn.readerId) throw new UserError("@INT:SumupNoReader");
@@ -403,7 +426,16 @@ export async function paymentStatus(
     };
   let state: PaymentState["state"] = "pending";
   let message: string | undefined;
-  if (conn.driver === "simulator") {
+  if (conn.driver === "comgate") {
+    // brána: zaplaceno jen PAID a na stejnou částku
+    const st = await comgateStatus(conn, String(log.externalId));
+    const cents = BigInt(/amount=(-?\d+)/.exec(String(log.detail))?.[1] ?? "0");
+    if (st.state === "paid" && (st.priceCents === null || st.priceCents === cents)) state = "successful";
+    else if (st.state === "cancelled" || st.state === "paid") {
+      state = "failed";
+      message = st.message;
+    }
+  } else if (conn.driver === "simulator") {
     // simulace: schválí za 3 s; částka končící ,13 Kč se zamítne
     const age = Date.now() - new Date(String(log.createdAt)).getTime();
     const cents = BigInt(/amount=(-?\d+)/.exec(String(log.detail))?.[1] ?? "0");
@@ -464,6 +496,7 @@ export async function paymentCancel(
 ) {
   const log = await data.get("int.log", ref);
   if (!log || log.status !== "pending") return;
+  if (conn.driver === "comgate" && log.externalId) await comgateCancel(conn, String(log.externalId));
   if (conn.driver === "sumup")
     await sumup(
       conn,
@@ -526,6 +559,11 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         if (bad) e.scopes = "@INT:ScopeUnknown";
       }
       if (Object.keys(e).length) return e;
+    },
+    // Comgate: adresa pro oznámení o zaplacení (zadává se v portálu Comgate)
+    async afterSave(ctx, d) {
+      const url = d.driver === "comgate" ? `/api/pay/comgate/${ctx.tenantId}/${d.id}` : null;
+      if ((d.pushUrl ?? null) !== url) await ctx.data.update("int.connection", String(d.id), { pushUrl: url });
     },
     downloads: {
       /** nový klíč API: v databázi jen otisk, uživatel ho dostane jednou jako soubor */
@@ -700,6 +738,14 @@ export const intHandlers: Record<string, ObjectHandlers> = {
           return setCheck(ctx.data, conn, ctx.t("@INT:ManualOk"));
         if (conn.driver === "simulator")
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
+        if (conn.driver === "comgate") {
+          const methods = await comgateTestCall(conn).catch(async (e) => {
+            await writeLog(ctx.data, conn, "payment.test", "error", { message: ctx.t((e as UserError).label ?? "@INT:StatusError", (e as UserError).params) });
+            throw e;
+          });
+          await writeLog(ctx.data, conn, "payment.test", "ok", { message: clip(methods, 240) });
+          return setCheck(ctx.data, conn, ctx.t("@INT:ComgateTestOk", { methods }));
+        }
         if (!conn.readerId) throw new UserError("@INT:SumupNoReader");
         const r = await sumup(
           conn,

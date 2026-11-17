@@ -251,6 +251,12 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `bank.paymentMethod.eshop`. Ceny/košík/objednávka jen v `catalog.ts` (server): objednávka → `shop.order` + `ar.order` s `pricesInclTax`
   (daň z ceny s DPH, faktura převezme, tisk ukáže cenu/MJ bez DPH) potvrzená = rezervace, převod → `ar.advance` (VS, QR); úhrada zálohy
   (handler `ar.advance`) → stav K vyřízení. Vzhled obchodu = vlastní CSS (`components/eshop`, šablony `data-layout`), ne Fluent.
+- Platební brána Comgate (`src/modules/int/comgate.ts`, ovladač `comgate` druhu payment): REST v2, `Authorization: Basic merchant:secret`,
+  `testMode` = testovací platby. Stav se nikdy nebere z oznámení — `/api/pay/comgate/<tenant>/<napojení>` (`src/server/payment-push.ts`)
+  i návrat kupujícího ověří stav dotazem u brány (`settleGatewayLog` v `src/server/eshop.ts`) a zapíší ho do `int.log` (payment.start,
+  `detail` = `amount=… redirect=…`). E-shop: platba kind `card` jen s aktivní bránou (`gatewayConnection`, TEST- má přednost),
+  `shop.order.paymentLogId`; pokladna: brána jen s `posQr`, `PaymentState.qr` = QR s platební stránkou. Testovací prostředí kopíruje
+  ostré napojení do TEST-COMGATE. Comgate vyžaduje povolenou IP serveru.
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

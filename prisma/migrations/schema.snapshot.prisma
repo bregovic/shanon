@@ -3987,6 +3987,10 @@ model IntConnection {
   autoPrint      Boolean   @default(false) @map("auto_print")
   merchantCode   String?   @map("merchant_code") @db.VarChar(20)
   apiKey         String?   @map("api_key") @db.VarChar(4000)
+  testMode       Boolean   @default(false) @map("test_mode")
+  payMethods     String?   @map("pay_methods") @db.VarChar(200)
+  posQr          Boolean   @default(false) @map("pos_qr")
+  pushUrl        String?   @map("push_url") @db.VarChar(200)
   affiliateAppId String?   @map("affiliate_app_id") @db.VarChar(120)
   affiliateKey   String?   @map("affiliate_key") @db.VarChar(4000)
   pairingCode    String?   @map("pairing_code") @db.VarChar(20)
@@ -4047,8 +4051,9 @@ model IntLog {
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?  @map("updated_by") @db.Uuid
 
-  company    SysCompany    @relation("IntLog_company", fields: [companyId], references: [id], onDelete: Restrict)
-  connection IntConnection @relation("IntLog_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+  company              SysCompany    @relation("IntLog_company", fields: [companyId], references: [id], onDelete: Restrict)
+  connection           IntConnection @relation("IntLog_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+  shopOrder_paymentLog ShopOrder[]   @relation("ShopOrder_paymentLog")
 
   @@index([tenantId, companyId])
   @@index([connectionId])
@@ -4398,6 +4403,7 @@ model ShopOrder {
   currencyId      String?   @map("currency_id") @db.Uuid
   arOrderId       String?   @map("ar_order_id") @db.Uuid
   advanceId       String?   @map("advance_id") @db.Uuid
+  paymentLogId    String?   @map("payment_log_id") @db.Uuid
   token           String?   @db.VarChar(64)
   ipHash          String?   @map("ip_hash") @db.VarChar(64)
   ext             Json      @default("{}")
@@ -4413,6 +4419,7 @@ model ShopOrder {
   currency      SysCurrency?       @relation("ShopOrder_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   arOrder       ArOrder?           @relation("ShopOrder_arOrder", fields: [arOrderId], references: [id], onDelete: Restrict)
   advance       ArAdvance?         @relation("ShopOrder_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  paymentLog    IntLog?            @relation("ShopOrder_paymentLog", fields: [paymentLogId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([deliveryId])
@@ -4420,6 +4427,7 @@ model ShopOrder {
   @@index([currencyId])
   @@index([arOrderId])
   @@index([advanceId])
+  @@index([paymentLogId])
   @@map("shop_order")
 }
 

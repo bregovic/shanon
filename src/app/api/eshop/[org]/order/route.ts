@@ -50,5 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ org: st
   );
   if (!res) return Response.json({ ok: false, error: "Obchod nenalezen." }, { status: 404 });
   if (!res.ok) return Response.json({ ok: false, errors: res.errorText }, { status: 400 });
-  return Response.json({ ok: true, orderNum: res.orderNum, url: `/${org}/objednavka/${res.token}` });
+  // platba bránou → adresa platební stránky, jinak stránka objednávky
+  const url = res.url && /^https:\/\/[^/]*comgate\./.test(res.url) ? res.url : `/${org}/objednavka/${res.token}`;
+  return Response.json({ ok: true, orderNum: res.orderNum, url });
 }

@@ -50,8 +50,11 @@ export async function shopSetup(data: DataApi): Promise<void> {
   if (!(await data.find("shop.page", {}, { take: 1 })).length) {
     for (const p of PAGES) await data.create("shop.page", { ...p, body: TODO, inFooter: true, active: true });
   }
+  // platba bránou (karta, Google Pay, Apple Pay) — nabízí se, jen když je napojená brána Comgate
+  if (!(await data.find("bank.paymentMethod", { code: "WEB-KARTA" }, { take: 1 })).length)
+    await data.create("bank.paymentMethod", { code: "WEB-KARTA", name: "Kartou, Google Pay, Apple Pay", kind: "card", eshop: true });
   // platební metody pro e-shop: převod (s QR), dobírka, hotově při odběru — jen když firma žádnou nemá
-  if (!(await data.find("bank.paymentMethod", { eshop: true }, { take: 1 })).length) {
+  if (!(await data.find("bank.paymentMethod", { eshop: true }, { take: 50 })).some((m) => m.kind !== "card")) {
     const [acc] = await data.find("bank.account", { blocked: false }, { take: 1, orderBy: { code: "asc" } }).catch(() => [] as RecordData[]);
     for (const [code, name, kind] of [
       ["WEB-PREVOD", "Převodem (QR platba)", "transfer"],
