@@ -225,8 +225,9 @@ function ColumnMenu({
         }}
       >
         <MenuTrigger disableButtonEnhancement>
-          <div className={s.headLabel} data-col={col.name} style={{ justifyContent: col.align === "right" ? "flex-end" : "flex-start" }}>
-            {col.label}
+          <div className={s.headLabel} data-col={col.name} title={col.image ? col.label : undefined} style={{ justifyContent: col.align === "right" ? "flex-end" : "flex-start" }}>
+            {/* sloupec obrázku bez nadpisu (je úzký) — popisek jen v nápovědě */}
+            {col.image ? null : col.label}
             {current && <Filter24Regular className={s.active} fontSize={16} />}
           </div>
         </MenuTrigger>

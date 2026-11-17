@@ -20,6 +20,8 @@ export interface FieldMeta {
   refHref?: string;
   /** cíl odkazu se otevírá v seznamu (číselník) — „Otevřít“ vede do přehledu s vybraným záznamem */
   refList?: boolean;
+  /** odkaz na partnera (cíl s titleRef): v seznamu jen název, bez čísla */
+  refNameOnly?: boolean;
   /** číslo se nesčítá v řádku Celkem */
   noTotal?: boolean;
   /** pole rozšíření (hodnota v record.ext) */
@@ -58,8 +60,11 @@ export function displayValue(f: FieldMeta, row: RecordData, lang: string): strin
       return new Date(String(v)).toLocaleString(locale);
     case "enum":
       return f.options?.find((o) => o.value === v)?.label ?? String(v);
-    case "ref":
-      return String((row._titles as RecordData | undefined)?.[f.name] ?? "");
+    case "ref": {
+      const t = String((row._titles as RecordData | undefined)?.[f.name] ?? "");
+      // „DOD00001 · Masna Novák“ → „Masna Novák“
+      return f.refNameOnly && t.includes(" · ") ? t.slice(t.indexOf(" · ") + 3) : t;
+    }
     default:
       return String(v);
   }

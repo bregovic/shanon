@@ -74,6 +74,7 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       initialFilters={initialFilters}
       initialSort={sort ? { sort, dir } : undefined}
       viewName={sp.v ? String(sp.v).slice(0, 120) : undefined}
+      mergeable={!!def.mergeable}
       helpHref={helpFor(def.id) ? `/help/${helpFor(def.id)!.id}` : undefined}
       helpLabel={t("@SYS:HelpOpen")}
       bulkActions={

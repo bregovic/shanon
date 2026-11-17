@@ -132,7 +132,7 @@ export function extFields(ctx: Pick<Ctx, "extensions">, objectId: string): Recor
   return out;
 }
 
-function handlersFor(ctx: Ctx, objectId: string): ObjectHandlers[] {
+export function handlersFor(ctx: Ctx, objectId: string): ObjectHandlers[] {
   const list = [...(registry.coreHandlers.get(objectId) ?? [])];
   for (const id of ctx.extensions) {
     const h = registry.extensions.get(id)?.handlers?.[objectId];

@@ -79,13 +79,28 @@ export function fieldWhere(def: ObjectDef, field: string, expr: string, lang: La
 
   if (kind === "ref") {
     const target = registry.objects.get(f.edt.refObject!)!;
-    const inner = fieldWhere(target, target.titleField, expr, lang);
-    if (!inner) return null;
     const rel = field.replace(/Id$/, "");
     // prázdný odkaz = null ve sloupci, ne podmínka na cíl
     const conds = parseFilter("string", expr);
     if (conds.length === 1 && conds[0].op === "empty") return conds[0].not ? { NOT: { [field]: null } } : { [field]: null };
-    return { [rel]: { is: inner } };
+    // standard: odkaz se filtruje podle kódu i názvu cíle (u partnera podle názvu subjektu)
+    const parts: Where[] = [];
+    const byCode = fieldWhere(target, target.titleField, expr, lang);
+    if (byCode) parts.push(byCode);
+    const nf = ["name", "description"].find((n) => n !== target.titleField && target.fields[n]?.edt.kind === "string");
+    if (nf && !target.titleRef) {
+      const byName = fieldWhere(target, nf, expr, lang);
+      if (byName) parts.push(byName);
+    }
+    if (target.titleRef) {
+      const sub = registry.objects.get(target.fields[target.titleRef].edt.refObject!)!;
+      const bySub = fieldWhere(sub, sub.titleField, expr, lang);
+      if (bySub) parts.push({ [target.titleRef.replace(/Id$/, "")]: { is: bySub } });
+    }
+    if (!parts.length) return null;
+    // „!text“ = neodpovídá kódu ani názvu (A), jinak stačí jedno (NEBO)
+    const negative = conds.length > 0 && conds.every((c) => "not" in c && c.not);
+    return { [rel]: { is: parts.length === 1 ? parts[0] : negative ? { AND: parts } : { OR: parts } } };
   }
 
   const conds = parseFilter(kind, expr);

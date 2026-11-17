@@ -146,7 +146,13 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   smazaného konceptu jde do `sys.numberSeqFree` a `nextNumber` ho přidělí přednostně.
 - Související doklady jako tlačítka v liště: `ObjectDef.related` (počet, bez záznamů neaktivní).
 - Lookup standard: odkaz = „kód · název“ (`nameFieldOf`, u partnerů `titleRef`), hledá se
-  podle obou; import přijme i „kód · název“.
+  podle obou; import přijme i „kód · název“. Filtr sloupce odkazu v seznamu taky podle kódu i názvu (`filter-where.ts`,
+  u partnera název subjektu; `!text` = ani jedno). V seznamu má odkaz na partnera jen název (`FieldMeta.refNameOnly`),
+  sloupec obrázku je bez nadpisu.
+- Sloučit záznamy (`ObjectDef.mergeable`, `src/server/merge.ts`, tlačítko Sloučit v seznamu u ≥ 2 vybraných): ponechá se
+  záznam s nejnižším kódem, odkazy ze všech objektů a přílohy se přepojí, ostatní se smažou (jedna transakce, střet
+  jedinečného klíče odmítne); úpravy ponechaného `ObjectHandlers.merge` (položka: stejná MJ a zadání ceny, vyšší cena,
+  dodavatel jen shodný, název bez „(dodavatel)“).
 - PDF sestav na serveru: `src/server/print-pdf.ts` (pdfkit, DejaVu Sans), `/api/pdf/<doklad>/<id>`;
   prvky pod tabulkou řádků drží navrženou pozici a posunou se jen při přetečení.
 - Sklad (`src/modules/whs`): pohyb jen přes `move()` (whs.trans + whs.onhand v jednom),

@@ -5,7 +5,40 @@
  */
 import { fromCents, percentOf, toCents, toScaled } from "@/core/money";
 import { slugify } from "@/lib/slug";
-import type { DataApi, ObjectHandlers, RecordData, ValidationErrors } from "@/core/module";
+
+import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
+
+/** „Klobása (Antoni)“ → „Klobása“ — dodavatel v závorce na konci názvu. */
+const baseName = (n: unknown) => String(n ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+
+/**
+ * Sloučit položky (stejný výrobek od více dodavatelů): stejná jednotka a zadání ceny, prodejní cena vyšší z cen,
+ * dodavatel jen když je u všech stejný, název bez „(dodavatel)“, když se jinak shoduje; obrázek / kategorie / popis
+ * z první položky, která je má; v e-shopu, když je v něm kterákoli.
+ */
+const itemMergeHandler: ObjectHandlers = {
+  merge(_ctx, t, others) {
+    const all = [t, ...others];
+    const one = (f: string) => new Set(all.map((r) => String(r[f] ?? ""))).size === 1;
+    if (!one("unitId")) throw new UserError("@INV:MergeUnit");
+    if (!one("priceInclTax") || !one("currencyId")) throw new UserError("@INV:MergePriceMode");
+    const p: RecordData = {};
+    const price = all.map((r) => r.salesPrice).filter((v) => v !== null && v !== undefined && v !== "").sort((a, b) => Number(b) - Number(a))[0];
+    if (price !== undefined && String(price) !== String(t.salesPrice)) p.salesPrice = price;
+    if (!one("vendorId")) {
+      p.vendorId = null;
+      p.vendorItemName = null;
+    }
+    const base = baseName(t.name);
+    if (base && base !== t.name && all.every((r) => baseName(r.name).toLowerCase() === base.toLowerCase())) p.name = base;
+    for (const f of ["image", "categoryId", "description", "brand", "ean"]) if (!t[f]) {
+      const v = others.find((r) => r[f])?.[f];
+      if (v) p[f] = v;
+    }
+    if (!t.eshop && others.some((r) => r.eshop)) p.eshop = true;
+    return p;
+  },
+};
 
 /** cena s DPH → bez DPH (zaokrouhleno na haléře) */
 export function netFromGross(gross: bigint, rate: unknown): bigint {
@@ -40,6 +73,7 @@ export async function itemPrices(data: DataApi, item: RecordData) {
 
 export const invHandlers: Record<string, ObjectHandlers> = {
   "inv.item": {
+    ...itemMergeHandler,
     async beforeSave(ctx, data) {
       if (!data.taxCodeId && data.groupId) {
         const g = await ctx.data.get("inv.itemGroup", String(data.groupId));

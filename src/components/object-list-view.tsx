@@ -21,8 +21,8 @@ import {
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Play24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
-import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction } from "@/app/actions";
+import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Play24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
+import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
@@ -59,6 +59,8 @@ export interface ObjectListProps {
   initialSort?: { sort?: string; dir?: "asc" | "desc" };
   /** název otevřeného uloženého pohledu (?v=) */
   viewName?: string;
+  /** Sloučit vybrané záznamy (ObjectDef.mergeable) */
+  mergeable?: boolean;
   /** akce nad víc vybranými záznamy (výpisy → deník HK) */
   bulkActions?: { id: string; label: string }[];
   /** „Hotovo {ok} z {n}.“ */
@@ -79,6 +81,22 @@ export function ObjectListView(p: ObjectListProps) {
   const [error, setError] = useState<string>();
   const [view, setView] = useState<{ filters: Record<string, string>; sort?: string; dir: "asc" | "desc" }>({ filters: {}, dir: "asc" });
   const [clearKey, setClearKey] = useState(0);
+  const [merge, setMerge] = useState(false);
+  const [mergeBusy, setMergeBusy] = useState(false);
+  // ponechá se záznam s nejnižším kódem (stejně jako server)
+  const mergeTarget = [...selected].sort((a, b) => String(a[p.titleField] ?? "").localeCompare(String(b[p.titleField] ?? ""), "cs", { numeric: true }))[0];
+  const doMerge = async () => {
+    setMergeBusy(true);
+    const r = await mergeRecordsAction(p.objectId, selected.map((x) => String(x.id)));
+    setMergeBusy(false);
+    setMerge(false);
+    if (!r.ok) setError(r.message);
+    else {
+      setError(undefined);
+      setInfo(p.labels.views.merged.replace("{target}", r.data.title));
+      setReload((n) => n + 1);
+    }
+  };
   const [saveView, setSaveView] = useState<{ name: string; folder: string } | null>(null);
   const fav = useFavorites();
   // filtry z menu (bez uloženého pohledu) patří ke stránce — „Filtrováno“ ukazuje jen ty navíc
@@ -203,6 +221,11 @@ export function ObjectListView(p: ObjectListProps) {
             {p.labels.actions.delete}
           </Button>
         )}
+        {p.mergeable && p.canDelete && (
+          <Button icon={<ArrowMinimize24Regular />} disabled={selected.length < 2} onClick={() => setMerge(true)}>
+            {p.labels.views.merge}
+          </Button>
+        )}
         {(p.bulkActions ?? []).map((a) => (
           <Button key={a.id} icon={<Play24Regular />} disabled={!selected.length || bulkBusy} onClick={() => void bulk(a.id)}>
             {a.label}
@@ -282,6 +305,33 @@ export function ObjectListView(p: ObjectListProps) {
         />
       </PageContent>
 
+      {merge && mergeTarget && (
+        <Dialog open onOpenChange={(_, d) => !d.open && setMerge(false)}>
+          <DialogSurface style={{ maxWidth: 520 }}>
+            <DialogBody>
+              <DialogTitle>{p.labels.views.mergeTitle}</DialogTitle>
+              <DialogContent style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {selected.map((r) => (
+                    <li key={String(r.id)} style={{ fontWeight: r === mergeTarget ? 600 : undefined }}>
+                      {String(r[p.titleField] ?? "")} · {String(r.name ?? "")}
+                    </li>
+                  ))}
+                </ul>
+                <span>
+                  {p.labels.views.mergeConfirm.replace("{target}", `${String(mergeTarget[p.titleField] ?? "")} · ${String(mergeTarget.name ?? "")}`).replace("{count}", String(selected.length - 1))}
+                </span>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setMerge(false)}>{p.labels.views.cancel}</Button>
+                <Button appearance="primary" disabled={mergeBusy} onClick={() => void doMerge()}>
+                  {p.labels.views.merge}
+                </Button>
+              </DialogActions>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
+      )}
       {saveView && fav && (
         <Dialog open onOpenChange={(_, d) => !d.open && setSaveView(null)}>
           <DialogSurface style={{ maxWidth: 460 }}>

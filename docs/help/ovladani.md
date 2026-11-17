@@ -25,7 +25,9 @@ summary: Přehled zkratek po oblastech (všude, seznam, formulář, mřížka ř
 
 Číslo nebo kód záznamu je odkaz – klik ho rovnou otevře. Filtr a řazení jsou v menu záhlaví sloupce.
 
-**Filtry a pohledy.** Nastavený filtr ukáže nad seznamem lištu „Filtrováno: …“ s tlačítkem **Zrušit filtry**. Filtr platí, dokud seznam neopustíte na jinou agendu (návrat z detailu záznamu ho zachová). **Uložit pohled** uloží filtry a řazení pod názvem do oblíbených, volitelně do složky (např. „Objednávky“); pohled otevřete z menu oblíbených (hvězdička v hlavičce). **Upravit oblíbené…** v tom menu přejmenuje, přesune do složky nebo odebere oblíbené. U zaškrtávacích polí filtr `""` najde nezaškrtnuté a `!""` zaškrtnuté.
+**Filtry a pohledy.** Nastavený filtr ukáže nad seznamem lištu „Filtrováno: …“ s tlačítkem **Zrušit filtry**. Filtr platí, dokud seznam neopustíte na jinou agendu (návrat z detailu záznamu ho zachová). **Uložit pohled** uloží filtry a řazení pod názvem do oblíbených, volitelně do složky (např. „Objednávky“); pohled otevřete z menu oblíbených (hvězdička v hlavičce). **Upravit oblíbené…** v tom menu přejmenuje, přesune do složky nebo odebere oblíbené. U zaškrtávacích polí filtr `""` najde nezaškrtnuté a `!""` zaškrtnuté. Sloupec s odkazem (kategorie, dodavatel…) jde filtrovat podle kódu i názvu.
+
+**Sloučit.** U položek označte v seznamu dva a více záznamů stejného výrobku a zvolte **Sloučit**: ponechá se položka s nejnižším číslem, prodeje, faktury, slevy a přílohy ostatních se převedou na ni a ostatní se smažou. Cena je vyšší z cen, dodavatel zůstane jen shodný, z názvu zmizí „(dodavatel)“. Sloučit nejde vrátit.
 
 ## Formulář
 

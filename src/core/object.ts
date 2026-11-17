@@ -100,6 +100,8 @@ export interface ObjectDef {
   /** unikátní kombinace polí (v rámci tenanta/firmy) */
   unique?: string[][];
   defaultSort?: { field: string; dir: "asc" | "desc" };
+  /** Sloučit vybrané záznamy do jednoho (odkazy se přepojí, ostatní smažou) — `src/server/merge.ts`, úpravy v `ObjectHandlers.merge` */
+  mergeable?: boolean;
   /** automatické číslování: pole se vyplní z číselné řady */
   numberSeq?: { field: string; seq: string };
   /** jen pro správce tenanta (role, oprávnění) — oprávnění v rolích na ně nestačí */

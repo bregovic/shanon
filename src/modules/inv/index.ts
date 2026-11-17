@@ -123,6 +123,7 @@ export const category = defineObject({
 
 export const item = defineObject({
   id: "inv.item",
+  mergeable: true,
   table: "inv_item",
   label: "@INV:Item",
   labelPlural: "@INV:Items",
@@ -321,6 +322,8 @@ export default defineModule({
       Weighed: "Prodej na váhu",
       Eshop: "V e-shopu",
       CategoryEshop: "Zobrazit v e-shopu",
+      MergeUnit: "Sloučit lze jen položky se stejnou měrnou jednotkou.",
+      MergePriceMode: "Sloučit lze jen položky se stejným zadáním ceny (s DPH / bez DPH) a měnou.",
       CategoryEshopHelp: "Kategorie se v obchodě ukáže, jen když v ní (nebo v podkategorii) je položka v e-shopu.",
       Slug: "Adresa v e-shopu",
       SlugHelp: "Jen malá písmena bez diakritiky, číslice a pomlčka, např. uzeniny.",
@@ -383,6 +386,8 @@ export default defineModule({
       Weighed: "Sold by weight",
       Eshop: "In the e-shop",
       CategoryEshop: "Show in the e-shop",
+      MergeUnit: "Only items with the same unit can be merged.",
+      MergePriceMode: "Only items with the same price entry (incl. / excl. VAT) and currency can be merged.",
       CategoryEshopHelp: "The category appears in the shop only when it (or a subcategory) has an e-shop item.",
       Slug: "E-shop address",
       SlugHelp: "Lowercase letters without accents, digits and hyphen only, e.g. sausages.",

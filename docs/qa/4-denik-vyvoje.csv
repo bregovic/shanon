@@ -132,3 +132,11 @@ Postup: stáhnout, upravit v Excelu, uložit jako CSV a naimportovat zpět — z
 - Menu oblíbených (hvězdička v hlavičce) má složky; **Upravit oblíbené…** přejmenuje, přesune nebo odebere.
 
 Návod: Nápověda → Ovládání a klávesové zkratky."
+2026-11-17;feature;Položky;Sloučit položky;;;"V seznamu položek označte dvě a více položek stejného výrobku (např. od různých dodavatelů) a zvolte **Sloučit**.
+
+- Ponechá se položka s nejnižším číslem; prodeje, faktury, slevy a přílohy ostatních se převedou na ni, ostatní se smažou.
+- Prodejní cena = vyšší z cen, dodavatel zůstane jen když je u všech stejný, z názvu zmizí „(dodavatel)“.
+- Sloučit lze jen položky se stejnou měrnou jednotkou a stejným zadáním ceny. Nelze vrátit."
+2026-11-17;change;Systém;Seznamy: filtr odkazů podle kódu i názvu, dodavatel jen názvem;;;"- Sloupec s odkazem (kategorie, skupina, dodavatel, odběratel…) jde filtrovat podle kódu i podle názvu, např. `*novák*`.
+- V seznamech je u dodavatele a odběratele jen název (bez interního čísla).
+- Sloupec obrázku je bez nadpisu."

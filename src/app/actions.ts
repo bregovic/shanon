@@ -288,6 +288,20 @@ export async function deleteRecordsAction(objectId: string, ids: string[]): Prom
   }
 }
 
+/** Sloučit vybrané záznamy (`ObjectDef.mergeable`) — jedna transakce. */
+export async function mergeRecordsAction(objectId: string, ids: string[]): Promise<ActionResult<{ id: string; title: string }>> {
+  const s = await requireSession();
+  try {
+    const { mergeRecords } = await import("@/server/merge");
+    const def = registry.objects.get(objectId);
+    const kept = await inTenant(s.ctx, (sess) => mergeRecords(sess, objectId, ids));
+    revalidatePath(objectHref(objectId));
+    return { ok: true, data: { id: String(kept.id), title: String(kept[def?.titleField ?? "id"] ?? "") } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
 export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult<{ open?: string; warnings?: string[] } | undefined>> {
   const s = await requireSession();
   try {
