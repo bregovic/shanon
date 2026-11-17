@@ -187,7 +187,10 @@ export function AppShell({ modules, companies, companyId, user, labels, menu, ch
           </Tooltip>
         </div>
       </header>
-      <main className={s.content}>{children}</main>
+      {/* klíč = firma: po přepnutí firmy se obsah sestaví znovu (mřížky, formuláře, přepínače nesmí držet data předchozí firmy) */}
+      <main key={companyId ?? "-"} className={s.content}>
+        {children}
+      </main>
     </div>
   );
 }
