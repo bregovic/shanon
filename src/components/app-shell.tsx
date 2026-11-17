@@ -24,6 +24,7 @@ import { Building24Regular, Checkmark24Regular, Home24Regular, QuestionCircle24R
 import { logoutAction, switchCompanyAction } from "@/app/actions";
 import { NotificationBell } from "./notification-bell";
 import { FavoritesMenu } from "./favorites";
+import { dropStaleGridViews } from "@/lib/grid-view";
 import { RecentMenu } from "./recent-menu";
 import { ModuleIcon } from "./icons";
 import { MenuSearch } from "./menu-search";
@@ -77,7 +78,10 @@ export function AppShell({ modules, companies, companyId, user, labels, menu, ch
   const s = useStyles();
   const path = usePathname();
   // historie cest v aplikaci pro Esc „zpět, odkud jsem přišel“
-  useEffect(() => trackNavigation(path), [path]);
+  useEffect(() => {
+    trackNavigation(path);
+    dropStaleGridViews(path);
+  }, [path]);
   const router = useRouter();
   const [, start] = useTransition();
   const current = modules.find((m) => path === m.href || path.startsWith(`${m.href}/`));

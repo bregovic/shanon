@@ -295,6 +295,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   Výchozí protiúčet a dimenze: název deníku → hlavička deníku (lze změnit) → nový řádek; protiúčet banka/pokladna
   ne u řádku stejného druhu, jediný účet firmy se doplní. Proskok na odkazovaný záznam: Ctrl+Enter / Ctrl+klik
   v `RefCombobox` (mřížka napřed uloží řádek), Esc = `goBack`. Potvrzení Uloženo = `toast()` (`ToastHost` v AppShell). Přehled zkratek pro uživatele = `docs/help/ovladani.md` (při nové zkratce doplnit).
+- Filtry seznamu: `sessionStorage grid:<objekt>` s `base` (cesta seznamu) — `dropStaleGridViews` v AppShell je zahodí při
+  odchodu z agendy (detail `/<base>/<id>` je zachová). Uložený pohled = oblíbená položka (`sys_favorite`, `folder` = složka v menu)
+  s adresou `?v=<název>&filter.<pole>=…&sort=…&dir=…`; lišta „Filtrováno“ + Zrušit filtry + Uložit pohled v `ObjectListView`.
 - Lišta formuláře (standard): Uložit + akce zpracování jako tlačítka; ostatní ve skupinách
   `Tisk ▾` (tisk, PDF, soubory, e-mail), `Zobrazit ▾` (související doklady, Náhled dokladu), `Další ▾`
   (Duplikovat). Skupina = `actions[].group` (výchozí: download → print, jinak process). Náhled dokladu =

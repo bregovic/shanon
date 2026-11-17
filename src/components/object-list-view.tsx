@@ -14,16 +14,19 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
+  Field,
+  Input,
   MessageBar,
+  MessageBarActions,
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Edit24Regular, Play24Regular, QuestionCircle24Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowClockwise24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Play24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DocuRefButton } from "./docuref-panel";
-import { FavoriteStar } from "./favorites";
+import { FavoriteStar, FolderPicker, useFavorites } from "./favorites";
 import { HistoryButton } from "./history-panel";
 import { ImportButton } from "./import-dialog";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
@@ -52,6 +55,10 @@ export interface ObjectListProps {
   focusId?: string;
   /** filtry z odkazu (?filter.pole=výraz) */
   initialFilters?: Record<string, string>;
+  /** řazení z odkazu (uložený pohled) */
+  initialSort?: { sort?: string; dir?: "asc" | "desc" };
+  /** název otevřeného uloženého pohledu (?v=) */
+  viewName?: string;
   /** akce nad víc vybranými záznamy (výpisy → deník HK) */
   bulkActions?: { id: string; label: string }[];
   /** „Hotovo {ok} z {n}.“ */
@@ -71,6 +78,25 @@ export function ObjectListView(p: ObjectListProps) {
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string>();
   const [view, setView] = useState<{ filters: Record<string, string>; sort?: string; dir: "asc" | "desc" }>({ filters: {}, dir: "asc" });
+  const [clearKey, setClearKey] = useState(0);
+  const [saveView, setSaveView] = useState<{ name: string; folder: string } | null>(null);
+  const fav = useFavorites();
+  // filtry z menu (bez uloženého pohledu) patří ke stránce — „Filtrováno“ ukazuje jen ty navíc
+  const baseFilters = useMemo(() => (p.viewName ? {} : (p.initialFilters ?? {})), [p.viewName, p.initialFilters]);
+  // filtry navíc proti stránce (Zrušit filtry) a proti otevřenému pohledu (co uživatel změnil)
+  const extra = Object.entries(view.filters).filter(([k, v]) => v && baseFilters[k] !== v);
+  const changed = p.viewName ? Object.entries(view.filters).filter(([k, v]) => v && p.initialFilters?.[k] !== v) : extra;
+  const colLabel = (k: string) => p.columns.find((c) => c.name === k)?.label ?? k;
+  /** adresa pohledu: seznam + filtry + řazení */
+  const viewHref = (name: string) => {
+    const q = new URLSearchParams({ v: name });
+    for (const [k, v] of Object.entries(view.filters)) if (v) q.set(`filter.${k}`, v);
+    if (view.sort) {
+      q.set("sort", view.sort);
+      q.set("dir", view.dir);
+    }
+    return `${objectHref(p.objectId)}?${q}`;
+  };
   const viewQuery = () => {
     const q = new URLSearchParams({ filters: JSON.stringify(view.filters), dir: view.dir });
     if (view.sort) q.set("sort", view.sort);
@@ -215,6 +241,27 @@ export function ObjectListView(p: ObjectListProps) {
             <MessageBarBody>{info}</MessageBarBody>
           </MessageBar>
         )}
+        {(extra.length > 0 || p.viewName) && (
+          <MessageBar intent="info" icon={<Filter16Regular />} style={{ marginBottom: 8 }}>
+            <MessageBarBody>
+              {p.viewName ? p.labels.views.opened.replace("{name}", p.viewName) : ""}
+              {p.viewName && changed.length > 0 ? " · " : ""}
+              {changed.length > 0 ? p.labels.views.filtered.replace("{fields}", changed.map(([k, v]) => `${colLabel(k)} ${v}`).join(", ")) : ""}
+            </MessageBarBody>
+            <MessageBarActions>
+              {fav && (
+                <Button size="small" icon={<StarAdd16Regular />} onClick={() => setSaveView({ name: p.viewName ?? p.crumbs[p.crumbs.length - 1].label, folder: "" })}>
+                  {p.labels.views.save}
+                </Button>
+              )}
+              {extra.length > 0 && (
+                <Button size="small" icon={<Dismiss16Regular />} onClick={() => setClearKey((n) => n + 1)}>
+                  {p.labels.views.clear}
+                </Button>
+              )}
+            </MessageBarActions>
+          </MessageBar>
+        )}
         <SmartGrid
           objectId={p.objectId}
           columns={p.columns}
@@ -227,11 +274,46 @@ export function ObjectListView(p: ObjectListProps) {
           titleField={p.titleField}
           focusId={p.focusId}
           initialFilters={p.initialFilters}
+          initialSort={p.initialSort}
+          clearKey={clearKey}
+          baseFilters={baseFilters}
           onSelectionChange={setSelected}
           onViewChange={setView}
         />
       </PageContent>
 
+      {saveView && fav && (
+        <Dialog open onOpenChange={(_, d) => !d.open && setSaveView(null)}>
+          <DialogSurface style={{ maxWidth: 460 }}>
+            <DialogBody>
+              <DialogTitle>{p.labels.views.saveTitle}</DialogTitle>
+              <DialogContent style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <span>{p.labels.views.saveHint}</span>
+                <Field label={p.labels.views.name} required>
+                  <Input autoFocus value={saveView.name} onChange={(_, d) => setSaveView({ ...saveView, name: d.value })} />
+                </Field>
+                <FolderPicker label={p.labels.views.folder} hint={p.labels.views.folderHint} value={saveView.folder} onChange={(folder) => setSaveView({ ...saveView, folder })} />
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setSaveView(null)}>{p.labels.views.cancel}</Button>
+                <Button
+                  appearance="primary"
+                  disabled={!saveView.name.trim()}
+                  onClick={async () => {
+                    const href = viewHref(saveView.name.trim());
+                    await fav.save(href, saveView.name.trim(), saveView.folder);
+                    setSaveView(null);
+                    router.replace(href);
+                    router.refresh();
+                  }}
+                >
+                  {p.labels.views.saveButton}
+                </Button>
+              </DialogActions>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
+      )}
       {!p.openInPage && (
         <RecordDrawer
           objectId={p.objectId}

@@ -80,6 +80,12 @@ interface Props {
   focusId?: string;
   /** filtry sloupců z odkazu (?filter.pole=výraz) — mají přednost před uloženými */
   initialFilters?: Record<string, string>;
+  /** řazení z odkazu (uložený pohled: ?sort=pole&dir=desc) */
+  initialSort?: { sort?: string; dir?: "asc" | "desc" };
+  /** změna čísla zruší filtry (zůstanou jen `baseFilters`) */
+  clearKey?: number;
+  /** filtry, které ke stránce patří (z menu) — Zrušit filtry je ponechá */
+  baseFilters?: Record<string, string>;
   /** změna čísla vynutí nové načtení (po uložení/smazání) */
   reloadKey?: number;
   /** klíč pro zapamatování filtrů v rámci relace prohlížeče */
@@ -333,6 +339,9 @@ export function SmartGrid({
   onSelectionChange,
   focusId,
   initialFilters,
+  initialSort,
+  clearKey = 0,
+  baseFilters,
   reloadKey = 0,
   storageKey,
   maxHeight = "calc(100vh - 190px)",
@@ -386,7 +395,11 @@ export function SmartGrid({
     if (!restored.current) {
       // první běh: obnovit filtry z relace prohlížeče, jinak použít data ze serveru
       restored.current = true;
-      const v = initialFilters && Object.keys(initialFilters).length ? { ...loadView(storageKey), filters: initialFilters } : loadView(storageKey);
+      // pohled z odkazu (filtry / řazení v adrese) má přednost před zapamatovaným
+      const fromUrl = (initialFilters && Object.keys(initialFilters).length) || initialSort?.sort;
+      const v: View = fromUrl
+        ? { filters: initialFilters ?? {}, ...(initialSort?.sort ? { sort: initialSort.sort, dir: initialSort.dir ?? "asc" } : { dir: "asc" as const }) }
+        : loadView(storageKey);
       if (Object.keys(v.filters).length || v.sort) {
         // synchronizace s úložištěm prohlížeče až po hydrataci (server ho nezná)
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -397,7 +410,7 @@ export function SmartGrid({
     }
     if (storageKey) {
       try {
-        sessionStorage.setItem(`grid:${storageKey}`, JSON.stringify(view));
+        sessionStorage.setItem(`grid:${storageKey}`, JSON.stringify({ ...view, base: location.pathname }));
       } catch {
         /* úložiště nedostupné */
       }
@@ -409,6 +422,13 @@ export function SmartGrid({
   }, [view, reloadKey, fetchPage, storageKey]);
 
   useEffect(() => onViewChange?.(view), [view, onViewChange]);
+  // Zrušit filtry (z lišty nad seznamem)
+  const baseKey = JSON.stringify(baseFilters ?? {});
+  useEffect(() => {
+    if (!clearKey) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setView((v) => ({ ...v, filters: JSON.parse(baseKey) }));
+  }, [clearKey, baseKey]);
 
   const selectedRows = useMemo(() => rows.filter((r) => selected.has(String(r.id))), [rows, selected]);
   useEffect(() => onSelectionChange?.(selectedRows), [selectedRows, onSelectionChange]);

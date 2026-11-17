@@ -40,7 +40,10 @@ export default async function ObjectListPage({ params, searchParams }: { params:
   const meta = fieldsMeta(s.ctx, def, t);
   const mod = registry.modules.get(module)!;
   // filtr z odkazu (?filter.pole=) už v první stránce — jinak by seznam probliknul celý a filtroval se až v prohlížeči
-  const initial = await listRecords(s.ctx, def.id, { lang: s.lang, totals: true, filters: Object.keys(initialFilters).length ? initialFilters : undefined });
+  // uložený pohled: řazení z adresy (?sort=pole&dir=desc), jen existující sloupec
+  const sort = sp.sort && sp.sort in def.fields ? sp.sort : undefined;
+  const dir = sp.dir === "desc" ? ("desc" as const) : ("asc" as const);
+  const initial = await listRecords(s.ctx, def.id, { lang: s.lang, totals: true, filters: Object.keys(initialFilters).length ? initialFilters : undefined, ...(sort ? { sort, dir } : {}) });
   // proklik z odkazu: vybraný záznam musí být v seznamu, i když není na první stránce
   if (focus && !initial.rows.some((r) => r.id === focus)) {
     const rec = await getRecord(s.ctx, def.id, focus).catch(() => null);
@@ -69,6 +72,8 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       initial={{ rows: initial.rows, total: initial.total, totals: initial.totals }}
       focusId={focus}
       initialFilters={initialFilters}
+      initialSort={sort ? { sort, dir } : undefined}
+      viewName={sp.v ? String(sp.v).slice(0, 120) : undefined}
       helpHref={helpFor(def.id) ? `/help/${helpFor(def.id)!.id}` : undefined}
       helpLabel={t("@SYS:HelpOpen")}
       bulkActions={

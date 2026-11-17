@@ -803,12 +803,37 @@ export async function historyAction(objectId: string, recordId: string): Promise
 export async function toggleFavoriteAction(href: string, label: string): Promise<boolean> {
   const s = await requireSession();
   if (!href.startsWith("/") || href.startsWith("//")) return false;
-  const key = { userId_href: { userId: s.user.id, href: href.slice(0, 255) } };
+  const key = { userId_href: { userId: s.user.id, href: href.slice(0, 1000) } };
   const exists = await prisma.sysFavorite.findUnique({ where: key });
   if (exists) await prisma.sysFavorite.delete({ where: key });
-  else await prisma.sysFavorite.create({ data: { userId: s.user.id, href: href.slice(0, 255), label: label.slice(0, 120) } });
+  else await prisma.sysFavorite.create({ data: { userId: s.user.id, href: href.slice(0, 1000), label: label.slice(0, 120) } });
   revalidatePath("/", "layout");
   return !exists;
+}
+
+/** Uložit pohled (seznam s filtry a řazením) nebo stránku do oblíbených pod názvem a do složky. */
+export async function saveFavoriteAction(href: string, label: string, folder: string): Promise<void> {
+  const s = await requireSession();
+  if (!href.startsWith("/") || href.startsWith("//") || !label.trim()) return;
+  const data = { label: label.trim().slice(0, 120), folder: folder.trim().slice(0, 60) || null };
+  await prisma.sysFavorite.upsert({
+    where: { userId_href: { userId: s.user.id, href: href.slice(0, 1000) } },
+    create: { userId: s.user.id, href: href.slice(0, 1000), ...data },
+    update: data,
+  });
+  revalidatePath("/", "layout");
+}
+
+/** Úprava oblíbených: přejmenování, složka, odebrání (jen vlastní záznamy uživatele). */
+export async function updateFavoritesAction(items: { href: string; label: string; folder: string; remove?: boolean }[]): Promise<void> {
+  const s = await requireSession();
+  for (const it of items.slice(0, 500)) {
+    const where = { userId_href: { userId: s.user.id, href: String(it.href).slice(0, 1000) } };
+    if (it.remove) await prisma.sysFavorite.deleteMany({ where: { userId: s.user.id, href: String(it.href) } });
+    else if (String(it.label).trim())
+      await prisma.sysFavorite.update({ where, data: { label: String(it.label).trim().slice(0, 120), folder: String(it.folder ?? "").trim().slice(0, 60) || null } }).catch(() => null);
+  }
+  revalidatePath("/", "layout");
 }
 
 // ---------------------------------------------------------------------------

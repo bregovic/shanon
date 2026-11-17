@@ -24,13 +24,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const favorites = await prisma.sysFavorite.findMany({
     where: { userId: s.user.id },
     orderBy: { createdAt: "asc" },
-    select: { href: true, label: true },
+    select: { href: true, label: true, folder: true },
   });
 
   return (
     <FavoritesProvider
       favorites={favorites}
-      labels={{ add: t("@SYS:AddFavorite"), remove: t("@SYS:RemoveFavorite"), title: t("@SYS:Favorites"), empty: t("@SYS:NoFavorites") }}
+      labels={{
+        add: t("@SYS:AddFavorite"),
+        remove: t("@SYS:RemoveFavorite"),
+        title: t("@SYS:Favorites"),
+        empty: t("@SYS:NoFavorites"),
+        manage: t("@SYS:FavoritesManage"),
+        name: t("@SYS:Name"),
+        folder: t("@SYS:FavoriteFolder"),
+        save: t("@SYS:Save"),
+        cancel: t("@SYS:Cancel"),
+        removeItem: t("@SYS:Delete"),
+      }}
     >
     <AppShell
       modules={modules}

@@ -173,8 +173,10 @@ model SysFileBlob {
 /// Oblíbené stránky uživatele.
 model SysFavorite {
   userId    String   @map("user_id") @db.Uuid
-  href      String   @db.VarChar(255)
+  href      String   @db.VarChar(1000)
   label     String   @db.VarChar(120)
+  /// složka v menu oblíbených (prázdná = bez složky)
+  folder    String?  @db.VarChar(60)
   createdAt DateTime @default(now()) @map("created_at")
 
   user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)

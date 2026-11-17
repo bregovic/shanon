@@ -124,3 +124,11 @@ Postup: stáhnout, upravit v Excelu, uložit jako CSV a naimportovat zpět — z
 2026-11-17;change;Testování a vývoj;Deník vývoje se plní sám a obsahuje i historii;;;"Zápisy deníku se do aplikace nahrají samy při každém nasazení na TEST i PROD. Doplněna historie od 12. 11. 2026; víc úprav jedné oblasti v jednom vydání je jeden zápis."
 2026-11-17;fix;E-shop;Banner e-shopu: menší nadpis, bez zdvojeného názvu;;;"Banner na úvodní stránce obchodu ukazuje jen vlastní nadpis (E-shop → Obchod → Nadpis); bez nadpisu, nebo když je stejný jako název obchodu, se název v banneru neopakuje — je v hlavičce. Nadpis banneru je menší a banner nižší."
 2026-11-17;fix;Systém;Import přečte zaškrtnutí „✓“ z exportu do Excelu;;;Export seznamu do Excelu zapisuje zaškrtnutá pole jako „✓“. Import ho teď přečte jako ano — dřív skončil chybou „Neplatná hodnota“, když měla některá položka zaškrtnuté např. Prodej na váhu.
+2026-11-17;feature;Systém;Uložené pohledy v oblíbených, filtry jen v rámci agendy;CR-091;;"Seznamy a oblíbené:
+
+- Nad filtrovaným seznamem je lišta „Filtrováno: …“ s **Zrušit filtry** — už se nestane, že záznamy „zmizí“ kvůli zapomenutému filtru.
+- Filtr platí, dokud seznam neopustíte na jinou agendu; návrat z detailu záznamu ho zachová.
+- **Uložit pohled** uloží filtry a řazení pod názvem do oblíbených, volitelně do složky.
+- Menu oblíbených (hvězdička v hlavičce) má složky; **Upravit oblíbené…** přejmenuje, přesune nebo odebere.
+
+Návod: Nápověda → Ovládání a klávesové zkratky."
