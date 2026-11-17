@@ -218,6 +218,7 @@ export function cellValue(f: FieldDef, raw: string, lang: Lang): [unknown, strin
       return [m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : v, null];
     }
     case "bool": {
+      if (v === "✓" || v === "✔") return [true, null]; // zaškrtnuté v exportu do Excelu
       const n = norm(v);
       if (BOOL_TRUE.has(n)) return [true, null];
       if (BOOL_FALSE.has(n)) return [false, null];
