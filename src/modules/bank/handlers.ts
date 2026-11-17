@@ -216,8 +216,9 @@ export async function importStatement(data: DataApi, account: RecordData, file: 
   return ids;
 }
 
-/** Účet pohledávek / závazků partnera otevřené položky (ze skupiny). */
+/** Účet pohledávek / závazků otevřené položky (účet, na kterém vznikla — profil; jinak ze skupiny partnera). */
 async function summaryAccount(data: DataApi, trans: RecordData, kind: "customer" | "vendor") {
+  if (trans.accountId) return String(trans.accountId);
   const partner = await data.get(kind === "customer" ? "ar.customer" : "ap.vendor", String(trans[`${kind}Id`]));
   const group = partner ? await data.get(kind === "customer" ? "ar.group" : "ap.group", String(partner.groupId)) : null;
   const acc = group?.[kind === "customer" ? "receivableAccountId" : "payableAccountId"];

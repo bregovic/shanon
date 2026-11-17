@@ -235,7 +235,11 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   (`_warnings` / `warnings`) a UI je ukáže jako `toast(…, "warning")`. Kontrola duplicit `checkDuplicate` (gl/posting.ts) podle
   výčtu `DupCheck` (přijmout / varovat / odmítnout / odmítnout ve stejném roce): číslo faktury (`ar.parameters` / `ap.parameters`,
   přijatá u téhož dodavatele), ručně zadané číslo dokladu v HK (`gl.parameters.voucherDupCheck`; `gl.voucher.voucherNum`
-  není jedinečné kvůli opravným deníkům). Účtenka na přijaté faktuře (`receipt`) = zjednodušený doklad, `tax.trans.simplified`.
+  není jedinečné kvůli opravným deníkům). Typ přijatého dokladu `ap.invoice.docType` (faktura / účtenka / dar): účtenka = zjednodušený doklad, `tax.trans.simplified`;
+  dar = bez DPH, řádek 543100, profil darů z `ap.parameters.donationProfileId` (DAR → 379).
+- Účtovací profily (`<ar|ap>.postingProfile` + řádky partner / skupina / všechny → účet salda): faktura nese `postingProfileId`
+  (výchozí z parametrů podle typu), `summaryAccountOf` v `tax/document.ts`; bez profilu účet skupiny. Položka salda si účet
+  pamatuje (`trans.accountId`) a úhrada (banka `summaryAccount`, deník s VS v `planJournal`) jde proti němu.
 - Platba DPH (`src/modules/tax/vat-payment.ts`, druh `vatPayment` přiznání, akce `postPayment`, obsluha `vatPaymentHandlers` zvlášť
   kvůli importům): zúčtování účtů DPH z `tax.trans` období proti dodavateli FÚ (`tax.parameters.taxOfficeVendorId`), položka
   `ap.trans` (VS = DIČ, splatnost 25. den) → uhrazení párováním výpisu. Tisk `vatPaymentPrintable` (QR). Druh `incomeTax` zatím

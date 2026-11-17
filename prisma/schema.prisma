@@ -271,6 +271,8 @@ model SysCompany {
   invDiscount_company              InvDiscount[]              @relation("InvDiscount_company")
   arParameters_company             ArParameters[]             @relation("ArParameters_company")
   arGroup_company                  ArGroup[]                  @relation("ArGroup_company")
+  arPostingProfile_company         ArPostingProfile[]         @relation("ArPostingProfile_company")
+  arPostingProfileLine_company     ArPostingProfileLine[]     @relation("ArPostingProfileLine_company")
   arCustomer_company               ArCustomer[]               @relation("ArCustomer_company")
   arOrder_company                  ArOrder[]                  @relation("ArOrder_company")
   arOrderLine_company              ArOrderLine[]              @relation("ArOrderLine_company")
@@ -280,6 +282,8 @@ model SysCompany {
   arTrans_company                  ArTrans[]                  @relation("ArTrans_company")
   apParameters_company             ApParameters[]             @relation("ApParameters_company")
   apGroup_company                  ApGroup[]                  @relation("ApGroup_company")
+  apPostingProfile_company         ApPostingProfile[]         @relation("ApPostingProfile_company")
+  apPostingProfileLine_company     ApPostingProfileLine[]     @relation("ApPostingProfileLine_company")
   apVendor_company                 ApVendor[]                 @relation("ApVendor_company")
   apOrder_company                  ApOrder[]                  @relation("ApOrder_company")
   apOrderLine_company              ApOrderLine[]              @relation("ApOrderLine_company")
@@ -1096,42 +1100,46 @@ model GlAccount {
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy      String?  @map("updated_by") @db.Uuid
 
-  company                         SysCompany          @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
-  itemTaxGroup                    TaxItemGroup?       @relation("GlAccount_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
-  glSystemAccount_account         GlSystemAccount[]   @relation("GlSystemAccount_account")
-  glTrans_account                 GlTrans[]           @relation("GlTrans_account")
-  glJournalName_offsetAccount     GlJournalName[]     @relation("GlJournalName_offsetAccount")
-  glJournal_offsetAccount         GlJournal[]         @relation("GlJournal_offsetAccount")
-  glJournalLine_account           GlJournalLine[]     @relation("GlJournalLine_account")
-  glJournalLine_offsetAccount     GlJournalLine[]     @relation("GlJournalLine_offsetAccount")
-  taxCode_account                 TaxCode[]           @relation("TaxCode_account")
-  taxCode_outputAccount           TaxCode[]           @relation("TaxCode_outputAccount")
-  invItemGroup_revenueAccount     InvItemGroup[]      @relation("InvItemGroup_revenueAccount")
-  invItemGroup_costAccount        InvItemGroup[]      @relation("InvItemGroup_costAccount")
-  arGroup_receivableAccount       ArGroup[]           @relation("ArGroup_receivableAccount")
-  arGroup_revenueAccount          ArGroup[]           @relation("ArGroup_revenueAccount")
-  arGroup_advanceAccount          ArGroup[]           @relation("ArGroup_advanceAccount")
-  arOrderLine_revenueAccount      ArOrderLine[]       @relation("ArOrderLine_revenueAccount")
-  arInvoiceLine_revenueAccount    ArInvoiceLine[]     @relation("ArInvoiceLine_revenueAccount")
-  apGroup_payableAccount          ApGroup[]           @relation("ApGroup_payableAccount")
-  apGroup_expenseAccount          ApGroup[]           @relation("ApGroup_expenseAccount")
-  apGroup_advanceAccount          ApGroup[]           @relation("ApGroup_advanceAccount")
-  apOrderLine_expenseAccount      ApOrderLine[]       @relation("ApOrderLine_expenseAccount")
-  apInvoiceLine_expenseAccount    ApInvoiceLine[]     @relation("ApInvoiceLine_expenseAccount")
-  bankAccount_glAccount           BankAccount[]       @relation("BankAccount_glAccount")
-  bankStatementLine_offsetAccount BankStatementLine[] @relation("BankStatementLine_offsetAccount")
-  bankPostingRule_offsetAccount   BankPostingRule[]   @relation("BankPostingRule_offsetAccount")
-  cashDesk_account                CashDesk[]          @relation("CashDesk_account")
-  cashVoucher_offsetAccount       CashVoucher[]       @relation("CashVoucher_offsetAccount")
-  posRegister_cashAccount         PosRegister[]       @relation("PosRegister_cashAccount")
-  posRegister_cardAccount         PosRegister[]       @relation("PosRegister_cardAccount")
-  posReceiptLine_revenueAccount   PosReceiptLine[]    @relation("PosReceiptLine_revenueAccount")
-  whsParameters_stockAccount      WhsParameters[]     @relation("WhsParameters_stockAccount")
-  whsParameters_inTransitAccount  WhsParameters[]     @relation("WhsParameters_inTransitAccount")
-  whsParameters_cogsAccount       WhsParameters[]     @relation("WhsParameters_cogsAccount")
-  whsParameters_lossAccount       WhsParameters[]     @relation("WhsParameters_lossAccount")
-  whsParameters_gainAccount       WhsParameters[]     @relation("WhsParameters_gainAccount")
-  whsParameters_scrapAccount      WhsParameters[]     @relation("WhsParameters_scrapAccount")
+  company                             SysCompany             @relation("GlAccount_company", fields: [companyId], references: [id], onDelete: Restrict)
+  itemTaxGroup                        TaxItemGroup?          @relation("GlAccount_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  glSystemAccount_account             GlSystemAccount[]      @relation("GlSystemAccount_account")
+  glTrans_account                     GlTrans[]              @relation("GlTrans_account")
+  glJournalName_offsetAccount         GlJournalName[]        @relation("GlJournalName_offsetAccount")
+  glJournal_offsetAccount             GlJournal[]            @relation("GlJournal_offsetAccount")
+  glJournalLine_account               GlJournalLine[]        @relation("GlJournalLine_account")
+  glJournalLine_offsetAccount         GlJournalLine[]        @relation("GlJournalLine_offsetAccount")
+  taxCode_account                     TaxCode[]              @relation("TaxCode_account")
+  taxCode_outputAccount               TaxCode[]              @relation("TaxCode_outputAccount")
+  invItemGroup_revenueAccount         InvItemGroup[]         @relation("InvItemGroup_revenueAccount")
+  invItemGroup_costAccount            InvItemGroup[]         @relation("InvItemGroup_costAccount")
+  arGroup_receivableAccount           ArGroup[]              @relation("ArGroup_receivableAccount")
+  arGroup_revenueAccount              ArGroup[]              @relation("ArGroup_revenueAccount")
+  arGroup_advanceAccount              ArGroup[]              @relation("ArGroup_advanceAccount")
+  arPostingProfileLine_summaryAccount ArPostingProfileLine[] @relation("ArPostingProfileLine_summaryAccount")
+  arOrderLine_revenueAccount          ArOrderLine[]          @relation("ArOrderLine_revenueAccount")
+  arInvoiceLine_revenueAccount        ArInvoiceLine[]        @relation("ArInvoiceLine_revenueAccount")
+  arTrans_account                     ArTrans[]              @relation("ArTrans_account")
+  apGroup_payableAccount              ApGroup[]              @relation("ApGroup_payableAccount")
+  apGroup_expenseAccount              ApGroup[]              @relation("ApGroup_expenseAccount")
+  apGroup_advanceAccount              ApGroup[]              @relation("ApGroup_advanceAccount")
+  apPostingProfileLine_summaryAccount ApPostingProfileLine[] @relation("ApPostingProfileLine_summaryAccount")
+  apOrderLine_expenseAccount          ApOrderLine[]          @relation("ApOrderLine_expenseAccount")
+  apInvoiceLine_expenseAccount        ApInvoiceLine[]        @relation("ApInvoiceLine_expenseAccount")
+  apTrans_account                     ApTrans[]              @relation("ApTrans_account")
+  bankAccount_glAccount               BankAccount[]          @relation("BankAccount_glAccount")
+  bankStatementLine_offsetAccount     BankStatementLine[]    @relation("BankStatementLine_offsetAccount")
+  bankPostingRule_offsetAccount       BankPostingRule[]      @relation("BankPostingRule_offsetAccount")
+  cashDesk_account                    CashDesk[]             @relation("CashDesk_account")
+  cashVoucher_offsetAccount           CashVoucher[]          @relation("CashVoucher_offsetAccount")
+  posRegister_cashAccount             PosRegister[]          @relation("PosRegister_cashAccount")
+  posRegister_cardAccount             PosRegister[]          @relation("PosRegister_cardAccount")
+  posReceiptLine_revenueAccount       PosReceiptLine[]       @relation("PosReceiptLine_revenueAccount")
+  whsParameters_stockAccount          WhsParameters[]        @relation("WhsParameters_stockAccount")
+  whsParameters_inTransitAccount      WhsParameters[]        @relation("WhsParameters_inTransitAccount")
+  whsParameters_cogsAccount           WhsParameters[]        @relation("WhsParameters_cogsAccount")
+  whsParameters_lossAccount           WhsParameters[]        @relation("WhsParameters_lossAccount")
+  whsParameters_gainAccount           WhsParameters[]        @relation("WhsParameters_gainAccount")
+  whsParameters_scrapAccount          WhsParameters[]        @relation("WhsParameters_scrapAccount")
 
   @@unique([tenantId, companyId, accountNum])
   @@index([tenantId, companyId])
@@ -1921,20 +1929,23 @@ model InvDiscount {
 
 /// ar.parameters — generováno z definice objektu
 model ArParameters {
-  id              String   @id @default(uuid(7)) @db.Uuid
-  tenantId        String   @map("tenant_id") @db.Uuid
-  companyId       String   @map("company_id") @db.Uuid
-  invoiceNumCheck String   @default("reject") @map("invoice_num_check") @db.VarChar(40)
-  ext             Json     @default("{}")
-  version         Int      @default(1)
-  createdAt       DateTime @default(now()) @map("created_at")
-  createdBy       String?  @map("created_by") @db.Uuid
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy       String?  @map("updated_by") @db.Uuid
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  invoiceNumCheck  String   @default("reject") @map("invoice_num_check") @db.VarChar(40)
+  postingProfileId String?  @map("posting_profile_id") @db.Uuid
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company SysCompany @relation("ArParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  company        SysCompany        @relation("ArParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  postingProfile ArPostingProfile? @relation("ArParameters_postingProfile", fields: [postingProfileId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
+  @@index([postingProfileId])
   @@map("ar_parameters")
 }
 
@@ -1958,13 +1969,14 @@ model ArGroup {
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy           String?  @map("updated_by") @db.Uuid
 
-  company           SysCompany   @relation("ArGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
-  receivableAccount GlAccount    @relation("ArGroup_receivableAccount", fields: [receivableAccountId], references: [id], onDelete: Restrict)
-  revenueAccount    GlAccount?   @relation("ArGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
-  taxGroup          TaxGroup?    @relation("ArGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  taxCode           TaxCode?     @relation("ArGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  advanceAccount    GlAccount?   @relation("ArGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
-  arCustomer_group  ArCustomer[] @relation("ArCustomer_group")
+  company                    SysCompany             @relation("ArGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  receivableAccount          GlAccount              @relation("ArGroup_receivableAccount", fields: [receivableAccountId], references: [id], onDelete: Restrict)
+  revenueAccount             GlAccount?             @relation("ArGroup_revenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  taxGroup                   TaxGroup?              @relation("ArGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  taxCode                    TaxCode?               @relation("ArGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  advanceAccount             GlAccount?             @relation("ArGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
+  arPostingProfileLine_group ArPostingProfileLine[] @relation("ArPostingProfileLine_group")
+  arCustomer_group           ArCustomer[]           @relation("ArCustomer_group")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -1974,6 +1986,61 @@ model ArGroup {
   @@index([taxCodeId])
   @@index([advanceAccountId])
   @@map("ar_group")
+}
+
+/// ar.postingProfile — generováno z definice objektu
+model ArPostingProfile {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company                      SysCompany             @relation("ArPostingProfile_company", fields: [companyId], references: [id], onDelete: Restrict)
+  arParameters_postingProfile  ArParameters[]         @relation("ArParameters_postingProfile")
+  arPostingProfileLine_profile ArPostingProfileLine[] @relation("ArPostingProfileLine_profile")
+  arInvoice_postingProfile     ArInvoice[]            @relation("ArInvoice_postingProfile")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("ar_posting_profile")
+}
+
+/// ar.postingProfileLine — generováno z definice objektu
+model ArPostingProfileLine {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  profileId        String   @map("profile_id") @db.Uuid
+  accountCode      String   @default("all") @map("account_code") @db.VarChar(40)
+  customerId       String?  @map("customer_id") @db.Uuid
+  groupId          String?  @map("group_id") @db.Uuid
+  summaryAccountId String   @map("summary_account_id") @db.Uuid
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  company        SysCompany       @relation("ArPostingProfileLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  profile        ArPostingProfile @relation("ArPostingProfileLine_profile", fields: [profileId], references: [id], onDelete: Restrict)
+  customer       ArCustomer?      @relation("ArPostingProfileLine_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  group          ArGroup?         @relation("ArPostingProfileLine_group", fields: [groupId], references: [id], onDelete: Restrict)
+  summaryAccount GlAccount        @relation("ArPostingProfileLine_summaryAccount", fields: [summaryAccountId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([profileId])
+  @@index([customerId])
+  @@index([groupId])
+  @@index([summaryAccountId])
+  @@map("ar_posting_profile_line")
 }
 
 /// ar.customer — generováno z definice objektu
@@ -2005,22 +2072,23 @@ model ArCustomer {
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy       String?  @map("updated_by") @db.Uuid
 
-  company                      SysCompany          @relation("ArCustomer_company", fields: [companyId], references: [id], onDelete: Restrict)
-  subject                      GabSubject?         @relation("ArCustomer_subject", fields: [subjectId], references: [id], onDelete: Restrict)
-  group                        ArGroup?            @relation("ArCustomer_group", fields: [groupId], references: [id], onDelete: Restrict)
-  taxGroup                     TaxGroup?           @relation("ArCustomer_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  currency                     SysCurrency?        @relation("ArCustomer_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  bankAccount                  GabBankAccount?     @relation("ArCustomer_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
-  paymentMethod                BankPaymentMethod?  @relation("ArCustomer_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
-  glJournal_offsetCustomer     GlJournal[]         @relation("GlJournal_offsetCustomer")
-  glJournalLine_customer       GlJournalLine[]     @relation("GlJournalLine_customer")
-  glJournalLine_offsetCustomer GlJournalLine[]     @relation("GlJournalLine_offsetCustomer")
-  arOrder_customer             ArOrder[]           @relation("ArOrder_customer")
-  arInvoice_customer           ArInvoice[]         @relation("ArInvoice_customer")
-  arAdvance_customer           ArAdvance[]         @relation("ArAdvance_customer")
-  arTrans_customer             ArTrans[]           @relation("ArTrans_customer")
-  bankStatementLine_customer   BankStatementLine[] @relation("BankStatementLine_customer")
-  intDocument_customer         IntDocument[]       @relation("IntDocument_customer")
+  company                       SysCompany             @relation("ArCustomer_company", fields: [companyId], references: [id], onDelete: Restrict)
+  subject                       GabSubject?            @relation("ArCustomer_subject", fields: [subjectId], references: [id], onDelete: Restrict)
+  group                         ArGroup?               @relation("ArCustomer_group", fields: [groupId], references: [id], onDelete: Restrict)
+  taxGroup                      TaxGroup?              @relation("ArCustomer_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  currency                      SysCurrency?           @relation("ArCustomer_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  bankAccount                   GabBankAccount?        @relation("ArCustomer_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  paymentMethod                 BankPaymentMethod?     @relation("ArCustomer_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  glJournal_offsetCustomer      GlJournal[]            @relation("GlJournal_offsetCustomer")
+  glJournalLine_customer        GlJournalLine[]        @relation("GlJournalLine_customer")
+  glJournalLine_offsetCustomer  GlJournalLine[]        @relation("GlJournalLine_offsetCustomer")
+  arPostingProfileLine_customer ArPostingProfileLine[] @relation("ArPostingProfileLine_customer")
+  arOrder_customer              ArOrder[]              @relation("ArOrder_customer")
+  arInvoice_customer            ArInvoice[]            @relation("ArInvoice_customer")
+  arAdvance_customer            ArAdvance[]            @relation("ArAdvance_customer")
+  arTrans_customer              ArTrans[]              @relation("ArTrans_customer")
+  bankStatementLine_customer    BankStatementLine[]    @relation("BankStatementLine_customer")
+  intDocument_customer          IntDocument[]          @relation("IntDocument_customer")
 
   @@unique([tenantId, companyId, accountNum])
   @@unique([tenantId, companyId, subjectId])
@@ -2133,39 +2201,41 @@ model ArOrderLine {
 
 /// ar.invoice — generováno z definice objektu
 model ArInvoice {
-  id              String    @id @default(uuid(7)) @db.Uuid
-  tenantId        String    @map("tenant_id") @db.Uuid
-  companyId       String    @map("company_id") @db.Uuid
-  invoiceNum      String    @map("invoice_num") @db.VarChar(20)
-  customerId      String    @map("customer_id") @db.Uuid
-  invoiceDate     DateTime  @default(now()) @map("invoice_date") @db.Date
-  taxDate         DateTime? @map("tax_date") @db.Date
-  dueDate         DateTime? @map("due_date") @db.Date
-  currencyId      String?   @map("currency_id") @db.Uuid
-  taxGroupId      String?   @map("tax_group_id") @db.Uuid
-  vs              String?   @db.VarChar(10)
-  description     String?   @db.VarChar(255)
-  amountNet       Decimal?  @map("amount_net") @db.Decimal(18, 2)
-  taxAmount       Decimal?  @map("tax_amount") @db.Decimal(18, 2)
-  roundingAmount  Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
-  bankAccountId   String?   @map("bank_account_id") @db.Uuid
-  paymentMethodId String?   @map("payment_method_id") @db.Uuid
-  amountGross     Decimal?  @map("amount_gross") @db.Decimal(18, 2)
-  paidAmount      Decimal?  @map("paid_amount") @db.Decimal(18, 2)
-  status          String    @default("draft") @db.VarChar(40)
-  voucherId       String?   @map("voucher_id") @db.Uuid
-  orderId         String?   @map("order_id") @db.Uuid
-  advanceId       String?   @map("advance_id") @db.Uuid
-  advanceAmount   Decimal?  @map("advance_amount") @db.Decimal(18, 2)
-  emailedAt       DateTime? @map("emailed_at")
-  ext             Json      @default("{}")
-  version         Int       @default(1)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  createdBy       String?   @map("created_by") @db.Uuid
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy       String?   @map("updated_by") @db.Uuid
+  id               String    @id @default(uuid(7)) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  invoiceNum       String    @map("invoice_num") @db.VarChar(20)
+  postingProfileId String?   @map("posting_profile_id") @db.Uuid
+  customerId       String    @map("customer_id") @db.Uuid
+  invoiceDate      DateTime  @default(now()) @map("invoice_date") @db.Date
+  taxDate          DateTime? @map("tax_date") @db.Date
+  dueDate          DateTime? @map("due_date") @db.Date
+  currencyId       String?   @map("currency_id") @db.Uuid
+  taxGroupId       String?   @map("tax_group_id") @db.Uuid
+  vs               String?   @db.VarChar(10)
+  description      String?   @db.VarChar(255)
+  amountNet        Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount        Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  roundingAmount   Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
+  bankAccountId    String?   @map("bank_account_id") @db.Uuid
+  paymentMethodId  String?   @map("payment_method_id") @db.Uuid
+  amountGross      Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  paidAmount       Decimal?  @map("paid_amount") @db.Decimal(18, 2)
+  status           String    @default("draft") @db.VarChar(40)
+  voucherId        String?   @map("voucher_id") @db.Uuid
+  orderId          String?   @map("order_id") @db.Uuid
+  advanceId        String?   @map("advance_id") @db.Uuid
+  advanceAmount    Decimal?  @map("advance_amount") @db.Decimal(18, 2)
+  emailedAt        DateTime? @map("emailed_at")
+  ext              Json      @default("{}")
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  createdBy        String?   @map("created_by") @db.Uuid
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?   @map("updated_by") @db.Uuid
 
   company               SysCompany         @relation("ArInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
+  postingProfile        ArPostingProfile?  @relation("ArInvoice_postingProfile", fields: [postingProfileId], references: [id], onDelete: Restrict)
   customer              ArCustomer         @relation("ArInvoice_customer", fields: [customerId], references: [id], onDelete: Restrict)
   currency              SysCurrency?       @relation("ArInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   taxGroup              TaxGroup?          @relation("ArInvoice_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
@@ -2179,6 +2249,7 @@ model ArInvoice {
   arTrans_invoice       ArTrans[]          @relation("ArTrans_invoice")
 
   @@index([tenantId, companyId])
+  @@index([postingProfileId])
   @@index([customerId])
   @@index([currencyId])
   @@index([taxGroupId])
@@ -2305,6 +2376,7 @@ model ArTrans {
   amountCur   Decimal?  @map("amount_cur") @db.Decimal(18, 2)
   paidAmount  Decimal?  @map("paid_amount") @db.Decimal(18, 2)
   closed      Boolean   @default(false)
+  accountId   String?   @map("account_id") @db.Uuid
   ext         Json      @default("{}")
   version     Int       @default(1)
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -2318,6 +2390,7 @@ model ArTrans {
   advance                         ArAdvance?          @relation("ArTrans_advance", fields: [advanceId], references: [id], onDelete: Restrict)
   voucher                         GlVoucher?          @relation("ArTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   currency                        SysCurrency?        @relation("ArTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  account                         GlAccount?          @relation("ArTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
   bankStatementLine_customerTrans BankStatementLine[] @relation("BankStatementLine_customerTrans")
 
   @@index([tenantId, companyId])
@@ -2326,25 +2399,32 @@ model ArTrans {
   @@index([advanceId])
   @@index([voucherId])
   @@index([currencyId])
+  @@index([accountId])
   @@map("ar_trans")
 }
 
 /// ap.parameters — generováno z definice objektu
 model ApParameters {
-  id              String   @id @default(uuid(7)) @db.Uuid
-  tenantId        String   @map("tenant_id") @db.Uuid
-  companyId       String   @map("company_id") @db.Uuid
-  invoiceNumCheck String   @default("reject") @map("invoice_num_check") @db.VarChar(40)
-  ext             Json     @default("{}")
-  version         Int      @default(1)
-  createdAt       DateTime @default(now()) @map("created_at")
-  createdBy       String?  @map("created_by") @db.Uuid
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy       String?  @map("updated_by") @db.Uuid
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  invoiceNumCheck   String   @default("reject") @map("invoice_num_check") @db.VarChar(40)
+  postingProfileId  String?  @map("posting_profile_id") @db.Uuid
+  donationProfileId String?  @map("donation_profile_id") @db.Uuid
+  ext               Json     @default("{}")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at")
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy         String?  @map("updated_by") @db.Uuid
 
-  company SysCompany @relation("ApParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  company         SysCompany        @relation("ApParameters_company", fields: [companyId], references: [id], onDelete: Restrict)
+  postingProfile  ApPostingProfile? @relation("ApParameters_postingProfile", fields: [postingProfileId], references: [id], onDelete: Restrict)
+  donationProfile ApPostingProfile? @relation("ApParameters_donationProfile", fields: [donationProfileId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
+  @@index([postingProfileId])
+  @@index([donationProfileId])
   @@map("ap_parameters")
 }
 
@@ -2368,13 +2448,14 @@ model ApGroup {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company        SysCompany @relation("ApGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
-  payableAccount GlAccount  @relation("ApGroup_payableAccount", fields: [payableAccountId], references: [id], onDelete: Restrict)
-  expenseAccount GlAccount? @relation("ApGroup_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
-  taxGroup       TaxGroup?  @relation("ApGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  taxCode        TaxCode?   @relation("ApGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  advanceAccount GlAccount? @relation("ApGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
-  apVendor_group ApVendor[] @relation("ApVendor_group")
+  company                    SysCompany             @relation("ApGroup_company", fields: [companyId], references: [id], onDelete: Restrict)
+  payableAccount             GlAccount              @relation("ApGroup_payableAccount", fields: [payableAccountId], references: [id], onDelete: Restrict)
+  expenseAccount             GlAccount?             @relation("ApGroup_expenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  taxGroup                   TaxGroup?              @relation("ApGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  taxCode                    TaxCode?               @relation("ApGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  advanceAccount             GlAccount?             @relation("ApGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
+  apPostingProfileLine_group ApPostingProfileLine[] @relation("ApPostingProfileLine_group")
+  apVendor_group             ApVendor[]             @relation("ApVendor_group")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -2384,6 +2465,62 @@ model ApGroup {
   @@index([taxCodeId])
   @@index([advanceAccountId])
   @@map("ap_group")
+}
+
+/// ap.postingProfile — generováno z definice objektu
+model ApPostingProfile {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company                      SysCompany             @relation("ApPostingProfile_company", fields: [companyId], references: [id], onDelete: Restrict)
+  apParameters_postingProfile  ApParameters[]         @relation("ApParameters_postingProfile")
+  apParameters_donationProfile ApParameters[]         @relation("ApParameters_donationProfile")
+  apPostingProfileLine_profile ApPostingProfileLine[] @relation("ApPostingProfileLine_profile")
+  apInvoice_postingProfile     ApInvoice[]            @relation("ApInvoice_postingProfile")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("ap_posting_profile")
+}
+
+/// ap.postingProfileLine — generováno z definice objektu
+model ApPostingProfileLine {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  profileId        String   @map("profile_id") @db.Uuid
+  accountCode      String   @default("all") @map("account_code") @db.VarChar(40)
+  vendorId         String?  @map("vendor_id") @db.Uuid
+  groupId          String?  @map("group_id") @db.Uuid
+  summaryAccountId String   @map("summary_account_id") @db.Uuid
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  company        SysCompany       @relation("ApPostingProfileLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  profile        ApPostingProfile @relation("ApPostingProfileLine_profile", fields: [profileId], references: [id], onDelete: Restrict)
+  vendor         ApVendor?        @relation("ApPostingProfileLine_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  group          ApGroup?         @relation("ApPostingProfileLine_group", fields: [groupId], references: [id], onDelete: Restrict)
+  summaryAccount GlAccount        @relation("ApPostingProfileLine_summaryAccount", fields: [summaryAccountId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([profileId])
+  @@index([vendorId])
+  @@index([groupId])
+  @@index([summaryAccountId])
+  @@map("ap_posting_profile_line")
 }
 
 /// ap.vendor — generováno z definice objektu
@@ -2427,6 +2564,7 @@ model ApVendor {
   glJournalLine_offsetVendor    GlJournalLine[]        @relation("GlJournalLine_offsetVendor")
   taxParameters_taxOfficeVendor TaxParameters[]        @relation("TaxParameters_taxOfficeVendor")
   invItem_vendor                InvItem[]              @relation("InvItem_vendor")
+  apPostingProfileLine_vendor   ApPostingProfileLine[] @relation("ApPostingProfileLine_vendor")
   apOrder_vendor                ApOrder[]              @relation("ApOrder_vendor")
   apInvoice_vendor              ApInvoice[]            @relation("ApInvoice_vendor")
   apAdvance_vendor              ApAdvance[]            @relation("ApAdvance_vendor")
@@ -2548,50 +2686,53 @@ model ApOrderLine {
 
 /// ap.invoice — generováno z definice objektu
 model ApInvoice {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
-  companyId      String    @map("company_id") @db.Uuid
-  invoiceNum     String    @map("invoice_num") @db.VarChar(20)
-  externalNum    String?   @map("external_num") @db.VarChar(20)
-  receipt        Boolean   @default(false)
-  vendorId       String    @map("vendor_id") @db.Uuid
-  invoiceDate    DateTime  @default(now()) @map("invoice_date") @db.Date
-  taxDate        DateTime? @map("tax_date") @db.Date
-  dueDate        DateTime? @map("due_date") @db.Date
-  currencyId     String?   @map("currency_id") @db.Uuid
-  taxGroupId     String?   @map("tax_group_id") @db.Uuid
-  vs             String?   @db.VarChar(10)
-  description    String?   @db.VarChar(255)
-  amountNet      Decimal?  @map("amount_net") @db.Decimal(18, 2)
-  taxAmount      Decimal?  @map("tax_amount") @db.Decimal(18, 2)
-  roundingAmount Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
-  amountGross    Decimal?  @map("amount_gross") @db.Decimal(18, 2)
-  paidAmount     Decimal?  @map("paid_amount") @db.Decimal(18, 2)
-  status         String    @default("draft") @db.VarChar(40)
-  voucherId      String?   @map("voucher_id") @db.Uuid
-  orderId        String?   @map("order_id") @db.Uuid
-  advanceId      String?   @map("advance_id") @db.Uuid
-  advanceAmount  Decimal?  @map("advance_amount") @db.Decimal(18, 2)
-  emailedAt      DateTime? @map("emailed_at")
-  ext            Json      @default("{}")
-  version        Int       @default(1)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  createdBy      String?   @map("created_by") @db.Uuid
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy      String?   @map("updated_by") @db.Uuid
+  id               String    @id @default(uuid(7)) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  invoiceNum       String    @map("invoice_num") @db.VarChar(20)
+  externalNum      String?   @map("external_num") @db.VarChar(20)
+  docType          String    @default("invoice") @map("doc_type") @db.VarChar(40)
+  postingProfileId String?   @map("posting_profile_id") @db.Uuid
+  vendorId         String    @map("vendor_id") @db.Uuid
+  invoiceDate      DateTime  @default(now()) @map("invoice_date") @db.Date
+  taxDate          DateTime? @map("tax_date") @db.Date
+  dueDate          DateTime? @map("due_date") @db.Date
+  currencyId       String?   @map("currency_id") @db.Uuid
+  taxGroupId       String?   @map("tax_group_id") @db.Uuid
+  vs               String?   @db.VarChar(10)
+  description      String?   @db.VarChar(255)
+  amountNet        Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount        Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  roundingAmount   Decimal?  @map("rounding_amount") @db.Decimal(18, 2)
+  amountGross      Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  paidAmount       Decimal?  @map("paid_amount") @db.Decimal(18, 2)
+  status           String    @default("draft") @db.VarChar(40)
+  voucherId        String?   @map("voucher_id") @db.Uuid
+  orderId          String?   @map("order_id") @db.Uuid
+  advanceId        String?   @map("advance_id") @db.Uuid
+  advanceAmount    Decimal?  @map("advance_amount") @db.Decimal(18, 2)
+  emailedAt        DateTime? @map("emailed_at")
+  ext              Json      @default("{}")
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  createdBy        String?   @map("created_by") @db.Uuid
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?   @map("updated_by") @db.Uuid
 
-  company               SysCompany      @relation("ApInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
-  vendor                ApVendor        @relation("ApInvoice_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
-  currency              SysCurrency?    @relation("ApInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  taxGroup              TaxGroup?       @relation("ApInvoice_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  voucher               GlVoucher?      @relation("ApInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
-  order                 ApOrder?        @relation("ApInvoice_order", fields: [orderId], references: [id], onDelete: Restrict)
-  advance               ApAdvance?      @relation("ApInvoice_advance", fields: [advanceId], references: [id], onDelete: Restrict)
-  apOrder_invoice       ApOrder[]       @relation("ApOrder_invoice")
-  apInvoiceLine_invoice ApInvoiceLine[] @relation("ApInvoiceLine_invoice")
-  apTrans_invoice       ApTrans[]       @relation("ApTrans_invoice")
+  company               SysCompany        @relation("ApInvoice_company", fields: [companyId], references: [id], onDelete: Restrict)
+  postingProfile        ApPostingProfile? @relation("ApInvoice_postingProfile", fields: [postingProfileId], references: [id], onDelete: Restrict)
+  vendor                ApVendor          @relation("ApInvoice_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  currency              SysCurrency?      @relation("ApInvoice_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxGroup              TaxGroup?         @relation("ApInvoice_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  voucher               GlVoucher?        @relation("ApInvoice_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  order                 ApOrder?          @relation("ApInvoice_order", fields: [orderId], references: [id], onDelete: Restrict)
+  advance               ApAdvance?        @relation("ApInvoice_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  apOrder_invoice       ApOrder[]         @relation("ApOrder_invoice")
+  apInvoiceLine_invoice ApInvoiceLine[]   @relation("ApInvoiceLine_invoice")
+  apTrans_invoice       ApTrans[]         @relation("ApTrans_invoice")
 
   @@index([tenantId, companyId])
+  @@index([postingProfileId])
   @@index([vendorId])
   @@index([currencyId])
   @@index([taxGroupId])
@@ -2717,6 +2858,7 @@ model ApTrans {
   amountCur   Decimal?  @map("amount_cur") @db.Decimal(18, 2)
   paidAmount  Decimal?  @map("paid_amount") @db.Decimal(18, 2)
   closed      Boolean   @default(false)
+  accountId   String?   @map("account_id") @db.Uuid
   ext         Json      @default("{}")
   version     Int       @default(1)
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -2730,6 +2872,7 @@ model ApTrans {
   advance                          ApAdvance?             @relation("ApTrans_advance", fields: [advanceId], references: [id], onDelete: Restrict)
   voucher                          GlVoucher?             @relation("ApTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   currency                         SysCurrency?           @relation("ApTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  account                          GlAccount?             @relation("ApTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
   bankStatementLine_vendorTrans    BankStatementLine[]    @relation("BankStatementLine_vendorTrans")
   bankPaymentOrderLine_vendorTrans BankPaymentOrderLine[] @relation("BankPaymentOrderLine_vendorTrans")
 
@@ -2739,6 +2882,7 @@ model ApTrans {
   @@index([advanceId])
   @@index([voucherId])
   @@index([currencyId])
+  @@index([accountId])
   @@map("ap_trans")
 }
 

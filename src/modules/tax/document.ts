@@ -40,8 +40,10 @@ export interface InvoiceConfig {
   side: 1 | -1;
   /** stavy hlavičky, ve kterých se řádky nemění (výchozí: zaúčtováno) */
   lockedStatuses?: string[];
-  /** parametry pomocné knihy (kontrola čísla faktury) */
+  /** parametry pomocné knihy (kontrola čísla faktury, výchozí účtovací profily) */
   parameters?: string;
+  /** řádky účtovacích profilů (účet salda podle partnera / skupiny / všech) */
+  profileLine?: string;
   /** zálohy partnera: objekt zálohy a pole účtu záloh ve skupině */
   advance?: { object: string; groupAccountField: string; defaultAccount: string };
 }
@@ -73,6 +75,37 @@ async function partnerAndGroup(data: DataApi, cfg: InvoiceConfig, partnerId: unk
   const group = await data.get(cfg.groupObject, String(partner.groupId));
   if (!group) throw new UserError("@SYS:InvalidValue");
   return { partner, group };
+}
+
+/**
+ * Účet salda dokladu: řádek účtovacího profilu pro partnera, jinak pro jeho skupinu, jinak pro všechny;
+ * bez profilu (nebo bez vhodného řádku) účet závazků / pohledávek ze skupiny partnera.
+ */
+export async function summaryAccountOf(data: DataApi, cfg: InvoiceConfig, profileId: unknown, partner: RecordData, group: RecordData): Promise<string> {
+  if (profileId && cfg.profileLine) {
+    const lines = await data.find(cfg.profileLine, { profileId: String(profileId) }, { take: 500 });
+    const hit =
+      lines.find((l) => l.accountCode === "partner" && l[cfg.partnerField] === partner.id) ??
+      lines.find((l) => l.accountCode === "group" && l.groupId === group.id) ??
+      lines.find((l) => l.accountCode === "all");
+    if (hit?.summaryAccountId) return String(hit.summaryAccountId);
+  }
+  if (!group[cfg.groupSummaryField]) throw new UserError("@SYS:InvalidValue");
+  return String(group[cfg.groupSummaryField]);
+}
+
+/** Výchozí účtovací profil podle typu dokladu (dar → profil darů, jinak výchozí profil z parametrů). */
+async function defaultProfile(data: DataApi, cfg: InvoiceConfig, docType: unknown): Promise<string | null> {
+  if (!cfg.parameters) return null;
+  const [p] = await data.find(cfg.parameters, {}, { take: 1 });
+  if (!p) return null;
+  return ((docType === "donation" ? p.donationProfileId : p.postingProfileId) as string) ?? null;
+}
+
+/** Výchozí účet nákladů daru: 543100 (odčitatelné dary), jinak první účet syntetiky 543. */
+async function donationAccount(data: DataApi): Promise<string | null> {
+  const [a] = await data.find("gl.account", { accountNum: "543100", blocked: false }, { take: 1 });
+  return a ? String(a.id) : postingAccount(data, "543");
 }
 
 async function assertDraft(data: DataApi, cfg: InvoiceConfig, headerId: unknown) {
@@ -124,6 +157,14 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         const partnerGroup = await partnerTaxGroup(ctx.data, cfg.partnerObject, cfg.groupObject, data[cfg.partnerField]);
         const oldGroup = before && before[cfg.partnerField] !== data[cfg.partnerField] ? await partnerTaxGroup(ctx.data, cfg.partnerObject, cfg.groupObject, before[cfg.partnerField]) : undefined;
         if (!data.taxGroupId || (oldGroup !== undefined && data.taxGroupId === oldGroup)) data.taxGroupId = partnerGroup;
+        // dar je bez DPH — bez skupiny DPH (řádky ji pak nemají a kód nevznikne)
+        if (data.docType === "donation") data.taxGroupId = null;
+        // účtovací profil podle typu dokladu (nový doklad, jiný typ; ručně zvolený profil zůstane)
+        if (cfg.profileLine) {
+          const typeChanged = !!before && (before.docType ?? null) !== (data.docType ?? null);
+          const wasDefault = !before || !data.postingProfileId || data.postingProfileId === (await defaultProfile(ctx.data, cfg, before.docType));
+          if (isNew ? !data.postingProfileId : typeChanged && wasDefault) data.postingProfileId = await defaultProfile(ctx.data, cfg, data.docType);
+        }
         // jiná skupina DPH na hlavičce: řádky se starou skupinou ji po uložení převezmou (afterSave)
         if (before && (before.taxGroupId ?? null) !== (data.taxGroupId ?? null)) groupChanged.set(String(data.id), (before.taxGroupId as string) ?? null);
         else if (data.id) groupChanged.delete(String(data.id));
@@ -182,6 +223,10 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
       },
       async afterSave(ctx, data) {
         const key = String(data.id);
+        // dar: řádky bez DPH (řádek si při uložení daň sám vynuluje)
+        if (data.docType === "donation")
+          for (const l of await ctx.data.find(cfg.line, { [cfg.lineHeaderField]: data.id }, { take: 1000 }))
+            if (l.taxCodeId || l.taxGroupId || l.itemTaxGroupId || toCents(l.taxAmount ?? "0") !== BigInt(0)) await ctx.data.update(cfg.line, String(l.id), { taxCodeId: null });
         const oldCur = currencyChanged.get(key);
         if (oldCur) {
           currencyChanged.delete(key);
@@ -258,7 +303,9 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         if (!data.description) missing.description = "@SYS:Required";
         if (data.unitPrice === null || data.unitPrice === undefined || data.unitPrice === "") missing.unitPrice = "@SYS:Required";
         if (Object.keys(missing).length) return missing;
-        // výchozí hodnoty jen u nového řádku — uživatel může DPH i účet změnit
+        const donation = h.docType === "donation";
+        // výchozí hodnoty jen u nového řádku — uživatel může DPH i účet změnit (dar: účet darů 543)
+        if (isNew && !data[cfg.lineAccountField] && donation) data[cfg.lineAccountField] = await donationAccount(ctx.data);
         if (isNew && !data[cfg.lineAccountField]) data[cfg.lineAccountField] = group[cfg.groupLineAccountField] ?? null;
         if (isNew && !data.taxCodeId) data.taxCodeId = group.taxCodeId ?? null;
         if (!data[cfg.lineAccountField]) return { [cfg.lineAccountField]: "@SYS:Required" };
@@ -275,6 +322,8 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         data.taxCodeId = userCode;
         await resolveLineCode(ctx.data, data, before, cfg.side === 1 ? "sales" : "purchase");
         data.taxCodeId ??= legacy;
+        // dar: bez DPH (nevzniká daňová transakce, nejde do přiznání ani KH)
+        if (donation) Object.assign(data, { taxCodeId: null, taxGroupId: null, itemTaxGroupId: null });
         const net = mulCents(data.qty ?? "1", 4, data.unitPrice ?? "0", 2);
         const code = data.taxCodeId ? await ctx.data.get("tax.taxCode", String(data.taxCodeId)) : null;
         data.amountNet = fromCents(net);
@@ -302,16 +351,21 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
  */
 export async function postInvoice(data: DataApi, companyId: string | null, cfg: InvoiceConfig, header: RecordData) {
   if (header.status !== "draft") throw new UserError("@GL:Locked");
-  // účtenka (zjednodušený daňový doklad) může být bez čísla dokladu dodavatele — pak naše číslo
-  if (!header[cfg.docNumField] && !header.receipt) throw new UserError("@SYS:FixErrors", {}, { [cfg.docNumField]: "@SYS:Required" });
+  const receipt = header.docType === "receipt";
+  const donation = header.docType === "donation";
+  // účtenka (zjednodušený daňový doklad) a dar mohou být bez čísla dokladu dodavatele — pak naše číslo
+  if (!header[cfg.docNumField] && !receipt && !donation) throw new UserError("@SYS:FixErrors", {}, { [cfg.docNumField]: "@SYS:Required" });
   const lines = await data.find(cfg.line, { [cfg.lineHeaderField]: header.id });
   if (!lines.length) throw new UserError("@GL:NoLines");
   // plátce DPH: každý řádek musí mít daňový kód, jinak by DPH nevzniklo a chybělo v přiznání
   const org = await data.find("org.entity", {}, { take: 1 }).catch(() => [] as RecordData[]);
   const vatPayer = org.length ? org[0].vatPayer !== false : true;
-  const noCode = vatPayer ? lines.find((l) => !l.taxCodeId) : undefined;
+  const noCode = vatPayer && !donation ? lines.find((l) => !l.taxCodeId) : undefined;
   if (noCode) throw new UserError("@TAX:NoTaxCode", { line: String(noCode.description ?? "") });
+  const withTax = donation ? lines.find((l) => l.taxCodeId || toCents(l.taxAmount ?? "0") !== BigInt(0)) : undefined;
+  if (withTax) throw new UserError("@TAX:DonationWithTax", { line: String(withTax.description ?? "") });
   const { partner, group } = await partnerAndGroup(data, cfg, header[cfg.partnerField]);
+  const summaryAcc = await summaryAccountOf(data, cfg, header.postingProfileId, partner, group);
   const subject = partner.subjectId ? await data.get("gab.subject", String(partner.subjectId)) : null;
   const date = String(header.invoiceDate);
   const taxDate = String(header.taxDate ?? date);
@@ -387,7 +441,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
   }
   // pohledávka MD / závazek D — celkem s DPH
   posting.push({
-    accountId: String(group[cfg.groupSummaryField]),
+    accountId: summaryAcc,
     amount: fromCents(s * grossAcc),
     amountCur: fromCents(s * grossCur),
     currencyId: curId,
@@ -418,7 +472,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
         advCode = await data.get("tax.taxCode", String(adv.taxCodeId));
         posting.push({ accountId: String(advCode!.accountId), amount: fromCents(s * advTax), amountCur: fromCents(s * advTax), currencyId: curId, text: String(adv.taxDocNum ?? adv.advanceNum) });
       }
-      posting.push({ accountId: String(group[cfg.groupSummaryField]), amount: fromCents(-s * advAcc), amountCur: fromCents(-s * advCur), currencyId: curId, text: String(adv.advanceNum) });
+      posting.push({ accountId: summaryAcc, amount: fromCents(-s * advAcc), amountCur: fromCents(-s * advCur), currencyId: curId, text: String(adv.advanceNum) });
     }
   }
 
@@ -439,7 +493,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
       await data.create("tax.trans", {
         ...part,
         // oddíl KH podle dokladu: jednotlivě (A.4 / B.2) jen od 10 000 Kč s DIČ, jinak souhrnně (A.5 / B.3)
-        ...(khSectionOf(part.khSection ?? codeRecs.get(codeId)!.khSection, grossAcc, subject?.vatId, !!header.receipt) ?? {}),
+        ...(khSectionOf(part.khSection ?? codeRecs.get(codeId)!.khSection, grossAcc, subject?.vatId, receipt) ?? {}),
         taxDate,
         currencyId: curId,
         baseCur: fromCents(t.baseCur),
@@ -451,7 +505,7 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
         sourceObject: cfg.header,
         sourceId: String(header.id),
         // účtenka → KH souhrnně (B.3 / A.5)
-        simplified: !!header.receipt,
+        simplified: receipt,
       });
   }
   // odpočet DPH zálohy v daňových transakcích (záporný základ a daň k DUZP faktury)
@@ -488,6 +542,8 @@ export async function postInvoice(data: DataApi, companyId: string | null, cfg: 
     amountCur: fromCents(grossCur),
     paidAmount: fromCents(advCur),
     closed: advCur >= grossCur,
+    // úhrada (banka, deník) se zaúčtuje proti účtu, na kterém závazek / pohledávka vznikla
+    accountId: summaryAcc,
   });
   if (adv && advCur > BigInt(0)) {
     const settled = toCents(adv.settledAmount) + advCur;

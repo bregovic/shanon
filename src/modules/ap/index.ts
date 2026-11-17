@@ -19,6 +19,7 @@ export const ap = partnerLedger({
   advanceSeq: "APADV",
   advanceAccount: "314",
   externalNum: true,
+  donationProfile: { code: "DAR", name: "Dary", summary: "379" },
 });
 
 export default defineModule({

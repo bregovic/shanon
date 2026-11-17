@@ -132,6 +132,16 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
       if (!off) errors.push({ ref: "@GL:LineAccountMissing", params: { line: String(n) } });
       else legs.push({ ...off, line: l, lineNo: n, amount: -amount, currencyId, amountCur: neg(amountCur), dims: offsetDimsOf(l) });
     }
+    // úhrada s VS otevřené faktury partnera: účet salda, na kterém faktura vznikla (účtovací profil, např. dar 379)
+    if (l.vs) {
+      for (const x of legs) {
+        if (!x.partner) continue;
+        const obj = x.partner.kind === "customer" ? "ar.trans" : "ap.trans";
+        const field = x.partner.kind === "customer" ? "customerId" : "vendorId";
+        const [tr] = await data.find(obj, { [field]: x.partner.rec.id, kind: "invoice", vs: l.vs, closed: false }, { take: 1 });
+        if (tr?.accountId) x.accountId = String(tr.accountId);
+      }
+    }
     // DPH: základ na straně účtu hlavní knihy, řádek daně (u samovyměření MD i D), protistrana s daní
     if (l.taxCodeId) {
       let code: RecordData | null = null;

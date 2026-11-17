@@ -50,6 +50,28 @@ export const AdvanceStatus = defineEnum({
   ],
 });
 
+/** Typ přijatého dokladu: faktura, účtenka (zjednodušený daňový doklad), dar (bez DPH, účet darů). */
+export const InvoiceDocType = defineEnum({
+  id: "InvoiceDocType",
+  label: "@TAX:DocType",
+  values: [
+    { value: "invoice", label: "@TAX:DocTypeInvoice" },
+    { value: "receipt", label: "@TAX:Receipt" },
+    { value: "donation", label: "@TAX:DocTypeDonation", color: "brand" },
+  ],
+});
+
+/** Pro koho platí řádek účtovacího profilu (jako Account code v AX: tabulka / skupina / vše). */
+export const ProfileAccountCode = defineEnum({
+  id: "ProfileAccountCode",
+  label: "@TAX:ProfileAccountCode",
+  values: [
+    { value: "partner", label: "@TAX:ProfileForPartner" },
+    { value: "group", label: "@TAX:ProfileForGroup" },
+    { value: "all", label: "@TAX:ProfileForAll" },
+  ],
+});
+
 export interface PartnerLedgerSpec {
   /** id modulu, např. "ar" */
   module: string;
@@ -69,6 +91,8 @@ export interface PartnerLedgerSpec {
   advanceAccount: string;
   /** u přijatých faktur číslo dokladu dodavatele */
   externalNum?: boolean;
+  /** výchozí účtovací profil darů (přijaté doklady typu Dar) — syntetika účtu závazků */
+  donationProfile?: { code: string; name: string; summary: string };
 }
 
 export function partnerLedger(sp: PartnerLedgerSpec) {
@@ -117,10 +141,54 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     fields: {
       /** číslo faktury (dodavatele / naše), které už existuje: přijmout / varovat / odmítnout / odmítnout ve stejném roce */
       invoiceNumCheck: { edt: enumEdt(DupCheck), label: L("InvoiceNumCheck"), mandatory: true, default: "reject" },
+      /** výchozí účtovací profil faktur (prázdné = účet ze skupiny partnera) */
+      postingProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfileDefault") },
+      ...(sp.side === -1 ? { donationProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfileDonation") } } : {}),
     },
     titleField: "invoiceNumCheck",
-    list: ["invoiceNumCheck"],
-    form: [{ label: "@GL:Checks", fields: ["invoiceNumCheck"] }],
+    list: ["invoiceNumCheck", "postingProfileId"],
+    form: [
+      { label: "@GL:Checks", fields: ["invoiceNumCheck"] },
+      { label: "@GL:Posting", fields: ["postingProfileId", ...(sp.side === -1 ? ["donationProfileId"] : [])] },
+    ],
+  });
+
+  // účtovací profil (Posting profile v AX): účet salda podle partnera / skupiny / všech;
+  // faktura si profil vybere (výchozí z parametrů, dar z profilu darů), bez profilu platí účet skupiny
+  const profile = defineObject({
+    id: id("postingProfile"),
+    table: `${m}_posting_profile`,
+    label: "@TAX:PostingProfile",
+    labelPlural: "@TAX:PostingProfiles",
+    scope: "company",
+    fields: {
+      code: { edt: Edts.Code, mandatory: true },
+      name: { edt: Edts.Name, mandatory: true },
+    },
+    titleField: "code",
+    list: ["code", "name"],
+    form: [{ label: "@SYS:General", fields: ["code", "name"] }],
+    unique: [["code"]],
+    defaultSort: { field: "code", dir: "asc" },
+    lines: [{ object: id("postingProfileLine"), field: "profileId", label: "@TAX:Lines" }],
+  });
+
+  const profileLine = defineObject({
+    id: id("postingProfileLine"),
+    table: `${m}_posting_profile_line`,
+    label: "@TAX:PostingProfileLine",
+    labelPlural: "@TAX:PostingProfileLines",
+    scope: "company",
+    fields: {
+      profileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfile"), mandatory: true },
+      accountCode: { edt: enumEdt(ProfileAccountCode), mandatory: true, default: "all" },
+      [partnerId]: { edt: refEdt(id(sp.partner), L("Partner")) },
+      groupId: { edt: refEdt(id("group"), L("Group")) },
+      summaryAccountId: { edt: AccountRef(L("SummaryAccount")), mandatory: true },
+    },
+    titleField: "accountCode",
+    list: ["accountCode", partnerId, "groupId", "summaryAccountId"],
+    form: [{ label: "@SYS:General", fields: ["profileId", "accountCode", partnerId, "groupId", "summaryAccountId"] }],
   });
 
   const partner = defineObject({
@@ -178,8 +246,11 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     invoiceNum: { edt: Edts.Code, label: "@TAX:InvoiceNum", mandatory: true, readOnly: sp.side !== 1 },
     // povinné až při zaúčtování (faktura z objednávky ho ještě nezná)
     ...(sp.externalNum ? { externalNum: { edt: Edts.Code, label: L("ExternalNum") } } : {}),
-    // přijatá: účtenka = zjednodušený daňový doklad (do 10 000 Kč, KH B.3, číslo dokladu dodavatele nepovinné)
-    ...(sp.side === -1 ? { receipt: { edt: Edts.NoYes, label: "@TAX:Receipt" } } : {}),
+    // přijatá: účtenka = zjednodušený daňový doklad (KH souhrnně, číslo dodavatele nepovinné),
+    // dar = bez DPH, náklad 543, závazek podle profilu darů (379)
+    ...(sp.side === -1 ? { docType: { edt: enumEdt(InvoiceDocType), mandatory: true, default: "invoice" } } : {}),
+    /** účet závazků / pohledávek dokladu (prázdné = účet ze skupiny partnera) */
+    postingProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfile") },
     [partnerId]: { edt: refEdt(id(sp.partner), L("Partner")), mandatory: true },
     invoiceDate: { edt: Edts.TransDate, label: "@TAX:InvoiceDate", mandatory: true, default: "$today" },
     taxDate: { edt: Edts.TransDate, label: "@TAX:TaxDate" },
@@ -211,7 +282,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     advanceAmount: { edt: Edts.Amount, label: "@TAX:AdvanceDeducted", readOnly: true },
     emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
   };
-  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["receipt"] : []), partnerId, "taxGroupId", "description", "orderId", "advanceId"];
+  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType"] : []), partnerId, "taxGroupId", "postingProfileId", "description", "orderId", "advanceId"];
   const invoice = defineObject({
     id: id("invoice"),
     table: `${m}_invoice`,
@@ -220,7 +291,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     scope: "company",
     fields: invoiceFields,
     titleField: "invoiceNum",
-    list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
+    list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
     form: [
       { label: "@TAX:Header", fields: headerFields },
       { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs", ...(sp.side === 1 ? ["bankAccountId", "paymentMethodId"] : [])] },
@@ -431,12 +502,14 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       /** u faktury: kolik už bylo uhrazeno (součet úhrad) */
       paidAmount: { edt: Edts.AmountCur, label: "@TAX:PaidAmount" },
       closed: { edt: Edts.NoYes, label: "@TAX:Closed" },
+      /** účet salda, na kterém položka vznikla (z účtovacího profilu); prázdné = účet skupiny partnera */
+      accountId: { edt: AccountRef(L("SummaryAccount")) },
     },
     titleField: "documentNum",
     list: [partnerId, "kind", "documentNum", "vs", "date", "dueDate", "currencyId", "amountCur", "amount", "paidAmount", "closed", "voucherId"],
     form: [
       { label: "@SYS:General", fields: [partnerId, "kind", "invoiceId", "documentNum", "vs", "date", "dueDate"] },
-      { label: "@TAX:Amounts", fields: ["currencyId", "amountCur", "amount", "paidAmount", "closed", "voucherId"] },
+      { label: "@TAX:Amounts", fields: ["currencyId", "amountCur", "amount", "paidAmount", "closed", "voucherId", "accountId"] },
     ],
     defaultSort: { field: "date", dir: "desc" },
   });
@@ -457,6 +530,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       : { price: "purchasePrice", tax: "purchaseTaxCodeId", groupAccount: "costAccountId" },
     partnerTrans: trans.id,
     parameters: params.id,
+    profileLine: profileLine.id,
     docNumField: sp.externalNum ? "externalNum" : "invoiceNum",
     side: sp.side,
     advance: { object: advance.id, groupAccountField: "advanceAccountId", defaultAccount: sp.advanceAccount },
@@ -466,14 +540,23 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   const inv = invoiceHandlers(cfg);
 
   return {
-    enums: [TransKind, OrderStatus, AdvanceStatus],
-    objects: [params, group, partner, order, orderLine, invoice, invoiceLine, advance, trans],
+    enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ProfileAccountCode],
+    objects: [params, group, profile, profileLine, partner, order, orderLine, invoice, invoiceLine, advance, trans],
     handlers: {
       ...inv,
       ...documentLineHandlers(orderCfg),
       ...orderHandlers(docs),
       // faktura z objednávky: smazáním konceptu se objednávka vrátí k fakturaci
       [invoice.id]: { ...inv[invoice.id], beforeDelete: (ctx: EventContext, d: RecordData) => releaseOrder(ctx.data, docs, d) },
+      // řádek profilu: partner jen pro „Partner“, skupina jen pro „Skupina“
+      [profileLine.id]: {
+        async beforeSave(_ctx: EventContext, d: RecordData) {
+          if (d.accountCode !== "partner") d[partnerId] = null;
+          if (d.accountCode !== "group") d.groupId = null;
+          if (d.accountCode === "partner" && !d[partnerId]) return { [partnerId]: "@SYS:Required" };
+          if (d.accountCode === "group" && !d.groupId) return { groupId: "@SYS:Required" };
+        },
+      } as ObjectHandlers,
       [params.id]: {
         async beforeSave(ctx: EventContext, _d: RecordData, isNew: boolean) {
           if (isNew && (await ctx.data.find(params.id, {}, { take: 1 })).length) throw new UserError("@GL:OneParameters");
@@ -511,7 +594,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }, { object: "gl.journal", href: `/gl/journal?filter.journalType=${sp.side === 1 ? "customerPayment" : "vendorPayment"}`, label: "@GL:JournalsPayment", module: "gl" }, ...(sp.side === -1 ? [{ object: "bank.paymentOrder", module: "bank" }] : [])] },
       // nahrání dokladů k vytěžení (Integrace), cíl předvolený podle agendy
       { label: L("Module"), kind: "functions" as const, items: [{ href: `/int/doc-import?target=${m}Invoice`, label: "@INT:DocImport", module: "int" }] },
-      { label: "@SYS:Setup", items: [{ object: params.id }, { object: group.id }] },
+      { label: "@SYS:Setup", items: [{ object: params.id }, { object: group.id }, { object: profile.id }] },
     ],
     /** výchozí skupina partnerů (účtovací profil) podle čísel účtů */
     setup: (groupDefaults: { code: string; name: string; summary: string; line: string; taxCode: string }) =>
@@ -519,6 +602,23 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
         // skupina DPH Tuzemsko skupinám partnerů, které žádnou nemají
         const [tuz] = await data.find("tax.taxGroup", { code: "TUZ" }, { take: 1 });
         if (tuz) for (const g of await data.find(group.id, { taxGroupId: null }, { take: 500 })) await data.update(group.id, String(g.id), { taxGroupId: tuz.id });
+        // profil darů (závazek 379) a jeho nastavení v parametrech (jen chybějící)
+        if (sp.donationProfile) {
+          const dp = sp.donationProfile;
+          let [prof] = await data.find(profile.id, { code: dp.code }, { take: 1 });
+          if (!prof) {
+            const acc = await postingAccount(data, dp.summary);
+            if (acc) {
+              prof = await data.create(profile.id, { code: dp.code, name: dp.name });
+              await data.create(profileLine.id, { profileId: prof.id, accountCode: "all", summaryAccountId: acc });
+            }
+          }
+          if (prof) {
+            const [p] = await data.find(params.id, {}, { take: 1 });
+            if (!p) await data.create(params.id, { invoiceNumCheck: "reject", donationProfileId: prof.id });
+            else if (!p.donationProfileId) await data.update(params.id, String(p.id), { donationProfileId: prof.id });
+          }
+        }
         if ((await data.find(group.id, {}, { take: 1 })).length) return;
         const acc = (num: string) => postingAccount(data, num);
         const summary = await acc(groupDefaults.summary);

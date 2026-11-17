@@ -23,7 +23,9 @@ describe("kontroly duplicit", () => {
     await expect(saveRecord(T, "ap.invoice", null, { vendorId: v1.id, externalNum: "F-100", invoiceDate: "2026-11-02" }, undefined, client)).rejects.toMatchObject({ label: "@SYS:FixErrors" });
     await saveRecord(T, "ap.invoice", null, { vendorId: v2.id, externalNum: "F-100", invoiceDate: "2026-11-02" }, undefined, client);
     // varovat: uloží se, varování v kontextu
-    const p = await saveRecord(T, "ap.parameters", null, { invoiceNumCheck: "warn" }, undefined, client);
+    // parametry zakládá výchozí nastavení (profil darů); druhé parametry nejdou
+    const [p0] = (await listRecords(T, "ap.parameters", {}, client)).rows;
+    const p = await saveRecord(T, "ap.parameters", String(p0.id), { ...p0, invoiceNumCheck: "warn" }, undefined, client);
     await expect(saveRecord(T, "ap.parameters", null, { invoiceNumCheck: "warn" }, undefined, client)).rejects.toMatchObject({ label: "@GL:OneParameters" });
     const W = { ...T, warnings: [] as string[] };
     await saveRecord(W, "ap.invoice", null, { vendorId: v1.id, externalNum: "F-100", invoiceDate: "2026-11-03" }, undefined, client);

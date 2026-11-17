@@ -32,3 +32,4 @@ INT-MAIL;Odesílání dokladů e-mailem;Integrace;uat;;Napojení pošty (SMTP, t
 SYS-NOTICES;Upozornění (zvoneček);Správa systému;uat;;Zvoneček v hlavičce: chyby dávkových úloh, doklady ke kontrole, nespolehlivý plátce DPH, neodeslané tržby EET; přečtení po uživatelích.
 GL-JOURNAL-ENTRY;Rychlé pořizování deníku;Hlavní kniha;uat;;Číslo dokladu hned na řádku, datum z hlavičky / předchozího řádku, dorovnání nového řádku, klávesy Enter / šipky, zkratky data (d, d+1, 15, 1511), deníky po modulech.
 INT-PORTAL;Dodavatelský portál;Integrace;uat;;Veřejná stránka pro nahrání dokladů dodavateli, kontroly a limity, doklady ke zpracování.
+AP-POSTING-PROFILE;Účtovací profily a dary;Dodavatelé;uat;;Účtovací profil (partner / skupina / všechny → účet salda) u dodavatelů i odběratelů, typ přijatého dokladu Faktura / Účtenka / Dar, dar bez DPH na 543100 a 379, úhrada proti účtu vzniku.
