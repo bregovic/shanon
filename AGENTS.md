@@ -257,6 +257,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `detail` = `amount=… redirect=…`). E-shop: platba kind `card` jen s aktivní bránou (`gatewayConnection`, TEST- má přednost),
   `shop.order.paymentLogId`; pokladna: brána jen s `posQr`, `PaymentState.qr` = QR s platební stránkou. Testovací prostředí kopíruje
   ostré napojení do TEST-COMGATE. Comgate vyžaduje povolenou IP serveru.
+- Pokladna a odběratel: `pos.receipt.customerId` (účtenka = faktura – daňový doklad, `ReceiptPrint.customer`, šablona účtenky v3
+  s `doc.title`/`customer.*`), uzávěrka dá účtenku s CZ DIČ od 10 000 Kč do KH jednotlivě (A.4, `sourceObject` pos.receipt);
+  `sellOnInvoice` = vydaná faktura `pricesInclTax` zaúčtovaná přes `ar.cfg` + `postInvoice`. E-mail z pokladny `sendDocumentNow`
+  (`src/server/mail.ts`, koncept s PDF + odeslání). Kód firmy z ARES = `companyCodeFromName` (4 znaky, jedinečný).
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

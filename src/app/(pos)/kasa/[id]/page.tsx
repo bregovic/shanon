@@ -119,6 +119,8 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       }
       payment={data.conns.payment ? { driver: String(data.conns.payment.driver) } : null}
       eet={data.conns.eet ? { pending: data.eetPending } : null}
+      customers={s.ctx.modules.has("ar")}
+      mail={s.ctx.modules.has("int")}
       user={s.user.name}
       canLock={hasPin}
       lang={s.lang}

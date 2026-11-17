@@ -6,6 +6,7 @@ import { inTenant, Session, type Ctx } from "./data";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
 import { czIban } from "@/core/print";
+import { companyCodeFromName } from "@/modules/org/company-code";
 import type { DataApi } from "@/core/module";
 
 export function createCompanyFromRegistry(
@@ -20,7 +21,9 @@ export function createCompanyFromRegistry(
       if (!hit)
         throw new UserError("@GAB:AresNotFound", { query: String(query) });
       // firma už existuje → údaje z registru se jen aktualizují
-      const code = String(hit.regNo ?? hit.vatId ?? "").slice(0, 20);
+      // kód = zkratka z názvu (4 znaky), jedinečná v tenantovi; firmu jde přejmenovat i s kódem ručně
+      const taken = hit.existingId ? [] : (await sess.sys().api().find("sys.company", {}, { take: 5000 })).map((c) => String(c.code));
+      const code = companyCodeFromName(hit.name, taken);
       const company = hit.existingId
         ? await sess.save("sys.company", hit.existingId, { name: hit.name.slice(0, 120), regNo: hit.regNo, vatId: hit.vatId, vatPayer: !!hit.vatId, country: hit.country })
         : await sess.save("sys.company", null, {

@@ -94,8 +94,15 @@ export function receiptEscPos(
   if (r.company.address) p.line(r.company.address);
   p.line([r.company.regNo && `IČO ${r.company.regNo}`, r.company.vatId && `DIČ ${r.company.vatId}`].filter(Boolean).join("  "));
   p.align("left").sep();
-  p.pair(L.SimplifiedDoc, r.receiptNum);
+  p.pair(r.customer ? L.InvoiceDoc : L.SimplifiedDoc, r.receiptNum);
   p.pair(r.register, new Date(r.issuedAt).toLocaleString(opts.locale));
+  if (r.customer) {
+    // odběratel (faktura – daňový doklad)
+    p.sep().line(`${L.Customer}: ${r.customer.name}`.slice(0, opts.width));
+    if (r.customer.address) p.line(r.customer.address.slice(0, opts.width));
+    const ids = [r.customer.regNo && `IČO ${r.customer.regNo}`, r.customer.vatId && `DIČ ${r.customer.vatId}`].filter(Boolean).join("  ");
+    if (ids) p.line(ids);
+  }
   p.sep();
   const n = (v: string) => new Intl.NumberFormat(opts.locale, { maximumFractionDigits: 3 }).format(Number(v));
   for (const l of r.lines) {

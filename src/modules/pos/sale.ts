@@ -7,7 +7,10 @@
  *   a účtuje se na účty zaokrouhlení pokladny.
  * - Uzávěrka zaúčtuje směnu jedním dokladem: MD hotovost + MD karty /
  *   D tržby (účty skupin položek) + D DPH po kódech ± zaokrouhlení,
- *   a založí daňové transakce jako zjednodušené doklady (KH oddíl A.5).
+ *   a založí daňové transakce jako zjednodušené doklady (KH oddíl A.5); účtenka s odběratelem
+ *   s českým DIČ od 10 000 Kč jde do KH jednotlivě (A.4).
+ * - Známý odběratel: placeno hned → účtenka s odběratelem (tiskne se jako faktura – daňový doklad),
+ *   „na fakturu“ → zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele (bez účtenky).
  */
 import { convertPrice } from "@/modules/gl/posting";
 import { fromCents, mulCents, roundCents, sumCents, toCents } from "@/core/money";
@@ -16,6 +19,8 @@ import { accountingCurrencyId, currencyRounding, postVoucher, systemAccount, typ
 import { bestDiscount, netFromGross } from "@/modules/inv/handlers";
 import { addressLine, orgOf } from "@/modules/org";
 import { closeBasket } from "./basket";
+import { ar } from "@/modules/ar";
+import { postInvoice } from "@/modules/tax/document";
 
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -23,7 +28,10 @@ const today = () => new Date().toISOString().slice(0, 10);
 export interface SaleInput {
   registerId: string;
   lines: { itemId: string; qty: string }[];
-  payment: "cash" | "card";
+  /** invoice = na fakturu (odběratel zaplatí později) */
+  payment: "cash" | "card" | "invoice";
+  /** známý odběratel (Odběratelé) — na účtence / faktuře */
+  customerId?: string | null;
   /** přijatá hotovost (jen u platby hotově) */
   cashGiven?: string | null;
   /** platba kartou přes terminál: id transakce (ověřené volajícím) */
@@ -90,8 +98,35 @@ export async function quote(data: DataApi, input: SaleInput) {
   return { reg, shift, lines, gross, net, paid };
 }
 
+/** Odběratel prodeje (jen se zapnutými Odběrateli, neblokovaný). */
+async function customerOf(data: DataApi, customerId: string | null | undefined): Promise<RecordData | null> {
+  if (!customerId) return null;
+  const c = await data.get("ar.customer", String(customerId)).catch(() => null);
+  if (!c) throw new UserError("@SYS:NotFound");
+  if (c.blocked) throw new UserError("@SYS:PartnerBlocked");
+  return c;
+}
+
+/**
+ * Prodej na fakturu: vydaná faktura odběrateli s cenami s DPH (stejné ceny a slevy jako na pokladně),
+ * zaúčtovaná (saldo, DPH, vyskladnění). Hotovost ani karta se nepohybují, účtenka nevzniká.
+ */
+export async function sellOnInvoice(data: DataApi, input: SaleInput): Promise<RecordData> {
+  const customer = await customerOf(data, input.customerId);
+  if (!customer) throw new UserError("@POS:CustomerRequired");
+  const { reg, lines } = await quote(data, { ...input, payment: "invoice" });
+  const inv = await data.create("ar.invoice", { customerId: customer.id, pricesInclTax: true, description: String(reg.name).slice(0, 255) });
+  for (const l of lines)
+    await data.create("ar.invoiceLine", { invoiceId: inv.id, itemId: l.itemId, description: l.description, qty: l.qty, unitId: l.unitId, unitPrice: l.unitPrice, taxCodeId: l.taxCodeId, ...(l.revenueAccountId ? { revenueAccountId: l.revenueAccountId } : {}) });
+  await postInvoice(data, data.companyId ?? null, ar.cfg, (await data.get("ar.invoice", String(inv.id)))!);
+  if (input.basketId) await closeBasket(data, input.basketId, "paid", null);
+  return (await data.get("ar.invoice", String(inv.id)))!;
+}
+
 /** Prodej: účtenka s řádky v otevřené směně pokladny. */
 export async function sell(data: DataApi, input: SaleInput): Promise<RecordData> {
+  if (input.payment === "invoice") throw new UserError("@POS:CustomerRequired");
+  const customer = await customerOf(data, input.customerId);
   const { reg, shift, lines, gross, net, paid } = await quote(data, input);
   const cash = input.payment === "cash";
   let given: bigint | null = null;
@@ -113,6 +148,7 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
     cashGiven: given === null ? null : fromCents(given),
     change: given === null ? null : fromCents(given - paid),
     paymentRef: input.payment === "card" ? (input.paymentRef ?? null) : null,
+    ...(customer ? { customerId: customer.id } : {}),
   });
   for (const l of lines) {
     await data.create("pos.receiptLine", {
@@ -203,8 +239,51 @@ export async function closeShift(data: DataApi, shift: RecordData) {
       lines,
     });
     voucherId = voucher.id;
+    // účtenka s odběratelem s českým DIČ od 10 000 Kč = daňový doklad pro KH jednotlivě (A.4), zbytek souhrnně (A.5)
+    for (const r of await data.find("pos.receipt", { shiftId: shift.id }, { take: 100000 })) {
+      if (!r.customerId || toCents(r.amountGross) < BigInt(1_000_000)) continue;
+      const cust = await data.get("ar.customer", String(r.customerId)).catch(() => null);
+      const subj = cust?.subjectId ? await data.get("gab.subject", String(cust.subjectId)) : null;
+      const vatId = String(subj?.vatId ?? "").replace(/\s/g, "").toUpperCase();
+      if (!/^CZ\d{8,10}$/.test(vatId)) continue;
+      const own = new Map<string, { base: bigint; tax: bigint }>();
+      for (const l of await data.find("pos.receiptLine", { receiptId: r.id }, { take: 10000 })) {
+        const codeId = String(l.taxCodeId ?? "");
+        if (!codeId) continue;
+        const x = own.get(codeId) ?? { base: zero, tax: zero };
+        x.base += toCents(l.amountNet);
+        x.tax += toCents(l.taxAmount);
+        own.set(codeId, x);
+      }
+      for (const [codeId, x] of own) {
+        const agg = t.taxes.get(codeId);
+        if (agg) {
+          agg.base -= x.base;
+          agg.tax -= x.tax;
+        }
+        const code = await data.get("tax.taxCode", codeId);
+        await data.create("tax.trans", {
+          taxDate: String(r.date ?? date).slice(0, 10),
+          taxCodeId: codeId,
+          direction: code!.direction,
+          reportLine: code!.reportLine ?? null,
+          khSection: code!.khSection === "A4" || code!.khSection === "A5" ? "A4" : (code!.khSection ?? null),
+          base: fromCents(x.base),
+          tax: fromCents(x.tax),
+          baseCur: fromCents(x.base),
+          taxCur: fromCents(x.tax),
+          subjectId: subj?.id ?? null,
+          vatId,
+          documentNum: String(r.receiptNum),
+          voucherId,
+          sourceObject: "pos.receipt",
+          sourceId: String(r.id),
+          simplified: false,
+        });
+      }
+    }
     for (const [codeId, x] of t.taxes) {
-      if (!codeId) continue;
+      if (!codeId || (x.base === zero && x.tax === zero)) continue;
       const code = await data.get("tax.taxCode", codeId);
       await data.create("tax.trans", {
         taxDate: date,
@@ -253,11 +332,15 @@ export const posHandlers: Record<string, ObjectHandlers> = {
 };
 
 export interface ReceiptPrint {
+  /** id účtenky (odeslání e-mailem z pokladny) */
+  id?: string;
   receiptNum: string;
   issuedAt: string;
   register: string;
   /** tradeName = název provozovny/značka nad obchodním jménem (jen když se liší) */
   company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null; logoId?: string | null };
+  /** známý odběratel — účtenka je pak faktura – daňový doklad */
+  customer?: { name: string; regNo: string | null; vatId: string | null; address: string | null; email: string | null } | null;
   lines: { description: string; qty: string; unit: string; unitPrice: string; amount: string; rate: string; originalPrice?: string | null }[];
   vat: { rate: string; base: string; tax: string }[];
   gross: string;
@@ -282,6 +365,22 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
   const [tp] = org ? [] : await data.find("tax.parameters", {}, { take: 1 }).catch(() => [] as RecordData[]);
   const addr = addressLine(org ?? tp);
   const lines = await data.find("pos.receiptLine", { receiptId }, { take: 10000 });
+  // odběratel: údaje subjektu z adresáře (sídlo = první adresa)
+  let customer: ReceiptPrint["customer"] = null;
+  if (r.customerId) {
+    const c = await data.get("ar.customer", String(r.customerId)).catch(() => null);
+    const subj = c?.subjectId ? await data.get("gab.subject", String(c.subjectId)) : null;
+    if (subj) {
+      const [a] = await data.find("gab.address", { subjectId: subj.id }, { take: 1 });
+      customer = {
+        name: String(subj.name),
+        regNo: (subj.regNo as string) ?? null,
+        vatId: (subj.vatId as string) ?? null,
+        address: a ? [a.street, [a.zipCode, a.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null : null,
+        email: String(c?.docEmail || subj.email || "") || null,
+      };
+    }
+  }
   const rates = new Map<string, string>();
   const units = new Map<string, string>();
   const vat = new Map<string, { base: bigint; tax: bigint }>();
@@ -307,6 +406,7 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
     });
   }
   return {
+    id: String(r.id),
     receiptNum: String(r.receiptNum),
     issuedAt: String(r.createdAt ?? r.date),
     register: String(reg?.name ?? ""),
@@ -318,6 +418,7 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
       vatId: ((org?.vatId ?? company?.vatId) as string) ?? null,
       address: addr,
     },
+    customer,
     lines: out,
     vat: [...vat].map(([rate, v]) => ({ rate, base: fromCents(v.base), tax: fromCents(v.tax) })),
     gross: String(r.amountGross),

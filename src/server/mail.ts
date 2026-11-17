@@ -17,7 +17,7 @@ import { renderPdf } from "./print-pdf";
 const sysCtx = (ctx: Ctx): Ctx => ({ ...ctx, perms: ADMIN });
 
 interface DraftSpec {
-  objectId: "ar.invoice" | "ar.advance";
+  objectId: "ar.invoice" | "ar.advance" | "pos.receipt";
   numField: string;
   amountField: string;
   dueField: string;
@@ -57,7 +57,7 @@ async function draftFor(ctx: Ctx, id: string, spec: DraftSpec, client?: PrismaCl
         body,
         num,
         connectionId: conn?.id ?? null,
-        label: `${t(spec.objectId === "ar.invoice" ? "@AR:Invoice" : taxDoc ? "@TAX:AdvanceTaxDoc" : "@AR:Advance")} ${num}`,
+        label: `${t(spec.objectId === "ar.invoice" ? "@AR:Invoice" : spec.objectId === "pos.receipt" ? "@POS:Receipt" : taxDoc ? "@TAX:AdvanceTaxDoc" : "@AR:Advance")} ${num}`,
       };
     },
     client,
@@ -89,6 +89,20 @@ async function draftFor(ctx: Ctx, id: string, spec: DraftSpec, client?: PrismaCl
 
 export const invoiceMailDraft = (ctx: Ctx, id: string, client?: PrismaClient) =>
   draftFor(ctx, id, { objectId: "ar.invoice", numField: "invoiceNum", amountField: "amountGross", dueField: "dueDate", subject: "@INT:MailInvoiceSubject", body: "@INT:MailInvoiceBody" }, client);
+
+export const receiptMailDraft = (ctx: Ctx, id: string, client?: PrismaClient) =>
+  draftFor(ctx, id, { objectId: "pos.receipt", numField: "receiptNum", amountField: "amountGross", dueField: "date", subject: "@INT:MailReceiptSubject", body: "@INT:MailReceiptBody" }, client);
+
+/**
+ * Odeslat doklad hned (pokladna): koncept s PDF jako „Odeslat e-mailem“, příjemce zadaný na pokladně,
+ * pak odeslání napojením pošty. Bez napojení pošty zůstane koncept v Odeslané poště a vrátí se chyba.
+ */
+export async function sendDocumentNow(ctx: Ctx, objectId: "ar.invoice" | "pos.receipt", id: string, to: string, client?: PrismaClient): Promise<void> {
+  const draft = objectId === "ar.invoice" ? await invoiceMailDraft(ctx, id, client) : await receiptMailDraft(ctx, id, client);
+  const mailId = draft.open!.id;
+  await inTenant(ctx, (s) => s.sys().api().update("int.mail", mailId, { mailTo: to }), client);
+  await sendMail(ctx, mailId, client);
+}
 
 export const advanceMailDraft = (ctx: Ctx, id: string, client?: PrismaClient) =>
   draftFor(ctx, id, { objectId: "ar.advance", numField: "advanceNum", amountField: "amount", dueField: "dueDate", subject: "@INT:MailAdvanceSubject", body: "@INT:MailAdvanceBody" }, client);

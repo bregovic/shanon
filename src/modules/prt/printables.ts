@@ -974,6 +974,61 @@ function receiptLayout(): PrintLayout {
       T("name", 2, 13, 68, 5, "{company.name}", { bold: true, align: "center", size: 10 }),
       T("addr", 2, 18, 68, 10, "{company.address}\nIČO {company.regNo}   DIČ {company.vatId}", { align: "center", size: 7.5 }),
       { id: "sep1", type: "line", x: 2, y: 29, w: 68, h: 1 },
+      T("title", 2, 30, 68, 5, "{doc.title}", { bold: true, align: "center", size: 8.5 }),
+      T("num", 2, 35, 68, 9, "č. {doc.number}\n{doc.dateTime}   pokladna {doc.register}", { align: "center", size: 7.5 }),
+      // známý odběratel (účtenka = faktura – daňový doklad); bez odběratele se nezobrazí ani nezabere místo
+      { ...T("cust", 2, 44, 68, 1, "Odběratel: {customer.name}\n{customer.address}\n{customer.ids}", { size: 7.5 }), showIf: "customer.name" },
+      {
+        id: "lines",
+        type: "table",
+        x: 2,
+        y: 45,
+        w: 68,
+        h: 20,
+        style: { size: 7.5 },
+        columns: [
+          { field: "description", label: "Položka", width: 29 },
+          { field: "qty", label: "Mn.", width: 10, align: "right", format: "qty" },
+          { field: "unit", label: "MJ", width: 6 },
+          { field: "rate", label: "%", width: 6, align: "right" },
+          { field: "gross", label: "Kč", width: 17, align: "right", format: "money" },
+        ],
+      },
+      T("total", 2, 67, 68, 7, "Celkem k úhradě {doc.paid:money} Kč", { bold: true, size: 12, align: "right" }),
+      { ...T("round", 2, 74, 68, 4, "Zaokrouhlení {doc.rounding:money} Kč", { size: 7.5, align: "right" }), showIf: "doc.rounding" },
+      T("pay", 2, 78, 68, 4, "Platba: {doc.payment}", { size: 7.5, align: "right" }),
+      { ...T("cash", 2, 82, 68, 4, "Přijato {doc.cashGiven:money} Kč   Vráceno {doc.change:money} Kč", { size: 7.5, align: "right" }), showIf: "doc.cashGiven" },
+      {
+        id: "vat",
+        type: "vat",
+        x: 2,
+        y: 87,
+        w: 68,
+        h: 12,
+        style: { size: 7.5 },
+        columns: [
+          { field: "rate", label: "Sazba %", width: 17, align: "right" },
+          { field: "base", label: "Základ", width: 17, align: "right", format: "money" },
+          { field: "tax", label: "DPH", width: 15, align: "right", format: "money" },
+          { field: "gross", label: "Celkem", width: 19, align: "right", format: "money" },
+        ],
+      },
+      { ...T("eet", 2, 101, 68, 8, "Evidence tržeb – běžný režim\nPOK: {doc.fik}", { size: 7, align: "center" }), showIf: "doc.fik" },
+      T("foot", 2, 110, 68, 9, "{doc.footer}\nDěkujeme za nákup", { align: "center", size: 8 }),
+    ],
+  };
+}
+
+/** Účtenka v2 (do 17. 11. 2026, bez odběratele) — neupravené šablony se převedou. */
+export function receiptLayoutV2(): PrintLayout {
+  return {
+    paper: "receipt80",
+    fontSize: 8.5,
+    elements: [
+      { id: "logo", type: "image", x: 16, y: 0, w: 40, h: 12, field: "company.logo", showIf: "company.logo", style: { align: "center" } },
+      T("name", 2, 13, 68, 5, "{company.name}", { bold: true, align: "center", size: 10 }),
+      T("addr", 2, 18, 68, 10, "{company.address}\nIČO {company.regNo}   DIČ {company.vatId}", { align: "center", size: 7.5 }),
+      { id: "sep1", type: "line", x: 2, y: 29, w: 68, h: 1 },
       T("title", 2, 30, 68, 5, "Zjednodušený daňový doklad", { bold: true, align: "center", size: 8.5 }),
       T("num", 2, 35, 68, 9, "č. {doc.number}\n{doc.dateTime}   pokladna {doc.register}", { align: "center", size: 7.5 }),
       {
@@ -1016,6 +1071,7 @@ function receiptLayout(): PrintLayout {
     ],
   };
 }
+
 
 /** Účtenka v1 (14. 11. 2026) — neupravené šablony se převedou. */
 export function receiptLayoutV1(): PrintLayout {
@@ -1131,6 +1187,10 @@ export const receiptPrintable: PrintableDef = {
     { path: "doc.change", label: "@PRT:Change", format: "money" },
     { path: "doc.fik", label: "@PRT:Fik" },
     { path: "doc.footer", label: "@PRT:Footer" },
+    { path: "doc.title", label: "@PRT:DocTitle" },
+    { path: "customer.name", label: "@PRT:CustomerName" },
+    { path: "customer.address", label: "@PRT:CustomerAddress" },
+    { path: "customer.ids", label: "@PRT:CustomerIds" },
   ],
   lineFields: [
     { path: "description", label: "@PRT:LineDescription" },
@@ -1144,7 +1204,7 @@ export const receiptPrintable: PrintableDef = {
     return receiptData(await receiptPrint(data, companyId, id));
   },
   defaultLayout: receiptLayout,
-  legacyLayouts: [legacyReceiptLayout(), receiptLayoutV1()],
+  legacyLayouts: [legacyReceiptLayout(), receiptLayoutV1(), receiptLayoutV2()],
 };
 
 // ---------------------------------------------------------------------------

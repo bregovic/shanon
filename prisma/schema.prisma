@@ -2102,6 +2102,7 @@ model ArCustomer {
   arAdvance_customer            ArAdvance[]            @relation("ArAdvance_customer")
   arTrans_customer              ArTrans[]              @relation("ArTrans_customer")
   bankStatementLine_customer    BankStatementLine[]    @relation("BankStatementLine_customer")
+  posReceipt_customer           PosReceipt[]           @relation("PosReceipt_customer")
   intDocument_customer          IntDocument[]          @relation("IntDocument_customer")
   shopShop_customer             ShopShop[]             @relation("ShopShop_customer")
 
@@ -3494,6 +3495,7 @@ model PosReceipt {
   cashGiven     Decimal? @map("cash_given") @db.Decimal(18, 2)
   change        Decimal? @db.Decimal(18, 2)
   paymentRef    String?  @map("payment_ref") @db.VarChar(255)
+  customerId    String?  @map("customer_id") @db.Uuid
   eetStatus     String?  @map("eet_status") @db.VarChar(40)
   eetPok        String?  @map("eet_pok") @db.VarChar(255)
   eetMessage    String?  @map("eet_message") @db.VarChar(255)
@@ -3507,12 +3509,14 @@ model PosReceipt {
   company                SysCompany       @relation("PosReceipt_company", fields: [companyId], references: [id], onDelete: Restrict)
   register               PosRegister      @relation("PosReceipt_register", fields: [registerId], references: [id], onDelete: Restrict)
   shift                  PosShift         @relation("PosReceipt_shift", fields: [shiftId], references: [id], onDelete: Restrict)
+  customer               ArCustomer?      @relation("PosReceipt_customer", fields: [customerId], references: [id], onDelete: Restrict)
   posReceiptLine_receipt PosReceiptLine[] @relation("PosReceiptLine_receipt")
   posBasket_receipt      PosBasket[]      @relation("PosBasket_receipt")
 
   @@index([tenantId, companyId])
   @@index([registerId])
   @@index([shiftId])
+  @@index([customerId])
   @@map("pos_receipt")
 }
 

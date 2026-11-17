@@ -21,7 +21,8 @@ import { importIssuedIsdoc, isdocXml } from "@/server/isdoc-import";
 import { runReport } from "@/server/report";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
-import { openShiftOf, quote, receiptPrint, sell, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
+import { openShiftOf, quote, receiptPrint, sell, sellOnInvoice, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
+import { sendDocumentNow } from "@/server/mail";
 import { assertPaid, connectionsFor, eetRegisterReceipt, eetResendPending, paymentCancel, paymentStart, paymentStatus, type PaymentState } from "@/modules/int/drivers";
 import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
@@ -414,9 +415,69 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
   }
 }
 
+/** Odběratelé pro pokladnu (hledání podle názvu, IČO nebo čísla). */
+export async function posCustomersAction(q: string): Promise<ActionResult<{ id: string; name: string; regNo: string; vatId: string; email: string }[]>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    if (!s.ctx.modules.has("ar")) return { ok: true, data: [] };
+    const needle = String(q ?? "").trim().toLowerCase().slice(0, 60);
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const out: { id: string; name: string; regNo: string; vatId: string; email: string }[] = [];
+      for (const c of await api.find("ar.customer", { blocked: false }, { take: 2000, orderBy: { accountNum: "asc" } })) {
+        const subj = c.subjectId ? await api.get("gab.subject", String(c.subjectId)) : null;
+        const row = { id: String(c.id), name: String(subj?.name ?? c.accountNum), regNo: String(subj?.regNo ?? ""), vatId: String(subj?.vatId ?? ""), email: String(c.docEmail || subj?.email || "") };
+        if (!needle || `${row.name} ${row.regNo} ${c.accountNum}`.toLowerCase().includes(needle)) out.push(row);
+        if (out.length >= 30) break;
+      }
+      return out;
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Prodej na fakturu známému odběrateli (zaúčtovaná vydaná faktura, bez účtenky). */
+export async function posInvoiceAction(input: SaleInput): Promise<ActionResult<{ id: string; invoiceNum: string; amount: string; dueDate: string; email: string }>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    assertCan(s.ctx.perms, "ar.invoice", "write");
+    const sale = { ...saleInput(input), payment: "invoice" as const };
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const inv = await sellOnInvoice(api, sale);
+      const c = await api.get("ar.customer", String(inv.customerId));
+      const subj = c?.subjectId ? await api.get("gab.subject", String(c.subjectId)) : null;
+      return { id: String(inv.id), invoiceNum: String(inv.invoiceNum), amount: String(inv.amountGross), dueDate: String(inv.dueDate ?? "").slice(0, 10), email: String(c?.docEmail || subj?.email || "") };
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Odeslat účtenku nebo fakturu z pokladny e-mailem (PDF, napojení pošty). */
+export async function posMailAction(kind: "receipt" | "invoice", id: string, to: string): Promise<ActionResult> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    if (!s.ctx.modules.has("int")) throw new UserError("@INT:MailNoConnection");
+    const email = String(to ?? "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UserError("@SYS:InvalidEmail");
+    await sendDocumentNow(s.ctx, kind === "invoice" ? "ar.invoice" : "pos.receipt", String(id), email);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
 function saleInput(input: SaleInput): SaleInput {
   return {
     registerId: String(input.registerId),
+    customerId: input.customerId ? String(input.customerId) : null,
     payment: input.payment === "card" ? "card" : "cash",
     cashGiven: input.cashGiven ? String(input.cashGiven) : null,
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,

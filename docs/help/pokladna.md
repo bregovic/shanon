@@ -31,3 +31,11 @@ summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a 
 
 - Ceny a DPH počítá vždy server podle položek – kasa ukazuje jen orientační součet.
 - Neodeslané tržby EET se dosílají samy (do 48 hodin); tlačítko v liště je odešle hned.
+
+## Známý odběratel a prodej na fakturu
+
+- **Odběratel** v košíku → vyberte odběratele (hledání podle názvu nebo IČO).
+- Zaplaceno hned (hotově, kartou): účtenka se vytiskne jako **Faktura – daňový doklad** s údaji odběratele. Do účetnictví jde uzávěrkou směny jako ostatní účtenky; doklad od 10 000 Kč s českým DIČ odběratele jde do kontrolního hlášení jednotlivě.
+- **Na fakturu** (zaplatí později): vystaví se zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele — je v saldu odběratele, zaplacení se spáruje z výpisu. **Tisk faktury** otevře PDF.
+- **Odeslat e-mailem**: účtenku i fakturu jde poslat jako PDF (adresa se předvyplní z odběratele). Potřebuje napojení pošty v Integraci.
+

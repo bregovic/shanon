@@ -30,6 +30,9 @@ import {
 } from "@fluentui/react-components";
 import {
   ArrowLeft24Regular,
+  Person24Regular,
+  DocumentText24Regular,
+  Mail24Regular,
   Backspace24Regular,
   Box20Regular,
   Dismiss24Regular,
@@ -53,6 +56,9 @@ import {
   posEetResendAction,
   posOpenShiftAction,
   posSellAction,
+  posCustomersAction,
+  posInvoiceAction,
+  posMailAction,
   posShiftSummaryAction,
   posLockAction,
 } from "@/app/actions";
@@ -83,6 +89,28 @@ export interface PosItem {
 interface Line {
   item: PosItem;
   qty: number;
+}
+
+/** Známý odběratel nákupu (Odběratelé). */
+interface CustomerPick {
+  id: string;
+  name: string;
+  regNo: string;
+  vatId: string;
+  email: string;
+}
+
+/** Odeslání dokladu e-mailem: adresa (předvyplněná z odběratele) + Odeslat. */
+function MailRow({ st, L, value, onChange, busy, state, onSend }: { st: ReturnType<typeof useStyles>; L: Record<string, string>; value: string; onChange: (v: string) => void; busy: boolean; state: { ok: boolean; text: string } | null; onSend: () => void }) {
+  return (
+    <div className={st.mailRow}>
+      <Input type="email" value={value} placeholder={L.Email} onChange={(_, d) => onChange(d.value)} style={{ flex: 1, minWidth: 0 }} aria-label={L.Email} />
+      <Button icon={<Mail24Regular />} disabled={busy || !value.trim()} onClick={onSend}>
+        {L.SendEmail}
+      </Button>
+      {state && <div className={st.mailState} style={{ color: state.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>{state.text}</div>}
+    </div>
+  );
 }
 
 const useStyles = makeStyles({
@@ -207,6 +235,24 @@ const useStyles = makeStyles({
   lineSub: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, display: "flex", alignItems: "center", gap: "6px" },
   lineAmt: { textAlign: "right", fontWeight: tokens.fontWeightSemibold, alignSelf: "center" },
   empty: { color: tokens.colorNeutralForeground3, padding: "24px 8px", textAlign: "center" },
+  custName: { marginLeft: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  custList: { display: "flex", flexDirection: "column", gap: "4px", marginTop: "12px", maxHeight: "50vh", overflowY: "auto" },
+  custRow: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: "2px",
+    padding: "10px 12px",
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: "pointer",
+    textAlign: "left",
+    fontSize: tokens.fontSizeBase300,
+    ":hover": { backgroundColor: tokens.colorNeutralBackground1Hover },
+  },
+  mailRow: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", paddingTop: "12px", width: "100%" },
+  mailState: { flexBasis: "100%", fontSize: tokens.fontSizeBase200 },
   total: { padding: "12px 16px", borderTop: `1px solid ${tokens.colorNeutralStroke2}`, display: "flex", flexDirection: "column", gap: "10px" },
   totalRow: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: tokens.fontSizeBase600, fontWeight: tokens.fontWeightBold },
   pay: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" },
@@ -253,6 +299,10 @@ export function PosTerminal(p: {
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
+  /** zapnuté Odběratele: prodej známému odběrateli a na fakturu */
+  customers?: boolean;
+  /** zapnutá Integrace: odeslání dokladu e-mailem */
+  mail?: boolean;
   user: string;
   /** pokladna má PIN — jde zamknout bez uzávěrky */
   canLock?: boolean;
@@ -308,6 +358,15 @@ export function PosTerminal(p: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [receipt, setReceipt] = useState<ReceiptPrint | null>(null);
+  // známý odběratel nákupu; prodej na fakturu → vystavená faktura
+  const [customer, setCustomer] = useState<CustomerPick | null>(null);
+  const [custDlg, setCustDlg] = useState(false);
+  const [custQ, setCustQ] = useState("");
+  const [custRows, setCustRows] = useState<CustomerPick[]>([]);
+  const [invoiceDone, setInvoiceDone] = useState<{ id: string; invoiceNum: string; amount: string; dueDate: string; email: string } | null>(null);
+  // odeslání dokladu e-mailem (účtenka / faktura)
+  const [mailTo, setMailTo] = useState("");
+  const [mailState, setMailState] = useState<{ ok: boolean; text: string } | null>(null);
   const [opening, setOpening] = useState("");
   const [summary, setSummary] = useState<Record<string, string | number> | null>(null);
   const search = useRef<HTMLInputElement>(null);
@@ -604,6 +663,7 @@ export function PosTerminal(p: {
       cashGiven: payment === "cash" && given ? given.replace(",", ".") : null,
       paymentRef,
       basketId: active?.id ?? null,
+      customerId: customer?.id ?? null,
       lines: saleLines(),
     });
     setBusy(false);
@@ -614,6 +674,9 @@ export function PosTerminal(p: {
     setPayDlg(null);
     setCard(null);
     setGiven("");
+    setMailTo(customer?.email ?? "");
+    setMailState(null);
+    setCustomer(null);
     if (active) {
       // zaplacený nákup boxu: box volný, zpět na volný prodej
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -651,6 +714,40 @@ export function PosTerminal(p: {
       if (st.data?.state === "successful") return finishSale("card", ref);
       if (st.data?.state === "failed") return setCard({ ref, state: "declined", message: st.data.message });
     }
+  };
+
+  /** Prodej na fakturu: zaúčtovaná vydaná faktura odběrateli (bez platby na pokladně). */
+  const payOnInvoice = async () => {
+    if (!customer) return;
+    setBusy(true);
+    setError(undefined);
+    const res = await posInvoiceAction({ registerId: p.register.id, payment: "invoice", customerId: customer.id, basketId: active?.id ?? null, lines: saleLines() });
+    setBusy(false);
+    if (!res.ok) return setError(res.message);
+    setMailTo(res.data.email || customer.email || "");
+    setMailState(null);
+    setInvoiceDone(res.data);
+    setCustomer(null);
+    if (active) {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      dirty.current = false;
+      setBaskets((bs) => bs.filter((b) => b.id !== active.id));
+      setActive(null);
+      loadLines(freeStash.current);
+      freeStash.current = [];
+    } else setLines([]);
+  };
+  const findCustomers = async (q: string) => {
+    setCustQ(q);
+    const r = await posCustomersAction(q);
+    if (r.ok) setCustRows(r.data);
+  };
+  const sendMail = async (kind: "receipt" | "invoice", id: string) => {
+    setBusy(true);
+    setMailState(null);
+    const r = await posMailAction(kind, id, mailTo);
+    setBusy(false);
+    setMailState(r.ok ? { ok: true, text: `${L.EmailSent} ${mailTo}` } : { ok: false, text: r.message });
   };
 
   const cancelCard = async () => {
@@ -838,6 +935,22 @@ export function PosTerminal(p: {
                 </Button>
               )}
             </div>
+            {p.customers && (
+              <div className={st.cartHead}>
+                {customer ? (
+                  <>
+                    <Person24Regular />
+                    <span className={st.custName}>{customer.name}</span>
+                    <span className={st.spacer} />
+                    <Button appearance="subtle" size="small" icon={<Dismiss24Regular />} aria-label={L.Remove} onClick={() => setCustomer(null)} />
+                  </>
+                ) : (
+                  <Button appearance="subtle" size="small" icon={<Person24Regular />} onClick={() => (setCustDlg(true), void findCustomers(""))}>
+                    {L.ChooseCustomer}
+                  </Button>
+                )}
+              </div>
+            )}
             <div className={st.cartHead}>
               {active ? active.label : L.Cart}
               <span className={st.spacer} />
@@ -885,6 +998,12 @@ export function PosTerminal(p: {
                   {L.PayCard}
                 </Button>
               </div>
+              {customer && (
+                <Button className={st.payBtn} style={{ marginTop: 8, width: "100%" }} icon={<DocumentText24Regular />} disabled={!lines.length || busy} onClick={() => void payOnInvoice()}>
+                  {L.OnInvoice}
+                </Button>
+              )}
+              {error && customer && !payDlg && <div style={{ color: "var(--colorPaletteRedForeground1)", marginTop: 6 }}>{error}</div>}
             </div>
           </aside>
         </div>
@@ -1076,12 +1195,69 @@ export function PosTerminal(p: {
                 ) : (
                   <Receipt r={receipt} L={L} fmt={fmt} st={st} locale={locale} />
                 ))}
+              {p.mail && receipt?.id && (
+                <MailRow st={st} L={L} value={mailTo} onChange={setMailTo} busy={busy} state={mailState} onSend={() => void sendMail("receipt", receipt.id!)} />
+              )}
             </DialogContent>
             <DialogActions>
               <Button icon={<Print24Regular />} onClick={() => receipt && printReceipt(receipt)}>
                 {L.PrintReceipt}
               </Button>
               <Button appearance="primary" size="large" onClick={() => setReceipt(null)}>
+                {L.NewSale}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      {/* výběr odběratele */}
+      <Dialog open={custDlg} onOpenChange={(_, d) => !d.open && setCustDlg(false)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{L.ChooseCustomer}</DialogTitle>
+            <DialogContent>
+              <Input autoFocus value={custQ} placeholder={L.SearchCustomer} onChange={(_, d) => void findCustomers(d.value)} style={{ width: "100%" }} />
+              <div className={st.custList}>
+                {!custRows.length && <p className={st.empty}>{L.NoCustomers}</p>}
+                {custRows.map((c) => (
+                  <button key={c.id} className={st.custRow} onClick={() => (setCustomer(c), setCustDlg(false))}>
+                    <strong>{c.name}</strong>
+                    <span>{[c.regNo && `IČO ${c.regNo}`, c.vatId && `DIČ ${c.vatId}`].filter(Boolean).join("  ")}</span>
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setCustDlg(false)}>{L.Cancel}</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      {/* faktura z prodeje na fakturu */}
+      <Dialog open={!!invoiceDone} onOpenChange={(_, d) => !d.open && setInvoiceDone(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>
+              {L.InvoiceIssued} {invoiceDone?.invoiceNum}
+            </DialogTitle>
+            <DialogContent>
+              {invoiceDone && (
+                <div className={st.sumGrid}>
+                  <span>{L.Total}</span>
+                  <strong>{fmt(invoiceDone.amount)}</strong>
+                  <span>{L.DueDate}</span>
+                  <span>{invoiceDone.dueDate ? new Date(invoiceDone.dueDate).toLocaleDateString(locale) : ""}</span>
+                </div>
+              )}
+              {p.mail && invoiceDone && <MailRow st={st} L={L} value={mailTo} onChange={setMailTo} busy={busy} state={mailState} onSend={() => void sendMail("invoice", invoiceDone.id)} />}
+            </DialogContent>
+            <DialogActions>
+              <Button icon={<Print24Regular />} onClick={() => invoiceDone && window.open(`/api/pdf/ar.invoice/${invoiceDone.id}`, "_blank")}>
+                {L.PrintInvoice}
+              </Button>
+              <Button appearance="primary" size="large" onClick={() => setInvoiceDone(null)}>
                 {L.NewSale}
               </Button>
             </DialogActions>
@@ -1366,9 +1542,16 @@ function Receipt({
       </div>
       <div className={st.rSep} />
       <div className={st.rRow}>
-        <span>{L.SimplifiedDoc}</span>
+        <span>{r.customer ? L.InvoiceDoc : L.SimplifiedDoc}</span>
         <span>{r.receiptNum}</span>
       </div>
+      {r.customer && (
+        <div>
+          {L.Customer}: {r.customer.name}
+          {r.customer.address && <div>{r.customer.address}</div>}
+          <div>{[r.customer.regNo && `IČO ${r.customer.regNo}`, r.customer.vatId && `DIČ ${r.customer.vatId}`].filter(Boolean).join("  ")}</div>
+        </div>
+      )}
       <div className={st.rRow}>
         <span>{r.register}</span>
         <span>{new Date(r.issuedAt).toLocaleString(locale)}</span>

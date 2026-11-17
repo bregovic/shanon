@@ -880,7 +880,7 @@ describe("založení firmy z rejstříku", () => {
     );
     const id = await createCompanyFromRegistry(T, "27079864", client);
     const c = (await getRecord(T, "sys.company", id, client))!;
-    expect([c.code, c.name, c.vatId]).toEqual(["27079864", "Uzenářství s.r.o.", "CZ27079864"]);
+    expect([c.code, c.name, c.vatId]).toEqual(["UZEN", "Uzenářství s.r.o.", "CZ27079864"]);
     const C2 = { ...T, companyId: id };
     const [org] = (await listRecords(C2, "org.entity", {}, client)).rows;
     expect([org.legalName, org.street, org.houseNo, org.orientNo, org.city, org.zipCode]).toEqual(["Uzenářství s.r.o.", "Na náměstí", "97", "3", "Davle", "252 06"]);

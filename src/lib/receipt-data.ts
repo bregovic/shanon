@@ -15,7 +15,14 @@ export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: st
       logo: r.company.logoId ? `/api/files/${r.company.logoId}` : "",
       ...extra,
     },
+    // známý odběratel: účtenka je faktura – daňový doklad (úplné údaje odběratele)
+    customer: {
+      name: r.customer?.name ?? "",
+      address: r.customer?.address ?? "",
+      ids: [r.customer?.regNo ? `IČO ${r.customer.regNo}` : "", r.customer?.vatId ? `DIČ ${r.customer.vatId}` : ""].filter(Boolean).join("   "),
+    },
     doc: {
+      title: r.customer ? "Faktura – daňový doklad" : "Zjednodušený daňový doklad",
       number: r.receiptNum,
       date: r.issuedAt,
       dateTime: new Date(r.issuedAt).toLocaleString("cs-CZ"),

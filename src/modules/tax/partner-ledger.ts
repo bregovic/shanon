@@ -552,6 +552,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   const inv = invoiceHandlers(cfg);
 
   return {
+    /** konfigurace faktur (zaúčtování faktury z jiného modulu, např. prodej na fakturu z pokladny) */
+    cfg,
     enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ProfileAccountCode],
     objects: [params, group, profile, profileLine, partner, order, orderLine, invoice, invoiceLine, advance, trans],
     handlers: {
