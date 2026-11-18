@@ -10,6 +10,12 @@ import {
   Badge,
   Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
   Drawer,
   DrawerBody,
   DrawerFooter,
@@ -32,8 +38,8 @@ import {
   Text,
   tokens,
 } from "@fluentui/react-components";
-import { Add24Regular, Dismiss24Regular, Edit24Regular } from "@fluentui/react-icons";
-import { saveUserAction, type UserCompanyInput, type UserInput } from "@/app/actions";
+import { Add24Regular, Delete24Regular, Dismiss24Regular, Edit24Regular } from "@fluentui/react-icons";
+import { deleteUserAction, saveUserAction, type UserCompanyInput, type UserInput } from "@/app/actions";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { useShortcuts } from "./shortcuts";
 
@@ -72,7 +78,9 @@ type Labels = Record<
   | "password"
   | "passwordHelp"
   | "user"
-  | "general",
+  | "general"
+  | "delete"
+  | "deleteConfirm",
   string
 >;
 
@@ -158,6 +166,17 @@ export function UsersView({
     });
   useShortcuts({ new: () => open(null) }, !edit);
   useShortcuts({ save }, !!edit);
+  const [confirmDel, setConfirmDel] = useState<User | null>(null);
+  const [delMsg, setDelMsg] = useState<string>();
+  const remove = () =>
+    start(async () => {
+      if (!confirmDel) return;
+      const res = await deleteUserAction(confirmDel.id);
+      if (!res.ok) return setDelMsg(res.message);
+      setConfirmDel(null);
+      setDelMsg(undefined);
+      router.refresh();
+    });
 
   return (
     <>
@@ -170,7 +189,31 @@ export function UsersView({
         <Button icon={<Edit24Regular />} disabled={!selected} onClick={() => open(users.find((u) => u.id === selected) ?? null)}>
           {labels.edit}
         </Button>
+        <Button icon={<Delete24Regular />} disabled={!selected} onClick={() => (setDelMsg(undefined), setConfirmDel(users.find((u) => u.id === selected) ?? null))}>
+          {labels.delete}
+        </Button>
       </ActionBar>
+      <Dialog open={!!confirmDel} onOpenChange={(_, d) => !d.open && setConfirmDel(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{labels.delete}</DialogTitle>
+            <DialogContent>
+              {delMsg && (
+                <MessageBar intent="error" style={{ marginBottom: 8 }}>
+                  <MessageBarBody>{delMsg}</MessageBarBody>
+                </MessageBar>
+              )}
+              {labels.deleteConfirm.replace("{name}", confirmDel ? `${confirmDel.name} (${confirmDel.email})` : "")}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmDel(null)}>{labels.cancel}</Button>
+              <Button appearance="primary" disabled={busy} onClick={remove}>
+                {labels.delete}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
       <PageContent>
         <div className={s.card}>
           <Table size="small">

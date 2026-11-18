@@ -12,9 +12,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
-import { isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
+import { clearLoginLock, isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
 import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, previewRecord, refOptions, runAction, saveRecord } from "@/server/data";
-import { prisma } from "@/server/db";
+import { prisma, withTenant } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
 import { importRecords, imagesFromUploads, readTable, type ImportReport } from "@/server/import";
@@ -48,7 +48,10 @@ export interface FormState {
 export async function loginAction(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "");
   const ok = await login(email, String(form.get("password") ?? ""));
-  if (!ok) return { message: (await getT("cs"))("@SYS:BadLogin"), values: { email } };
+  if (ok !== true) {
+    const t = await getT("cs");
+    return { message: ok ? t("@SYS:LoginLocked", { minutes: String(ok.locked) }) : t("@SYS:BadLogin"), values: { email } };
+  }
   redirect("/");
 }
 
@@ -807,6 +810,39 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
     }
     // změna hesla nebo deaktivace odhlásí ostatní relace uživatele
     if (existing && (input.password || !input.active)) await tx.sysSession.deleteMany({ where: { userId: existing.id } });
+  });
+  // nové heslo / e-mail od správce: zámek po neúspěšných pokusech se ruší, ať se uživatel hned přihlásí
+  if (input.password || existing?.email !== email) {
+    clearLoginLock(email);
+    if (existing) clearLoginLock(existing.email);
+  }
+  revalidatePath("/system/users");
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Smazat uživatele (přihlášení, oblíbené a přiřazení k firmám s ním). Sebe ne, posledního aktivního superuživatele ne;
+ * správce firmy jen běžného uživatele, který je jen v jeho firmách. Jeho otevřené úkoly zůstanou nepřiřazené (uvidí je správci).
+ */
+export async function deleteUserAction(id: string): Promise<ActionResult> {
+  const s = await requireSession();
+  if (!isAnyAdmin(s)) throw new Error("Forbidden");
+  const t = await getT(s.lang, s.ctx.tenantId);
+  const user = await prisma.sysUser.findFirst({ where: { id, tenantId: s.ctx.tenantId }, include: { companies: true } });
+  if (!user) return { ok: false, message: t("@SYS:NotFound") };
+  if (user.id === s.user.id) return { ok: false, message: t("@SYS:CannotDeleteSelf") };
+  if (!s.superUser) {
+    const scope = new Set(s.adminCompanyIds);
+    if (user.role === "admin" || user.companies.some((a) => !scope.has(a.companyId))) return { ok: false, message: t("@SYS:NoAccess") };
+  }
+  if (user.role === "admin" && user.active) {
+    const supers = await prisma.sysUser.count({ where: { tenantId: s.ctx.tenantId, role: "admin", active: true } });
+    if (supers <= 1) return { ok: false, message: t("@SYS:LastSuper") };
+  }
+  await prisma.sysUser.delete({ where: { id: user.id } });
+  await withTenant(s.ctx.tenantId, async (tx) => {
+    await tx.wfWorkItem.updateMany({ where: { tenantId: s.ctx.tenantId, assignedTo: user.id, status: "open" }, data: { assignedTo: null } });
+    await tx.sysAudit.create({ data: { tenantId: s.ctx.tenantId, objectId: "sys.user", recordId: user.id, action: "delete", userId: s.user.id, changes: { name: [user.name, null], email: [user.email, null] } } });
   });
   revalidatePath("/system/users");
   return { ok: true, data: undefined };

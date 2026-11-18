@@ -21,10 +21,16 @@ const hash = (token: string) => createHash("sha256").update(token).digest("hex")
 // jednoduchá brzda proti hádání hesel (na instanci); trvalejší řešení: tabulka pokusů
 const attempts = new Map<string, { n: number; until: number }>();
 
-export async function login(email: string, password: string): Promise<boolean> {
-  const key = email.toLowerCase();
+/** Zrušit zámek po neúspěšných pokusech (správce nastavil nové heslo / změnil e-mail). */
+export function clearLoginLock(email: string) {
+  attempts.delete(email.trim().toLowerCase());
+}
+
+/** `locked` = minut do odemčení po 5 neúspěšných pokusech (heslo se v tu chvíli neověřuje). */
+export async function login(email: string, password: string): Promise<boolean | { locked: number }> {
+  const key = email.trim().toLowerCase();
   const a = attempts.get(key);
-  if (a && a.n >= 5 && a.until > Date.now()) return false;
+  if (a && a.n >= 5 && a.until > Date.now()) return { locked: Math.max(1, Math.ceil((a.until - Date.now()) / 60_000)) };
 
   const user = await prisma.sysUser.findUnique({ where: { email: key } });
   // porovnání i pro neexistujícího uživatele, ať odezva neprozradí existenci účtu

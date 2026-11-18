@@ -67,6 +67,8 @@ export default async function UsersPage() {
         passwordHelp: t("@SYS:PasswordHelp"),
         user: t("@SYS:User"),
         general: t("@SYS:General"),
+        delete: t("@SYS:DeleteUser"),
+        deleteConfirm: t("@SYS:DeleteUserConfirm"),
       }}
     />
   );
