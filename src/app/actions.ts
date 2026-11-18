@@ -1,5 +1,6 @@
 "use server";
 
+import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
 import { createCompanyFromRegistry } from "@/server/company-lookup";
@@ -572,7 +573,7 @@ export async function posMailAction(kind: "receipt" | "invoice", id: string, to:
     assertCan(s.ctx.perms, "pos.receipt", "write");
     if (!s.ctx.modules.has("int")) throw new UserError("@INT:MailNoConnection");
     const email = String(to ?? "").trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UserError("@SYS:InvalidEmail");
+    if (!isEmail(email)) throw new UserError("@SYS:InvalidEmail");
     await sendDocumentNow(s.ctx, kind === "invoice" ? "ar.invoice" : "pos.receipt", String(id), email);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -584,6 +585,11 @@ function saleInput(input: SaleInput): SaleInput {
   return {
     registerId: String(input.registerId),
     customerId: input.customerId ? String(input.customerId) : null,
+    // odběratel jen na účtenku (bez evidence) — jen když není vybraný známý odběratel
+    buyer:
+      !input.customerId && input.buyer
+        ? { name: String(input.buyer.name ?? ""), street: String(input.buyer.street ?? ""), zip: String(input.buyer.zip ?? ""), city: String(input.buyer.city ?? "") }
+        : null,
     payment: input.payment === "card" ? "card" : "cash",
     cashGiven: input.cashGiven ? String(input.cashGiven) : null,
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,
@@ -795,7 +801,7 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult<{ m
   const name = `${firstName} ${lastName}`.trim();
   if (!firstName) errors.firstName = t("@SYS:Required");
   if (!lastName) errors.lastName = t("@SYS:Required");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = t("@SYS:InvalidEmail");
+  if (!isEmail(email)) errors.email = t("@SYS:InvalidEmail");
   // nový uživatel: heslo, nebo pozvánka (heslo si nastaví sám); změna hesla = aspoň 10 znaků
   const invite = !input.id && !input.password && !!input.sendInvite;
   if (!invite && (!input.id || input.password) && (input.password ?? "").length < 10) errors.password = t(input.id ? "@SYS:PasswordTooShort" : "@SYS:PasswordOrInvite");

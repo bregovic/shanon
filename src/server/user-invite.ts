@@ -5,6 +5,7 @@
  * Nastavení hesla token spotřebuje, odhlásí ostatní relace a zruší zámek po neúspěšných pokusech.
  * Nový uživatel bez hesla dostane náhodné heslo, které nikdo nezná — přihlásí se až po nastavení svého.
  */
+import { isEmail } from "@/core/edt";
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { Lang } from "@/core/labels";
@@ -36,6 +37,8 @@ export async function sendPasswordLink(
   const user = await prisma.sysUser.findFirst({ where: { id: userId, tenantId } });
   if (!user) throw new UserError("@SYS:NotFound");
   if (!user.active) throw new UserError("@SYS:UserInactive");
+  // starší účty mohly projít volnější kontrolou — poštovní server by adresu odmítl
+  if (!isEmail(user.email)) throw new UserError("@SYS:InvalidEmailFix", { email: user.email });
   const token = randomBytes(32).toString("base64url");
   const days = kind === "invite" ? INVITE_DAYS : RESET_DAYS;
   await prisma.sysUser.update({
@@ -118,7 +121,7 @@ function tooMany(key: string) {
  */
 export async function requestLoginHelp(email: string, message: string, ip: string): Promise<void> {
   const key = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)) throw new UserError("@SYS:InvalidEmail");
+  if (!isEmail(key)) throw new UserError("@SYS:InvalidEmail");
   if (tooMany(`ip:${ip}`) || tooMany(`mail:${key}`)) return;
   const user = await prisma.sysUser.findUnique({ where: { email: key }, include: { tenant: true } });
   const t = await getT("cs");

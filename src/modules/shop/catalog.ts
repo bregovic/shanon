@@ -5,6 +5,7 @@
  * množství × cena s DPH; objednávka má „Ceny včetně DPH“, takže součet sedí na košík. Dostupnost
  * = zásoba − rezervace (sklad obchodu, jinak všechny sklady), jen u skladových položek.
  */
+import { isEmail } from "@/core/edt";
 import { fromCents, mulCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type RecordData } from "@/core/module";
 import { accountingCurrencyId, convertPrice } from "@/modules/gl/posting";
@@ -371,7 +372,7 @@ const clip = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
 function checkBuyer(b: BuyerInput, address: boolean): Record<string, string> {
   const e: Record<string, string> = {};
   if (!clip(b.name, 120)) e.name = "@SYS:Required";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clip(b.email, 254))) e.email = "@SYS:InvalidEmail";
+  if (!isEmail(clip(b.email, 254))) e.email = "@SYS:InvalidEmail";
   if (b.regNo && !/^\d{8}$/.test(clip(b.regNo, 20).replace(/\s/g, ""))) e.regNo = "@SHOP:ErrRegNo";
   if (address) {
     if (!clip(b.street, 255)) e.street = "@SYS:Required";

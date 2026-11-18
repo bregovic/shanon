@@ -79,6 +79,14 @@ export function enumEdt(e: EnumDef, label: LabelRef = e.label): Edt {
 // Základní typy jádra
 // ---------------------------------------------------------------------------
 
+/**
+ * E-mailová adresa, kterou přijme poštovní server (Resend, SMTP): bez diakritiky a mezer, bez dvou teček
+ * za sebou a tečky na kraji jména, doména ze slov oddělených tečkou s koncovkou aspoň 2 písmena.
+ * Volnější vzor pouštěl adresy, které odeslání pak odmítlo („Invalid `to` field“).
+ */
+export const EMAIL_PATTERN = /^(?!\.)(?!.*\.\.)[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+(?<!\.)@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
+export const isEmail = (v: string) => v.length <= 254 && EMAIL_PATTERN.test(v);
+
 export const Edts = {
   /** uživatel (odpovědná osoba, řešitel úkolu) */
   User: defineEdt({ id: "UserId", kind: "string", label: "@SYS:User", maxLength: 36, user: true }),
@@ -104,7 +112,7 @@ export const Edts = {
     kind: "string",
     label: "@SYS:Email",
     maxLength: 254,
-    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    pattern: EMAIL_PATTERN,
     patternMessage: "@SYS:InvalidEmail",
     transform: "trim",
   }),

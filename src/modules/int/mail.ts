@@ -3,10 +3,10 @@
  * schránka (`mailTest`, nic neodesílá, zpráva jen do protokolu).
  */
 import nodemailer from "nodemailer";
+import { isEmail } from "@/core/edt";
 import { UserError, type RecordData } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
 
-const ADDRESS = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 
 /** „a@b.cz; c@d.cz, …“ → seznam adres; neplatná adresa = chyba s adresou. */
 export function parseAddresses(v: unknown): string[] {
@@ -14,7 +14,7 @@ export function parseAddresses(v: unknown): string[] {
     .split(/[,;\s]+/)
     .map((x) => x.trim())
     .filter(Boolean);
-  for (const a of list) if (!ADDRESS.test(a)) throw new UserError("@INT:MailBadAddress", { address: a });
+  for (const a of list) if (!isEmail(a)) throw new UserError("@INT:MailBadAddress", { address: a });
   return list;
 }
 

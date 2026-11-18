@@ -6,7 +6,7 @@
  * údaje (certifikát, hesla, API klíče) jsou pole se `secret` — v databázi
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
-import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
+import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 
@@ -196,7 +196,7 @@ const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
 const MAIL = { field: "kind", in: ["mail"] };
 const SMTP = { field: "driver", in: ["smtp"] };
-const Email = Str("MailAddress", "@INT:FromEmail", 254, /^[^\s@]+@[^\s@]+\.[^\s@]+$/, "@SYS:InvalidEmail");
+const Email = Str("MailAddress", "@INT:FromEmail", 254, EMAIL_PATTERN, "@SYS:InvalidEmail");
 
 export const connection = defineObject({
   id: "int.connection",
