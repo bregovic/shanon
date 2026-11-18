@@ -5,6 +5,7 @@
  * (sale.ts); nákup drží jen položky a množství.
  */
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import type { ScaleLine } from "./scale-line";
 
 export interface BasketView {
   id: string;
@@ -12,7 +13,18 @@ export interface BasketView {
   boxCode: string | null;
   version: number;
   updatedAt: string;
-  lines: { itemId: string; qty: string }[];
+  lines: { itemId: string; qty: string; scale?: ScaleLine | null }[];
+}
+
+/** vážení z ověřené váhy uložené u řádku boxu (JSON) — při zaplacení se cena vezme z něj */
+function scaleOf(v: unknown): ScaleLine | null {
+  if (!v) return null;
+  try {
+    const s = JSON.parse(String(v)) as ScaleLine;
+    return s && typeof s.total === "string" ? s : null;
+  } catch {
+    return null;
+  }
 }
 
 async function view(data: DataApi, b: RecordData): Promise<BasketView> {
@@ -24,7 +36,7 @@ async function view(data: DataApi, b: RecordData): Promise<BasketView> {
     boxCode: box ? String(box.code) : null,
     version: Number(b.version),
     updatedAt: String(b.updatedAt ?? ""),
-    lines: lines.map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
+    lines: lines.map((l) => ({ itemId: String(l.itemId), qty: String(l.qty), scale: scaleOf(l.scale) })),
   };
 }
 
@@ -56,7 +68,7 @@ export async function basketForBox(data: DataApi, box: RecordData, registerId: s
  */
 export async function saveBasket(
   data: DataApi,
-  input: { id?: string | null; label?: string | null; boxCode?: string | null; registerId: string; version?: number; lines: { itemId: string; qty: string }[] },
+  input: { id?: string | null; label?: string | null; boxCode?: string | null; registerId: string; version?: number; lines: { itemId: string; qty: string; scale?: ScaleLine | null }[] },
 ): Promise<BasketView> {
   if (input.lines.length > 500) throw new UserError("@POS:InvalidQty");
   let basket: RecordData;
@@ -82,7 +94,7 @@ export async function saveBasket(
   let n = 0;
   for (const l of input.lines) {
     if (!(Number(l.qty) > 0)) continue;
-    await data.create("pos.basketLine", { basketId: basket.id, lineNum: ++n, itemId: l.itemId, qty: l.qty });
+    await data.create("pos.basketLine", { basketId: basket.id, lineNum: ++n, itemId: l.itemId, qty: l.qty, scale: l.scale ? JSON.stringify(l.scale) : null });
   }
   return view(data, (await data.get("pos.basket", String(basket.id)))!);
 }

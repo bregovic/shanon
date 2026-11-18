@@ -12,6 +12,7 @@
  * - Známý odběratel: placeno hned → účtenka s odběratelem (tiskne se jako faktura – daňový doklad),
  *   „na fakturu“ → zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele (bez účtenky).
  */
+import type { ScaleLine } from "./scale-line";
 import { convertPrice } from "@/modules/gl/posting";
 import { fromCents, mulCents, roundCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
@@ -26,9 +27,16 @@ import { vatPayer } from "@/modules/tax/orders";
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
 
+export type { ScaleLine } from "./scale-line";
+
 export interface SaleInput {
   registerId: string;
-  lines: { itemId: string; qty: string }[];
+  lines: { itemId: string; qty: string; scale?: ScaleLine | null }[];
+  /**
+   * pokladna s ověřenou vahou (napojení s protokolem Dialog 06; doplní akce z napojení, ne terminál):
+   * vážené zboží v kg jde prodat jen s údaji z váhy
+   */
+  verifiedScale?: { name: string; serial: string | null; protocol: string } | null;
   /** invoice = na fakturu (odběratel zaplatí později) */
   payment: "cash" | "card" | "invoice";
   /** známý odběratel (Odběratelé) — na účtence / faktuře */
@@ -49,11 +57,15 @@ export async function openShiftOf(data: DataApi, registerId: string): Promise<Re
 }
 
 /** Řádek účtenky z položky — cena a DPH z databáze. */
-async function saleLine(data: DataApi, itemId: string, qtyRaw: string) {
+/** tvar čísel z váhy: hmotnost na 3 desetinná místa, ceny na 2 (jak je poslala váha) */
+const DEC: Record<number, RegExp> = { 2: /^\d{1,6}\.\d{2}$/, 3: /^\d{1,6}\.\d{3}$/ };
+
+async function saleLine(data: DataApi, itemId: string, qtyRaw: string, scale?: ScaleLine | null, verified?: SaleInput["verifiedScale"]) {
   const item = await data.get("inv.item", itemId);
   if (!item) throw new UserError("@SYS:NotFound");
   if (item.blocked) throw new UserError("@POS:ItemBlocked", { item: String(item.name) });
   if (item.priceGross === null || item.priceGross === undefined) throw new UserError("@POS:NoPrice", { item: String(item.name) });
+  if (scale || (verified && item.weighed && (await isKgItem(data, item)))) return scaleSaleLine(data, item, scale ?? null, verified ?? null);
   const qty = String(qtyRaw).replace(",", ".").trim();
   if (!/^\d+(\.\d{1,4})?$/.test(qty) || Number(qty) <= 0 || Number(qty) > 100000) throw new UserError("@POS:InvalidQty");
   const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
@@ -82,6 +94,53 @@ async function saleLine(data: DataApi, itemId: string, qtyRaw: string) {
   };
 }
 
+async function isKgItem(data: DataApi, item: RecordData) {
+  const unit = item.unitId ? await data.get("inv.unit", String(item.unitId)) : null;
+  return String(unit?.code ?? "").toUpperCase() === "KG";
+}
+
+/**
+ * Řádek z ověřené váhy: množství a cena přesně z váhy, žádná sleva ani přepočet (sleva = samostatný řádek).
+ * Kontroly: zboží je vážené, údaje jsou čísla ve tvaru z váhy, cena za kg z váhy = ceník (v haléřích).
+ */
+async function scaleSaleLine(data: DataApi, item: RecordData, scale: ScaleLine | null, verified: SaleInput["verifiedScale"] | null) {
+  const name = String(item.name);
+  if (!scale) throw new UserError("@POS:WeighOnScale", { item: name });
+  if (!item.weighed) throw new UserError("@POS:ScaleNotWeighed", { item: name });
+  if (!DEC[3].test(scale.weight) || !DEC[2].test(scale.unitPrice) || !DEC[2].test(scale.total) || toCents(scale.total) <= BigInt(0) || Number(scale.weight) <= 0)
+    throw new UserError("@POS:ScaleBadValue", { item: name });
+  const listPrice = await convertPrice(data, data.companyId ?? null, item.priceGross, item.currencyId as string, null, today());
+  if (toCents(scale.unitPrice) !== toCents(listPrice)) throw new UserError("@POS:ScalePriceMismatch", { item: name, scale: scale.unitPrice, price: String(listPrice) });
+  const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
+  const group = await data.get("inv.itemGroup", String(item.groupId));
+  const gross = toCents(scale.total); // cena z váhy — nepřepočítává se
+  const net = netFromGross(gross, code?.rate ?? 0);
+  return {
+    itemId: String(item.id),
+    description: name,
+    qty: scale.weight,
+    unitId: (item.unitId as string) ?? null,
+    unitPrice: scale.unitPrice,
+    originalPrice: null,
+    discountId: null,
+    taxCodeId: (item.taxCodeId as string) ?? null,
+    revenueAccountId: (group?.revenueAccountId as string) ?? null,
+    gross,
+    net,
+    tax: gross - net,
+    scale: {
+      scaleWeight: scale.weight,
+      scaleUnitPrice: scale.unitPrice,
+      scaleTotal: scale.total,
+      scaleName: verified?.name ?? null,
+      scaleSerial: verified?.serial ?? null,
+      scaleProtocol: verified?.protocol ?? "dialog06",
+      scaleRaw: String(scale.raw ?? "").slice(0, 2000),
+      weighedAt: scale.weighedAt && !Number.isNaN(Date.parse(scale.weighedAt)) ? new Date(scale.weighedAt).toISOString() : new Date().toISOString(),
+    } as RecordData,
+  };
+}
+
 /** Výpočet nákupu (ceny z položek) bez uložení — pro terminál a platbu kartou. */
 export async function quote(data: DataApi, input: SaleInput) {
   const reg = await data.get("pos.register", input.registerId);
@@ -92,7 +151,7 @@ export async function quote(data: DataApi, input: SaleInput) {
   if (!input.lines.length) throw new UserError("@POS:EmptySale");
   if (input.lines.length > 500) throw new UserError("@POS:InvalidQty");
   const lines = [];
-  for (const l of input.lines) lines.push(await saleLine(data, String(l.itemId), String(l.qty)));
+  for (const l of input.lines) lines.push(await saleLine(data, String(l.itemId), String(l.qty), l.scale, input.verifiedScale));
   const gross = sumCents(lines.map((l) => l.gross));
   const net = sumCents(lines.map((l) => l.net));
   // hotovost: zaokrouhlení podle účetní měny (CZK na koruny), mimo základ DPH
@@ -118,6 +177,8 @@ export async function sellOnInvoice(data: DataApi, input: SaleInput): Promise<Re
   const customer = await customerOf(data, input.customerId);
   if (!customer) throw new UserError("@POS:CustomerRequired");
   const { reg, lines } = await quote(data, { ...input, payment: "invoice" });
+  // faktura počítá řádek z množství × ceny — u ověřené váhy by se cena přepočítala
+  if (lines.some((l) => "scale" in l && l.scale)) throw new UserError("@POS:WeighedNotOnInvoice");
   const inv = await data.create("ar.invoice", { customerId: customer.id, pricesInclTax: true, description: String(reg.name).slice(0, 255) });
   for (const l of lines)
     await data.create("ar.invoiceLine", { invoiceId: inv.id, itemId: l.itemId, description: l.description, qty: l.qty, unitId: l.unitId, unitPrice: l.unitPrice, taxCodeId: l.taxCodeId, ...(l.revenueAccountId ? { revenueAccountId: l.revenueAccountId } : {}) });
@@ -175,6 +236,7 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
       amountGross: fromCents(l.gross),
       amountNet: fromCents(l.net),
       taxAmount: fromCents(l.tax),
+      ...("scale" in l && l.scale ? l.scale : {}),
     });
   }
   // zaplacený odložený nákup se uzavře (box je volný)

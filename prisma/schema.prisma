@@ -3561,28 +3561,36 @@ model PosReceipt {
 
 /// pos.receiptLine — generováno z definice objektu
 model PosReceiptLine {
-  id               String   @id @default(uuid(7)) @db.Uuid
-  tenantId         String   @map("tenant_id") @db.Uuid
-  companyId        String   @map("company_id") @db.Uuid
-  receiptId        String   @map("receipt_id") @db.Uuid
-  itemId           String   @map("item_id") @db.Uuid
-  description      String   @db.VarChar(255)
-  qty              Decimal  @db.Decimal(18, 4)
-  unitId           String?  @map("unit_id") @db.Uuid
-  unitPrice        Decimal  @map("unit_price") @db.Decimal(18, 2)
-  originalPrice    Decimal? @map("original_price") @db.Decimal(18, 2)
-  discountId       String?  @map("discount_id") @db.Uuid
-  taxCodeId        String?  @map("tax_code_id") @db.Uuid
-  revenueAccountId String?  @map("revenue_account_id") @db.Uuid
-  amountGross      Decimal? @map("amount_gross") @db.Decimal(18, 2)
-  amountNet        Decimal? @map("amount_net") @db.Decimal(18, 2)
-  taxAmount        Decimal? @map("tax_amount") @db.Decimal(18, 2)
-  ext              Json     @default("{}")
-  version          Int      @default(1)
-  createdAt        DateTime @default(now()) @map("created_at")
-  createdBy        String?  @map("created_by") @db.Uuid
-  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy        String?  @map("updated_by") @db.Uuid
+  id               String    @id @default(uuid(7)) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  receiptId        String    @map("receipt_id") @db.Uuid
+  itemId           String    @map("item_id") @db.Uuid
+  description      String    @db.VarChar(255)
+  qty              Decimal   @db.Decimal(18, 4)
+  unitId           String?   @map("unit_id") @db.Uuid
+  unitPrice        Decimal   @map("unit_price") @db.Decimal(18, 2)
+  originalPrice    Decimal?  @map("original_price") @db.Decimal(18, 2)
+  discountId       String?   @map("discount_id") @db.Uuid
+  taxCodeId        String?   @map("tax_code_id") @db.Uuid
+  revenueAccountId String?   @map("revenue_account_id") @db.Uuid
+  amountGross      Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  amountNet        Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount        Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  scaleWeight      Decimal?  @map("scale_weight") @db.Decimal(18, 4)
+  scaleUnitPrice   Decimal?  @map("scale_unit_price") @db.Decimal(18, 2)
+  scaleTotal       Decimal?  @map("scale_total") @db.Decimal(18, 2)
+  scaleName        String?   @map("scale_name") @db.VarChar(255)
+  scaleSerial      String?   @map("scale_serial") @db.VarChar(255)
+  scaleProtocol    String?   @map("scale_protocol") @db.VarChar(20)
+  scaleRaw         String?   @map("scale_raw")
+  weighedAt        DateTime? @map("weighed_at")
+  ext              Json      @default("{}")
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  createdBy        String?   @map("created_by") @db.Uuid
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?   @map("updated_by") @db.Uuid
 
   company        SysCompany   @relation("PosReceiptLine_company", fields: [companyId], references: [id], onDelete: Restrict)
   receipt        PosReceipt   @relation("PosReceiptLine_receipt", fields: [receiptId], references: [id], onDelete: Restrict)
@@ -3664,6 +3672,7 @@ model PosBasketLine {
   lineNum   Int?     @map("line_num")
   itemId    String   @map("item_id") @db.Uuid
   qty       Decimal  @db.Decimal(18, 4)
+  scale     String?
   ext       Json     @default("{}")
   version   Int      @default(1)
   createdAt DateTime @default(now()) @map("created_at")
@@ -4006,67 +4015,69 @@ model WhsItemCost {
 
 /// int.connection — generováno z definice objektu
 model IntConnection {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
-  companyId      String    @map("company_id") @db.Uuid
-  code           String    @db.VarChar(20)
-  name           String    @db.VarChar(120)
-  kind           String    @default("eet") @db.VarChar(40)
-  driver         String    @default("eet2") @db.VarChar(40)
-  registerId     String?   @map("register_id") @db.Uuid
-  active         Boolean   @default(true)
-  pausedByTest   Boolean   @default(false) @map("paused_by_test")
-  environment    String?   @default("playground") @db.VarChar(40)
-  unitId         String?   @map("unit_id") @db.VarChar(9)
-  posId          String?   @map("pos_id") @db.VarChar(20)
-  certPassword   String?   @map("cert_password") @db.VarChar(4000)
-  certData       String?   @map("cert_data")
-  certSubject    String?   @map("cert_subject") @db.VarChar(255)
-  certValidTo    DateTime? @map("cert_valid_to") @db.Date
-  paperWidth     String?   @default("80") @map("paper_width") @db.VarChar(40)
-  codePage       String?   @default("cp852") @map("code_page") @db.VarChar(40)
-  baudRate       Int?      @default(9600) @map("baud_rate")
-  scaleProtocol  String?   @default("toledo8217") @map("scale_protocol") @db.VarChar(40)
-  dataBits       Int?      @default(8) @map("data_bits")
-  parity         String?   @default("none") @db.VarChar(40)
-  stopBits       Int?      @default(1) @map("stop_bits")
-  openDrawer     Boolean   @default(false) @map("open_drawer")
-  autoPrint      Boolean   @default(false) @map("auto_print")
-  merchantCode   String?   @map("merchant_code") @db.VarChar(20)
-  apiKey         String?   @map("api_key") @db.VarChar(4000)
-  testMode       Boolean   @default(false) @map("test_mode")
-  payMethods     String?   @map("pay_methods") @db.VarChar(200)
-  posQr          Boolean   @default(false) @map("pos_qr")
-  pushUrl        String?   @map("push_url") @db.VarChar(200)
-  affiliateAppId String?   @map("affiliate_app_id") @db.VarChar(120)
-  affiliateKey   String?   @map("affiliate_key") @db.VarChar(4000)
-  pairingCode    String?   @map("pairing_code") @db.VarChar(20)
-  readerId       String?   @map("reader_id") @db.VarChar(60)
-  scopes         String?   @db.VarChar(400)
-  tokenPrefix    String?   @map("token_prefix") @db.VarChar(40)
-  tokenHash      String?   @map("token_hash") @db.VarChar(64)
-  model          String?   @db.VarChar(60)
-  dailyLimit     Int?      @default(50) @map("daily_limit")
-  autoList       Boolean   @default(true) @map("auto_list")
-  responsible    String?   @db.VarChar(36)
-  smtpHost       String?   @map("smtp_host") @db.VarChar(200)
-  smtpPort       Int?      @default(587) @map("smtp_port")
-  smtpSecurity   String?   @default("starttls") @map("smtp_security") @db.VarChar(40)
-  smtpUser       String?   @map("smtp_user") @db.VarChar(200)
-  smtpPassword   String?   @map("smtp_password") @db.VarChar(4000)
-  fromEmail      String?   @map("from_email") @db.VarChar(254)
-  fromName       String?   @map("from_name") @db.VarChar(120)
-  replyTo        String?   @map("reply_to") @db.VarChar(254)
-  bccSelf        Boolean   @default(false) @map("bcc_self")
-  signature      String?
-  lastCheckAt    DateTime? @map("last_check_at") @db.Date
-  lastResult     String?   @map("last_result") @db.VarChar(255)
-  ext            Json      @default("{}")
-  version        Int       @default(1)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  createdBy      String?   @map("created_by") @db.Uuid
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy      String?   @map("updated_by") @db.Uuid
+  id              String    @id @default(uuid(7)) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  code            String    @db.VarChar(20)
+  name            String    @db.VarChar(120)
+  kind            String    @default("eet") @db.VarChar(40)
+  driver          String    @default("eet2") @db.VarChar(40)
+  registerId      String?   @map("register_id") @db.Uuid
+  active          Boolean   @default(true)
+  pausedByTest    Boolean   @default(false) @map("paused_by_test")
+  environment     String?   @default("playground") @db.VarChar(40)
+  unitId          String?   @map("unit_id") @db.VarChar(9)
+  posId           String?   @map("pos_id") @db.VarChar(20)
+  certPassword    String?   @map("cert_password") @db.VarChar(4000)
+  certData        String?   @map("cert_data")
+  certSubject     String?   @map("cert_subject") @db.VarChar(255)
+  certValidTo     DateTime? @map("cert_valid_to") @db.Date
+  paperWidth      String?   @default("80") @map("paper_width") @db.VarChar(40)
+  codePage        String?   @default("cp852") @map("code_page") @db.VarChar(40)
+  baudRate        Int?      @default(9600) @map("baud_rate")
+  scaleProtocol   String?   @default("toledo8217") @map("scale_protocol") @db.VarChar(40)
+  scaleSerial     String?   @map("scale_serial") @db.VarChar(60)
+  scaleAutoAddSec Int?      @default(0) @map("scale_auto_add_sec")
+  dataBits        Int?      @default(8) @map("data_bits")
+  parity          String?   @default("none") @db.VarChar(40)
+  stopBits        Int?      @default(1) @map("stop_bits")
+  openDrawer      Boolean   @default(false) @map("open_drawer")
+  autoPrint       Boolean   @default(false) @map("auto_print")
+  merchantCode    String?   @map("merchant_code") @db.VarChar(20)
+  apiKey          String?   @map("api_key") @db.VarChar(4000)
+  testMode        Boolean   @default(false) @map("test_mode")
+  payMethods      String?   @map("pay_methods") @db.VarChar(200)
+  posQr           Boolean   @default(false) @map("pos_qr")
+  pushUrl         String?   @map("push_url") @db.VarChar(200)
+  affiliateAppId  String?   @map("affiliate_app_id") @db.VarChar(120)
+  affiliateKey    String?   @map("affiliate_key") @db.VarChar(4000)
+  pairingCode     String?   @map("pairing_code") @db.VarChar(20)
+  readerId        String?   @map("reader_id") @db.VarChar(60)
+  scopes          String?   @db.VarChar(400)
+  tokenPrefix     String?   @map("token_prefix") @db.VarChar(40)
+  tokenHash       String?   @map("token_hash") @db.VarChar(64)
+  model           String?   @db.VarChar(60)
+  dailyLimit      Int?      @default(50) @map("daily_limit")
+  autoList        Boolean   @default(true) @map("auto_list")
+  responsible     String?   @db.VarChar(36)
+  smtpHost        String?   @map("smtp_host") @db.VarChar(200)
+  smtpPort        Int?      @default(587) @map("smtp_port")
+  smtpSecurity    String?   @default("starttls") @map("smtp_security") @db.VarChar(40)
+  smtpUser        String?   @map("smtp_user") @db.VarChar(200)
+  smtpPassword    String?   @map("smtp_password") @db.VarChar(4000)
+  fromEmail       String?   @map("from_email") @db.VarChar(254)
+  fromName        String?   @map("from_name") @db.VarChar(120)
+  replyTo         String?   @map("reply_to") @db.VarChar(254)
+  bccSelf         Boolean   @default(false) @map("bcc_self")
+  signature       String?
+  lastCheckAt     DateTime? @map("last_check_at") @db.Date
+  lastResult      String?   @map("last_result") @db.VarChar(255)
+  ext             Json      @default("{}")
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  createdBy       String?   @map("created_by") @db.Uuid
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?   @map("updated_by") @db.Uuid
 
   company                SysCompany    @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
   register               PosRegister?  @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)

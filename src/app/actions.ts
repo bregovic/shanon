@@ -25,7 +25,7 @@ import { importIssuedIsdoc, isdocXml } from "@/server/isdoc-import";
 import { runReport } from "@/server/report";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
-import { openShiftOf, quote, receiptPrint, sell, sellOnInvoice, shiftTotals, type ReceiptPrint, type SaleInput } from "@/modules/pos/sale";
+import { openShiftOf, quote, receiptPrint, sell, sellOnInvoice, shiftTotals, type ReceiptPrint, type SaleInput, type ScaleLine } from "@/modules/pos/sale";
 import { sendDocumentNow } from "@/server/mail";
 import { disableCompanyModules, enableCompanyModules } from "@/server/modules";
 import { assertPaid, connectionsFor, eetRegisterReceipt, eetResendPending, paymentCancel, paymentStart, paymentStatus, type PaymentState } from "@/modules/int/drivers";
@@ -495,6 +495,7 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
     const withInt = s.ctx.modules.has("int");
     const receiptId = await inTenant(s.ctx, async (sess) => {
       const api = sess.sys().api();
+      if (withInt) sale.verifiedScale = await verifiedScaleOf(api, sale.registerId);
       // platba kartou přes terminál: schválená transakce na stejnou částku
       const conns = withInt ? await connectionsFor(api, sale.registerId) : {};
       if (sale.payment === "card" && conns.payment && conns.payment.driver !== "manual") {
@@ -555,6 +556,7 @@ export async function posInvoiceAction(input: SaleInput): Promise<ActionResult<{
     const sale = { ...saleInput(input), payment: "invoice" as const };
     const data = await inTenant(s.ctx, async (sess) => {
       const api = sess.sys().api();
+      if (s.ctx.modules.has("int")) sale.verifiedScale = await verifiedScaleOf(api, sale.registerId);
       const inv = await sellOnInvoice(api, sale);
       const c = await api.get("ar.customer", String(inv.customerId));
       const subj = c?.subjectId ? await api.get("gab.subject", String(c.subjectId)) : null;
@@ -594,8 +596,23 @@ function saleInput(input: SaleInput): SaleInput {
     cashGiven: input.cashGiven ? String(input.cashGiven) : null,
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,
     basketId: input.basketId ? String(input.basketId) : null,
-    lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
+    lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty), scale: scaleLineOf(l.scale) })),
   };
+}
+
+/** údaje z váhy od terminálu: jen texty v očekávaném tvaru (kontrolu tvaru a ceny dělá prodej) */
+function scaleLineOf(v: unknown): ScaleLine | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const str = (k: string, n = 40) => String(o[k] ?? "").slice(0, n);
+  return { weight: str("weight"), unitPrice: str("unitPrice"), total: str("total"), raw: str("raw", 2000), weighedAt: str("weighedAt") };
+}
+
+/** Pokladna s ověřenou vahou (Dialog 06): údaj bere server z napojení, terminál ho poslat nemůže. */
+async function verifiedScaleOf(api: Parameters<typeof connectionsFor>[0], registerId: string): Promise<SaleInput["verifiedScale"]> {
+  const conn = (await connectionsFor(api, registerId)).scale;
+  if (!conn || conn.scaleProtocol !== "dialog06") return null;
+  return { name: String(conn.name ?? conn.code ?? ""), serial: (conn.scaleSerial as string) || null, protocol: "dialog06" };
 }
 
 /** Platba kartou na terminálu: zahájení (částku spočítá server z položek). */
@@ -611,6 +628,7 @@ export async function posCardStartAction(input: SaleInput): Promise<ActionResult
       const api = sess.sys().api();
       const conn = (await connectionsFor(api, sale.registerId)).payment;
       if (!conn) throw new UserError("@INT:NoConnection");
+      sale.verifiedScale = await verifiedScaleOf(api, sale.registerId);
       const q = await quote(api, sale);
       return paymentStart(api, conn, q.paid, `${q.reg.code}`, { origin, tenantId: s.ctx.tenantId });
     });
@@ -1135,7 +1153,7 @@ export async function posBasketSaveAction(input: {
       boxCode: input.boxCode ? String(input.boxCode) : null,
       registerId: String(input.registerId),
       version: typeof input.version === "number" ? input.version : undefined,
-      lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty) })),
+      lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty), scale: scaleLineOf((l as { scale?: unknown }).scale) })),
     };
     return { ok: true, data: await inTenant(s.ctx, (sess) => saveBasket(sess.sys().api(), clean)) };
   } catch (e) {

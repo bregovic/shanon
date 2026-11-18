@@ -33,6 +33,8 @@ export const ScaleProtocol = defineEnum({
     { value: "toledo8217", label: "@INT:ScaleToledo8217" },
     { value: "casEcr", label: "@INT:ScaleCasEcr" },
     { value: "continuous", label: "@INT:ScaleContinuous" },
+    // ověřená váha: cenu počítá váha (pokladna jen posílá cenu za kg) — panel Váha v pokladně
+    { value: "dialog06", label: "@INT:ScaleDialog06" },
   ],
 });
 export const SerialParity = defineEnum({
@@ -227,7 +229,11 @@ export const connection = defineObject({
     codePage: { edt: enumEdt(CodePage), default: "cp852", visibleWhen: SERIAL },
     baudRate: { edt: Edts.Int, label: "@INT:BaudRate", default: 9600, visibleWhen: { field: "driver", in: ["escposSerial", "scaleSerial"] } },
     // pokladní váha (sériový port): protokol a parametry portu podle nastavení váhy
-    scaleProtocol: { edt: enumEdt(ScaleProtocol), default: "toledo8217", visibleWhen: { field: "driver", in: ["scaleSerial"] } },
+    scaleProtocol: { edt: enumEdt(ScaleProtocol), default: "toledo8217", visibleWhen: { field: "driver", in: ["scaleSerial", "scaleSim"] } },
+    /** výrobní číslo váhy — ukládá se ke každé vážené položce (doložení ceny) */
+    scaleSerial: { edt: Str("ScaleSerialNo", "@INT:ScaleSerialNo", 60), visibleWhen: { field: "driver", in: ["scaleSerial", "scaleSim"] } },
+    /** Dialog 06: přidat do nákupu samo po N s ustálení (0 = vždy potvrdí prodavač) */
+    scaleAutoAddSec: { edt: Edts.Int, label: "@INT:ScaleAutoAdd", default: 0, help: "@INT:ScaleAutoAddHelp", visibleWhen: { field: "driver", in: ["scaleSerial", "scaleSim"] } },
     dataBits: { edt: Edts.Int, label: "@INT:DataBits", default: 8, visibleWhen: { field: "driver", in: ["scaleSerial"] } },
     parity: { edt: enumEdt(SerialParity), default: "none", visibleWhen: { field: "driver", in: ["scaleSerial"] } },
     stopBits: { edt: Edts.Int, label: "@INT:StopBits", default: 1, visibleWhen: { field: "driver", in: ["scaleSerial"] } },
@@ -280,7 +286,7 @@ export const connection = defineObject({
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
     { label: "@INT:ComgateSettings", fields: ["merchantCode", "apiKey", "testMode", "payMethods", "posQr", "pushUrl"], visibleWhen: COMGATE },
     { label: "@INT:GatewaySimSettings", fields: ["posQr"], visibleWhen: { field: "driver", in: ["gatewaySim"] } },
-    { label: "@INT:ScaleSettings", fields: ["scaleProtocol", "baudRate", "dataBits", "parity", "stopBits"], visibleWhen: { field: "driver", in: ["scaleSerial"] } },
+    { label: "@INT:ScaleSettings", fields: ["scaleProtocol", "scaleSerial", "scaleAutoAddSec", "baudRate", "dataBits", "parity", "stopBits"], visibleWhen: { field: "driver", in: ["scaleSerial", "scaleSim"] } },
     { label: "@INT:ApiSettings", fields: ["scopes", "tokenPrefix"], visibleWhen: API },
     { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "autoList", "responsible"], visibleWhen: OCR },
     { label: "@INT:MailSettings", fields: ["smtpHost", "smtpPort", "smtpSecurity", "smtpUser", "smtpPassword", "fromEmail", "fromName", "replyTo", "bccSelf", "signature"], visibleWhen: MAIL },
@@ -587,6 +593,10 @@ export default defineModule({
       ScaleToledo8217: "Mettler Toledo 8217 a kompatibilní (dotaz W)",
       ScaleCasEcr: "CAS ECR a kompatibilní (ENQ / DC1)",
       ScaleContinuous: "Plynulé posílání hmotnosti (ST/US)",
+      ScaleDialog06: "Dialog 06 (ověřená váha počítá cenu)",
+      ScaleSerialNo: "Výrobní číslo váhy",
+      ScaleAutoAdd: "Přidat samo po ustálení (s)",
+      ScaleAutoAddHelp: "0 = položku vždy potvrdí prodavač. Jen u Dialog 06.",
       DataBits: "Datové bity",
       StopBits: "Stop bity",
       Parity: "Parita",
@@ -934,6 +944,10 @@ export default defineModule({
       ScaleToledo8217: "Mettler Toledo 8217 and compatible (W request)",
       ScaleCasEcr: "CAS ECR and compatible (ENQ / DC1)",
       ScaleContinuous: "Continuous weight output (ST/US)",
+      ScaleDialog06: "Dialog 06 (verified scale computes the price)",
+      ScaleSerialNo: "Scale serial number",
+      ScaleAutoAdd: "Add automatically after stable (s)",
+      ScaleAutoAddHelp: "0 = the cashier always confirms. Dialog 06 only.",
       DataBits: "Data bits",
       StopBits: "Stop bits",
       Parity: "Parity",
