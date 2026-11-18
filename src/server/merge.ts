@@ -8,7 +8,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { UserError, type RecordData } from "@/core/module";
 import type { ObjectDef } from "@/core/object";
 import { registry } from "@/registry";
-import { getObject, handlersFor, type Session } from "./data";
+import { forgetReads, getObject, handlersFor, type Session } from "./data";
 
 type Delegate = { updateMany(a: unknown): Promise<{ count: number }> };
 const model = (s: Session, def: ObjectDef) => (s.tx as unknown as Record<string, Delegate>)[def.table.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())];
@@ -50,6 +50,7 @@ export async function mergeRecords(s: Session, objectId: string, ids: string[]):
     }
   }
   await s.tx.sysDocuRef.updateMany({ where: { tenantId, objectId, recordId: { in: otherIds } }, data: { recordId: targetId } });
+  forgetReads(s.tx); // odkazy přepojené hromadně mimo save
 
   for (const id of otherIds) await s.remove(objectId, id);
   if (Object.keys(patch).length) return s.save(objectId, targetId, patch);

@@ -226,6 +226,42 @@ function prismaError(e: unknown): never {
 }
 
 // ---------------------------------------------------------------------------
+// Paměť čtení transakce
+// ---------------------------------------------------------------------------
+
+/**
+ * Čtení `get` / `find` v jedné transakci se pamatuje: logika dokladů čte stejnou hlavičku, partnera, účty
+ * a parametry opakovaně (řádek faktury 6× hlavičku). Zápis objektu přes `save` / `remove` zahodí paměť
+ * toho objektu; kód, který zapisuje mimo ně (hromadné `updateMany`, SQL, návrat k savepointu), volá
+ * `forgetReads(tx)`. Volající dostává vždy kopii. Paměť zaniká s transakcí.
+ */
+const READS = new WeakMap<object, Map<string, Map<string, RecordData | RecordData[] | null>>>();
+const READ_LIMIT = 5000;
+const FIND_CACHE_MAX_ROWS = 500;
+const clone = <T>(v: T): T => (v === null ? v : structuredClone(v));
+
+/** Zahodit paměť čtení transakce (celou, nebo jen objektů) — po zápisu mimo `save` / `remove`. */
+export function forgetReads(tx: object, objectIds?: string[]) {
+  const m = READS.get(tx);
+  if (!m) return;
+  if (!objectIds) m.clear();
+  else for (const o of objectIds) m.delete(o);
+}
+
+function readCache(tx: object, objectId: string) {
+  let m = READS.get(tx);
+  if (!m) READS.set(tx, (m = new Map()));
+  let o = m.get(objectId);
+  if (!o) {
+    let n = 0;
+    for (const x of m.values()) n += x.size;
+    if (n > READ_LIMIT) m.clear(); // dlouhé dávky: paměť nesmí růst bez omezení
+    m.set(objectId, (o = new Map()));
+  }
+  return o;
+}
+
+// ---------------------------------------------------------------------------
 // Operace v rámci transakce
 // ---------------------------------------------------------------------------
 
@@ -284,17 +320,41 @@ export class Session {
     return true;
   }
 
+  /** Klíč paměti čtení: firma a sdílené číselníky určují, co `scopeWhere` vrátí. */
+  private get readScope(): string {
+    return `${this.ctx.companyId ?? ""}|${this.ctx.shared ? JSON.stringify(this.ctx.shared) : ""}`;
+  }
+
   async get(objectId: string, id: string): Promise<RecordData | null> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "read", this.system);
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+    const cache = readCache(this.tx, objectId);
+    const key = `g|${this.readScope}|${id}`;
+    if (cache.has(key)) return clone(cache.get(key) as RecordData | null);
     const row = await delegate(this.tx, def).findFirst({ where: { id, ...scopeWhere(this.ctx, def) } });
-    return row ? serialize(def, row) : null;
+    const out = row ? serialize(def, row) : null;
+    cache.set(key, clone(out));
+    return out;
   }
 
   async find(objectId: string, where: RecordData, take = 1000, orderBy?: Record<string, "asc" | "desc">): Promise<RecordData[]> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "read", this.system);
+    const cache = readCache(this.tx, objectId);
+    let key: string | null = null;
+    try {
+      key = `f|${this.readScope}|${JSON.stringify(where)}|${take}|${JSON.stringify(orderBy ?? {})}`;
+    } catch {
+      key = null; // nečitelná podmínka (BigInt…) — bez paměti
+    }
+    if (key && cache.has(key)) return clone(cache.get(key) as RecordData[]);
+    const out = await this.findRaw(def, where, take, orderBy);
+    if (key && out.length <= FIND_CACHE_MAX_ROWS) cache.set(key, clone(out));
+    return out;
+  }
+
+  private async findRaw(def: ObjectDef, where: RecordData, take: number, orderBy?: Record<string, "asc" | "desc">): Promise<RecordData[]> {
     const rows = await delegate(this.tx, def).findMany({
       where: { ...toDb(def, where), ...scopeWhere(this.ctx, def) },
       // řazení podle polí objektu i podle času založení / změny
@@ -452,6 +512,7 @@ export class Session {
     if (!num) return;
     const seq = await this.findSeq({ usedFor: def.id, code: def.numberSeq.seq });
     if (!seq?.continuous) return;
+    forgetReads(this.tx, ["sys.numberSeq", "sys.numberSeqFree"]);
     await this.tx.sysNumberSeqFree.createMany({ data: [{ tenantId: this.ctx.tenantId, companyId: this.ctx.companyId, seqId: seq.id, number: String(num) }], skipDuplicates: true });
   }
 
@@ -475,6 +536,7 @@ export class Session {
   private async nextNumberRaw(seq: string | { id?: string; usedFor?: string; code?: string }, date = new Date()): Promise<string> {
     if (!this.ctx.companyId) throw new UserError("@SYS:NoCompany");
     const by = typeof seq === "string" ? { code: seq } : seq;
+    forgetReads(this.tx, ["sys.numberSeq", "sys.numberSeqFree"]);
     const scope = Prisma.sql`tenant_id = ${this.ctx.tenantId}::uuid AND company_id = ${this.ctx.companyId}::uuid`;
     const take = async (cond: Prisma.Sql) =>
       // atomicky: UPDATE … RETURNING drží zámek řádku do konce transakce
@@ -597,6 +659,7 @@ export class Session {
     const d = delegate(this.tx, def);
     const values = toDb(def, merged);
     let saved: RecordData;
+    forgetReads(this.tx, [objectId]);
     try {
       if (isNew) {
         saved = await d.create({
@@ -623,6 +686,7 @@ export class Session {
       prismaError(e);
     }
     const result = serialize(def, saved);
+    forgetReads(this.tx, [objectId]);
     await this.audit(objectId, String(result.id), isNew ? "create" : "update", existing && maskSecrets(def, existing), maskSecrets(def, result));
     for (const h of handlersFor(this.ctx, objectId)) await h.afterSave?.(ectx, result, isNew);
     // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
@@ -657,6 +721,7 @@ export class Session {
       for (const line of await sys.find(l.object, { [l.field]: id })) await sys.remove(l.object, String(line.id));
     }
     try {
+      forgetReads(this.tx, [objectId]);
       await delegate(this.tx, def).deleteMany({ where: { id, ...scopeWhere(this.ctx, def) } });
     } catch (e) {
       prismaError(e);
@@ -755,6 +820,7 @@ export const setImageField = (ctx: Ctx, objectId: string, id: string, field: str
       const before = await s.sys().get(objectId, id);
       if (!before) throw new UserError("@SYS:NotFound");
       if (def.lockedWhen && before[def.lockedWhen.field] === def.lockedWhen.equals) throw new UserError("@SYS:Locked");
+      forgetReads(s.tx, [objectId]);
       await delegate(s.tx, def).updateMany({ where: { id, ...scopeWhere(ctx, def) }, data: { [field]: value, updatedBy: ctx.userId } });
       await s.audit(objectId, id, "update", { [field]: before[field] ?? null }, { [field]: value });
       return before[field] as string | null;

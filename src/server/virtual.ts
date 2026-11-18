@@ -12,7 +12,7 @@ import { UserError, type RecordData } from "@/core/module";
 import type { ObjectDef } from "@/core/object";
 import { registry } from "@/registry";
 import type { Session } from "./data";
-import { getObject } from "./data";
+import { forgetReads, getObject } from "./data";
 
 type Delegate = {
   count(a: unknown): Promise<number>;
@@ -55,6 +55,7 @@ export async function virtualBeforeSave(s: Session, objectId: string, d: RecordD
       data: { tenantId: s.ctx.tenantId, code: `V-${String(d.code)}`.slice(0, 20), name: String(d.name ?? d.code).slice(0, 120), currency: "CZK", country: "CZ", vatPayer: false, virtual: true },
     });
     d.holderCompanyId = holder.id;
+    forgetReads(s.tx, ["sys.company"]);
   }
   if (objectId === "sys.virtualMember") {
     const c = await s.tx.sysCompany.findFirst({ where: { id: String(d.memberCompanyId), tenantId: s.ctx.tenantId } });
@@ -120,5 +121,7 @@ export async function detachMember(s: Session, member: RecordData): Promise<void
       for (const [from, to] of map) await model(s, def).updateMany({ where: { tenantId, companyId, [name]: from }, data: { [name]: to } });
     }
   }
+  forgetReads(s.tx); // kopie a přepojení mimo save
   await s.tx.sysVirtualMember.deleteMany({ where: { id: String(member.id), tenantId } });
+  forgetReads(s.tx, ["sys.virtualMember"]);
 }

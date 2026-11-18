@@ -21,7 +21,7 @@ import { coerce } from "@/core/validate";
 import { fillLabel, resolveLabel, type Lang } from "@/core/labels";
 import { labelTable, registry } from "@/registry";
 import { can } from "@/core/security";
-import { getObject, inTenant, type Ctx, type Session } from "./data";
+import { forgetReads, getObject, inTenant, type Ctx, type Session } from "./data";
 import { imageMime, safeFileName } from "./docuref";
 import { defaultStorage, storageFor } from "./storage";
 
@@ -401,6 +401,7 @@ export async function importRecords(
               else report.created++;
             } catch (e) {
               await s.tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT shanon_import_row");
+              forgetReads(s.tx); // vrácené zápisy řádku nesmí zůstat v paměti čtení
               if (!(e instanceof UserError)) throw e;
               const fields = Object.entries(e.fields ?? {});
               if (!fields.length) err(lineNo(i), null, t(e.label, e.params));

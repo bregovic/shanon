@@ -20,6 +20,13 @@ moderním webovém stacku.
    jednu službu `postVoucher()`.
 6. **Bezpečnost od prvního dne.** Žádné debug/setup skripty na webu, každá
    akce ověřuje relaci, žádné tajné údaje v repu.
+7. **Funkce co nejvíc objektově.** Nové chování = vlastnost definice objektu (`ObjectDef`, `FieldDef`, `ModuleDef`)
+   s jednou obecnou implementací v jádru, kterou dostane každý objekt (číselné řady, Sloučit, Duplikovat,
+   související doklady, import / export, pohledy). Kód pro jeden konkrétní objekt jen tam, kde jde o jeho
+   byznys pravidlo (obsluhy `ObjectHandlers`).
+8. **Efektivně od začátku — počítá se s tisíci dokladů denně.** Počet dotazů nesmí růst s počtem řádků
+   (žádné čtení v cyklu za záznam), číselníky se čtou jednou, výpisy po stránkách na serveru, dlouhé
+   operace po dávkách v limitu transakce. Každá nová „horká“ cesta má případ v `scripts/perf.ts`.
 
 ## 2. Vrstvy
 
@@ -78,6 +85,11 @@ Každé čtení a zápis objektu jde tudy. Pořadí při uložení:
 8. `afterSave`
 
 Vše v jedné transakci s `SET LOCAL ROLE shanon_app` a `app.tenant_id` → RLS.
+
+**Paměť čtení transakce:** `get` / `find` si v rámci transakce pamatují výsledek (klíč = objekt + firma
++ podmínka), volající dostane kopii. `save` / `remove` zahodí paměť svého objektu; kód, který zapisuje
+mimo ně (hromadné `updateMany`, SQL, návrat k savepointu), volá `forgetReads(tx)`. Logika proto může
+číst hlavičku, partnera nebo parametry opakovaně bez dalších dotazů. `list` (grid) paměť nepoužívá.
 
 ## 4b. Filtry gridu
 

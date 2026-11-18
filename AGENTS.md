@@ -8,6 +8,22 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 
+## Manifest: objektově a efektivně
+
+- **Objektově:** novou funkci navrhnout jako vlastnost definice (`ObjectDef` / `FieldDef` / `ModuleDef`)
+  s jednou obecnou implementací v jádru (`src/server`, `src/core`), kterou dostanou všechny objekty — ne kód
+  pro jeden objekt, stránku nebo endpoint. Vzory: `numberSeq`, `mergeable`, `related`, `lines`, `postingPreview`,
+  `rememberLast`, import / export, uložené pohledy. Specifický kód jen pro byznys pravidlo (`ObjectHandlers`).
+- **Efektivně (tisíce transakcí):**
+  - počet dotazů nesmí růst s počtem řádků: žádné `get` / `find` v cyklu za záznam — načíst hromadně
+    (`{ in: [...] }`) a spárovat v paměti; číselníky jednou za operaci;
+  - opakované čtení v jedné transakci obsluhuje paměť čtení datové služby (`get` / `find`); zápis mimo
+    `save` / `remove` (`updateMany`, SQL, `ROLLBACK TO SAVEPOINT`) = zavolat `forgetReads(tx)`;
+  - seznamy jen po stránkách na serveru (`listRecords`), součty agregací v DB, ne sčítáním v JS;
+  - dlouhé operace po dávkách (`IMPORT_BATCH`, limit transakce 20 s), síť mimo transakci (`outside`);
+  - veřejné stránky (e-shop, portál) mají pevný počet dotazů na stránku bez ohledu na velikost katalogu;
+  - nová horká cesta = případ ve `scripts/perf.ts`, výsledek porovnat s měřítkem níže (Workflow → Výkon).
+
 ## Objekty a moduly
 
 - Nová tabulka = nový objekt v `src/modules/<modul>/index.ts` (`defineObject`),
@@ -447,8 +463,9 @@ ta používá stejné komponenty a akce.
   během; transakce má limit 20 s, dlouhé operace (zaúčtování stovek dokladů) čtou číselníky
   jednou za běh (`cachedReads`) a nedělají zbytečné zápisy. Měřítko 15. 11. 2026 (PGlite):
   řádek deníku 16 ms, faktura se 3 řádky 52 ms, zaúčtování faktury 63 ms, 500 dokladů deníku 6 s.
-  18. 11. 2026: řádek deníku 18 ms, faktura se 3 řádky 88 ms (28 dotazů na řádek — opakované čtení hlavičky / partnera),
-  zaúčtování 78 ms (85 dotazů), e-shop kategorie 250 položek 19 ms, přehled 16 ms, košík 10 položek 46 ms.
+  18. 11. 2026 před pamětí čtení: faktura se 3 řádky 88 ms (28 dotazů na řádek), zaúčtování 78 ms (85 dotazů).
+  Po paměti čtení transakce: řádek deníku 16 ms, faktura se 3 řádky 60 ms, zaúčtování 49 ms, e-shop kategorie
+  250 položek 22 ms, přehled 18 ms, košík 10 položek 31 ms.
   Výpis zboží e-shopu nesmí dotazovat za položku: číselníky přes `catalogReads`, zásoba hromadně `stockOf` (`shop/catalog.ts`).
 - Před dokončením úkolu (dřívější SOP): build projde, nové texty jsou labely
   v cs i en, nový objekt má test v `tests/`, změna je ověřená v prohlížeči
