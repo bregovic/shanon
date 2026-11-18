@@ -52,5 +52,14 @@ Váha se připojuje k počítači pokladny kabelem RS-232 nebo USB (převodník 
 
 **Testovací prostředí** založí **TEST-SCALE – simulátor váhy**: pokladna se chová, jako by byla váha připojená (chvíli kolísá, pak se ustálí náhodná hmotnost).
 
-**Ověřená váha (stanovené měřidlo):** při prodeji podle hmotnosti musí být váha ověřená a její displej viditelný pro zákazníka. Když pokladna přebírá hmotnost z váhy, posuzuje ČMI celou sestavu váha + pokladna (prohlášení výrobce o shodě sestavy, případně informativní štítek, že ověření platí jen pro váhu) — postup konzultujte s dodavatelem váhy. Protokol Dialog 06 (ověřený přenos ceny mezi pokladnou a váhou) zatím Shanon neumí.
+**Ověřená váha (stanovené měřidlo):** při prodeji podle hmotnosti musí být váha ověřená a její displej viditelný pro zákazníka. Když pokladna přebírá hmotnost z váhy, posuzuje ČMI celou sestavu váha + pokladna (prohlášení výrobce o shodě sestavy, případně informativní štítek, že ověření platí jen pro váhu) — postup konzultujte s dodavatelem váhy. Pro ověřenou váhu s výpočtem ceny je protokol **Dialog 06** (viz níže).
+
+**Panel Váha (Dialog 06):** v napojení váhy zvolte protokol **Dialog 06**, vyplňte výrobní číslo váhy a případně
+**Přidat samo po ustálení** (0 = vždy potvrdí prodavač). Na pokladně pak vedle Nákupu přibude panel **Váha**: klepnutí
+na vážené zboží pošle cenu za kg do váhy, váha zváží a sama spočítá cenu, panel ji ukáže a po ustálení ji
+**Přidat do nákupu** vloží přesně tak, jak ji vrátila váha (pokladna cenu nepočítá). Další vážení jde až po sundání
+zboží z váhy. Vážený řádek nejde upravit — jen smazat a zvážit znovu; sleva se dává samostatným řádkem. Ke každé vážené
+položce se uloží hmotnost, cena za kg, cena, váha, výrobní číslo a surová odpověď váhy (doložení ceny). Prodej na
+fakturu s váženým zbožím z ověřené váhy zatím nejde. Rámce Dialog 06 jsou zatím předběžné — před ostrým provozem je
+ověřit podle specifikace výrobce váhy a zkouškou na skutečné váze.
 

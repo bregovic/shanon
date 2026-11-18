@@ -484,7 +484,8 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
     vat.set(rate, v);
     out.push({
       description: String(l.description),
-      qty: String(Number(l.qty)),
+      // vážení z ověřené váhy: hmotnost tak, jak ji vrátila váha (3 desetinná místa, bez ořezání nul)
+      qty: l.scaleWeight ? Number(l.scaleWeight).toFixed(3) : String(Number(l.qty)),
       unit: units.get(unitId) ?? "",
       unitPrice: String(l.unitPrice),
       amount: String(l.amountGross),

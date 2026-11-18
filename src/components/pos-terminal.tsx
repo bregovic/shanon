@@ -69,6 +69,9 @@ import { receiptData } from "@/lib/receipt-data";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
 import { connectScalePort, readScale, readScaleSim, scalePort, type ScaleConfig, type ScaleReading } from "@/lib/scale";
+import type { ScaleWeighing } from "@/lib/scale-driver";
+import type { ScaleLine } from "@/modules/pos/scale-line";
+import { ScalePanel, scalePending, useVerifiedScale, type VerifiedScaleConfig } from "./pos-scale-panel";
 
 export interface PosItem {
   id: string;
@@ -90,6 +93,8 @@ export interface PosItem {
 interface Line {
   item: PosItem;
   qty: number;
+  /** vážení z ověřené váhy: hmotnost a cena přesně z váhy, řádek nejde upravit (jen smazat a zvážit znovu) */
+  scale?: ScaleLine | null;
 }
 
 /** Spustí čtení váhy jednou po otevření dialogu hmotnosti (připojená váha zadá hmotnost sama). */
@@ -156,6 +161,8 @@ const useStyles = makeStyles({
     gridTemplateColumns: "1fr 380px",
     "@media (max-width: 900px)": { gridTemplateColumns: "1fr", gridTemplateRows: "1fr auto", overflowY: "auto" },
   },
+  // s panelem Váha: zboží | váha (~320 px) | nákup
+  mainScale: { gridTemplateColumns: "1fr 320px 380px", "@media (max-width: 1200px)": { gridTemplateColumns: "1fr 300px 340px" } },
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
   // jedna posuvná řada (i při mnoha boxech zůstane místo pro zboží a košík)
@@ -324,6 +331,8 @@ export function PosTerminal(p: {
   eet: { pending: number } | null;
   /** pokladní váha (Integrace): sériový port v prohlížeči nebo simulátor */
   scale?: ({ driver: string } & ScaleConfig) | null;
+  /** ověřená váha (Dialog 06): panel Váha, cenu počítá váha */
+  verifiedScale?: VerifiedScaleConfig | null;
   /** zapnuté Odběratele: prodej známému odběrateli a na fakturu */
   customers?: boolean;
   /** zapnutá Integrace: odeslání dokladu e-mailem */
@@ -347,6 +356,9 @@ export function PosTerminal(p: {
   const [sub, setSub] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
+  // ověřená váha (Dialog 06): klepnutí na vážené zboží pošle cenu za kg do váhy, panel Váha převezme výsledek
+  const { driver: vDriver, state: vState } = useVerifiedScale(p.verifiedScale ?? null);
+  const verified = !!p.verifiedScale;
 
   // zadání množství / hmotnosti: nový řádek (idx = null) nebo úprava řádku nákupu
   const [weigh, setWeigh] = useState<{ item: PosItem; value: string; idx?: number | null; auto?: boolean } | null>(null);
@@ -417,7 +429,7 @@ export function PosTerminal(p: {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const itemById = useMemo(() => new Map(p.items.map((i) => [i.id, i])), [p.items]);
   const toLines = useCallback(
-    (b: BasketView): Line[] => b.lines.flatMap((l) => (itemById.has(l.itemId) ? [{ item: itemById.get(l.itemId)!, qty: Number(l.qty) }] : [])),
+    (b: BasketView): Line[] => b.lines.flatMap((l) => (itemById.has(l.itemId) ? [{ item: itemById.get(l.itemId)!, qty: Number(l.qty), scale: l.scale ?? null }] : [])),
     [itemById],
   );
   /** nastavit řádky ze serveru (bez zpětného uložení) */
@@ -454,7 +466,7 @@ export function PosTerminal(p: {
       id: a.id,
       registerId: p.register.id,
       version: a.version,
-      lines: ls.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) })),
+      lines: ls.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null })),
     });
     dirty.current = false;
     if (r.ok) {
@@ -513,7 +525,7 @@ export function PosTerminal(p: {
     const v = value.trim();
     if (!v) return;
     setBusy(true);
-    const r = await posBasketSaveAction({ label: v, boxCode: v, registerId: p.register.id, lines: lines.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) })) });
+    const r = await posBasketSaveAction({ label: v, boxCode: v, registerId: p.register.id, lines: lines.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null })) });
     setBusy(false);
     if (!r.ok) return setError(r.message);
     setParkDlg(null);
@@ -595,9 +607,11 @@ export function PosTerminal(p: {
     setPortReady(!!port);
   };
 
-  const total = lines.reduce((a, l) => a + Math.round(Number(l.item.price) * l.qty * 100), 0) / 100;
+  // vážený řádek z ověřené váhy: cena z váhy (jen součet řádků, nic se nepřepočítává)
+  const total = lines.reduce((a, l) => a + (l.scale ? Math.round(Number(l.scale.total) * 100) : Math.round(Number(l.item.price) * l.qty * 100)), 0) / 100;
   const startPay = (m: "cash" | "card") => {
     setError(undefined);
+    if (scalePending(vState)) return setError(L.ScalePending);
     setMethod(m);
     setDue(m === "cash" ? roundCash(total, p.register.cashRounding) : total);
     setPayDlg(m);
@@ -678,6 +692,18 @@ export function PosTerminal(p: {
     if (id) setFlash((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   };
   const remove = (idx: number) => setLines((ls) => ls.filter((_, j) => j !== idx));
+  /** Přidat do nákupu z panelu Váha: vždy nový řádek s hodnotami z váhy, váha se vymaže a čeká na nulu */
+  const addWeighed = useCallback(
+    (r: ScaleWeighing) => {
+      const prod = vDriver?.snapshot.product;
+      const item = prod ? itemById.get(prod.id) : null;
+      if (!item || !vDriver) return;
+      setLines((ls) => [...ls, { item, qty: Number(r.weight), scale: { weight: r.weight, unitPrice: r.unitPrice, total: r.total, raw: r.raw, weighedAt: r.at } }]);
+      setFlash((f) => ({ id: item.id, n: (f?.n ?? 0) + 1 }));
+      void vDriver.clear(true);
+    },
+    [vDriver, itemById],
+  );
   /** zavřít dialog množství (a ukončit čtení váhy) */
   const closeWeigh = () => {
     scaleLoop.current++;
@@ -696,6 +722,11 @@ export function PosTerminal(p: {
 
   const pick = (item: PosItem) => {
     setError(undefined);
+    // ověřená váha: cena za kg (ceníková, ne akční — sleva by šla samostatným řádkem) do váhy
+    if (verified && item.weighed && isKg(item)) {
+      void vDriver?.setUnitPrice({ id: item.id, name: item.name, unitPrice: item.regular || item.price });
+      return;
+    }
     if (item.weighed) {
       // připojená váha (nebo simulátor): hmotnost se po otevření dialogu načte sama (ScaleAutoStart)
       setWeigh({ item, value: "", auto: !!p.scale && isKg(item) && (scaleSim || scaleReady) });
@@ -705,6 +736,7 @@ export function PosTerminal(p: {
   /** podržení dlaždice: zadat množství rovnou */
   const pickQty = (item: PosItem) => {
     setError(undefined);
+    if (verified && item.weighed && isKg(item)) return pick(item);
     setWeigh({ item, value: "", idx: null });
   };
 
@@ -728,7 +760,8 @@ export function PosTerminal(p: {
     });
   };
 
-  const saleLines = () => lines.map((l) => ({ itemId: l.item.id, qty: String(Number(l.qty.toFixed(3))) }));
+  // vážený řádek z ověřené váhy: hmotnost a cena jdou na server tak, jak je vrátila váha
+  const saleLines = () => lines.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null }));
 
   const finishSale = async (payment: "cash" | "card", paymentRef: string | null) => {
     setBusy(true);
@@ -935,7 +968,7 @@ export function PosTerminal(p: {
           </Button>
         </div>
       ) : (
-        <div className={st.main}>
+        <div className={mergeClasses(st.main, verified && st.mainScale)}>
           <section className={st.catalog}>
             <Input
               ref={search}
@@ -1002,6 +1035,8 @@ export function PosTerminal(p: {
             </div>
           </section>
 
+          {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
+
           <aside className={st.cart} aria-label={L.Cart}>
             <div className={st.baskets}>
               <Button size="small" shape="circular" appearance={active ? "secondary" : "primary"} onClick={() => void openFree()}>
@@ -1066,15 +1101,15 @@ export function PosTerminal(p: {
                   key={`${l.item.id}-${idx}`}
                   st={st}
                   flash={flash?.id === l.item.id ? flash.n : 0}
-                  qtyText={l.item.weighed ? `${num.format(l.qty)} ${l.item.unit.toLowerCase()}` : `${l.qty}×`}
+                  qtyText={l.scale ? `${l.scale.weight.replace(".", ",")} kg` : l.item.weighed ? `${num.format(l.qty)} ${l.item.unit.toLowerCase()}` : `${l.qty}×`}
                   name={l.item.name}
-                  unitPrice={`${fmt(l.item.price)}${l.item.unit && l.item.unit !== "KS" ? ` / ${l.item.unit.toLowerCase()}` : ""}`}
-                  amount={fmt(Math.round(Number(l.item.price) * l.qty * 100) / 100)}
+                  unitPrice={l.scale ? `${fmt(l.scale.unitPrice)} / kg` : `${fmt(l.item.price)}${l.item.unit && l.item.unit !== "KS" ? ` / ${l.item.unit.toLowerCase()}` : ""}`}
+                  amount={l.scale ? fmt(l.scale.total) : fmt(Math.round(Number(l.item.price) * l.qty * 100) / 100)}
                   stepper={!l.item.weighed}
                   labels={{ minus: L.Less, plus: L.More, remove: L.Remove, qty: L.Quantity }}
                   onMinus={() => setQty(idx, l.qty - 1)}
                   onPlus={() => setQty(idx, l.qty + 1)}
-                  onEdit={() => setWeigh({ item: l.item, value: num.format(isKg(l.item) ? l.qty / W_FACTOR[wUnit] : l.qty).replace(/\s/g, ""), idx })}
+                  onEdit={() => (l.scale ? setError(L.WeighedLocked) : setWeigh({ item: l.item, value: num.format(isKg(l.item) ? l.qty / W_FACTOR[wUnit] : l.qty).replace(/\s/g, ""), idx }))}
                   onRemove={() => remove(idx)}
                 />
               ))}

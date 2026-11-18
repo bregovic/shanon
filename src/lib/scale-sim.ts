@@ -30,7 +30,10 @@ export class SimScaleTransport implements ScaleTransport {
     await new Promise((r) => setTimeout(r, Math.min(60, timeoutMs)));
     const b = Array.from(req);
     const now = Date.now();
-    if (this.removeAt && now >= this.removeAt) (this.grams = 0), (this.removeAt = 0);
+    if (this.removeAt && now >= this.removeAt) {
+      this.grams = 0;
+      this.removeAt = 0;
+    }
     // dotaz na stav: EOT ENQ
     if (b.length === 2 && b[1] === ENQ) {
       if (!this.priceCents) return parseDialog06(frame("09", "32"))!.msg; // bez ceny

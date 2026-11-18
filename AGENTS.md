@@ -312,7 +312,14 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   (`src/server/mail.ts`, koncept s PDF + odeslání). Kód firmy z ARES = `companyCodeFromName` (4 znaky, jedinečný).
 - Pokladní váha (`src/lib/scale.ts`, napojení druhu `scale`: `scaleSerial` / `scaleSim`): Web Serial v kase, protokoly toledo8217 /
   casEcr / continuous (`parseScale`, testy bez hardwaru), bere se jen ustálená kladná hmotnost; port váhy zapamatovaný v localStorage
-  (`pos.port.scale`), tiskárna ho přeskočí (`grantedPort`). Automatické zvážení po otevření dialogu `ScaleAutoStart`. Dialog 06 zatím ne.
+  (`pos.port.scale`), tiskárna ho přeskočí (`grantedPort`). Automatické zvážení po otevření dialogu `ScaleAutoStart`.
+- Ověřená váha Dialog 06 (napojení `scaleProtocol = dialog06`): **cenu váženého zboží počítá jen váha** (WELMEC 2.2) — v kódu
+  pokladny nesmí být hmotnost × cena pro takový řádek. Kodek `src/lib/dialog06.ts` (rámce PŘEDBĚŽNÉ, po specifikaci TEM měnit
+  jen tam), `ScaleDriver` (`src/lib/scale-driver.ts`: výměny 1 s × 3, dotaz 250 ms, kontrola ceny za kg, návrat na nulu,
+  připojení po 5 s; přenos `WebSerialTransport` / `SimScaleTransport` v `scale-sim.ts` — jen simulátor počítá cenu, hraje váhu),
+  panel `src/components/pos-scale-panel.tsx`. Server (`scaleSaleLine` v `pos/sale.ts`): řádek s `scale` = qty a cena z váhy,
+  cena za kg = ceník, bez slevy; pokladna s ověřenou vahou (`verifiedScale` doplní akce z napojení) neprodá vážené kg zboží bez
+  údajů z váhy; audit na `pos.receiptLine.scale*`, box drží vážení v `pos.basketLine.scale` (JSON).
 - Hromadný import mimo UI: `npx tsx --conditions=react-server scripts/import-file.ts
   <tenant> <firma> <objekt> <soubor>`; data zákazníků (ceníky, IČO) nikdy do repa.
 - Pošta (`src/modules/int/mail.ts` ovladač SMTP přes nodemailer / `mailTest` jen do protokolu,

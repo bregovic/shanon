@@ -5,7 +5,7 @@
  * - `toledo8217` — Mettler Toledo 8217 a kompatibilní („W“ → STX hmotnost [N] CR; STX ? stav CR = pohyb / chyba),
  * - `casEcr` — ECR protokol CAS a dalších (ENQ → ACK ustálená / NAK nebo BEL neustálená; DC1 → STX … hmotnost … ETX),
  * - `continuous` — váha sama posílá řádky („ST,GS,+  0.452kg“; ST = ustálená, US = neustálená, OL = přetížení).
- * Dialog 06 (ověřený přenos ceny pro váhy se stanoveným měřidlem) zatím není — viz nápověda Pokladna.
+ * Dialog 06 (ověřená váha počítá cenu) je zvlášť: src/lib/dialog06.ts + ScaleDriver + panel Váha.
  *
  * Hmotnost se bere jen ustálená a kladná; tárování a nulování dělá váha sama.
  */

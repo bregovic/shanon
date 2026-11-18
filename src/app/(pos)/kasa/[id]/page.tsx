@@ -118,8 +118,14 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           : null
       }
       payment={data.conns.payment ? { driver: String(data.conns.payment.driver) } : null}
+      // ověřená váha (Dialog 06): panel Váha místo dialogu hmotnosti; cenu počítá váha
+      verifiedScale={
+        data.conns.scale && data.conns.scale.scaleProtocol === "dialog06"
+          ? { driver: String(data.conns.scale.driver), baudRate: Number(data.conns.scale.baudRate ?? 9600), autoAddSec: Math.max(0, Number(data.conns.scale.scaleAutoAddSec ?? 0)) }
+          : null
+      }
       scale={
-        data.conns.scale
+        data.conns.scale && data.conns.scale.scaleProtocol !== "dialog06"
           ? {
               driver: String(data.conns.scale.driver),
               protocol: (["toledo8217", "casEcr", "continuous"].includes(String(data.conns.scale.scaleProtocol)) ? data.conns.scale.scaleProtocol : "toledo8217") as "toledo8217",
