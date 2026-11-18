@@ -33,12 +33,15 @@ const fromAddress = () => from().replace(/^.*<([^>]+)>.*$/, "$1");
 
 export const supportEmail = () => process.env.SHANON_SUPPORT_EMAIL || fromAddress();
 
-/** adresy prostředí; aktuální = SHANON_PUBLIC_URL, jinak doména služby na Railway, jinak PROD */
+/**
+ * Adresy prostředí; aktuální = SHANON_PUBLIC_URL, jinak podle prostředí Railway (test / production).
+ * RAILWAY_PUBLIC_DOMAIN se nebere: je to vygenerovaná doména služby (shanon-app-test…), ne adresa, kterou používáme.
+ */
 export function envUrls() {
   const prod = (process.env.SHANON_PROD_URL || "https://shanon.up.railway.app").replace(/\/$/, "");
   const test = (process.env.SHANON_TEST_URL || "https://shanon-test.up.railway.app").replace(/\/$/, "");
-  const railway = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "";
-  const self = (process.env.SHANON_PUBLIC_URL || railway || prod).replace(/\/$/, "");
+  const envName = process.env.RAILWAY_ENVIRONMENT_NAME;
+  const self = (process.env.SHANON_PUBLIC_URL || (envName === "test" ? test : prod)).replace(/\/$/, "");
   return { prod, test, self, isTest: !!test && self === test };
 }
 
