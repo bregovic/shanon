@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
-import { isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
+import { clearLoginLock, isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
 import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, previewRecord, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
@@ -48,7 +48,10 @@ export interface FormState {
 export async function loginAction(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "");
   const ok = await login(email, String(form.get("password") ?? ""));
-  if (!ok) return { message: (await getT("cs"))("@SYS:BadLogin"), values: { email } };
+  if (ok !== true) {
+    const t = await getT("cs");
+    return { message: ok ? t("@SYS:LoginLocked", { minutes: String(ok.locked) }) : t("@SYS:BadLogin"), values: { email } };
+  }
   redirect("/");
 }
 
@@ -808,6 +811,11 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
     // změna hesla nebo deaktivace odhlásí ostatní relace uživatele
     if (existing && (input.password || !input.active)) await tx.sysSession.deleteMany({ where: { userId: existing.id } });
   });
+  // nové heslo / e-mail od správce: zámek po neúspěšných pokusech se ruší, ať se uživatel hned přihlásí
+  if (input.password || existing?.email !== email) {
+    clearLoginLock(email);
+    if (existing) clearLoginLock(existing.email);
+  }
   revalidatePath("/system/users");
   return { ok: true, data: undefined };
 }
