@@ -24,7 +24,10 @@ import { unpostInvoice } from "../src/modules/tax/document";
 /** doklady dodavatele, které se mažou s ním (pořadí = pořadí mazání) */
 const DOCS = ["int.document", "ap.invoice", "ap.order", "ap.advance", "ap.trans"];
 
-const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+/** zamčený doklad (lockedWhen) → hodnota, na kterou se před smazáním přepne */
+const UNLOCK: Record<string, string> = { "int.document": "rejected" };
+
+const norm =(s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** moduly firmy — objekty vypnutých modulů nemají data ani přístup */
 let enabled = new Set<string>();
@@ -139,8 +142,16 @@ async function main() {
           await s.tx.$executeRawUnsafe(`UPDATE "${registry.objects.get(n.obj)!.table}" SET "${col}" = NULL WHERE id = $1::uuid AND tenant_id = $2::uuid`, n.id, ctx.tenantId);
         }
         forgetReads(s.tx);
-        for (const o of [...DOCS, "ap.vendor"])
-          for (const id of del.get(o)?.keys() ?? []) if (await api.get(o, id)) await api.remove(o, id);
+        for (const o of [...DOCS, "ap.vendor"]) {
+          const lock = registry.objects.get(o)!.lockedWhen;
+          for (const id of del.get(o)?.keys() ?? []) {
+            const rec = await api.get(o, id);
+            if (!rec) continue;
+            // zalistovaný vytěžený doklad je zamčený (mazat ho nejde) — nejdřív Odmítnuto (systémová úprava zámek obejde)
+            if (lock && rec[lock.field] === lock.equals && UNLOCK[o]) await api.update(o, id, { [lock.field]: UNLOCK[o] });
+            await api.remove(o, id);
+          }
+        }
         console.log("\nsmazáno");
       },
       client,
