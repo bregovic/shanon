@@ -13,9 +13,15 @@ import { notify } from "@/modules/sys/notify";
 import { slugify } from "@/lib/slug";
 
 const zero = BigInt(0);
-const today = () => new Date().toISOString().slice(0, 10);
+/** Datum a hodina v Praze (server běží v UTC — kolem půlnoci by „dnes“ byl jiný den). */
+const PRAGUE = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
+function pragueNow(at = new Date()) {
+  const p = Object.fromEntries(PRAGUE.formatToParts(at).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
+}
+const today = () => pragueNow().date;
 
-export { slugify };
+export { slugify, pragueNow };
 
 export interface ShopProduct {
   id: string;
@@ -221,13 +227,14 @@ const addDays = (iso: string, n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-/** Nabídka vyzvednutí podle obchodu: dny od–do, hodiny od–do (bez hodin = jen den). */
-export function pickupWindow(shop: RecordData, date = today()) {
+/** Nabídka vyzvednutí podle obchodu: dny od–do, hodiny od–do (bez hodin = jen den). Po zavírací hodině už ne dnes. */
+export function pickupWindow(shop: RecordData, date = today(), hour = pragueNow().hour) {
   const lead = Math.max(0, Number(shop.pickupLeadDays ?? 0));
   const span = Math.max(lead, Number(shop.pickupMaxDays ?? 14));
   const from = shop.pickupFrom === null || shop.pickupFrom === undefined || shop.pickupFrom === "" ? null : Number(shop.pickupFrom);
   const to = shop.pickupTo === null || shop.pickupTo === undefined || shop.pickupTo === "" ? null : Number(shop.pickupTo);
-  return { today: date, minDate: addDays(date, lead), maxDate: addDays(date, span), fromHour: from, toHour: to };
+  const closed = lead === 0 && to !== null && Number.isFinite(to) && hour >= to;
+  return { today: date, minDate: addDays(date, closed ? 1 : lead), maxDate: addDays(date, span), fromHour: from, toHour: to };
 }
 
 /** Rezerva ceny váženého zboží v %: položka, jinak obchod (výchozí 10). */

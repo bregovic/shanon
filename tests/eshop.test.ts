@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
 import { getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
-import { listProducts, orderView, placeOrder, quote, slugify, type OrderInput } from "@/modules/shop/catalog";
+import { listProducts, orderView, pickupWindow, placeOrder, pragueNow, quote, slugify, type OrderInput } from "@/modules/shop/catalog";
 import { completePick, pickBoard, setPick } from "@/modules/shop/picking";
 import type { DataApi, RecordData } from "@/core/module";
 
@@ -118,7 +118,8 @@ describe("e-shop", () => {
   }, 120_000);
 
   it("vážené zboží: den vyzvednutí, cena nejvýše, bez zálohy, vychystání podle skutečné váhy, faktura", async () => {
-    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const now = pragueNow();
+    const tomorrow = new Date(Date.parse(`${now.date}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
     const base: OrderInput = { lines: [{ itemId: ids.w, qty: "1" }, { itemId: ids.a, qty: 1 }], deliveryId: await dl("ODBER"), paymentMethodId: await pm("WEB-PREVOD"), buyer, terms: true };
     // košík: odhad 400 + 90, nejvýše 440 + 90 (rezerva 10 %), karta se nenabízí
     const q = await api((a) => quote(a, shop, base));
@@ -128,11 +129,11 @@ describe("e-shop", () => {
     expect(Object.keys(noDay.errors ?? {})).toContain("pickupDate");
     const badHour = await api((a) => placeOrder(a, shop, { ...base, pickupDate: tomorrow, pickupHour: 23 }, "ip-w", "w".repeat(30)));
     expect(Object.keys(badHour.errors ?? {})).toContain("pickupHour");
-    // dnes, co nejdřív (obchod dovoluje vyzvednutí ještě dnes): den = dnes, bez hodiny
-    const asap = await api((a) => placeOrder(a, shop, { ...base, pickupAsap: true, pickupHour: 23 }, "ip-a", "q".repeat(32)));
+    // dnes, co nejdřív (obchod dovoluje vyzvednutí ještě dnes): den = dnes, bez hodiny; bez zavírací hodiny, ať test nezávisí na čase
+    const asap = await api((a) => placeOrder(a, { ...shop, pickupTo: null }, { ...base, pickupAsap: true, pickupHour: 23 }, "ip-a", "q".repeat(32)));
     expect(asap.ok).toBe(true);
     const [soA] = (await listRecords(S, "shop.order", { filter: { orderNum: String(asap.orderNum) } }, client)).rows;
-    expect([String(soA.pickupDate).slice(0, 10), soA.pickupHour, soA.pickupAsap]).toEqual([new Date().toISOString().slice(0, 10), null, true]);
+    expect([String(soA.pickupDate).slice(0, 10), soA.pickupHour, soA.pickupAsap]).toEqual([now.date, null, true]);
     const r = await api((a) => placeOrder(a, shop, { ...base, pickupDate: tomorrow, pickupHour: 10 }, "ip-w", "w".repeat(32)));
     expect(r.ok).toBe(true);
     const [so] = (await listRecords(S, "shop.order", { filter: { orderNum: String(r.orderNum) } }, client)).rows;
@@ -161,6 +162,17 @@ describe("e-shop", () => {
     await runAction(S, "shop.order", String(so.id), "ship", client);
     expect((await getRecord(S, "shop.order", String(so.id), client))!.status).toBe("shipped");
   }, 180_000);
+
+  it("vyzvednutí: pražské datum, po zavírací hodině až zítra", () => {
+    // 23:30 UTC 18. 11. = 0:30 v Praze 19. 11.
+    expect(pragueNow(new Date("2026-11-18T23:30:00Z"))).toEqual({ date: "2026-11-19", hour: 0 });
+    expect(pragueNow(new Date("2026-07-01T22:30:00Z"))).toEqual({ date: "2026-07-02", hour: 0 });
+    const s = { pickupLeadDays: 0, pickupMaxDays: 14, pickupFrom: 8, pickupTo: 17 };
+    expect(pickupWindow(s, "2026-11-18", 10).minDate).toBe("2026-11-18");
+    expect(pickupWindow(s, "2026-11-18", 17).minDate).toBe("2026-11-19");
+    expect(pickupWindow({ ...s, pickupTo: null }, "2026-11-18", 22).minDate).toBe("2026-11-18");
+    expect(pickupWindow({ ...s, pickupLeadDays: 2 }, "2026-11-18", 20).minDate).toBe("2026-11-20");
+  });
 
   it("dobírka bez zálohy, zrušení, limit objednávek z adresy", async () => {
     const input: OrderInput = { lines: [{ itemId: ids.a, qty: 1 }], deliveryId: await dl("ADRESA"), paymentMethodId: await pm("WEB-DOBIRKA"), buyer, terms: true };
