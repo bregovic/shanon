@@ -234,6 +234,12 @@ export function uiLabels(t: T) {
       cancel: t("@SYS:Cancel"),
       saved: t("@SYS:Saved"),
       confirmDelete: t("@SYS:ConfirmDelete"),
+      deleteChecking: t("@SYS:DeleteChecking"),
+      deleteAllOk: t("@SYS:DeleteAllOk"),
+      deleteSomeOk: t("@SYS:DeleteSomeOk"),
+      deleteNoneOk: t("@SYS:DeleteNoneOk"),
+      deleteUsedIn: t("@SYS:DeleteUsedIn"),
+      deleteCount: t("@SYS:DeleteCount"),
     },
   };
 }

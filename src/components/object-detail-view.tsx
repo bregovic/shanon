@@ -37,6 +37,7 @@ import { ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons"
 import { bulkRecordAction, deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
+import { DeleteDialog } from "./delete-dialog";
 import { DocuRefButton } from "./docuref-panel";
 import { HistoryButton } from "./history-panel";
 import { ImportButton } from "./import-dialog";
@@ -134,6 +135,7 @@ const useStyles = makeStyles({
 function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: string; lang: string; labels: UiLabels }) {
   const s = useStyles();
   const [selected, setSelected] = useState<Row[]>([]);
+  const [confirmLines, setConfirmLines] = useState(false);
   const [reload, setReload] = useState(0);
   const [drawer, setDrawer] = useState<{ open: boolean; id: string | null; title: string }>({ open: false, id: null, title: "" });
   const [error, setError] = useState<string>();
@@ -182,11 +184,18 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
             <Button icon={<Edit24Regular />} disabled={selected.length !== 1} onClick={() => open(selected[0])}>
               {labels.actions.edit}
             </Button>
-            <Button
-              icon={<Delete24Regular />}
-              disabled={selected.length === 0}
-              onClick={async () => {
-                const r = await deleteRecordsAction(spec.objectId, selected.map((x) => String(x.id)));
+            <Button icon={<Delete24Regular />} disabled={selected.length === 0} onClick={() => setConfirmLines(true)}>
+              {labels.actions.delete}
+            </Button>
+            <DeleteDialog
+              open={confirmLines}
+              objectId={spec.objectId}
+              ids={selected.map((x) => String(x.id))}
+              labels={labels.actions}
+              onClose={() => setConfirmLines(false)}
+              onConfirm={async (ids) => {
+                setConfirmLines(false);
+                const r = await deleteRecordsAction(spec.objectId, ids);
                 if (!r.ok) setError(r.message);
                 else {
                   setError(undefined);
@@ -194,9 +203,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
                   router.refresh();
                 }
               }}
-            >
-              {labels.actions.delete}
-            </Button>
+            />
           </>
         )}
       </div>
@@ -635,20 +642,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           </DialogBody>
         </DialogSurface>
       </Dialog>
-      <Dialog open={confirm} onOpenChange={(_, d) => setConfirm(d.open)}>
-        <DialogSurface>
-          <DialogBody>
-            <DialogTitle>{p.labels.actions.delete}</DialogTitle>
-            <DialogContent>{p.labels.actions.confirmDelete.replace("{n}", "1")}</DialogContent>
-            <DialogActions>
-              <Button onClick={() => setConfirm(false)}>{p.labels.actions.cancel}</Button>
-              <Button appearance="primary" onClick={remove}>
-                {p.labels.actions.delete}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+      {p.id && <DeleteDialog open={confirm} objectId={p.objectId} ids={[p.id]} labels={p.labels.actions} onClose={() => setConfirm(false)} onConfirm={() => remove()} />}
     </>
   );
 }

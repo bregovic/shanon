@@ -25,6 +25,7 @@ import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDow
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
+import { DeleteDialog } from "./delete-dialog";
 import { DocuRefButton } from "./docuref-panel";
 import { FavoriteStar, FolderPicker, useFavorites } from "./favorites";
 import { HistoryButton } from "./history-panel";
@@ -190,9 +191,9 @@ export function ObjectListView(p: ObjectListProps) {
     setReload((n) => n + 1);
   };
 
-  const remove = async () => {
+  const remove = async (ids: string[]) => {
     setConfirm(false);
-    const res = await deleteRecordsAction(p.objectId, selected.map((r) => String(r.id)));
+    const res = await deleteRecordsAction(p.objectId, ids);
     if (!res.ok) setError(res.message);
     else {
       setError(undefined);
@@ -395,20 +396,7 @@ export function ObjectListView(p: ObjectListProps) {
         />
       )}
 
-      <Dialog open={confirm} onOpenChange={(_, d) => setConfirm(d.open)}>
-        <DialogSurface>
-          <DialogBody>
-            <DialogTitle>{p.labels.actions.delete}</DialogTitle>
-            <DialogContent>{p.labels.actions.confirmDelete.replace("{n}", String(selected.length))}</DialogContent>
-            <DialogActions>
-              <Button onClick={() => setConfirm(false)}>{p.labels.actions.cancel}</Button>
-              <Button appearance="primary" onClick={remove}>
-                {p.labels.actions.delete}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+      <DeleteDialog open={confirm} objectId={p.objectId} ids={selected.map((r) => String(r.id))} labels={p.labels.actions} onClose={() => setConfirm(false)} onConfirm={(ids) => void remove(ids)} />
     </>
   );
 }

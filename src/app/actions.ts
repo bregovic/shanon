@@ -8,6 +8,7 @@ import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "
 import { basketForBox, boxByCode, closeBasket, openBaskets, saveBasket, type BasketView } from "@/modules/pos/basket";
 import { duplicateRecord, type DuplicateResult } from "@/server/duplicate";
 import bcrypt from "bcryptjs";
+import { deleteCheck, usedInText } from "@/server/delete-check";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
@@ -286,6 +287,40 @@ export async function deleteRecordsAction(objectId: string, ids: string[]): Prom
     });
     revalidatePath(objectHref(objectId));
     return { ok: true, data: undefined };
+  } catch (e) {
+    // záznam je použitý jinde: říct kde (mazání bez dialogu — řádky v mřížce, API)
+    if (e instanceof UserError && e.label === "@SYS:InUse") {
+      try {
+        const t = await getT(s.lang, s.ctx.tenantId);
+        const where = usedInText(await deleteCheck(s.ctx, objectId, ids), t);
+        if (where) return { ok: false, message: t("@SYS:InUseWhere", { where }) };
+      } catch {
+        // kontrola vazeb je jen doplněk hlášky
+      }
+    }
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Před smazáním: které vybrané záznamy smazat půjde, které ne a kde jsou použité. */
+export async function deleteCheckAction(
+  objectId: string,
+  ids: string[],
+): Promise<ActionResult<{ id: string; title: string; ok: boolean; reason?: string; refs: { label: string; count: number; titles: string[]; href?: string }[] }[]>> {
+  const s = await requireSession();
+  try {
+    const t = await getT(s.lang, s.ctx.tenantId);
+    const rows = await deleteCheck(s.ctx, objectId, ids);
+    return {
+      ok: true,
+      data: rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        ok: r.ok,
+        reason: r.reason ? t(r.reason.label, Object.fromEntries(Object.entries(r.reason.params).map(([k, v]) => [k, v.startsWith("@") ? t(v) : v]))) : undefined,
+        refs: r.refs.map((x) => ({ label: t(x.label), count: x.count, titles: x.titles, href: x.href })),
+      })),
+    };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
