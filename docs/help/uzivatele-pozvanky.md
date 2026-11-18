@@ -33,5 +33,6 @@ odpoví v poli **Odpověď** a z námětu může tlačítkem **Vytvořit požada
 ## Systémová pošta (správce aplikace)
 
 Pozvánky, resety a žádosti o pomoc chodí přes systémovou poštu aplikace, ne přes poštu firmy. Nastavuje se v prostředí
-serveru (`SHANON_SMTP_HOST`, `SHANON_SMTP_PORT`, `SHANON_SMTP_USER`, `SHANON_SMTP_PASS`, `SHANON_SMTP_FROM`,
-`SHANON_SUPPORT_EMAIL`). Bez nich se e-mail neodešle a aplikace to po uložení řekne.
+serveru: `RESEND_API_KEY` a `SHANON_MAIL_FROM` (odesílatel na ověřené doméně, např. `Shanon <shanon@hollyhop.cz>`),
+`SHANON_SUPPORT_EMAIL` (kam chodí Nemůžu se přihlásit). Na Railway jen přes Resend — odchozí SMTP je tam blokované;
+`SHANON_SMTP_*` slouží jen pro vlastní hosting. Bez nastavení se e-mail neodešle a aplikace to po uložení řekne.

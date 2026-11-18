@@ -176,7 +176,7 @@ export function UsersView({
       }
       // nový uživatel s pozvánkou: říct, jestli e-mail odešel
       if (!edit.id && edit.sendInvite && !edit.password)
-        setInfo(res.data?.mailed ? { intent: "success", text: labels.inviteSent.replace("{email}", edit.email.trim()) } : { intent: "warning", text: labels.mailNotConfigured });
+        setInfo(res.data?.mailed ? { intent: "success", text: labels.inviteSent.replace("{email}", edit.email.trim()) } : { intent: "warning", text: res.data?.mailError ?? labels.mailNotConfigured });
       else setInfo(undefined);
       setEdit(null);
       router.refresh();

@@ -46,7 +46,12 @@ export async function sendPasswordLink(
   const link = `${envUrls().self}/login/heslo?t=${token}`;
   const name = user.firstName || user.name;
   const mail = kind === "invite" ? inviteMail(t, { name, email: user.email, company: companyName, inviter: inviter.name, link, days }) : resetMail(t, { name, email: user.email, inviter: inviter.name, link, days });
-  return sendSystemMail({ to: user.email, replyTo: inviter.email, ...mail });
+  try {
+    return await sendSystemMail({ to: user.email, replyTo: inviter.email, ...mail });
+  } catch (e) {
+    console.error("systémová pošta", e);
+    throw new UserError("@SYS:MailFailed", { error: String((e as Error).message ?? e).slice(0, 200) });
+  }
 }
 
 /** Uživatel podle tokenu z odkazu (platný, aktivní účet), jinak null. */

@@ -783,7 +783,7 @@ export interface UserInput {
   companies: UserCompanyInput[];
 }
 
-export async function saveUserAction(input: UserInput): Promise<ActionResult<{ mailed?: boolean }>> {
+export async function saveUserAction(input: UserInput): Promise<ActionResult<{ mailed?: boolean; mailError?: string }>> {
   const s = await requireSession();
   if (!isAnyAdmin(s)) throw new Error("Forbidden");
   const t = await getT(s.lang, s.ctx.tenantId);
@@ -859,16 +859,18 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult<{ m
     if (existing) clearLoginLock(existing.email);
   }
   let mailed: boolean | undefined;
+  let mailError: string | undefined;
   if (invite && created) {
+    // uživatel je uložený i když pozvánka neodejde — jde poslat znovu z jeho karty
     try {
       mailed = await sendPasswordLink(s.ctx.tenantId, created, "invite", { name: s.user.name, email: s.user.email }, await currentCompanyName(s));
     } catch (e) {
-      console.error("pozvánka neodešla", e);
       mailed = false;
+      mailError = e instanceof UserError ? (await userError(e, s.lang, s.ctx.tenantId)).message : String(e);
     }
   }
   revalidatePath("/system/users");
-  return { ok: true, data: { mailed } };
+  return { ok: true, data: { mailed, mailError } };
 }
 
 /** název firmy, ze které správce zve (do pozvánky) */
