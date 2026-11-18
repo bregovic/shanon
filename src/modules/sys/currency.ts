@@ -225,6 +225,14 @@ export async function rateFor(
 }
 
 export const sysHandlers: Record<string, ObjectHandlers> = {
+  "sys.numberSeqFree": {
+    actions: {
+      // nepoužité číslo souvislé řady se už nepřidělí (uživatel ho smaže, systémový záznam maže obsluha)
+      async discard(ctx, rec) {
+        await ctx.data.remove("sys.numberSeqFree", String(rec.id));
+      },
+    },
+  },
   "sys.currency": {
     actions: {
       async cnb(ctx) {

@@ -21,7 +21,7 @@ import {
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Play24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
@@ -63,6 +63,9 @@ export interface ObjectListProps {
   mergeable?: boolean;
   /** akce nad víc vybranými záznamy (výpisy → deník HK) */
   bulkActions?: { id: string; label: string }[];
+  /** hromadný tisk vybraných dokladů (tisknutelný objekt): adresa `/print/<objekt>/batch` */
+  printHref?: string;
+  printLabel?: string;
   /** „Hotovo {ok} z {n}.“ */
   bulkDoneLabel?: string;
   /** návod k agendě (Nápověda) */
@@ -231,6 +234,15 @@ export function ObjectListView(p: ObjectListProps) {
             {a.label}
           </Button>
         ))}
+        {p.printHref && (
+          <Button
+            icon={<Print24Regular />}
+            disabled={!selected.length || selected.length > 100}
+            onClick={() => window.open(`${p.printHref}?ids=${selected.map((x) => String(x.id)).join(",")}`, "_blank")}
+          >
+            {p.printLabel}
+          </Button>
+        )}
         <ToolbarDivider />
         <DocuRefButton
           objectId={p.objectId}

@@ -141,19 +141,41 @@ export async function renderPdf(
   data: PrintData,
   opts: { locale?: string; title?: string; attachments?: { name: string; mime: string; data: string | Buffer }[] } = {},
 ): Promise<Buffer> {
+  return renderPdfMany([{ layout, data, attachments: opts.attachments }], opts);
+}
+
+/**
+ * Víc dokladů do jednoho PDF (hromadný tisk ze seznamu) — každý doklad začíná
+ * na nové stránce. Spojit hotová PDF by chtělo další knihovnu; kreslit je do
+ * jednoho dokumentu vyjde nastejno.
+ */
+export async function renderPdfMany(
+  jobs: { layout: PrintLayout; data: PrintData; attachments?: { name: string; mime: string; data: string | Buffer }[] }[],
+  opts: { locale?: string; title?: string } = {},
+): Promise<Buffer> {
   const locale = opts.locale ?? "cs-CZ";
-  const paper = PAPERS[layout.paper] ?? PAPERS.a4;
-  const fs = layout.fontSize || 9;
-  const flow = !paper.h;
-  // účtenka: výška podle obsahu (odhad — dole se ořízne)
-  const pageH = flow ? Math.max(60, ...layout.elements.map((e) => e.y + e.h)) + 20 + ((valueAt(data, "lines") as unknown[] | undefined)?.length ?? 0) * 5 : paper.h;
-  const doc = new PDFDocument({ size: [paper.w * MM, pageH * MM], margin: 0, autoFirstPage: true, info: { Title: opts.title ?? "", Producer: "Shanon" } });
+  const doc = new PDFDocument({ margin: 0, autoFirstPage: false, info: { Title: opts.title ?? "", Producer: "Shanon" } });
   doc.registerFont("R", join(FONT_DIR, "DejaVuSans.ttf"));
   doc.registerFont("B", join(FONT_DIR, "DejaVuSans-Bold.ttf"));
   doc.registerFont("I", join(FONT_DIR, "DejaVuSans-Oblique.ttf"));
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
   const done = new Promise<Buffer>((res) => doc.on("end", () => res(Buffer.concat(chunks))));
+  for (const job of jobs) drawJob(doc, job.layout, job.data, locale);
+  // vložené soubory (ISDOC faktury — účetní programy odběratelů si ho načtou samy)
+  for (const a of jobs.flatMap((j) => j.attachments ?? [])) doc.file(Buffer.isBuffer(a.data) ? a.data : Buffer.from(a.data, "utf8"), { name: a.name, type: a.mime, description: a.name });
+  doc.end();
+  return done;
+}
+
+/** Jeden doklad od nové stránky. */
+function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string) {
+  const paper = PAPERS[layout.paper] ?? PAPERS.a4;
+  const fs = layout.fontSize || 9;
+  const flow = !paper.h;
+  // účtenka: výška podle obsahu (odhad — dole se ořízne)
+  const pageH = flow ? Math.max(60, ...layout.elements.map((e) => e.y + e.h)) + 20 + ((valueAt(data, "lines") as unknown[] | undefined)?.length ?? 0) * 5 : paper.h;
+  doc.addPage({ size: [paper.w * MM, pageH * MM], margin: 0 });
 
   const table = layout.elements.find((e) => e.type === "table");
   if (flow) {
@@ -190,8 +212,4 @@ export async function renderPdf(
     if (!flow && base + restH > pageH - MARGIN / 2) base = newPage() / MM;
     for (const el of rest) drawElement(doc, el, data, locale, fs, base - bottom);
   }
-  // vložené soubory (ISDOC faktury — účetní programy odběratelů si ho načtou samy)
-  for (const a of opts.attachments ?? []) doc.file(Buffer.isBuffer(a.data) ? a.data : Buffer.from(a.data, "utf8"), { name: a.name, type: a.mime, description: a.name });
-  doc.end();
-  return done;
 }

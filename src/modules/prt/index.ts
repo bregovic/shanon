@@ -212,6 +212,8 @@ export default defineModule({
       DefaultTemplateMissing: "Pro tento druh dokladu není šablona — založte ji v Tiskové sestavy.",
       Template1: "Šablona",
       Back: "Zpět",
+      BatchTitle: "Vybrané doklady ({count})",
+      BatchTooMany: "Najednou lze vytisknout nejvýš {max} dokladů. Vyberte méně.",
     },
     en: {
       DocAdvance: "Advance invoice / tax document for payment",
@@ -324,6 +326,8 @@ export default defineModule({
       DefaultTemplateMissing: "There is no template for this document type — create one in Print layouts.",
       Template1: "Template",
       Back: "Back",
+      BatchTitle: "Selected documents ({count})",
+      BatchTooMany: "At most {max} documents can be printed at once. Select fewer.",
     },
   },
 });

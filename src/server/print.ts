@@ -83,6 +83,17 @@ export async function recentDocs(ctx: Ctx, docType: string, q = "") {
   });
 }
 
+/** Nejvýš tolik dokladů najednou — každý je vlastní transakce, PDF roste se stránkami. */
+export const PRINT_BATCH_MAX = 100;
+
+/** Id dokladů hromadného tisku z adresy (?ids=a,b,c), bez duplicit, v pořadí výběru. */
+export function batchIds(raw: string | null | undefined): string[] {
+  const ids = [...new Set(String(raw ?? "").split(",").map((x) => x.trim()).filter((x) => /^[0-9a-f-]{36}$/i.test(x)))];
+  if (!ids.length) throw new UserError("@SYS:Required");
+  if (ids.length > PRINT_BATCH_MAX) throw new UserError("@PRT:BatchTooMany", { max: String(PRINT_BATCH_MAX) });
+  return ids;
+}
+
 export function printableObjectIds(): Set<string> {
   return new Set(modules.flatMap((m) => (m.printables ?? []).map((p) => p.id)));
 }

@@ -49,7 +49,7 @@ export function PrintToolbar({
         </Select>
       )}
       {pdfHref && (
-        <Button icon={<DocumentPdf24Regular />} onClick={() => window.open(`${pdfHref}${templateId ? `?template=${templateId}` : ""}`, "_blank")}>
+        <Button icon={<DocumentPdf24Regular />} onClick={() => window.open(`${pdfHref}${templateId ? `${pdfHref.includes("?") ? "&" : "?"}template=${templateId}` : ""}`, "_blank")}>
           {labels.pdf}
         </Button>
       )}

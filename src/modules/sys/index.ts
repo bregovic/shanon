@@ -199,6 +199,8 @@ export const numberSeqFree = defineObject({
   form: [{ label: "@SYS:General", fields: ["seqId", "number"] }],
   unique: [["seqId", "number"]],
   defaultSort: { field: "number", dir: "asc" },
+  // číslo, které se už přidělovat nemá (v řadě zůstane mezera) — hromadně nad vybranými v detailu řady
+  actions: [{ id: "discard", label: "@SYS:DiscardFreeNumbers", bulk: true }],
 });
 
 /** Úroveň oprávnění (vyšší zahrnuje nižší). */
@@ -625,6 +627,7 @@ export default defineModule({
       Continuous: "Souvislá řada",
       FreeNumber: "Nepoužité číslo",
       FreeNumbers: "Nepoužitá čísla",
+      DiscardFreeNumbers: "Smazat vybraná čísla",
       Number: "Číslo",
       VirtualHolder: "Virtuální (sdílená data)",
       VirtualCompany: "Virtuální společnost",
@@ -1042,6 +1045,7 @@ export default defineModule({
       Continuous: "Continuous sequence",
       FreeNumber: "Unused number",
       FreeNumbers: "Unused numbers",
+      DiscardFreeNumbers: "Delete selected numbers",
       Number: "Number",
       VirtualHolder: "Virtual (shared data)",
       VirtualCompany: "Virtual company",
