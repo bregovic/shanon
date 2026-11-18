@@ -444,10 +444,12 @@ export const notification = defineObject({
     message: { edt: Edts.Description, label: "@SYS:NoticeMessage" },
     href: { edt: NoticeHref },
     key: { edt: NoticeKey },
+    /** jen pro tohoto uživatele (prázdné = všem uživatelům firmy) */
+    userId: { edt: Edts.User },
   },
   titleField: "title",
-  list: ["kind", "title", "message"],
-  form: [{ label: "@SYS:General", fields: ["kind", "title", "params", "message", "href", "key"] }],
+  list: ["kind", "title", "message", "userId"],
+  form: [{ label: "@SYS:General", fields: ["kind", "title", "params", "message", "href", "key", "userId"] }],
   defaultSort: { field: "createdAt", dir: "desc" },
 });
 

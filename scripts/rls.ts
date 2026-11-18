@@ -26,6 +26,14 @@ export function rlsStatements(): string[] {
     `GRANT SELECT, INSERT, UPDATE, DELETE ON "sys_global_key" TO ${APP_ROLE};`,
     // moduly po firmách — bez RLS (čte se i před výběrem tenanta při přihlášení), kód filtruje tenant_id
     `GRANT SELECT, INSERT, UPDATE, DELETE ON "sys_company_module" TO ${APP_ROLE};`,
+    // uživatelé: jen čtení neškodných sloupců (pole typu uživatel, jména), nikdy heslo / PIN; jen vlastní tenant.
+    // RLS bez FORCE — přihlášení (vlastník tabulky) čte dál bez omezení.
+    `REVOKE ALL ON "sys_user" FROM ${APP_ROLE};`,
+    `GRANT SELECT (id, tenant_id, name, email, active, role) ON "sys_user" TO ${APP_ROLE};`,
+    `ALTER TABLE "sys_user" ENABLE ROW LEVEL SECURITY;`,
+    `DROP POLICY IF EXISTS tenant_isolation ON "sys_user";`,
+    `CREATE POLICY tenant_isolation ON "sys_user" FOR SELECT TO ${APP_ROLE}
+       USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);`,
   ];
   for (const t of tables) {
     sql.push(

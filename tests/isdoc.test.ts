@@ -64,16 +64,16 @@ describe("ISDOC", () => {
     const [vg] = (await listRecords(B, "ap.group", {}, client)).rows;
     await saveRecord(B, "ap.vendor", null, { subjectId: vs.id, groupId: vg.id }, undefined, client);
     const files: [string, Buffer][] = [["faktura.pdf", pdf], ["faktura.isdoc", Buffer.from(x.xml)], ["faktura.isdocx", zip("faktura.isdoc", Buffer.from(x.xml))]];
-    for (const [name, data] of files) {
+    // ISDOC = přesná data: první se zalistuje sám (úkol Zkontrolovat), další se stejným číslem jsou duplicita ke kontrole
+    for (const [i, [name, data]] of files.entries()) {
       const d = await saveRecord(B, "int.document", null, { fileName: name }, undefined, client);
       await addFile(B, "int.document", String(d.id), { name, type: "application/octet-stream", data }, client);
       await runAction(B, "int.document", String(d.id), "extract", client);
       const got = (await getRecord(B, "int.document", String(d.id), client))!;
-      expect([name, got.target, got.status, got.docNumber, got.amountGross, got.regNo]).toEqual([name, "apInvoice", "ready", inv.invoiceNum, "242.00", "87654321"]);
+      expect([name, got.target, got.status, got.docNumber, got.amountGross, got.regNo]).toEqual([name, "apInvoice", i === 0 ? "listed" : "attention", inv.invoiceNum, "242.00", "87654321"]);
     }
-    // zalistovat první: přijatá faktura se stejnými částkami
+    // první zalistovaný: přijatá faktura se stejnými částkami
     const [first] = (await listRecords(B, "int.document", { filter: { fileName: "faktura.pdf" } }, client)).rows;
-    await runAction(B, "int.document", String(first.id), "list", client);
     const done = (await getRecord(B, "int.document", String(first.id), client))!;
     const ap = (await getRecord(B, "ap.invoice", String(done.resultId), client))!;
     expect([ap.externalNum, ap.amountNet, ap.taxAmount, ap.amountGross]).toEqual([inv.invoiceNum, "200.00", "42.00", "242.00"]);

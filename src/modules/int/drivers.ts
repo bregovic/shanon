@@ -27,6 +27,7 @@ import { viesLookup } from "@/modules/gab/registry-lookup";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
 import { fetchCnb, fetchEcb } from "@/modules/sys/currency";
 import { registry } from "@/registry";
+import { closeWorkItems } from "@/modules/wf/work";
 import {
   EET_RESEND_HOURS,
   buildEetMessage,
@@ -544,6 +545,8 @@ export const intHandlers: Record<string, ObjectHandlers> = {
       },
       async reject(ctx, doc) {
         await ctx.data.update("int.document", String(doc.id), { status: "rejected" });
+        // úkoly k odmítnutému dokladu už nejsou potřeba
+        for (const k of ["fix", "review"]) await closeWorkItems(ctx.data, { sourceKey: `int.document:${doc.id}:${k}` }, "cancelled", undefined, ctx.userId);
       },
     },
   },

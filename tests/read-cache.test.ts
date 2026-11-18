@@ -1,7 +1,7 @@
 /** Paměť čtení transakce: kopie pro volajícího, zápis objektu ji zahodí, hromadný zápis mimo save přes forgetReads. */
 import { describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
-import { forgetReads, inTenant, listRecords, saveRecord } from "@/server/data";
+import { forgetReads, inTenant, listRecords } from "@/server/data";
 import { mergeRecords } from "@/server/merge";
 import { provisionTenant } from "@/server/provision";
 

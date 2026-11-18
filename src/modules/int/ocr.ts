@@ -28,9 +28,11 @@ const party = {
 export const OCR_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["docType", "issuer", "recipient", "docNumber", "orderNumber", "issueDate", "taxDate", "dueDate", "vs", "currency", "amountNet", "taxAmount", "amountGross", "lines", "note"],
+  required: ["docType", "confidence", "uncertainFields", "issuer", "recipient", "docNumber", "orderNumber", "issueDate", "taxDate", "dueDate", "vs", "currency", "amountNet", "taxAmount", "amountGross", "lines", "note"],
   properties: {
     docType: { type: "string", enum: ["invoice", "advance", "order", "receipt", "creditNote", "donation", "other"] },
+    confidence: { type: "string", enum: ["high", "medium", "low"] },
+    uncertainFields: { type: "array", items: { type: "string" } },
     issuer: party,
     recipient: party,
     docNumber: str,
@@ -69,6 +71,10 @@ export interface OcrParty {
 }
 export interface OcrResult {
   docType: "invoice" | "advance" | "order" | "receipt" | "creditNote" | "donation" | "other";
+  /** jak jistě je doklad přečtený (nečitelný sken, ručně psané, chybějící údaje → medium / low) */
+  confidence?: "high" | "medium" | "low";
+  /** názvy polí, kterými si vytěžení není jisté (amountGross, issuer.regNo…) */
+  uncertainFields?: string[];
   issuer: OcrParty;
   recipient: OcrParty;
   docNumber: string | null;
@@ -92,6 +98,7 @@ const SYSTEM = [
   "issuer = vystavitel (dodavatel), recipient = příjemce (odběratel). IČO do regNo bez mezer, DIČ do vatId i s předponou země.",
   "Řádky: unitPrice a amountNet bez DPH; když doklad uvádí ceny s DPH, přepočti je na základ podle sazby. taxRate v procentech (21, 12, 0).",
   "Měna jako kód ISO (CZK, EUR). vs = variabilní symbol, jen číslice.",
+  "confidence: high jen když jsou všechny důležité údaje (dodavatel s IČO, číslo dokladu, data, částky) dobře čitelné a sedí; jinak medium nebo low. Do uncertainFields vypiš názvy polí, kterými si nejsi jistý (např. amountGross, issueDate, issuer.regNo, lines).",
   "Potvrzení o přijetí daru, darovací smlouva nebo dar bez protiplnění = docType donation (issuer = obdarovaný, který potvrzení vystavil; recipient = dárce; bez DPH).",
 ].join(" ");
 

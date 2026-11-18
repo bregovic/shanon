@@ -50,9 +50,14 @@ export async function applyExtraction(data: DataApi, doc: RecordData, r: OcrResu
   // u objednávky, kterou jsme vystavili my, je partnerem příjemce
   const other = issuerIsUs ? r.recipient : r.issuer;
   const target = doc.target && doc.target !== "auto" ? String(doc.target) : inferTarget(r, issuerIsUs);
+  // jistota: strukturovaný ISDOC je vždy jistý; vytěžení ji vrací samo
+  const confidence = r.confidence ?? "high";
+  const uncertain = (r.uncertainFields ?? []).filter(Boolean).join(", ").slice(0, 255) || null;
   await data.update("int.document", String(doc.id), {
     target,
     docType: r.docType,
+    confidence,
+    uncertain,
     partnerName: other.name?.slice(0, 120) ?? null,
     regNo: other.regNo ? digits(other.regNo).slice(0, 12) || null : null,
     vatId: other.vatId ? normVat(other.vatId).slice(0, 16) : null,
@@ -84,7 +89,11 @@ export async function applyExtraction(data: DataApi, doc: RecordData, r: OcrResu
       amountNet: amount(l.amountNet ?? (l.unitPrice !== null ? l.unitPrice * (l.qty ?? 1) : null)),
     });
   }
-  return checkDocument(data, (await data.get("int.document", String(doc.id)))!, t);
+  const checked = await checkDocument(data, (await data.get("int.document", String(doc.id)))!, t);
+  // nejisté vytěžení = vždy ke kontrole (i když údaje formálně sedí); opakovaná kontrola po opravě to už nevrací
+  if (confidence === "high") return checked;
+  const note = t("@INT:DocUncertainMsg", { fields: uncertain ?? "—" });
+  return data.update("int.document", String(doc.id), { status: "attention", message: [note, checked.message].filter(Boolean).join(" · ").slice(0, 255) });
 }
 
 /** Subjekt adresáře podle IČO, jinak DIČ. */

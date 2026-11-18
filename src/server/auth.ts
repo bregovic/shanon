@@ -135,8 +135,17 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
       ).map((d) => ({ slot: d.position, name: d.name }))
     : [];
 
+  // uživatelé firmy (superuživatelé + přiřazení) — výběr v polích typu uživatel (řešitel úkolu…)
+  const users = companyId
+    ? await prisma.sysUser.findMany({
+        where: { tenantId: tenant.id, active: true, OR: [{ role: "admin" }, { companies: { some: { companyId } } }] },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
+
   return {
-    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions, lang: (user.lang as Lang) ?? DEFAULT_LANG, dims, userName: user.name },
+    ctx: { tenantId: tenant.id, userId: user.id, companyId, role: user.role, perms, modules, extensions, lang: (user.lang as Lang) ?? DEFAULT_LANG, dims, userName: user.name, users },
     lang: (user.lang as Lang) ?? DEFAULT_LANG,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     tenant: { id: tenant.id, name: tenant.name },

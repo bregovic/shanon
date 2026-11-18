@@ -130,6 +130,16 @@ export const DocTarget = defineEnum({
   ],
 });
 
+export const OcrConfidence = defineEnum({
+  id: "IntOcrConfidence",
+  label: "@INT:Confidence",
+  values: [
+    { value: "high", label: "@INT:ConfidenceHigh", color: "success" },
+    { value: "medium", label: "@INT:ConfidenceMedium", color: "warning" },
+    { value: "low", label: "@INT:ConfidenceLow", color: "danger" },
+  ],
+});
+
 export const OcrDocType = defineEnum({
   id: "IntOcrDocType",
   label: "@INT:DocType",
@@ -243,7 +253,9 @@ export const connection = defineObject({
     // vytěžování dokladů
     model: { edt: Str("OcrModel", "@INT:Model", 60), visibleWhen: OCR },
     dailyLimit: { edt: Edts.Int, label: "@INT:DailyLimit", default: 50, visibleWhen: OCR },
-    autoList: { edt: Edts.NoYes, label: "@INT:AutoList", visibleWhen: OCR },
+    autoList: { edt: Edts.NoYes, label: "@INT:AutoList", default: true, visibleWhen: OCR },
+    /** komu jdou úkoly k dokladům bez původce (dávka, e-mail) */
+    responsible: { edt: Edts.User, label: "@INT:Responsible", visibleWhen: OCR },
     // pošta (SMTP)
     smtpHost: { edt: Str("SmtpHost", "@INT:SmtpHost", 200), visibleWhen: SMTP },
     smtpPort: { edt: Edts.Int, label: "@INT:SmtpPort", default: 587, visibleWhen: SMTP },
@@ -270,7 +282,7 @@ export const connection = defineObject({
     { label: "@INT:GatewaySimSettings", fields: ["posQr"], visibleWhen: { field: "driver", in: ["gatewaySim"] } },
     { label: "@INT:ScaleSettings", fields: ["scaleProtocol", "baudRate", "dataBits", "parity", "stopBits"], visibleWhen: { field: "driver", in: ["scaleSerial"] } },
     { label: "@INT:ApiSettings", fields: ["scopes", "tokenPrefix"], visibleWhen: API },
-    { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "autoList"], visibleWhen: OCR },
+    { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "autoList", "responsible"], visibleWhen: OCR },
     { label: "@INT:MailSettings", fields: ["smtpHost", "smtpPort", "smtpSecurity", "smtpUser", "smtpPassword", "fromEmail", "fromName", "replyTo", "bccSelf", "signature"], visibleWhen: MAIL },
     { label: "@INT:State", fields: ["lastCheckAt", "lastResult"] },
   ],
@@ -377,6 +389,9 @@ export const document = defineObject({
     target: { edt: enumEdt(DocTarget), mandatory: true, default: "auto" },
     status: { edt: enumEdt(DocStatus), mandatory: true, default: "new", readOnly: true },
     docType: { edt: enumEdt(OcrDocType), readOnly: true },
+    /** jak jistě vytěžení doklad přečetlo; nejisté údaje vyjmenuje */
+    confidence: { edt: enumEdt(OcrConfidence), readOnly: true },
+    uncertain: { edt: Edts.Description, label: "@INT:Uncertain", readOnly: true },
     partnerName: { edt: Edts.Name, label: "@INT:PartnerName", mandatory: false },
     regNo: { edt: Edts.RegNo },
     vatId: { edt: Edts.VatId },
@@ -411,7 +426,7 @@ export const document = defineObject({
   titleField: "docNum",
   list: ["docNum", "fileName", "status", "target", "partnerName", "docNumber", "issueDate", "dueDate", "currencyCode", "amountGross", "message", "resultTitle"],
   form: [
-    { label: "@SYS:General", fields: ["docNum", "fileName", "target", "status", "docType", "message", "resultTitle"] },
+    { label: "@SYS:General", fields: ["docNum", "fileName", "target", "status", "docType", "confidence", "uncertain", "message", "resultTitle"] },
     { label: "@INT:Partner", fields: ["partnerName", "regNo", "vatId", "bankAccount", "subjectId", "vendorId", "customerId"] },
     { label: "@INT:DocData", fields: ["docNumber", "orderNumber", "issueDate", "taxDate", "dueDate", "vs"] },
     { label: "@INT:Amounts", fields: ["currencyCode", "amountNet", "taxAmount", "amountGross"] },
@@ -459,6 +474,8 @@ export const portal = defineObject({
     allowOther: { edt: Edts.NoYes, label: "@INT:OtherDoc", default: true },
     requireRegNo: { edt: Edts.NoYes, label: "@INT:RequireRegNo", default: true },
     autoExtract: { edt: Edts.NoYes, label: "@INT:AutoExtract", default: true },
+    /** komu jdou úkoly k dokladům z portálu (kontrola, zalistování, doplnění) */
+    responsible: { edt: Edts.User, label: "@INT:Responsible" },
     maxFileMb: { edt: Edts.Int, label: "@INT:MaxFileMb", default: 10 },
     maxFiles: { edt: Edts.Int, label: "@INT:MaxFiles", default: 5 },
     ipHourLimit: { edt: Edts.Int, label: "@INT:IpHourLimit", default: 10 },
@@ -467,7 +484,7 @@ export const portal = defineObject({
   titleField: "name",
   list: ["name", "active", "publicUrl", "autoExtract", "dailyLimit"],
   form: [
-    { label: "@SYS:General", fields: ["name", "active", "slug", "publicUrl"] },
+    { label: "@SYS:General", fields: ["name", "active", "slug", "publicUrl", "responsible"] },
     { label: "@INT:PortalPage", fields: ["title", "intro"] },
     { label: "@INT:PortalKinds", fields: ["allowInvoice", "allowAdvance", "allowOrder", "allowOther", "requireRegNo", "autoExtract"] },
     { label: "@INT:PortalLimits", fields: ["maxFileMb", "maxFiles", "ipHourLimit", "dailyLimit"] },
@@ -544,8 +561,9 @@ export default defineModule({
   label: "@INT:Module",
   description: "@INT:ModuleDesc",
   icon: "PlugConnected",
-  dependsOn: ["sys"],
-  enums: [ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity],
+  // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
+  dependsOn: ["sys", "wf"],
+  enums: [ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity],
   objects: [connection, log, portal, portalUpload, document, documentLine, mail],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
@@ -678,7 +696,18 @@ export default defineModule({
       DrvOpenaiTest: "OpenAI – testovací klíč serveru",
       Model: "Model",
       DailyLimit: "Denní limit dokladů",
-      AutoList: "Zalistovat připravené automaticky",
+      AutoList: "Zalistovat jistě vytěžené automaticky",
+      Responsible: "Odpovědná osoba",
+      Confidence: "Jistota vytěžení",
+      ConfidenceHigh: "Jisté",
+      ConfidenceMedium: "Částečně nejisté",
+      ConfidenceLow: "Nejisté",
+      Uncertain: "Nejisté údaje",
+      DocUncertainMsg: "Nejisté údaje: {fields}",
+      TaskFix: "Doplnit údaje dokladu {num}",
+      TaskReview: "Zkontrolovat doklad {num}",
+      TaskListDoc: "Zkontrolovat a zalistovat doklad {num}",
+      TaskFailed: "Vytěžení dokladu {num} selhalo — doplnit údaje",
       OcrSettings: "Vytěžování",
       OcrNoKey: "Doplňte API klíč v napojení.",
       OcrNoKeyIn: "Napojení {code} nemá API klíč — doplňte ho, nebo zapněte testovací prostředí (TEST-OCR).",
@@ -1014,7 +1043,18 @@ export default defineModule({
       DrvOpenaiTest: "OpenAI – server test key",
       Model: "Model",
       DailyLimit: "Daily document limit",
-      AutoList: "List ready documents automatically",
+      AutoList: "List confidently extracted documents automatically",
+      Responsible: "Responsible person",
+      Confidence: "Extraction confidence",
+      ConfidenceHigh: "Confident",
+      ConfidenceMedium: "Partly uncertain",
+      ConfidenceLow: "Uncertain",
+      Uncertain: "Uncertain fields",
+      DocUncertainMsg: "Uncertain fields: {fields}",
+      TaskFix: "Complete document {num}",
+      TaskReview: "Review document {num}",
+      TaskListDoc: "Review and list document {num}",
+      TaskFailed: "Extraction of document {num} failed — complete details",
       OcrSettings: "Document capture",
       OcrNoKey: "Enter the API key in the connection.",
       OcrNoKeyIn: "Connection {code} has no API key — fill it in or turn on the test environment (TEST-OCR).",

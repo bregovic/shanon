@@ -59,6 +59,8 @@ export interface Ctx {
   warnings?: string[];
   /** aktivní finanční dimenze (pořadí → název) — popisky a viditelnost polí dim1…dim6 */
   dims?: { slot: number; name: string }[];
+  /** uživatelé s přístupem k aktuální firmě (výběr v polích typu uživatel) */
+  users?: { id: string; name: string }[];
 }
 
 export interface ListParams {
@@ -378,7 +380,7 @@ export class Session {
     }
     const and: RecordData[] = [];
     for (const [k, expr] of Object.entries(p.filters ?? {})) {
-      const w = fieldWhere(def, k, String(expr ?? ""), p.lang ?? "cs");
+      const w = def.fields[k]?.edt.user ? await this.userWhere(k, String(expr ?? "")) : fieldWhere(def, k, String(expr ?? ""), p.lang ?? "cs");
       if (w) and.push(w);
     }
     if (and.length) where.AND = and;
@@ -420,6 +422,23 @@ export class Session {
       totals = Object.fromEntries(sumFields.map((f) => [f, (agg._sum?.[f] ?? new Prisma.Decimal(0)).toFixed(def.fields[f].edt.scale ?? 2)]));
     }
     return { rows: out, total, page, pageSize, totals };
+  }
+
+  /** Filtr pole typu uživatel: „me“ / „já“ = přihlášený, `""` / `!""` = (ne)vyplněno, jinak část jména nebo e-mailu (`!` = ne). */
+  private async userWhere(field: string, expr: string): Promise<RecordData | null> {
+    const e = expr.trim();
+    if (!e) return null;
+    if (e === '""') return { [field]: null };
+    if (e === '!""') return { NOT: { [field]: null } };
+    const not = e.startsWith("!");
+    const term = (not ? e.slice(1) : e).replace(/\*/g, "").trim();
+    let ids: string[];
+    if (/^(me|já|ja|@me)$/i.test(term)) ids = [this.ctx.userId];
+    else {
+      const users = await this.tx.sysUser.findMany({ where: { tenantId: this.ctx.tenantId, OR: [{ name: { contains: term, mode: "insensitive" } }, { email: { contains: term, mode: "insensitive" } }] }, select: { id: true }, take: 200 });
+      ids = users.map((u) => u.id);
+    }
+    return not ? { OR: [{ [field]: null }, { NOT: { [field]: { in: ids } } }] } : { [field]: { in: ids } };
   }
 
   /** SysLastValue: zapamatovat hodnoty polí s `rememberLast` (uživatel + firma + objekt + pole). */
@@ -613,6 +632,13 @@ export class Session {
       for (const [name, f] of Object.entries(def.fields)) {
         if (f.mandatory && name in data && (merged[name] === null || merged[name] === "")) errors[name] = "@SYS:Required";
       }
+    }
+
+    // pole typu uživatel: uživatel téhož tenanta (vstup od člověka; logika modulů zapisuje ověřené hodnoty)
+    for (const [name, f] of Object.entries(def.fields)) {
+      if (!f.edt.user || opts.system || this.system || !(name in data) || !merged[name] || errors[name]) continue;
+      const ok = /^[0-9a-f-]{36}$/i.test(String(merged[name])) && (await this.tx.sysUser.count({ where: { id: String(merged[name]), tenantId: this.ctx.tenantId } })) > 0;
+      if (!ok) errors[name] = "@SYS:InvalidValue";
     }
 
     // odkazy musí mířit na záznam téhož tenanta (a firmy) — FK to neohlídá

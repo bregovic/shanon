@@ -99,6 +99,8 @@ export interface ObjectDef {
   form: FormGroup[];
   /** unikátní kombinace polí (v rámci tenanta/firmy) */
   unique?: string[][];
+  /** indexy pro časté dotazy (v rámci tenanta/firmy), např. [["assignedTo", "status"]] — odkazy mají index samy */
+  indexes?: string[][];
   defaultSort?: { field: string; dir: "asc" | "desc" };
   /** Sloučit vybrané záznamy do jednoho (odkazy se přepojí, ostatní smažou) — `src/server/merge.ts`, úpravy v `ObjectHandlers.merge` */
   mergeable?: boolean;
@@ -218,6 +220,7 @@ export function defineObject(def: ObjectDef): ObjectDef {
   def.list.forEach((f) => check(f, "list"));
   def.form.forEach((g) => g.fields.forEach((f) => check(f, "form")));
   def.unique?.forEach((u) => u.forEach((f) => check(f, "unique")));
+  def.indexes?.forEach((u) => u.forEach((f) => check(f, "indexes")));
   if (def.numberSeq) check(def.numberSeq.field, "numberSeq");
   return def;
 }

@@ -15,6 +15,7 @@ import {
   BuildingBank24Regular,
   ReceiptMoney24Regular,
   Settings24Regular,
+  TaskListLtr24Regular,
 } from "@fluentui/react-icons";
 
 /** Ikony modulů podle ModuleDef.icon. Nový modul s novou ikonou = přidat sem. */
@@ -32,6 +33,7 @@ const MODULE_ICONS: Record<string, React.ComponentType> = {
   Building: Building24Regular,
   Cart: Cart24Regular,
   PlugConnected: PlugConnected24Regular,
+  TaskList: TaskListLtr24Regular,
 };
 
 export function ModuleIcon({ name }: { name: string }) {

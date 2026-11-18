@@ -24,7 +24,10 @@ export async function listNotices(ctx: Ctx, lang: Lang): Promise<{ items: Notice
   const t = await getT(lang, ctx.tenantId);
   return inTenant(ctx, async (s) => {
     const sys = s.sys();
-    const all = await sys.find("sys.notification", {}, LIMIT, { createdAt: "desc" });
+    // upozornění firmy (bez uživatele) + osobní upozornění přihlášeného
+    const all = [...(await sys.find("sys.notification", { userId: null }, LIMIT, { createdAt: "desc" })), ...(await sys.find("sys.notification", { userId: ctx.userId }, LIMIT, { createdAt: "desc" }))]
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, LIMIT);
     const read = new Set((await sys.find("sys.notificationRead", { userId: ctx.userId }, 2000)).map((r) => String(r.notificationId)));
     const items = all.map((n) => {
       let params: Record<string, string> = {};

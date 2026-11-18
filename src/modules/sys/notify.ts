@@ -19,6 +19,8 @@ export interface Notice {
   href?: string | null;
   key?: string | null;
   dedupeHours?: number;
+  /** jen pro tohoto uživatele (řešitel úkolu); bez = všem uživatelům firmy */
+  userId?: string | null;
 }
 
 export async function notify(data: DataApi, n: Notice): Promise<void> {
@@ -34,5 +36,6 @@ export async function notify(data: DataApi, n: Notice): Promise<void> {
     message: n.message ? String(n.message).slice(0, 255) : null,
     href: n.href ? n.href.slice(0, 255) : null,
     key: n.key ? n.key.slice(0, 120) : null,
+    userId: n.userId ?? null,
   });
 }

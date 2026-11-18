@@ -40,6 +40,8 @@ export interface Edt {
   noTotal?: boolean;
   /** převod vstupu (např. velká písmena u kódů) */
   transform?: "upper" | "lower" | "trim";
+  /** string: id uživatele (sys_user) — ve formuláři výběr uživatelů firmy, v seznamu jméno, filtr podle jména / „me“ */
+  user?: boolean;
 }
 
 export function defineEdt(edt: Edt): Edt {
@@ -78,6 +80,8 @@ export function enumEdt(e: EnumDef, label: LabelRef = e.label): Edt {
 // ---------------------------------------------------------------------------
 
 export const Edts = {
+  /** uživatel (odpovědná osoba, řešitel úkolu) */
+  User: defineEdt({ id: "UserId", kind: "string", label: "@SYS:User", maxLength: 36, user: true }),
   Code: defineEdt({ id: "Code", kind: "string", label: "@SYS:Code", maxLength: 20, transform: "upper" }),
   Name: defineEdt({ id: "Name", kind: "string", label: "@SYS:Name", maxLength: 120, transform: "trim" }),
   Description: defineEdt({ id: "Description", kind: "string", label: "@SYS:Description", maxLength: 255 }),

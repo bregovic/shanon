@@ -111,6 +111,7 @@ function model(o: ObjectDef, back: BackRel[]): string {
   lines.push(`  @@index([${scopeCols.join(", ")}])`);
   for (const [field] of refs) if (field !== "companyId") lines.push(`  @@index([${field}])`);
   for (const u of o.unique ?? []) lines.push(`  @@unique([${[...scopeCols, ...u].join(", ")}])`);
+  for (const ix of o.indexes ?? []) lines.push(`  @@index([${[...scopeCols, ...ix].join(", ")}])`);
   lines.push(`  @@map("${o.table}")`);
   lines.push("}");
   return lines.join("\n");

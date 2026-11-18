@@ -352,6 +352,7 @@ model SysCompany {
   shopPage_company                 ShopPage[]                 @relation("ShopPage_company")
   shopOrder_company                ShopOrder[]                @relation("ShopOrder_company")
   shopPick_company                 ShopPick[]                 @relation("ShopPick_company")
+  wfWorkItem_company               WfWorkItem[]               @relation("WfWorkItem_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -680,6 +681,7 @@ model SysNotification {
   message   String?  @db.VarChar(255)
   href      String?  @db.VarChar(255)
   key       String?  @db.VarChar(120)
+  userId    String?  @map("user_id") @db.VarChar(36)
   ext       Json     @default("{}")
   version   Int      @default(1)
   createdAt DateTime @default(now()) @map("created_at")
@@ -4035,7 +4037,8 @@ model IntConnection {
   tokenHash      String?   @map("token_hash") @db.VarChar(64)
   model          String?   @db.VarChar(60)
   dailyLimit     Int?      @default(50) @map("daily_limit")
-  autoList       Boolean   @default(false) @map("auto_list")
+  autoList       Boolean   @default(true) @map("auto_list")
+  responsible    String?   @db.VarChar(36)
   smtpHost       String?   @map("smtp_host") @db.VarChar(200)
   smtpPort       Int?      @default(587) @map("smtp_port")
   smtpSecurity   String?   @default("starttls") @map("smtp_security") @db.VarChar(40)
@@ -4113,6 +4116,7 @@ model IntPortal {
   allowOther   Boolean  @default(true) @map("allow_other")
   requireRegNo Boolean  @default(true) @map("require_reg_no")
   autoExtract  Boolean  @default(true) @map("auto_extract")
+  responsible  String?  @db.VarChar(36)
   maxFileMb    Int?     @default(10) @map("max_file_mb")
   maxFiles     Int?     @default(5) @map("max_files")
   ipHourLimit  Int?     @default(10) @map("ip_hour_limit")
@@ -4174,6 +4178,8 @@ model IntDocument {
   target       String    @default("auto") @db.VarChar(40)
   status       String    @default("new") @db.VarChar(40)
   docType      String?   @map("doc_type") @db.VarChar(40)
+  confidence   String?   @db.VarChar(40)
+  uncertain    String?   @db.VarChar(255)
   partnerName  String?   @map("partner_name") @db.VarChar(120)
   regNo        String?   @map("reg_no") @db.VarChar(12)
   vatId        String?   @map("vat_id") @db.VarChar(16)
@@ -4510,6 +4516,41 @@ model ShopPick {
   @@index([orderLineId])
   @@index([itemId])
   @@map("shop_pick")
+}
+
+/// wf.workItem — generováno z definice objektu
+model WfWorkItem {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  title       String    @db.VarChar(120)
+  kind        String    @default("task") @db.VarChar(40)
+  status      String    @default("open") @db.VarChar(40)
+  assignedTo  String?   @map("assigned_to") @db.VarChar(36)
+  dueDate     DateTime? @map("due_date") @db.Date
+  description String?
+  refObject   String?   @map("ref_object") @db.VarChar(60)
+  refId       String?   @map("ref_id") @db.VarChar(36)
+  refTitle    String?   @map("ref_title") @db.VarChar(120)
+  href        String?   @db.VarChar(255)
+  sourceKey   String?   @map("source_key") @db.VarChar(120)
+  result      String?   @db.VarChar(255)
+  completedAt DateTime? @map("completed_at")
+  completedBy String?   @map("completed_by") @db.VarChar(36)
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("WfWorkItem_company", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([tenantId, companyId, assignedTo, status])
+  @@index([tenantId, companyId, sourceKey, status])
+  @@index([tenantId, companyId, refObject, refId])
+  @@map("wf_work_item")
 }
 
 /// qa.feature — generováno z definice objektu

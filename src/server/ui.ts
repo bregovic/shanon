@@ -12,8 +12,22 @@ import { FILTER_HELP } from "@/core/filter";
 
 export { objectHref, displayValue, type FieldMeta } from "@/lib/meta";
 
-function meta(name: string, f: FieldDef, t: T, ext = false): FieldMeta {
+function meta(name: string, f: FieldDef, t: T, ext = false, users?: Ctx["users"]): FieldMeta {
   const e = f.edt;
+  // pole typu uživatel = výběr z uživatelů firmy (stejné zobrazení jako výčet)
+  if (e.user)
+    return {
+      name,
+      label: t(f.label ?? e.label),
+      help: f.help ?? e.help ? t((f.help ?? e.help)!) : undefined,
+      kind: "enum",
+      mandatory: !!f.mandatory,
+      readOnly: !!f.readOnly,
+      align: "left",
+      options: (users ?? []).map((u) => ({ value: u.id, label: u.name })),
+      ext,
+      visibleWhen: f.visibleWhen,
+    };
   return {
     name,
     label: t(f.label ?? e.label),
@@ -58,12 +72,12 @@ export const hiddenFields = (ctx: Ctx, def: ObjectDef) =>
 export function fieldsMeta(ctx: Ctx, def: ObjectDef, t: T): Record<string, FieldMeta> {
   const out: Record<string, FieldMeta> = {};
   for (const [n, f] of Object.entries(def.fields)) {
-    out[n] = meta(n, f, t);
+    out[n] = meta(n, f, t, false, ctx.users);
     // popisek dimenze = její název v tenantovi (Středisko, Zakázka…)
     const dim = f.dimSlot ? ctx.dims?.find((d) => d.slot === f.dimSlot) : undefined;
     if (dim) out[n] = { ...out[n], label: dim.name };
   }
-  for (const [n, f] of Object.entries(extFields(ctx, def.id))) out[n] = meta(n, f, t, true);
+  for (const [n, f] of Object.entries(extFields(ctx, def.id))) out[n] = meta(n, f, t, true, ctx.users);
   return out;
 }
 

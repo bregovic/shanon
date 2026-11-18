@@ -129,6 +129,16 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   Reporty umí parametr `kind: "ref"` (výběr záznamu objektu `refObject`).
 - Síť mimo transakci (transakce max. 20 s): akce `outside: true` / úloha `JobDef.outside`
   — obsluha v `src/server/outside.ts`, oprávnění ověří `runAction` předem (`checkOnly`).
+- Workflow (`src/modules/wf`): pracovní položka `wf.workItem` = obecný úkol k záznamu libovolného objektu (`refObject` + `refId`,
+  druh, řešitel, termín, výsledek). Zakládat jen přes `createWorkItem(data, …)` (otevřený úkol se stejným `sourceKey` se nezakládá
+  znovu, řešitel dostane osobní upozornění `notify({ userId })`), uzavírat `closeWorkItems`. Moje úkoly = panel v Přehledu
+  (`src/server/work-items.ts`). Vytěžování: chyba / nejistota (`confidence`, `uncertainFields` z OCR) / výhrady → úkol Doplnit údaje
+  původci (portál → `int.portal.responsible`, dávka → `int.connection.responsible`); jistý a připravený doklad se zalistuje sám
+  (`settleDocument`, ne z portálu, napojení `autoList`) + úkol Zkontrolovat. Schvalování = CR-098 (návrh v `docs/help/workflow.md`).
+- Pole typu uživatel: `Edts.User` (`Edt.user`, VARCHAR 36) — formulář výběr z `Ctx.users` (uživatelé firmy, načtení v `auth.ts`),
+  filtr seznamu jménem / e-mailem / `me` (`Session.userWhere`), uložení od člověka ověří uživatele tenanta. Aplikační role čte
+  ze `sys_user` jen id, jméno, e-mail, aktivní, roli (grant po sloupcích + RLS v `scripts/rls.ts`), nikdy heslo.
+- Indexy pro časté dotazy: `ObjectDef.indexes` (`[["assignedTo", "status"]]`, v rámci tenanta / firmy).
 - Vytěžování dokladů (`src/modules/int/ocr.ts`, `documents.ts`, `src/server/doc-import.ts`):
   napojení druhu „ocr“ (OpenAI Responses API, strukturovaný výstup; `openaiTest` = klíč
   `SHANON_TEST_OCR_KEY` z prostředí, nikdy v DB), mezitabulka `int.document` (+ řádky),
