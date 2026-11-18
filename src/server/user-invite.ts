@@ -45,7 +45,11 @@ export async function sendPasswordLink(
   const t = await getT((user.lang as Lang) || "cs", tenantId);
   const link = `${envUrls().self}/login/heslo?t=${token}`;
   const name = user.firstName || user.name;
-  const companies = await userCompanyNames(tenantId, user.id);
+  // názvy firem jsou jen do textu — chyba při jejich čtení pozvánku nezastaví (pak název organizace)
+  const companies = await userCompanyNames(tenantId, user.id).catch((e) => {
+    console.error("firmy uživatele do pozvánky", e);
+    return [] as string[];
+  });
   const mail =
     kind === "invite"
       ? inviteMail(t, { name, email: user.email, company: companies[0] ?? companyName, others: companies.slice(1), inviter: inviter.name, link, days })
@@ -63,9 +67,10 @@ export async function sendPasswordLink(
  * (vidí všechny firmy), u něj je seznam prázdný a pozvánka jmenuje organizaci.
  */
 async function userCompanyNames(tenantId: string, userId: string): Promise<string[]> {
+  // přiřazení čte správa uživatelů přímo (aplikační role k sys_user_company práva nemá), firmy v tenantovi
+  const links = await prisma.sysUserCompany.findMany({ where: { tenantId, userId }, orderBy: { createdAt: "asc" } });
+  if (!links.length) return [];
   return withTenant(tenantId, async (tx) => {
-    const links = await tx.sysUserCompany.findMany({ where: { tenantId, userId }, orderBy: { createdAt: "asc" } });
-    if (!links.length) return [];
     const cos = await tx.sysCompany.findMany({ where: { tenantId, id: { in: links.map((l) => l.companyId) } }, select: { id: true, code: true, name: true } });
     const byId = new Map(cos.map((c) => [c.id, c]));
     return links
