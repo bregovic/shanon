@@ -447,6 +447,9 @@ ta používá stejné komponenty a akce.
   během; transakce má limit 20 s, dlouhé operace (zaúčtování stovek dokladů) čtou číselníky
   jednou za běh (`cachedReads`) a nedělají zbytečné zápisy. Měřítko 15. 11. 2026 (PGlite):
   řádek deníku 16 ms, faktura se 3 řádky 52 ms, zaúčtování faktury 63 ms, 500 dokladů deníku 6 s.
+  18. 11. 2026: řádek deníku 18 ms, faktura se 3 řádky 88 ms (28 dotazů na řádek — opakované čtení hlavičky / partnera),
+  zaúčtování 78 ms (85 dotazů), e-shop kategorie 250 položek 19 ms, přehled 16 ms, košík 10 položek 46 ms.
+  Výpis zboží e-shopu nesmí dotazovat za položku: číselníky přes `catalogReads`, zásoba hromadně `stockOf` (`shop/catalog.ts`).
 - Před dokončením úkolu (dřívější SOP): build projde, nové texty jsou labely
   v cs i en, nový objekt má test v `tests/`, změna je ověřená v prohlížeči
   (desktop i mobil), žádné tajné údaje ani ladicí výpisy.

@@ -49,9 +49,44 @@ async function priceOf(data: DataApi, item: RecordData, currencyId: string, date
   return { price: d ? d.price : regular, regular: d ? regular : null };
 }
 
+/**
+ * Čtení pro výpis zboží: číselníky (sazba DPH, MJ, měna, slevy) jednou za výpis místo dotazu za každou položku.
+ * Zásoba a rezervace celého výpisu dvěma dotazy (`stockOf`). Jen čtení — zápisy jdou beze změny.
+ */
+const LOOKUPS = new Set(["tax.taxCode", "inv.unit", "sys.currency", "inv.discount", "gl.parameters"]);
+function catalogReads(data: DataApi): DataApi {
+  const memo = new Map<string, Promise<unknown>>();
+  const once = <T>(key: string, fn: () => Promise<T>) => {
+    if (!memo.has(key)) memo.set(key, fn());
+    return memo.get(key) as Promise<T>;
+  };
+  return {
+    ...data,
+    get: (o, id) => (LOOKUPS.has(o) ? once(`g:${o}:${id}`, () => data.get(o, id)) : data.get(o, id)),
+    find: (o, where, opts) => (LOOKUPS.has(o) ? once(`f:${o}:${JSON.stringify(where)}:${JSON.stringify(opts ?? {})}`, () => data.find(o, where, opts)) : data.find(o, where, opts)),
+  };
+}
+
+/** Volná zásoba položek výpisu najednou (null = sklad vypnutý). Chybějící položka = 0. */
+async function stockOf(data: DataApi, shop: RecordData, items: RecordData[]): Promise<Map<string, number> | null> {
+  const ids = items.filter((i) => !i.itemType || i.itemType === "item").map((i) => String(i.id));
+  const out = new Map<string, number>();
+  try {
+    for (let k = 0; k < ids.length; k += 200) {
+      const where: RecordData = { itemId: { in: ids.slice(k, k + 200) }, ...(shop.warehouseId ? { warehouseId: shop.warehouseId } : {}) };
+      for (const r of await data.find("whs.onhand", where, { take: 100000 })) out.set(String(r.itemId), (out.get(String(r.itemId)) ?? 0) + Number(r.qty ?? 0));
+      for (const r of await data.find("whs.reservation", where, { take: 100000 })) out.set(String(r.itemId), (out.get(String(r.itemId)) ?? 0) - Number(r.qty ?? 0));
+    }
+  } catch {
+    return null; // modul Sklad vypnutý
+  }
+  return out;
+}
+
 /** Volná zásoba skladové položky (null = sklad vypnutý nebo neskladová položka). */
-async function freeStock(data: DataApi, shop: RecordData, item: RecordData): Promise<number | null> {
+async function freeStock(data: DataApi, shop: RecordData, item: RecordData, pre?: Map<string, number> | null): Promise<number | null> {
   if (item.itemType && item.itemType !== "item") return null;
+  if (pre !== undefined) return pre === null ? null : Math.max(0, pre.get(String(item.id)) ?? 0);
   try {
     const where: RecordData = { itemId: item.id, ...(shop.warehouseId ? { warehouseId: shop.warehouseId } : {}) };
     const onhand = (await data.find("whs.onhand", where, { take: 1000 })).reduce((a, r) => a + Number(r.qty ?? 0), 0);
@@ -62,9 +97,9 @@ async function freeStock(data: DataApi, shop: RecordData, item: RecordData): Pro
   }
 }
 
-async function toProduct(data: DataApi, shop: RecordData, item: RecordData, currencyId: string, date: string, units: Map<string, string>): Promise<ShopProduct> {
+async function toProduct(data: DataApi, shop: RecordData, item: RecordData, currencyId: string, date: string, units: Map<string, string>, pre?: Map<string, number> | null): Promise<ShopProduct> {
   const p = await priceOf(data, item, currencyId, date);
-  const stock = await freeStock(data, shop, item);
+  const stock = await freeStock(data, shop, item, pre);
   const uid = String(item.unitId ?? "");
   if (uid && !units.has(uid)) units.set(uid, String((await data.get("inv.unit", uid))?.code ?? ""));
   return {
@@ -85,7 +120,8 @@ async function toProduct(data: DataApi, shop: RecordData, item: RecordData, curr
 }
 
 /** Položky obchodu (volitelně kategorie včetně podkategorií a hledání v názvu / čísle). */
-export async function listProducts(data: DataApi, shop: RecordData, opts: { categoryId?: string | null; q?: string; take?: number } = {}): Promise<ShopProduct[]> {
+export async function listProducts(api: DataApi, shop: RecordData, opts: { categoryId?: string | null; q?: string; take?: number } = {}): Promise<ShopProduct[]> {
+  const data = catalogReads(api);
   const currencyId = await shopCurrency(data);
   const date = today();
   let items = await data.find("inv.item", { eshop: true, blocked: false }, { take: 2000, orderBy: { name: "asc" } });
@@ -106,7 +142,9 @@ export async function listProducts(data: DataApi, shop: RecordData, opts: { cate
   if (q) items = items.filter((i) => `${i.name} ${i.itemNum} ${i.brand ?? ""}`.toLowerCase().includes(q));
   const units = new Map<string, string>();
   const out: ShopProduct[] = [];
-  for (const i of items.slice(0, opts.take ?? 500)) out.push(await toProduct(data, shop, i, currencyId, date, units));
+  const page = items.slice(0, opts.take ?? 500);
+  const pre = await stockOf(data, shop, page);
+  for (const i of page) out.push(await toProduct(data, shop, i, currencyId, date, units, pre));
   return out;
 }
 

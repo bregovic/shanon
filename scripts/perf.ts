@@ -13,11 +13,13 @@ import { getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } fro
 import { createPrisma } from "../src/server/db";
 import { provisionTenant } from "../src/server/provision";
 import { findReport } from "../src/server/report";
+import { listProducts, quote } from "../src/modules/shop/catalog";
 
 const arg = (n: string, d: number) => Number(process.argv.find((a) => a.startsWith(`--${n}=`))?.split("=")[1] ?? d);
 const LINES = arg("lines", 400);
 const INVOICES = arg("invoices", 300);
 const SUBJECTS = arg("subjects", 3000);
+const ITEMS = arg("items", 250);
 const client = createPrisma();
 const rows: [string, number, number][] = [];
 
@@ -32,7 +34,7 @@ async function time<T>(label: string, n: number, fn: () => Promise<T>): Promise<
 
 async function main() {
   const run = Date.now().toString(36);
-  const T: Ctx = (await provisionTenant(client, { code: `perf-${run}`, name: "Perf", adminEmail: `perf-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "bank", "cash", "whs", "inv"], company: { code: "P", name: "Perf s.r.o." } })).ctx;
+  const T: Ctx = (await provisionTenant(client, { code: `perf-${run}`, name: "Perf", adminEmail: `perf-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "bank", "cash", "whs", "inv", "shop"], company: { code: "P", name: "Perf s.r.o." } })).ctx;
   // dávkové úlohy tenanta vypnout (plánovač by je jinak spouštěl s ostatními tenanty)
   for (const j of (await listRecords(T, "sys.batchJob", { pageSize: 200 }, client)).rows) await saveRecord(T, "sys.batchJob", String(j.id), { active: false }, undefined, client);
   const acc = async (n: string) => String((await listRecords(T, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
@@ -92,6 +94,26 @@ async function main() {
     await time("report: předvaha", 5, async () => {
       for (let i = 0; i < 5; i++) await inTenant(T, (s) => tb.run(s.sys().api(), { dateFrom: "2026-01-01", dateTo: "2026-12-31" }, { companyId: T.companyId, t: s.sys().eventCtx("gl.trans").t }), client);
     });
+
+  // e-shop: katalog (cena, sleva, volná zásoba, MJ u každé položky), košík
+  const [unit] = (await listRecords(T, "inv.unit", { pageSize: 1 }, client)).rows;
+  const [igrp] = (await listRecords(T, "inv.itemGroup", { pageSize: 1 }, client)).rows;
+  const [cat] = [await saveRecord(T, "inv.category", null, { code: "PERF", name: "Výkon" }, undefined, client)];
+  const itemIds: string[] = [];
+  await time("položka e-shopu (založení)", ITEMS, async () => {
+    for (let i = 0; i < ITEMS; i++)
+      itemIds.push(String((await saveRecord(T, "inv.item", null, { itemNum: `E${String(i).padStart(4, "0")}`, name: `Zboží ${i}`, salesPrice: String(50 + i), unitId: unit?.id ?? null, groupId: igrp?.id ?? null, categoryId: cat.id, eshop: true }, undefined, client)).id));
+  });
+  const shop = (await listRecords(T, "shop.shop", { pageSize: 1 }, client)).rows[0] ?? {};
+  await time("e-shop: přehled (60 položek)", 10, async () => {
+    for (let i = 0; i < 10; i++) await inTenant(T, (s) => listProducts(s.sys().api(), shop, { take: 60 }), client);
+  });
+  await time(`e-shop: kategorie (${ITEMS} položek)`, 10, async () => {
+    for (let i = 0; i < 10; i++) await inTenant(T, (s) => listProducts(s.sys().api(), shop, { categoryId: String(cat.id) }), client);
+  });
+  await time("e-shop: košík 10 položek (quote)", 10, async () => {
+    for (let i = 0; i < 10; i++) await inTenant(T, (s) => quote(s.sys().api(), shop, { lines: itemIds.slice(0, 10).map((itemId) => ({ itemId, qty: "2" })) }), client);
+  });
 
   const total = rows.reduce((a, r) => a + r[2], 0);
   console.log(`\nCelkem ${(total / 1000).toFixed(1)} s · tenant perf-${run} (smazat: není potřeba, lokální DB)`);
