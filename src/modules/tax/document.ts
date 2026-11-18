@@ -225,10 +225,20 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
       },
       async afterSave(ctx, data) {
         const key = String(data.id);
-        // dar: řádky bez DPH (řádek si při uložení daň sám vynuluje)
-        if (data.docType === "donation")
-          for (const l of await ctx.data.find(cfg.line, { [cfg.lineHeaderField]: data.id }, { take: 1000 }))
-            if (l.taxCodeId || l.taxGroupId || l.itemTaxGroupId || toCents(l.taxAmount ?? "0") !== BigInt(0)) await ctx.data.update(cfg.line, String(l.id), { taxCodeId: null });
+        // dar: řádky bez DPH (řádek si při uložení daň sám vynuluje) a na účtu darů, pokud měly výchozí účet skupiny
+        // (typ změněný na Dar až po zalistování / založení řádků); ručně zvolený účet zůstane
+        if (data.docType === "donation") {
+          const lines = await ctx.data.find(cfg.line, { [cfg.lineHeaderField]: data.id }, { take: 1000 });
+          const { group } = lines.length ? await partnerAndGroup(ctx.data, cfg, data[cfg.partnerField]) : { group: null };
+          const groupAccount = group?.[cfg.groupLineAccountField] ?? null;
+          const gift = lines.length ? await donationAccount(ctx.data) : null;
+          for (const l of lines) {
+            const patch: RecordData = {};
+            if (l.taxCodeId || l.taxGroupId || l.itemTaxGroupId || toCents(l.taxAmount ?? "0") !== BigInt(0)) patch.taxCodeId = null;
+            if (gift && groupAccount && l[cfg.lineAccountField] === groupAccount && !l.itemId) patch[cfg.lineAccountField] = gift;
+            if (Object.keys(patch).length) await ctx.data.update(cfg.line, String(l.id), patch);
+          }
+        }
         const oldCur = currencyChanged.get(key);
         if (oldCur) {
           currencyChanged.delete(key);

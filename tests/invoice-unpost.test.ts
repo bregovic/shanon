@@ -109,8 +109,13 @@ describe("zrušit zaúčtování faktury", () => {
     const [std] = (await listRecords(T, "ap.postingProfile", { filter: { code: "STANDARD" } }, client)).rows;
     expect(inv2.postingProfileId).toBe(std.id);
     // přepnutí na dar převezme profil darů, zpět na fakturu ho zase vrátí
+    const l2 = await saveRecord(T, "ap.invoiceLine", null, { invoiceId: inv2.id, description: "Dar", qty: "1", unitPrice: "1000" }, undefined, client);
+    expect(l2.expenseAccountId).not.toBe(acc["543100"]);
     const sw = await saveRecord(T, "ap.invoice", String(inv2.id), { ...inv2, docType: "donation" }, undefined, client);
     expect(sw.postingProfileId).toBe(dar.id);
+    // řádek s výchozím účtem skupiny přejde na účet darů a bez DPH
+    const l2d = (await getRecord(T, "ap.invoiceLine", String(l2.id), client))!;
+    expect([l2d.expenseAccountId, l2d.taxCodeId]).toEqual([acc["543100"], null]);
     const back = await saveRecord(T, "ap.invoice", String(inv2.id), { ...sw, docType: "invoice" }, undefined, client);
     expect(back.postingProfileId).toBe(std.id);
     // výchozí profily závazků

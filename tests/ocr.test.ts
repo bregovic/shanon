@@ -133,5 +133,16 @@ describe("vytěžování dokladů", () => {
     expect([adv.externalNum, adv.amount, adv.status]).toEqual(["ZF-9", "1815.00", "open"]);
     const ord = (await getRecord(T, "ap.order", String(dob.resultId), client))!;
     expect([ord.externalRef, ord.amountNet]).toEqual(["OBJ-5", "1500.00"]);
+
+    // potvrzení o daru: přijatý doklad typu Dar bez čísla dokladu, účet 543100, bez DPH
+    fakeOpenAi(() => invoice({ docType: "donation", docNumber: null, amountNet: 5000, taxAmount: 0, amountGross: 5000, lines: [{ description: "Dar na činnost spolku", qty: 1, unit: null, unitPrice: 5000, taxRate: 0, amountNet: 5000 }] }));
+    const g = await newDoc(T);
+    await processPendingDocuments(T, client);
+    const dg = (await getRecord(T, "int.document", String(g.id), client))!;
+    expect([dg.docType, dg.target, dg.status]).toEqual(["donation", "apInvoice", "listed"]);
+    const gi = (await getRecord(T, "ap.invoice", String(dg.resultId), client))!;
+    const [a543] = (await listRecords(T, "gl.account", { filter: { accountNum: "543100" } }, client)).rows;
+    const [gl] = (await listRecords(T, "ap.invoiceLine", { filter: { invoiceId: String(gi.id) } }, client)).rows;
+    expect([gi.docType, gl.expenseAccountId, gl.taxCodeId]).toEqual(["donation", a543.id, null]);
   });
 });

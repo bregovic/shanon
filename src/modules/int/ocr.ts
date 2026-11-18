@@ -30,7 +30,7 @@ export const OCR_SCHEMA = {
   additionalProperties: false,
   required: ["docType", "issuer", "recipient", "docNumber", "orderNumber", "issueDate", "taxDate", "dueDate", "vs", "currency", "amountNet", "taxAmount", "amountGross", "lines", "note"],
   properties: {
-    docType: { type: "string", enum: ["invoice", "advance", "order", "receipt", "creditNote", "other"] },
+    docType: { type: "string", enum: ["invoice", "advance", "order", "receipt", "creditNote", "donation", "other"] },
     issuer: party,
     recipient: party,
     docNumber: str,
@@ -68,7 +68,7 @@ export interface OcrParty {
   iban: string | null;
 }
 export interface OcrResult {
-  docType: "invoice" | "advance" | "order" | "receipt" | "creditNote" | "other";
+  docType: "invoice" | "advance" | "order" | "receipt" | "creditNote" | "donation" | "other";
   issuer: OcrParty;
   recipient: OcrParty;
   docNumber: string | null;
@@ -92,6 +92,7 @@ const SYSTEM = [
   "issuer = vystavitel (dodavatel), recipient = příjemce (odběratel). IČO do regNo bez mezer, DIČ do vatId i s předponou země.",
   "Řádky: unitPrice a amountNet bez DPH; když doklad uvádí ceny s DPH, přepočti je na základ podle sazby. taxRate v procentech (21, 12, 0).",
   "Měna jako kód ISO (CZK, EUR). vs = variabilní symbol, jen číslice.",
+  "Potvrzení o přijetí daru, darovací smlouva nebo dar bez protiplnění = docType donation (issuer = obdarovaný, který potvrzení vystavil; recipient = dárce; bez DPH).",
 ].join(" ");
 
 /** Klíč napojení (testovací z prostředí serveru, ostrý z napojení). */

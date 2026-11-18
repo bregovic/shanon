@@ -123,7 +123,8 @@ export async function checkDocument(data: DataApi, doc: RecordData, t: T): Promi
     }
   }
   if (!doc.issueDate) issues.push(t("@INT:DocNoDate"));
-  if (!doc.docNumber && (doc.target === "apInvoice" || doc.target === "apAdvance")) issues.push(t("@INT:DocNoNumber"));
+  // číslo dokladu dodavatele: dar (potvrzení o daru) ho mít nemusí
+  if (!doc.docNumber && doc.docType !== "donation" && (doc.target === "apInvoice" || doc.target === "apAdvance")) issues.push(t("@INT:DocNoNumber"));
   const lines = await data.find("int.documentLine", { documentId: doc.id }, { take: 1000 });
   const gross = doc.amountGross !== null && doc.amountGross !== undefined ? toCents(doc.amountGross) : null;
   const net = doc.amountNet !== null && doc.amountNet !== undefined ? toCents(doc.amountNet) : null;
@@ -203,7 +204,7 @@ export async function listDocument(data: DataApi, doc: RecordData, t: T): Promis
   if (kind === "invoice") {
     header = await data.create(tg.object, {
       ...common,
-      ...(tg.partner === "ap.vendor" ? { externalNum: checked.docNumber ?? null, docType: checked.docType === "receipt" ? "receipt" : "invoice" } : {}),
+      ...(tg.partner === "ap.vendor" ? { externalNum: checked.docNumber ?? null, docType: checked.docType === "receipt" || checked.docType === "donation" ? checked.docType : "invoice" } : {}),
       invoiceDate: checked.issueDate,
       taxDate: checked.taxDate ?? checked.issueDate,
       dueDate: checked.dueDate ?? null,

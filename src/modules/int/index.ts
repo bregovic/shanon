@@ -139,6 +139,7 @@ export const OcrDocType = defineEnum({
     { value: "order", label: "@INT:TypeOrder" },
     { value: "receipt", label: "@INT:TypeReceipt" },
     { value: "creditNote", label: "@INT:TypeCreditNote" },
+    { value: "donation", label: "@INT:TypeDonation" },
     { value: "other", label: "@INT:TypeOther" },
   ],
 });
@@ -703,6 +704,7 @@ export default defineModule({
       TypeReceipt: "Účtenka",
       TypeCreditNote: "Dobropis",
       TypeOther: "Jiný",
+      TypeDonation: "Dar",
       DocNew: "Nový",
       DocProcessing: "Zpracovává se",
       DocAttention: "Ke kontrole",
@@ -1038,6 +1040,7 @@ export default defineModule({
       TypeReceipt: "Receipt",
       TypeCreditNote: "Credit note",
       TypeOther: "Other",
+      TypeDonation: "Donation",
       DocNew: "New",
       DocProcessing: "Processing",
       DocAttention: "To review",
