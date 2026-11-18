@@ -157,3 +157,10 @@ Návod: Nápověda → E-shop."
 2026-11-18;change;E-shop;Vychystávání: Hotovo u kusů, vážení v dialogu;;;"- Kusové zboží: tlačítko **Hotovo** (vychystáno v objednaném množství).
 - Zboží na váhu: **Zvážit** otevře dialog — s připojenou váhou se hmotnost načte sama, jde ji i zadat ručně.
 - Objednávky „Dnes, co nejdřív“ jsou nahoře se štítkem."
+2026-11-18;change;Výkon;Rychlejší e-shop a ukládání dokladů;;b5e488e;"- E-shop: přehled a kategorie načítají ceny, slevy a zásobu najednou — kategorie s 250 položkami místo 0,7 s za 0,02 s.
+- Ukládání a zaúčtování dokladů je asi o třetinu rychlejší (aplikace během jedné operace nečte stejné údaje opakovaně).
+- Nová pravidla vývoje: funkce co nejvíc obecně pro všechny objekty a s ohledem na velké množství dokladů."
+2026-11-18;fix;E-shop;Vyzvednutí podle pražského času;;70b83f5;"- „Dnes“ se počítá v pražském čase (dřív mezi půlnocí a 1:00 platil ještě včerejšek).
+- Po zavírací hodině obchodu (Vyzvednutí do) se „Dnes, co nejdřív“ už nenabízí — nejbližší den je zítra."
+2026-11-18;fix;Vytěžování dokladů;Dar z vytěžení a přepnutí na Dar;;1754111;"- Potvrzení o daru / darovací smlouva se vytěží jako přijatý doklad typu **Dar**: bez čísla dokladu, účet 543100, bez DPH.
+- Změna typu přijatého dokladu na Dar převede řádky s výchozím účtem skupiny na účet darů (ručně zvolený účet zůstane)."
