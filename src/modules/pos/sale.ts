@@ -33,6 +33,8 @@ export interface SaleInput {
   payment: "cash" | "card" | "invoice";
   /** známý odběratel (Odběratelé) — na účtence / faktuře */
   customerId?: string | null;
+  /** odběratel bez evidence — jen vytisknout na účtenku (doklad zůstává zjednodušený) */
+  buyer?: { name?: string; street?: string; zip?: string; city?: string } | null;
   /** přijatá hotovost (jen u platby hotově) */
   cashGiven?: string | null;
   /** platba kartou přes terminál: id transakce (ověřené volajícím) */
@@ -124,6 +126,13 @@ export async function sellOnInvoice(data: DataApi, input: SaleInput): Promise<Re
   return (await data.get("ar.invoice", String(inv.id)))!;
 }
 
+/** Odběratel bez evidence → pole účtenky (oříznuté; prázdný = nic). */
+function buyerFields(b: SaleInput["buyer"]): RecordData {
+  const clip = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n) || null;
+  const out = { buyerName: clip(b?.name, 255), buyerStreet: clip(b?.street, 255), buyerZip: clip(b?.zip, 20), buyerCity: clip(b?.city, 255) };
+  return Object.values(out).some(Boolean) ? out : {};
+}
+
 /** Prodej: účtenka s řádky v otevřené směně pokladny. */
 export async function sell(data: DataApi, input: SaleInput): Promise<RecordData> {
   if (input.payment === "invoice") throw new UserError("@POS:CustomerRequired");
@@ -149,7 +158,7 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
     cashGiven: given === null ? null : fromCents(given),
     change: given === null ? null : fromCents(given - paid),
     paymentRef: input.payment === "card" ? (input.paymentRef ?? null) : null,
-    ...(customer ? { customerId: customer.id } : {}),
+    ...(customer ? { customerId: customer.id } : buyerFields(input.buyer)),
   });
   for (const l of lines) {
     await data.create("pos.receiptLine", {
@@ -342,8 +351,11 @@ export interface ReceiptPrint {
   company: { name: string; tradeName?: string | null; regNo: string | null; vatId: string | null; address: string | null; logoId?: string | null; registration?: string | null };
   /** plátce DPH (neplátce: účtenka / faktura bez DPH, ne daňový doklad) */
   vatPayer?: boolean;
-  /** známý odběratel — účtenka je pak faktura – daňový doklad */
-  customer?: { name: string; regNo: string | null; vatId: string | null; address: string | null; email: string | null } | null;
+  /**
+   * odběratel na účtence. Známý (z Odběratelů) = účtenka je faktura – daňový doklad;
+   * `adhoc` = zadaný jen na účtenku (jméno, adresa) — doklad zůstává zjednodušený
+   */
+  customer?: { name: string; regNo: string | null; vatId: string | null; address: string | null; email: string | null; adhoc?: boolean } | null;
   lines: { description: string; qty: string; unit: string; unitPrice: string; amount: string; rate: string; originalPrice?: string | null }[];
   vat: { rate: string; base: string; tax: string }[];
   gross: string;
@@ -383,6 +395,16 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
         email: String(c?.docEmail || subj.email || "") || null,
       };
     }
+  }
+  if (!customer && (r.buyerName || r.buyerStreet || r.buyerCity)) {
+    customer = {
+      name: String(r.buyerName ?? ""),
+      regNo: null,
+      vatId: null,
+      address: [r.buyerStreet, [r.buyerZip, r.buyerCity].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
+      email: null,
+      adhoc: true,
+    };
   }
   const rates = new Map<string, string>();
   const units = new Map<string, string>();

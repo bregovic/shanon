@@ -3531,6 +3531,10 @@ model PosReceipt {
   change        Decimal? @db.Decimal(18, 2)
   paymentRef    String?  @map("payment_ref") @db.VarChar(255)
   customerId    String?  @map("customer_id") @db.Uuid
+  buyerName     String?  @map("buyer_name") @db.VarChar(255)
+  buyerStreet   String?  @map("buyer_street") @db.VarChar(255)
+  buyerZip      String?  @map("buyer_zip") @db.VarChar(20)
+  buyerCity     String?  @map("buyer_city") @db.VarChar(255)
   eetStatus     String?  @map("eet_status") @db.VarChar(40)
   eetPok        String?  @map("eet_pok") @db.VarChar(255)
   eetMessage    String?  @map("eet_message") @db.VarChar(255)

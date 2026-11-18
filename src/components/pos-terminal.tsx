@@ -104,6 +104,16 @@ function ScaleAutoStart({ onStart }: { onStart: () => void }) {
 }
 
 /** Známý odběratel nákupu (Odběratelé). */
+/** odběratel bez evidence — jen vytisknout na účtenku */
+interface Buyer {
+  name: string;
+  street: string;
+  zip: string;
+  city: string;
+}
+const NO_BUYER: Buyer = { name: "", street: "", zip: "", city: "" };
+const hasBuyer = (b: Buyer | null) => !!b && Object.values(b).some((v) => v.trim());
+
 interface CustomerPick {
   id: string;
   name: string;
@@ -385,6 +395,8 @@ export function PosTerminal(p: {
   const [customer, setCustomer] = useState<CustomerPick | null>(null);
   const [custDlg, setCustDlg] = useState(false);
   const [custQ, setCustQ] = useState("");
+  const [buyer, setBuyer] = useState<Buyer | null>(null);
+  const [buyerDraft, setBuyerDraft] = useState<Buyer>(NO_BUYER);
   const [custRows, setCustRows] = useState<CustomerPick[]>([]);
   const [invoiceDone, setInvoiceDone] = useState<{ id: string; invoiceNum: string; amount: string; dueDate: string; email: string } | null>(null);
   // odeslání dokladu e-mailem (účtenka / faktura)
@@ -728,6 +740,7 @@ export function PosTerminal(p: {
       paymentRef,
       basketId: active?.id ?? null,
       customerId: customer?.id ?? null,
+      buyer: customer ? null : hasBuyer(buyer) ? buyer : null,
       lines: saleLines(),
     });
     setBusy(false);
@@ -741,6 +754,8 @@ export function PosTerminal(p: {
     setMailTo(customer?.email ?? "");
     setMailState(null);
     setCustomer(null);
+    setBuyer(null);
+    setBuyerDraft(NO_BUYER);
     if (active) {
       // zaplacený nákup boxu: box volný, zpět na volný prodej
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -1012,6 +1027,16 @@ export function PosTerminal(p: {
                     <span className={st.custName}>{customer.name}</span>
                     <span className={st.spacer} />
                     <Button appearance="subtle" size="small" icon={<Dismiss24Regular />} aria-label={L.Remove} onClick={() => setCustomer(null)} />
+                  </>
+                ) : hasBuyer(buyer) ? (
+                  <>
+                    <Person24Regular />
+                    {/* odběratel jen na účtenku: klik = upravit */}
+                    <button type="button" className={st.custName} style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "inherit", font: "inherit", textAlign: "left" }} onClick={() => (setBuyerDraft(buyer!), setCustDlg(true), void findCustomers(""))}>
+                      {buyer!.name || [buyer!.street, buyer!.city].filter(Boolean).join(", ")}
+                    </button>
+                    <span className={st.spacer} />
+                    <Button appearance="subtle" size="small" icon={<Dismiss24Regular />} aria-label={L.Remove} onClick={() => (setBuyer(null), setBuyerDraft(NO_BUYER))} />
                   </>
                 ) : (
                   <Button appearance="subtle" size="small" icon={<Person24Regular />} onClick={() => (setCustDlg(true), void findCustomers(""))}>
@@ -1302,15 +1327,29 @@ export function PosTerminal(p: {
               <div className={st.custList}>
                 {!custRows.length && <p className={st.empty}>{L.NoCustomers}</p>}
                 {custRows.map((c) => (
-                  <button key={c.id} className={st.custRow} onClick={() => (setCustomer(c), setCustDlg(false))}>
+                  <button key={c.id} className={st.custRow} onClick={() => (setCustomer(c), setBuyer(null), setCustDlg(false))}>
                     <strong>{c.name}</strong>
                     <span>{[c.regNo && `IČO ${c.regNo}`, c.vatId && `DIČ ${c.vatId}`].filter(Boolean).join("  ")}</span>
                   </button>
                 ))}
               </div>
+              {/* odběratel bez evidence: jméno / adresa jen na účtenku, vše nepovinné */}
+              <div style={{ marginTop: 16, display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <strong>{L.Buyer}</strong>
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>{L.BuyerHint}</div>
+                </div>
+                <Input style={{ gridColumn: "1 / -1" }} placeholder={L.BuyerName} aria-label={L.BuyerName} value={buyerDraft.name} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, name: d.value })} />
+                <Input style={{ gridColumn: "1 / -1" }} placeholder={L.BuyerStreet} aria-label={L.BuyerStreet} value={buyerDraft.street} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, street: d.value })} />
+                <Input placeholder={L.BuyerZip} aria-label={L.BuyerZip} value={buyerDraft.zip} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, zip: d.value })} />
+                <Input placeholder={L.BuyerCity} aria-label={L.BuyerCity} value={buyerDraft.city} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, city: d.value })} />
+              </div>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setCustDlg(false)}>{L.Cancel}</Button>
+              <Button appearance="primary" disabled={!hasBuyer(buyerDraft)} onClick={() => (setBuyer({ ...buyerDraft }), setCustomer(null), setCustDlg(false))}>
+                {L.BuyerUse}
+              </Button>
             </DialogActions>
           </DialogBody>
         </DialogSurface>
@@ -1624,7 +1663,7 @@ function Receipt({
       {r.company.registration && <div className={st.rCenter} style={{ fontSize: "0.85em" }}>{r.company.registration}</div>}
       <div className={st.rSep} />
       <div className={st.rRow}>
-        <span>{r.vatPayer === false ? (r.customer ? L.InvoiceNonPayer : L.Receipt) : r.customer ? L.InvoiceDoc : L.SimplifiedDoc}</span>
+        <span>{r.vatPayer === false ? (r.customer && !r.customer.adhoc ? L.InvoiceNonPayer : L.Receipt) : r.customer && !r.customer.adhoc ? L.InvoiceDoc : L.SimplifiedDoc}</span>
         <span>{r.receiptNum}</span>
       </div>
       {r.customer && (

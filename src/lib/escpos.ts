@@ -98,7 +98,8 @@ export function receiptEscPos(
   // zápis v rejstříku (spisová značka) — dlouhý text po řádcích šířky papíru
   if (r.company.registration) for (let i = 0; i < r.company.registration.length; i += opts.width) p.line(r.company.registration.slice(i, i + opts.width));
   p.align("left").sep();
-  p.pair(r.vatPayer === false ? (r.customer ? L.InvoiceNonPayer : L.Receipt) : r.customer ? L.InvoiceDoc : L.SimplifiedDoc, r.receiptNum);
+  const known = !!r.customer && !r.customer.adhoc; // odběratel jen na účtenku fakturu nedělá
+  p.pair(r.vatPayer === false ? (known ? L.InvoiceNonPayer : L.Receipt) : known ? L.InvoiceDoc : L.SimplifiedDoc, r.receiptNum);
   p.pair(r.register, new Date(r.issuedAt).toLocaleString(opts.locale));
   if (r.customer) {
     // odběratel (faktura – daňový doklad)

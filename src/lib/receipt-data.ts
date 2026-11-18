@@ -3,6 +3,8 @@ import type { ReceiptPrint } from "@/modules/pos/sale";
 
 /** Data účtenky z podkladů pro tisk (stejné na serveru i v kase). */
 export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: string; web?: string } = {}, paymentLabels: Record<string, string> = {}) {
+  // odběratel zadaný jen na účtenku (adhoc) z ní fakturu nedělá
+  const known = !!r.customer && !r.customer.adhoc;
   return {
     company: {
       name: r.company.name,
@@ -24,7 +26,7 @@ export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: st
     },
     doc: {
       // neplátce DPH nevystavuje daňový doklad
-      title: r.vatPayer === false ? (r.customer ? "Faktura" : "Účtenka") : r.customer ? "Faktura – daňový doklad" : "Zjednodušený daňový doklad",
+      title: r.vatPayer === false ? (known ? "Faktura" : "Účtenka") : known ? "Faktura – daňový doklad" : "Zjednodušený daňový doklad",
       vatPayer: r.vatPayer === false ? "" : "1",
       nonPayerNote: r.vatPayer === false ? "Nejsme plátci DPH." : "",
       number: r.receiptNum,
