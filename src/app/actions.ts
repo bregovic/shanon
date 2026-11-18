@@ -863,7 +863,7 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult<{ m
   if (invite && created) {
     // uživatel je uložený i když pozvánka neodejde — jde poslat znovu z jeho karty
     try {
-      mailed = await sendPasswordLink(s.ctx.tenantId, created, "invite", { name: s.user.name, email: s.user.email }, await currentCompanyName(s));
+      mailed = await sendPasswordLink(s.ctx.tenantId, created, "invite", { name: s.user.name, email: s.user.email }, s.tenant.name);
     } catch (e) {
       mailed = false;
       mailError = e instanceof UserError ? (await userError(e, s.lang, s.ctx.tenantId)).message : String(e);
@@ -871,11 +871,6 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult<{ m
   }
   revalidatePath("/system/users");
   return { ok: true, data: { mailed, mailError } };
-}
-
-/** název firmy, ze které správce zve (do pozvánky) */
-async function currentCompanyName(s: Awaited<ReturnType<typeof requireSession>>) {
-  return s.companies.find((c) => c.id === s.ctx.companyId)?.name ?? s.tenant.name;
 }
 
 /**
@@ -897,7 +892,7 @@ export async function sendUserMailAction(id: string, kind: "invite" | "reset"): 
       await prisma.sysSession.deleteMany({ where: { userId: user.id } });
       clearLoginLock(user.email);
     }
-    const mailed = await sendPasswordLink(s.ctx.tenantId, user.id, kind, { name: s.user.name, email: s.user.email }, await currentCompanyName(s));
+    const mailed = await sendPasswordLink(s.ctx.tenantId, user.id, kind, { name: s.user.name, email: s.user.email }, s.tenant.name);
     revalidatePath("/system/users");
     return { ok: true, data: { mailed } };
   } catch (e) {

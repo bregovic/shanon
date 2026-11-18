@@ -10,7 +10,7 @@ import bcrypt from "bcryptjs";
 import type { Lang } from "@/core/labels";
 import { UserError } from "@/core/module";
 import { clearLoginLock, loginLockMinutes } from "./auth";
-import { prisma } from "./db";
+import { prisma, withTenant } from "./db";
 import { getT } from "./i18n";
 import { inviteMail, loginHelpMail, resetMail } from "./mail-templates";
 import { envUrls, sendSystemMail, supportEmail, systemMailConfigured } from "./system-mail";
@@ -45,13 +45,35 @@ export async function sendPasswordLink(
   const t = await getT((user.lang as Lang) || "cs", tenantId);
   const link = `${envUrls().self}/login/heslo?t=${token}`;
   const name = user.firstName || user.name;
-  const mail = kind === "invite" ? inviteMail(t, { name, email: user.email, company: companyName, inviter: inviter.name, link, days }) : resetMail(t, { name, email: user.email, inviter: inviter.name, link, days });
+  const companies = await userCompanyNames(tenantId, user.id);
+  const mail =
+    kind === "invite"
+      ? inviteMail(t, { name, email: user.email, company: companies[0] ?? companyName, others: companies.slice(1), inviter: inviter.name, link, days })
+      : resetMail(t, { name, email: user.email, inviter: inviter.name, link, days });
   try {
     return await sendSystemMail({ to: user.email, replyTo: inviter.email, ...mail });
   } catch (e) {
     console.error("systémová pošta", e);
     throw new UserError("@SYS:MailFailed", { error: String((e as Error).message ?? e).slice(0, 200) });
   }
+}
+
+/**
+ * Firmy, do kterých má uživatel přístup — v pořadí přiřazení (pak podle kódu). Superuživatel přiřazení nemá
+ * (vidí všechny firmy), u něj je seznam prázdný a pozvánka jmenuje organizaci.
+ */
+async function userCompanyNames(tenantId: string, userId: string): Promise<string[]> {
+  return withTenant(tenantId, async (tx) => {
+    const links = await tx.sysUserCompany.findMany({ where: { tenantId, userId }, orderBy: { createdAt: "asc" } });
+    if (!links.length) return [];
+    const cos = await tx.sysCompany.findMany({ where: { tenantId, id: { in: links.map((l) => l.companyId) } }, select: { id: true, code: true, name: true } });
+    const byId = new Map(cos.map((c) => [c.id, c]));
+    return links
+      .map((l, i) => ({ i, c: byId.get(l.companyId) }))
+      .filter((x) => !!x.c)
+      .sort((a, b) => a.i - b.i || a.c!.code.localeCompare(b.c!.code))
+      .map((x) => x.c!.name);
+  });
 }
 
 /** Uživatel podle tokenu z odkazu (platný, aktivní účet), jinak null. */

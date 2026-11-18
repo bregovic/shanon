@@ -99,11 +99,22 @@ function commonBlocks(t: T, email: string): Block[] {
   ];
 }
 
-export function inviteMail(t: T, p: { name: string; email: string; company: string; inviter: string; link: string; days: number }) {
+/** nejvýš tolik dalších firem se v pozvánce vyjmenuje; víc = jen počet */
+const OTHERS_LISTED = 4;
+
+export function inviteMail(t: T, p: { name: string; email: string; company: string; others?: string[]; inviter: string; link: string; days: number }) {
+  const others = p.others ?? [];
+  const more =
+    others.length === 0
+      ? []
+      : others.length <= OTHERS_LISTED
+        ? // tečka za větou, jen když ji nemá už název firmy („s.r.o.“)
+          [`${t("@SYS:MailInviteOthers", { list: others.join(", ") })}${others[others.length - 1].endsWith(".") ? "" : "."}`]
+        : [t("@SYS:MailInviteOthersCount", { n: String(others.length) })];
   return render({
     subject: t("@SYS:MailInviteSubject", { company: p.company }),
     title: t("@SYS:MailInviteTitle"),
-    intro: [t("@SYS:MailHello", { name: p.name }), t("@SYS:MailInviteText", { company: p.company, inviter: p.inviter })],
+    intro: [t("@SYS:MailHello", { name: p.name }), t("@SYS:MailInviteText", { company: p.company, inviter: p.inviter }), ...more],
     button: { label: t("@SYS:MailSetPassword"), href: p.link, note: t("@SYS:MailLinkValid", { days: String(p.days) }) },
     blocks: commonBlocks(t, p.email),
     footer: t("@SYS:MailFooter", { inviter: p.inviter }),
