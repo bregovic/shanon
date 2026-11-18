@@ -271,6 +271,64 @@ export const comment = defineObject({
   defaultSort: { field: "postedAt", dir: "asc" },
 });
 
+/** Druh příspěvku zpětné vazby. */
+export const FeedbackKind = defineEnum({
+  id: "QaFeedbackKind",
+  label: "@QA:FeedbackKind",
+  values: [
+    { value: "idea", label: "@QA:FbIdea", color: "brand" },
+    { value: "problem", label: "@QA:FbProblem", color: "danger" },
+    { value: "question", label: "@QA:FbQuestion", color: "informative" },
+    { value: "praise", label: "@QA:FbPraise", color: "success" },
+  ],
+});
+export const FeedbackStatus = defineEnum({
+  id: "QaFeedbackStatus",
+  label: "@QA:FeedbackStatus",
+  values: [
+    { value: "new", label: "@QA:New", color: "informative" },
+    { value: "read", label: "@QA:FbRead" },
+    { value: "planned", label: "@QA:FbPlanned", color: "brand" },
+    { value: "done", label: "@QA:Done", color: "success" },
+    { value: "rejected", label: "@QA:Rejected", color: "subtle" },
+  ],
+});
+
+/**
+ * Náměty a zpětná vazba od uživatelů: co chybí, nefunguje nebo by šlo lépe. Autor a datum se doplní samy;
+ * vývoj z námětu založí požadavek (Vytvořit požadavek) a odpoví. Odkaz sem vede i z pozvánky.
+ */
+export const feedback = defineObject({
+  id: "qa.feedback",
+  table: "qa_feedback",
+  label: "@QA:Feedback",
+  labelPlural: "@QA:Feedbacks",
+  scope: "tenant",
+  fields: {
+    feedbackNum: { edt: Edts.Code, label: "@QA:FeedbackNum", mandatory: true },
+    kind: { edt: enumEdt(FeedbackKind), mandatory: true, default: "idea" },
+    title: { edt: Edts.Description, label: "@QA:Title", mandatory: true },
+    text: { edt: Edts.Notes, label: "@QA:FbText", help: "@QA:FbTextHelp" },
+    featureId: { edt: refEdt("qa.feature", "@QA:Feature") },
+    page: { edt: Text("QaFbPage", "@QA:FbPage", 300), help: "@QA:FbPageHelp" },
+    status: { edt: enumEdt(FeedbackStatus), mandatory: true, default: "new" },
+    author: { edt: Text("QaFbAuthor", "@QA:Author", 120), readOnly: true },
+    postedAt: { edt: Edts.TransDate, label: "@QA:PostedAt", readOnly: true },
+    issueId: { edt: refEdt("qa.issue", "@QA:Issue"), readOnly: true },
+    reply: { edt: Edts.Notes, label: "@QA:FbReply" },
+  },
+  titleField: "feedbackNum",
+  list: ["feedbackNum", "kind", "title", "featureId", "author", "postedAt", "status", "issueId"],
+  form: [
+    { label: "@SYS:General", fields: ["feedbackNum", "kind", "title", "text", "featureId", "page"] },
+    { label: "@QA:FbHandling", fields: ["status", "author", "postedAt", "issueId", "reply"] },
+  ],
+  unique: [["feedbackNum"]],
+  numberSeq: { field: "feedbackNum", seq: "QAFEEDBACK" },
+  defaultSort: { field: "feedbackNum", dir: "desc" },
+  actions: [{ id: "createIssue", label: "@QA:FbCreateIssue", when: { field: "issueId", equals: null } }],
+});
+
 /** Testovaný scénář dostane datum, pokud ho tester nevyplnil. */
 const RANK: Record<string, number> = { critical: 1, high: 2, medium: 3, low: 4 };
 /** řešitel požadavků ve vývoji */
@@ -312,6 +370,29 @@ export const qaHandlers: Record<string, ObjectHandlers> = {
       }
     },
   },
+  "qa.feedback": {
+    beforeSave(ctx, d, isNew) {
+      if (isNew) {
+        d.author = ctx.userName ?? null;
+        d.postedAt = new Date().toISOString().slice(0, 10);
+      }
+    },
+    actions: {
+      // námět → požadavek (problém = chyba), vazba zpět a stav Převedeno na požadavek
+      async createIssue(ctx, fb) {
+        const desc = [String(fb.text ?? ""), fb.page ? String(fb.page) : "", `(${String(fb.feedbackNum)}, ${String(fb.author ?? "")})`].filter(Boolean).join("\n");
+        const iss = await ctx.data.create("qa.issue", {
+          type: fb.kind === "problem" ? "bug" : "change",
+          title: fb.title,
+          featureId: fb.featureId ?? null,
+          reportedBy: fb.author ?? null,
+          description: desc,
+        });
+        await ctx.data.update("qa.feedback", String(fb.id), { issueId: iss.id, status: "planned" });
+        return { open: { object: "qa.issue", id: String(iss.id) } };
+      },
+    },
+  },
   "qa.scenario": {
     beforeSave(_ctx, d) {
       if (d.result && d.result !== "notRun" && !d.testedAt) d.testedAt = new Date().toISOString().slice(0, 10);
@@ -325,18 +406,39 @@ export default defineModule({
   description: "@QA:ModuleDesc",
   icon: "Beaker",
   dependsOn: ["sys"],
-  enums: [FeatureStatus, TestStage, TestResult, IssueType, Priority, IssueStatus, ItemStatus, ChangeKind],
-  objects: [feature, scenario, issue, issueItem, comment, changelog],
+  enums: [FeatureStatus, TestStage, TestResult, IssueType, Priority, IssueStatus, ItemStatus, ChangeKind, FeedbackKind, FeedbackStatus],
+  objects: [feature, scenario, issue, issueItem, comment, changelog, feedback],
   menu: [
-    { label: "@QA:Module", items: [{ object: "qa.issue" }, { object: "qa.scenario" }, { object: "qa.changelog" }] },
+    { label: "@QA:Module", items: [{ object: "qa.feedback" }, { object: "qa.issue" }, { object: "qa.scenario" }, { object: "qa.changelog" }] },
     { label: "@QA:Module", kind: "functions", items: [{ href: "/qa/aktuality", label: "@QA:News" }] },
     { label: "@SYS:Setup", items: [{ object: "qa.feature" }] },
   ],
   // řada je per firma (číselné řady patří firmě); požadavky jsou sdílené v tenantovi
-  numberSeqs: [{ code: "QAISSUE", name: "@QA:Issues", format: "CR{YY}-{####}", usedFor: "qa.issue" }],
+  numberSeqs: [
+    { code: "QAISSUE", name: "@QA:Issues", format: "CR{YY}-{####}", usedFor: "qa.issue" },
+    { code: "QAFEEDBACK", name: "@QA:Feedbacks", format: "NAM{YY}-{####}", usedFor: "qa.feedback" },
+  ],
   labels: {
     cs: {
       Returned: "Vráceno do vývoje",
+      Feedback: "Námět",
+      Feedbacks: "Náměty a zpětná vazba",
+      FeedbackNum: "Číslo",
+      FeedbackKind: "Druh",
+      FeedbackStatus: "Stav",
+      FbIdea: "Námět",
+      FbProblem: "Problém",
+      FbQuestion: "Dotaz",
+      FbPraise: "Pochvala",
+      FbRead: "Přečteno",
+      FbPlanned: "Převedeno na požadavek",
+      FbText: "Popis",
+      FbTextHelp: "Co jste dělali, co jste čekali a co se stalo. U námětu stačí, co by vám pomohlo.",
+      FbPage: "Kde (adresa stránky)",
+      FbPageHelp: "Zkopírujte adresu z prohlížeče, ať víme, o kterou obrazovku jde.",
+      FbHandling: "Vyřízení",
+      FbReply: "Odpověď",
+      FbCreateIssue: "Vytvořit požadavek",
       Module: "Testování a vývoj",
       ChangelogEntry: "Záznam deníku vývoje",
       Changelog: "Deník vývoje",
@@ -425,6 +527,24 @@ export default defineModule({
       PostedAt: "Datum",
     },
     en: {
+      Feedback: "Suggestion",
+      Feedbacks: "Suggestions and feedback",
+      FeedbackNum: "Number",
+      FeedbackKind: "Kind",
+      FeedbackStatus: "Status",
+      FbIdea: "Suggestion",
+      FbProblem: "Problem",
+      FbQuestion: "Question",
+      FbPraise: "Praise",
+      FbRead: "Read",
+      FbPlanned: "Turned into a request",
+      FbText: "Description",
+      FbTextHelp: "What you did, what you expected and what happened. For a suggestion, what would help you.",
+      FbPage: "Where (page address)",
+      FbPageHelp: "Copy the address from the browser so we know which screen it is about.",
+      FbHandling: "Handling",
+      FbReply: "Reply",
+      FbCreateIssue: "Create request",
       Returned: "Returned to development",
       Module: "Testing and development",
       ChangelogEntry: "Development log entry",

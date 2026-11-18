@@ -9,6 +9,7 @@ import { basketForBox, boxByCode, closeBasket, openBaskets, saveBasket, type Bas
 import { duplicateRecord, type DuplicateResult } from "@/server/duplicate";
 import bcrypt from "bcryptjs";
 import { deleteCheck, usedInText } from "@/server/delete-check";
+import { requestLoginHelp, sendPasswordLink, setPasswordByToken, unusablePasswordHash } from "@/server/user-invite";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
@@ -776,11 +777,13 @@ export interface UserInput {
   active: boolean;
   lang: string;
   password?: string;
+  /** nový uživatel bez hesla: poslat pozvánku e-mailem (heslo si nastaví odkazem) */
+  sendInvite?: boolean;
   /** přiřazení k firmám, ve kterých smí editor spravovat uživatele */
   companies: UserCompanyInput[];
 }
 
-export async function saveUserAction(input: UserInput): Promise<ActionResult> {
+export async function saveUserAction(input: UserInput): Promise<ActionResult<{ mailed?: boolean }>> {
   const s = await requireSession();
   if (!isAnyAdmin(s)) throw new Error("Forbidden");
   const t = await getT(s.lang, s.ctx.tenantId);
@@ -793,7 +796,9 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
   if (!firstName) errors.firstName = t("@SYS:Required");
   if (!lastName) errors.lastName = t("@SYS:Required");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = t("@SYS:InvalidEmail");
-  if ((!input.id || input.password) && (input.password ?? "").length < 10) errors.password = t("@SYS:PasswordTooShort");
+  // nový uživatel: heslo, nebo pozvánka (heslo si nastaví sám); změna hesla = aspoň 10 znaků
+  const invite = !input.id && !input.password && !!input.sendInvite;
+  if (!invite && (!input.id || input.password) && (input.password ?? "").length < 10) errors.password = t(input.id ? "@SYS:PasswordTooShort" : "@SYS:PasswordOrInvite");
   const other = await prisma.sysUser.findUnique({ where: { email } });
   if (other && other.id !== input.id) errors.email = t("@SYS:EmailTaken");
   if (Object.keys(errors).length) return { ok: false, message: t("@SYS:FixErrors"), errors };
@@ -834,10 +839,12 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
     lang: input.lang === "en" ? "en" : "cs",
     ...(input.password ? { passwordHash: await bcrypt.hash(input.password, 12) } : {}),
   };
+  let created: string | null = null;
   await prisma.$transaction(async (tx) => {
     const user = existing
       ? await tx.sysUser.update({ where: { id: existing.id }, data })
-      : await tx.sysUser.create({ data: { ...data, tenantId: s.ctx.tenantId, passwordHash: data.passwordHash! } });
+      : await tx.sysUser.create({ data: { ...data, tenantId: s.ctx.tenantId, passwordHash: data.passwordHash ?? (await unusablePasswordHash()), passwordSetAt: data.passwordHash ? new Date() : null } });
+    created = user.id;
     // přiřazení ve firmách editora nahradit, ostatní firmy nechat beze změny
     await tx.sysUserCompany.deleteMany({ where: { userId: user.id, companyId: { in: [...scope] } } });
     if (assignments.length) {
@@ -851,8 +858,79 @@ export async function saveUserAction(input: UserInput): Promise<ActionResult> {
     clearLoginLock(email);
     if (existing) clearLoginLock(existing.email);
   }
+  let mailed: boolean | undefined;
+  if (invite && created) {
+    try {
+      mailed = await sendPasswordLink(s.ctx.tenantId, created, "invite", { name: s.user.name, email: s.user.email }, await currentCompanyName(s));
+    } catch (e) {
+      console.error("pozvánka neodešla", e);
+      mailed = false;
+    }
+  }
   revalidatePath("/system/users");
-  return { ok: true, data: undefined };
+  return { ok: true, data: { mailed } };
+}
+
+/** název firmy, ze které správce zve (do pozvánky) */
+async function currentCompanyName(s: Awaited<ReturnType<typeof requireSession>>) {
+  return s.companies.find((c) => c.id === s.ctx.companyId)?.name ?? s.tenant.name;
+}
+
+/**
+ * Pozvánka znovu / reset hesla správcem: odkaz na nastavení hesla e-mailem. Stejná práva jako úprava
+ * uživatele (správce firmy jen běžné uživatele svých firem). Reset zároveň odhlásí uživatele a zruší zámek.
+ */
+export async function sendUserMailAction(id: string, kind: "invite" | "reset"): Promise<ActionResult<{ mailed: boolean }>> {
+  const s = await requireSession();
+  if (!isAnyAdmin(s)) throw new Error("Forbidden");
+  const t = await getT(s.lang, s.ctx.tenantId);
+  const user = await prisma.sysUser.findFirst({ where: { id, tenantId: s.ctx.tenantId }, include: { companies: true } });
+  if (!user) return { ok: false, message: t("@SYS:NotFound") };
+  if (!s.superUser) {
+    const scope = new Set(s.adminCompanyIds);
+    if (user.role === "admin" || user.companies.some((a) => !scope.has(a.companyId))) return { ok: false, message: t("@SYS:NoAccess") };
+  }
+  try {
+    if (kind === "reset") {
+      await prisma.sysSession.deleteMany({ where: { userId: user.id } });
+      clearLoginLock(user.email);
+    }
+    const mailed = await sendPasswordLink(s.ctx.tenantId, user.id, kind, { name: s.user.name, email: s.user.email }, await currentCompanyName(s));
+    revalidatePath("/system/users");
+    return { ok: true, data: { mailed } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Nastavení hesla z odkazu v pozvánce / resetu (bez přihlášení) → rovnou přihlásit. */
+export async function setPasswordAction(_: FormState, form: FormData): Promise<FormState> {
+  const t = await getT("cs");
+  const password = String(form.get("password") ?? "");
+  if (password !== String(form.get("password2") ?? "")) return { message: t("@SYS:PasswordMismatch") };
+  let email: string;
+  try {
+    email = await setPasswordByToken(String(form.get("token") ?? ""), password);
+  } catch (e) {
+    return userError(e, "cs", "");
+  }
+  if ((await login(email, password)) !== true) redirect("/login");
+  redirect("/");
+}
+
+/** „Nemůžu se přihlásit“ z přihlašovací stránky → e-mail správci. Odpověď je vždy stejná. */
+export async function loginHelpAction(_: FormState, form: FormData): Promise<FormState> {
+  const t = await getT("cs");
+  const email = String(form.get("email") ?? "");
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "?";
+  try {
+    await requestLoginHelp(email, String(form.get("message") ?? ""), ip);
+  } catch (e) {
+    if (e instanceof UserError) return { message: t(e.label), values: { email } };
+    console.error("žádost o pomoc s přihlášením neodešla", e);
+  }
+  return { values: { email, sent: "1" } };
 }
 
 /**

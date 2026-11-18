@@ -1,0 +1,109 @@
+/**
+ * Pozvánka nového uživatele, reset hesla správcem a žádost „Nemůžu se přihlásit“.
+ *
+ * Odkaz nese jednorázový token; v databázi je jen jeho SHA-256 (`sys_user.invite_token_hash`) a platnost.
+ * Nastavení hesla token spotřebuje, odhlásí ostatní relace a zruší zámek po neúspěšných pokusech.
+ * Nový uživatel bez hesla dostane náhodné heslo, které nikdo nezná — přihlásí se až po nastavení svého.
+ */
+import { createHash, randomBytes } from "node:crypto";
+import bcrypt from "bcryptjs";
+import type { Lang } from "@/core/labels";
+import { UserError } from "@/core/module";
+import { clearLoginLock, loginLockMinutes } from "./auth";
+import { prisma } from "./db";
+import { getT } from "./i18n";
+import { inviteMail, loginHelpMail, resetMail } from "./mail-templates";
+import { envUrls, sendSystemMail, supportEmail, systemMailConfigured } from "./system-mail";
+
+const INVITE_DAYS = 7;
+const RESET_DAYS = 2;
+const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+
+/** heslo, které nikdo nezná (uživatel bez hesla = jen přes pozvánku) */
+export const unusablePasswordHash = () => bcrypt.hash(randomBytes(32).toString("base64url"), 12);
+
+/**
+ * Poslat pozvánku / odkaz na nové heslo. `inviter` = kdo posílá (jméno do textu, odpověď na e-mail jde jemu).
+ * Vrací false, když systémová pošta není nastavená (odkaz je jen v logu serveru).
+ */
+export async function sendPasswordLink(
+  tenantId: string,
+  userId: string,
+  kind: "invite" | "reset",
+  inviter: { name: string; email: string },
+  companyName: string,
+): Promise<boolean> {
+  const user = await prisma.sysUser.findFirst({ where: { id: userId, tenantId } });
+  if (!user) throw new UserError("@SYS:NotFound");
+  if (!user.active) throw new UserError("@SYS:UserInactive");
+  const token = randomBytes(32).toString("base64url");
+  const days = kind === "invite" ? INVITE_DAYS : RESET_DAYS;
+  await prisma.sysUser.update({
+    where: { id: user.id },
+    data: { inviteTokenHash: sha(token), inviteExpiresAt: new Date(Date.now() + days * 86_400_000), ...(kind === "invite" ? { invitedAt: new Date() } : {}) },
+  });
+  const t = await getT((user.lang as Lang) || "cs", tenantId);
+  const link = `${envUrls().self}/login/heslo?t=${token}`;
+  const name = user.firstName || user.name;
+  const mail = kind === "invite" ? inviteMail(t, { name, email: user.email, company: companyName, inviter: inviter.name, link, days }) : resetMail(t, { name, email: user.email, inviter: inviter.name, link, days });
+  return sendSystemMail({ to: user.email, replyTo: inviter.email, ...mail });
+}
+
+/** Uživatel podle tokenu z odkazu (platný, aktivní účet), jinak null. */
+export async function userByToken(token: string) {
+  if (!token || token.length < 20) return null;
+  const user = await prisma.sysUser.findFirst({ where: { inviteTokenHash: sha(token) } });
+  if (!user || !user.active || !user.inviteExpiresAt || user.inviteExpiresAt < new Date()) return null;
+  return user;
+}
+
+/** Nastavit heslo z odkazu; vrací e-mail (pro přihlášení). */
+export async function setPasswordByToken(token: string, password: string): Promise<string> {
+  const user = await userByToken(token);
+  if (!user) throw new UserError("@SYS:LinkInvalid");
+  if (password.length < 10) throw new UserError("@SYS:PasswordTooShort");
+  await prisma.$transaction([
+    prisma.sysUser.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(password, 12), passwordSetAt: new Date(), inviteTokenHash: null, inviteExpiresAt: null } }),
+    prisma.sysSession.deleteMany({ where: { userId: user.id } }),
+  ]);
+  clearLoginLock(user.email);
+  return user.email;
+}
+
+// brzda proti zahlcení správce: z jedné adresy / pro jeden e-mail nejvýš 3 žádosti za hodinu (na instanci)
+const helpHits = new Map<string, number[]>();
+function tooMany(key: string) {
+  const now = Date.now();
+  const hits = (helpHits.get(key) ?? []).filter((x) => x > now - 3_600_000);
+  hits.push(now);
+  helpHits.set(key, hits);
+  return hits.length > 3;
+}
+
+/**
+ * „Nemůžu se přihlásit“: zpráva správci se stavem účtu (existuje / aktivní / pozvaný bez hesla / zamčený).
+ * Žadateli se odpovídá vždy stejně — odpověď neprozradí, jestli účet existuje.
+ */
+export async function requestLoginHelp(email: string, message: string, ip: string): Promise<void> {
+  const key = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)) throw new UserError("@SYS:InvalidEmail");
+  if (tooMany(`ip:${ip}`) || tooMany(`mail:${key}`)) return;
+  const user = await prisma.sysUser.findUnique({ where: { email: key }, include: { tenant: true } });
+  const t = await getT("cs");
+  const locked = loginLockMinutes(key);
+  const account = !user
+    ? t("@SYS:HelpAccNone")
+    : [
+        `${user.name} (${user.tenant.name})`,
+        user.active ? t("@SYS:HelpAccActive") : t("@SYS:HelpAccInactive"),
+        user.invitedAt && !user.passwordSetAt ? t("@SYS:HelpAccInvited") : null,
+        locked ? t("@SYS:HelpAccLocked", { minutes: String(locked) }) : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+  const when = new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
+  const mail = loginHelpMail(t, { email: key, message: message.trim().slice(0, 2000), account, when });
+  await sendSystemMail({ to: supportEmail(), replyTo: key, ...mail });
+}
+
+export { systemMailConfigured };

@@ -26,6 +26,12 @@ export function clearLoginLock(email: string) {
   attempts.delete(email.trim().toLowerCase());
 }
 
+/** Minut do odemčení účtu po neúspěšných pokusech (0 = nezamčeno) — do žádosti „Nemůžu se přihlásit“. */
+export function loginLockMinutes(email: string): number {
+  const a = attempts.get(email.trim().toLowerCase());
+  return a && a.n >= 5 && a.until > Date.now() ? Math.max(1, Math.ceil((a.until - Date.now()) / 60_000)) : 0;
+}
+
 /** `locked` = minut do odemčení po 5 neúspěšných pokusech (heslo se v tu chvíli neověřuje). */
 export async function login(email: string, password: string): Promise<boolean | { locked: number }> {
   const key = email.trim().toLowerCase();

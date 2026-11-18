@@ -47,6 +47,12 @@ model SysUser {
   posPinHash   String?  @map("pos_pin_hash")
   /// e-mailová upozornění, která si uživatel zapnul: { dailySummary, overdueInvoices, integrationErrors }
   notify       Json     @default("{}")
+  /// pozvánka / reset hesla: SHA-256 jednorázového tokenu z odkazu (token samotný se neukládá) a jeho platnost
+  inviteTokenHash String?   @map("invite_token_hash") @db.VarChar(64)
+  inviteExpiresAt DateTime? @map("invite_expires_at")
+  /// kdy odešla poslední pozvánka; heslo si uživatel nastavil = passwordSetAt
+  invitedAt       DateTime? @map("invited_at")
+  passwordSetAt   DateTime? @map("password_set_at")
   createdAt    DateTime @default(now()) @map("created_at")
 
   tenant    SysTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)

@@ -8,5 +8,19 @@ export const metadata = { title: "Přihlášení" };
 export default async function LoginPage() {
   if (await getSession()) redirect("/");
   const t = await getT("cs");
-  return <LoginForm labels={{ email: t("@SYS:Email"), password: t("@SYS:Password"), submit: t("@SYS:SignIn") }} />;
+  return (
+    <LoginForm
+      labels={{
+        email: t("@SYS:Email"),
+        password: t("@SYS:Password"),
+        submit: t("@SYS:SignIn"),
+        cantLogin: t("@SYS:CantLogin"),
+        helpIntro: t("@SYS:LoginHelpIntro"),
+        helpMessage: t("@SYS:HelpMessage"),
+        helpSend: t("@SYS:HelpSend"),
+        helpSent: t("@SYS:HelpSent"),
+        back: t("@SYS:BackToLogin"),
+      }}
+    />
+  );
 }

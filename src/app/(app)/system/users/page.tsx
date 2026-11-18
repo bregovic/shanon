@@ -16,7 +16,7 @@ export default async function UsersPage() {
     prisma.sysUser.findMany({
       where: { tenantId: s.ctx.tenantId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, active: true, lang: true, companies: true },
+      select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, active: true, lang: true, companies: true, invitedAt: true, passwordSetAt: true },
     }),
     inTenant(s.ctx, (sess) => sess.sys().find("sys.role", {}, 1000)),
     inTenant(s.ctx, (sess) => sess.sys().find("sys.company", {}, 1000)),
@@ -41,6 +41,7 @@ export default async function UsersPage() {
         lang: u.lang,
         companies: u.companies.map((a) => ({ companyId: a.companyId, admin: a.admin, roleIds: a.roleIds })),
         companyCodes: u.companies.map((a) => `${companyCode.get(a.companyId) ?? "?"}${a.admin ? " ★" : ""}`).join(", "),
+        invited: !!u.invitedAt && !u.passwordSetAt,
       }))}
       companies={companies.filter((c) => scope.has(String(c.id))).map((c) => ({ id: String(c.id), label: `${c.code} · ${c.name}` }))}
       roles={roles.map((r) => ({ id: String(r.id), label: `${r.code} · ${r.name}` }))}
@@ -69,6 +70,15 @@ export default async function UsersPage() {
         general: t("@SYS:General"),
         delete: t("@SYS:DeleteUser"),
         deleteConfirm: t("@SYS:DeleteUserConfirm"),
+        sendInvite: t("@SYS:SendInvite"),
+        sendInviteHint: t("@SYS:SendInviteHint"),
+        inviteAgain: t("@SYS:InviteAgain"),
+        resetPassword: t("@SYS:ResetPasswordMail"),
+        resetConfirm: t("@SYS:ResetPasswordConfirm"),
+        inviteSent: t("@SYS:InviteSent"),
+        resetSent: t("@SYS:ResetSent"),
+        mailNotConfigured: t("@SYS:MailNotConfigured"),
+        invited: t("@SYS:UserInvited"),
       }}
     />
   );
