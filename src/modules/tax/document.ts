@@ -13,6 +13,7 @@ import { dimsOf } from "@/modules/gl/dimensions";
 import { postingAccount } from "@/modules/gl/setup";
 import { partnerTaxGroup, resolveLineCode, taxTransParts } from "./tax-groups";
 import { netFromGross } from "@/modules/inv/handlers";
+import { paymentDaysOf } from "./payment-terms";
 
 export interface InvoiceConfig {
   /** hlavička a řádky, např. ar.invoice / ar.invoiceLine */
@@ -175,8 +176,8 @@ export function invoiceHandlers(cfg: InvoiceConfig): Record<string, ObjectHandle
         else if (data.id) currencyChanged.delete(String(data.id));
         if (!data.invoiceDate) data.invoiceDate = today();
         // změna data vystavení: DUZP a splatnost ho následují, pokud je uživatel nezměnil ručně
-        // (DUZP = staré datum vystavení, splatnost = staré datum + dny splatnosti partnera / skupiny)
-        const days = Number(partner.paymentDays ?? group.paymentDays ?? 14);
+        // (DUZP = staré datum vystavení, splatnost = staré datum + dny platební podmínky partnera / skupiny, jinak 0)
+        const days = await paymentDaysOf(ctx.data, partner, group);
         const oldDate = day(before?.invoiceDate);
         if (oldDate && oldDate !== day(data.invoiceDate)) {
           if (day(data.taxDate) === oldDate) data.taxDate = null;

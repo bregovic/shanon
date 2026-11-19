@@ -126,12 +126,13 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       taxCodeId: { edt: refEdt("tax.taxCode", "@TAX:TaxCode") },
       /** prázdné = první účet syntetiky záloh (324 / 314) */
       advanceAccountId: { edt: AccountRef(L("AdvanceAccount")) },
-      paymentDays: { edt: Edts.Int, label: "@TAX:PaymentDays", default: 14 },
+      /** prázdné = doklady splatné ihned (0 dní) */
+      paymentTermId: { edt: refEdt("tax.paymentTerm", "@TAX:PaymentTerm") },
     },
     titleField: "code",
-    list: ["code", "name", sp.summaryField, sp.lineAccountField, "taxGroupId", "taxCodeId", "paymentDays"],
+    list: ["code", "name", sp.summaryField, sp.lineAccountField, "taxGroupId", "taxCodeId", "paymentTermId"],
     form: [
-      { label: "@SYS:General", fields: ["code", "name", "paymentDays"] },
+      { label: "@SYS:General", fields: ["code", "name", "paymentTermId"] },
       { label: "@GL:Posting", fields: [sp.summaryField, sp.lineAccountField, "taxGroupId", "taxCodeId", "advanceAccountId"] },
     ],
     unique: [["code"]],
@@ -218,7 +219,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       /** prázdné = skupina DPH ze skupiny partnerů */
       taxGroupId: { edt: refEdt("tax.taxGroup", "@TAX:TaxGroup") },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
-      paymentDays: { edt: Edts.Int, label: "@TAX:PaymentDays" },
+      /** prázdné = splatnost ze skupiny partnerů, jinak ihned */
+      paymentTermId: { edt: refEdt("tax.paymentTerm", "@TAX:PaymentTerm"), help: "@TAX:PaymentTermHelp", aliases: ["splatnost (dní)", "splatnost", "payment terms", "paymentdays"] },
       /** výchozí účet pro platby (z bankovních účtů subjektu) */
       bankAccountId: { edt: refEdt("gab.bankAccount", "@GAB:BankAccount") },
       paymentMethodId: { edt: refEdt("bank.paymentMethod", "@TAX:PaymentMethod"), optionalRef: true },
@@ -229,10 +231,10 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
     },
     titleField: "accountNum",
-    list: ["accountNum", "subjectId", "regNo", "groupId", "currencyId", "paymentDays", "blocked"],
+    list: ["accountNum", "subjectId", "regNo", "groupId", "currencyId", "paymentTermId", "blocked"],
     form: [
       { label: "@SYS:General", fields: ["accountNum", "subjectId", "regNo", "groupId", "taxGroupId", "postingProfileId", "blocked"] },
-      { label: L("Terms"), fields: ["currencyId", "paymentDays", "paymentMethodId", "bankAccountId", "docEmail"] },
+      { label: L("Terms"), fields: ["currencyId", "paymentTermId", "paymentMethodId", "bankAccountId", "docEmail"] },
       { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
     ],
     // import: podle čísla, subjektu, nebo jen podle IČO (opakovaný import partnera nezdvojí)
@@ -608,7 +610,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }, { object: "gl.journal", href: `/gl/journal?filter.journalType=${sp.side === 1 ? "customerPayment" : "vendorPayment"}`, label: "@GL:JournalsPayment", module: "gl" }, ...(sp.side === -1 ? [{ object: "bank.paymentOrder", module: "bank" }] : [])] },
       // nahrání dokladů k vytěžení (Integrace), cíl předvolený podle agendy
       { label: L("Module"), kind: "functions" as const, items: [{ href: `/int/doc-import?target=${m}Invoice`, label: "@INT:DocImport", module: "int" }] },
-      { label: "@SYS:Setup", items: [{ object: params.id }, { object: group.id }, { object: profile.id }] },
+      { label: "@SYS:Setup", items: [{ object: params.id }, { object: group.id }, { object: profile.id }, { object: "tax.paymentTerm" }] },
     ],
     /** výchozí skupina partnerů (účtovací profil) podle čísel účtů */
     setup: (groupDefaults: { code: string; name: string; summary: string; line: string; taxCode: string }) =>
@@ -664,7 +666,6 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
           [sp.lineAccountField]: await acc(groupDefaults.line),
           taxCodeId: tc?.id ?? null,
           taxGroupId: tuz?.id ?? null,
-          paymentDays: 14,
         });
       },
   };

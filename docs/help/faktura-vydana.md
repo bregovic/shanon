@@ -31,7 +31,7 @@ summary: Od založení faktury přes zaúčtování po PDF s QR kódem a ISDOC.
 
 ## Datum vystavení, DUZP a splatnost
 
-Po změně data vystavení se posune i DUZP a splatnost. Splatnost se počítá podle dnů splatnosti odběratele, jinak jeho skupiny, jinak 14 dní. Ručně změněné DUZP nebo splatnost zůstanou.
+Po změně data vystavení se posune i DUZP a splatnost. Splatnost se počítá podle platební podmínky odběratele (pole *Splatnost* na kartě), jinak jeho skupiny; bez podmínky je faktura splatná v den vystavení. Číselník podmínek (výchozí Ihned, 14 dní, 30 dní) je v Nastavení odběratelů i dodavatelů → **Platební podmínky**. Ručně změněné DUZP nebo splatnost zůstanou.
 
 ## Skupina DPH
 

@@ -1,6 +1,6 @@
 /**
  * Faktura: DUZP a splatnost následují datum vystavení (i u uložené faktury), dokud je uživatel nezmění ručně;
- * splatnost podle dnů partnera, jinak skupiny, jinak 14. Výchozí nastavení: dimenze Partner z adresáře, skupina Služby.
+ * splatnost podle platební podmínky partnera, jinak skupiny, jinak 0 dní (výchozí sada podmínek 0 / 14 / 30). Výchozí nastavení: dimenze Partner z adresáře, skupina Služby.
  */
 import { describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
@@ -18,8 +18,13 @@ describe("data faktury", () => {
     const s1 = await saveRecord(T, "gab.subject", null, { name: "Bez splatnosti" }, undefined, client);
     const c1 = await saveRecord(T, "ar.customer", null, { subjectId: s1.id, groupId: grp.id }, undefined, client);
     const s2 = await saveRecord(T, "gab.subject", null, { name: "Splatnost 30" }, undefined, client);
-    const c2 = await saveRecord(T, "ar.customer", null, { subjectId: s2.id, groupId: grp.id, paymentDays: 30 }, undefined, client);
-    const days = Number(grp.paymentDays ?? 14);
+    const terms = (await listRecords(T, "tax.paymentTerm", {}, client)).rows;
+    expect(terms.map((t) => [t.code, t.days])).toEqual([["0", 0], ["14", 14], ["30", 30]]);
+    const t30 = terms.find((t) => t.code === "30")!;
+    const c2 = await saveRecord(T, "ar.customer", null, { subjectId: s2.id, groupId: grp.id, paymentTermId: t30.id }, undefined, client);
+    // nová firma: skupina bez platební podmínky → splatné ihned
+    expect(grp.paymentTermId ?? null).toBeNull();
+    const days = 0;
     const plus = (x: string, n: number) => new Date(Date.parse(`${x}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
     // uložená faktura (po výběru odběratele), pak změna data vystavení → DUZP i splatnost se posunou
@@ -49,6 +54,14 @@ describe("data faktury", () => {
     await saveRecord(T, "ar.invoice", String(inv2.id), { ...r, invoiceDate: "2026-11-15" }, undefined, client);
     r = (await getRecord(T, "ar.invoice", String(inv2.id), client))!;
     expect([d(r.taxDate), d(r.dueDate)]).toEqual(["2026-11-15", "2026-12-15"]);
+
+    // odběratel bez podmínky → podmínka skupiny (faktura i záloha)
+    const t14 = terms.find((t) => t.code === "14")!;
+    await saveRecord(T, "ar.group", String(grp.id), { ...grp, paymentTermId: t14.id }, undefined, client);
+    const inv3 = await saveRecord(T, "ar.invoice", null, { customerId: c1.id, invoiceDate: "2026-11-01" }, undefined, client);
+    expect(d((await getRecord(T, "ar.invoice", String(inv3.id), client))!.dueDate)).toBe("2026-11-15");
+    const adv = await saveRecord(T, "ar.advance", null, { customerId: c2.id, issueDate: "2026-11-01", amount: "100" }, undefined, client);
+    expect(d(adv.dueDate)).toBe("2026-12-01");
 
     // výchozí nastavení firmy: skupina položek Služby, dimenze Partner z adresáře
     const sl = (await listRecords(T, "inv.itemGroup", { filter: { code: "SLUZBY" } }, client)).rows[0];

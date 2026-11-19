@@ -13,6 +13,7 @@ import { UserError, type DataApi, type ObjectHandlers, type RecordData, type Val
 import { postingAccount } from "@/modules/gl/setup";
 import { accountingCurrencyId, postVoucher } from "@/modules/gl/posting";
 import type { InvoiceConfig } from "./document";
+import { paymentDaysOf } from "./payment-terms";
 
 export interface OrderDocs {
   cfg: InvoiceConfig;
@@ -123,7 +124,7 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
         }
         if (!d.dueDate && d.issueDate) {
           const g = await ctx.data.get(cfg.groupObject, String(p.groupId));
-          d.dueDate = addDays(String(d.issueDate), Number(p.paymentDays ?? g?.paymentDays ?? 14));
+          d.dueDate = addDays(String(d.issueDate), await paymentDaysOf(ctx.data, p, g));
         }
         if (!isNew && toCents(d.amount) < toCents(d.paidAmount)) return { amount: "@TAX:AdvanceBelowPaid" };
       },

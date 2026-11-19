@@ -284,6 +284,7 @@ model SysCompany {
   taxGroup_company                 TaxGroup[]                 @relation("TaxGroup_company")
   taxItemGroup_company             TaxItemGroup[]             @relation("TaxItemGroup_company")
   taxGroupCode_company             TaxGroupCode[]             @relation("TaxGroupCode_company")
+  taxPaymentTerm_company           TaxPaymentTerm[]           @relation("TaxPaymentTerm_company")
   taxTrans_company                 TaxTrans[]                 @relation("TaxTrans_company")
   taxParameters_company            TaxParameters[]            @relation("TaxParameters_company")
   taxReturn_company                TaxReturn[]                @relation("TaxReturn_company")
@@ -1638,6 +1639,32 @@ model TaxGroupCode {
   @@map("tax_group_code")
 }
 
+/// tax.paymentTerm — generováno z definice objektu
+model TaxPaymentTerm {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  days      Int      @default(0)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company                SysCompany   @relation("TaxPaymentTerm_company", fields: [companyId], references: [id], onDelete: Restrict)
+  arGroup_paymentTerm    ArGroup[]    @relation("ArGroup_paymentTerm")
+  arCustomer_paymentTerm ArCustomer[] @relation("ArCustomer_paymentTerm")
+  apGroup_paymentTerm    ApGroup[]    @relation("ApGroup_paymentTerm")
+  apVendor_paymentTerm   ApVendor[]   @relation("ApVendor_paymentTerm")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("tax_payment_term")
+}
+
 /// tax.trans — generováno z definice objektu
 model TaxTrans {
   id           String   @id @default(uuid(7)) @db.Uuid
@@ -2006,7 +2033,7 @@ model ArGroup {
   taxGroupId          String?  @map("tax_group_id") @db.Uuid
   taxCodeId           String?  @map("tax_code_id") @db.Uuid
   advanceAccountId    String?  @map("advance_account_id") @db.Uuid
-  paymentDays         Int?     @default(14) @map("payment_days")
+  paymentTermId       String?  @map("payment_term_id") @db.Uuid
   ext                 Json     @default("{}")
   version             Int      @default(1)
   createdAt           DateTime @default(now()) @map("created_at")
@@ -2020,6 +2047,7 @@ model ArGroup {
   taxGroup                   TaxGroup?              @relation("ArGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   taxCode                    TaxCode?               @relation("ArGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   advanceAccount             GlAccount?             @relation("ArGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
+  paymentTerm                TaxPaymentTerm?        @relation("ArGroup_paymentTerm", fields: [paymentTermId], references: [id], onDelete: Restrict)
   arPostingProfileLine_group ArPostingProfileLine[] @relation("ArPostingProfileLine_group")
   arCustomer_group           ArCustomer[]           @relation("ArCustomer_group")
 
@@ -2030,6 +2058,7 @@ model ArGroup {
   @@index([taxGroupId])
   @@index([taxCodeId])
   @@index([advanceAccountId])
+  @@index([paymentTermId])
   @@map("ar_group")
 }
 
@@ -2106,7 +2135,7 @@ model ArCustomer {
   groupId          String?  @map("group_id") @db.Uuid
   taxGroupId       String?  @map("tax_group_id") @db.Uuid
   currencyId       String?  @map("currency_id") @db.Uuid
-  paymentDays      Int?     @map("payment_days")
+  paymentTermId    String?  @map("payment_term_id") @db.Uuid
   bankAccountId    String?  @map("bank_account_id") @db.Uuid
   paymentMethodId  String?  @map("payment_method_id") @db.Uuid
   postingProfileId String?  @map("posting_profile_id") @db.Uuid
@@ -2124,6 +2153,7 @@ model ArCustomer {
   group                         ArGroup?               @relation("ArCustomer_group", fields: [groupId], references: [id], onDelete: Restrict)
   taxGroup                      TaxGroup?              @relation("ArCustomer_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   currency                      SysCurrency?           @relation("ArCustomer_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  paymentTerm                   TaxPaymentTerm?        @relation("ArCustomer_paymentTerm", fields: [paymentTermId], references: [id], onDelete: Restrict)
   bankAccount                   GabBankAccount?        @relation("ArCustomer_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
   paymentMethod                 BankPaymentMethod?     @relation("ArCustomer_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
   postingProfile                ArPostingProfile?      @relation("ArCustomer_postingProfile", fields: [postingProfileId], references: [id], onDelete: Restrict)
@@ -2148,6 +2178,7 @@ model ArCustomer {
   @@index([groupId])
   @@index([taxGroupId])
   @@index([currencyId])
+  @@index([paymentTermId])
   @@index([bankAccountId])
   @@index([paymentMethodId])
   @@index([postingProfileId])
@@ -2496,7 +2527,7 @@ model ApGroup {
   taxGroupId       String?  @map("tax_group_id") @db.Uuid
   taxCodeId        String?  @map("tax_code_id") @db.Uuid
   advanceAccountId String?  @map("advance_account_id") @db.Uuid
-  paymentDays      Int?     @default(14) @map("payment_days")
+  paymentTermId    String?  @map("payment_term_id") @db.Uuid
   ext              Json     @default("{}")
   version          Int      @default(1)
   createdAt        DateTime @default(now()) @map("created_at")
@@ -2510,6 +2541,7 @@ model ApGroup {
   taxGroup                   TaxGroup?              @relation("ApGroup_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   taxCode                    TaxCode?               @relation("ApGroup_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
   advanceAccount             GlAccount?             @relation("ApGroup_advanceAccount", fields: [advanceAccountId], references: [id], onDelete: Restrict)
+  paymentTerm                TaxPaymentTerm?        @relation("ApGroup_paymentTerm", fields: [paymentTermId], references: [id], onDelete: Restrict)
   apPostingProfileLine_group ApPostingProfileLine[] @relation("ApPostingProfileLine_group")
   apVendor_group             ApVendor[]             @relation("ApVendor_group")
 
@@ -2520,6 +2552,7 @@ model ApGroup {
   @@index([taxGroupId])
   @@index([taxCodeId])
   @@index([advanceAccountId])
+  @@index([paymentTermId])
   @@map("ap_group")
 }
 
@@ -2597,7 +2630,7 @@ model ApVendor {
   groupId          String?  @map("group_id") @db.Uuid
   taxGroupId       String?  @map("tax_group_id") @db.Uuid
   currencyId       String?  @map("currency_id") @db.Uuid
-  paymentDays      Int?     @map("payment_days")
+  paymentTermId    String?  @map("payment_term_id") @db.Uuid
   bankAccountId    String?  @map("bank_account_id") @db.Uuid
   paymentMethodId  String?  @map("payment_method_id") @db.Uuid
   postingProfileId String?  @map("posting_profile_id") @db.Uuid
@@ -2615,6 +2648,7 @@ model ApVendor {
   group                         ApGroup?               @relation("ApVendor_group", fields: [groupId], references: [id], onDelete: Restrict)
   taxGroup                      TaxGroup?              @relation("ApVendor_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
   currency                      SysCurrency?           @relation("ApVendor_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  paymentTerm                   TaxPaymentTerm?        @relation("ApVendor_paymentTerm", fields: [paymentTermId], references: [id], onDelete: Restrict)
   bankAccount                   GabBankAccount?        @relation("ApVendor_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
   paymentMethod                 BankPaymentMethod?     @relation("ApVendor_paymentMethod", fields: [paymentMethodId], references: [id], onDelete: Restrict)
   postingProfile                ApPostingProfile?      @relation("ApVendor_postingProfile", fields: [postingProfileId], references: [id], onDelete: Restrict)
@@ -2640,6 +2674,7 @@ model ApVendor {
   @@index([groupId])
   @@index([taxGroupId])
   @@index([currencyId])
+  @@index([paymentTermId])
   @@index([bankAccountId])
   @@index([paymentMethodId])
   @@index([postingProfileId])

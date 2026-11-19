@@ -308,7 +308,7 @@ describe("odběratelé a dodavatelé", () => {
     expect(cust.accountNum).toMatch(/^ODB\d{5}$/);
     const inv = await saveRecord(A, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-12", description: "Služby" }, undefined, client);
     expect(inv.invoiceNum).toMatch(/^FV26\d{5}$/);
-    expect(inv.dueDate).toBe("2026-11-26"); // 14 dní ze skupiny
+    expect(inv.dueDate).toBe("2026-11-12"); // skupina bez platební podmínky → splatné ihned
     expect(inv.taxDate).toBe("2026-11-12");
     await saveRecord(A, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Konzultace", qty: "2.5", unitPrice: "1000" }, undefined, client);
     const l2 = await saveRecord(A, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Doprava", qty: "1", unitPrice: "99.99" }, undefined, client);

@@ -300,18 +300,19 @@ describe("položky: marže, slevy, ARES", () => {
       );
     });
     const { importRecords, parseCsv } = await import("@/server/import");
-    const csv = ["IČO;Splatnost (dní)", "11677619;21", ""].join("\n");
+    const csv = ["IČO;Splatnost (dní)", "11677619;14", ""].join("\n");
     const r1 = await importRecords(D, "ap.vendor", parseCsv(csv), { dryRun: false, lang: "cs" }, client);
     expect(r1.errors).toEqual([]);
     const [v] = (await listRecords(D, "ap.vendor", { filter: { regNo: "11677619" } }, client)).rows;
-    expect([v.regNo, v.paymentDays, (v._titles as Record<string, string>).subjectId?.includes("BK Concept")]).toEqual(["11677619", 21, true]);
+    const termId = async (code: string) => (await listRecords(D, "tax.paymentTerm", { filter: { code } }, client)).rows[0]?.id;
+    expect([v.regNo, v.paymentTermId, (v._titles as Record<string, string>).subjectId?.includes("BK Concept")]).toEqual(["11677619", await termId("14"), true]);
     expect(v.groupId).toBeTruthy();
     // opakovaný import podle IČO upraví, nezaloží druhého dodavatele (a ARES už nevolá — subjekt je v adresáři)
     const callsBefore = calls;
     const r2 = await importRecords(D, "ap.vendor", parseCsv(["IČO;Splatnost (dní)", "11677619;30", ""].join("\n")), { dryRun: false, lang: "cs" }, client);
     expect(r2.errors).toEqual([]);
     const all = (await listRecords(D, "ap.vendor", { filter: { regNo: "11677619" } }, client)).rows;
-    expect([all.length, all[0].paymentDays]).toEqual([1, 30]);
+    expect([all.length, all[0].paymentTermId]).toEqual([1, await termId("30")]);
     expect(calls).toBe(callsBefore);
     vi.unstubAllGlobals();
   });

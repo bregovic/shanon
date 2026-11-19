@@ -9,6 +9,7 @@ import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { postingAccount } from "@/modules/gl/setup";
 import { vatPayer } from "./orders";
+import { paymentTermSetup } from "./payment-terms";
 
 export const TaxDirection = defineEnum({
   id: "TaxDirection",
@@ -98,6 +99,26 @@ export const itemTaxGroup = defineObject({
   defaultSort: { field: "code", dir: "asc" },
 });
 
+/** Platební podmínka (Terms of payment v AX): splatnost v dnech od data vystavení; patří partnerovi a skupině partnerů. */
+export const paymentTerm = defineObject({
+  id: "tax.paymentTerm",
+  table: "tax_payment_term",
+  label: "@TAX:PaymentTerm",
+  labelPlural: "@TAX:PaymentTerms",
+  scope: "company",
+  shareable: true,
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    days: { edt: Edts.Int, label: "@TAX:PaymentDays", mandatory: true, default: 0 },
+  },
+  titleField: "code",
+  list: ["code", "name", "days"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "days"] }],
+  unique: [["code"]],
+  defaultSort: { field: "days", dir: "asc" },
+});
+
 /** Kombinace skupina DPH × položka DPH → daňový kód pro prodej a pro nákup. */
 export const taxGroupCode = defineObject({
   id: "tax.taxGroupCode",
@@ -182,6 +203,7 @@ const NP_ITEMS: [string, string][] = [["BEZ", "Bez DPH"]];
 const NP_MATRIX: Record<string, Record<string, [string, string]>> = { TUZ: { BEZ: ["BEZ", "P0"] } };
 
 export async function taxSetup(data: DataApi) {
+  await paymentTermSetup(data);
   const vatId = await postingAccount(data, "343");
   if (!vatId) return;
   const payer = await vatPayer(data);
@@ -396,10 +418,10 @@ export default defineModule({
   icon: "ReceiptMoney",
   dependsOn: ["gl", "gab", "prt"],
   enums: [TaxDirection, SubjectKind, FilingPeriod, ReturnKind, ReturnStatus],
-  objects: [taxCode, taxGroup, itemTaxGroup, taxGroupCode, taxTrans, parameters, vatReturn],
+  objects: [taxCode, taxGroup, itemTaxGroup, taxGroupCode, paymentTerm, taxTrans, parameters, vatReturn],
   menu: [
     { label: "@TAX:Module", items: [{ object: "tax.return" }, { object: "tax.trans" }] },
-    { label: "@SYS:Setup", items: [{ object: "tax.taxCode" }, { object: "tax.taxGroup" }, { object: "tax.itemTaxGroup" }, { object: "tax.parameters" }] },
+    { label: "@SYS:Setup", items: [{ object: "tax.taxCode" }, { object: "tax.taxGroup" }, { object: "tax.itemTaxGroup" }, { object: "tax.paymentTerm" }, { object: "tax.parameters" }] },
   ],
   setup: taxSetup,
   labels: {
@@ -490,6 +512,9 @@ export default defineModule({
       AmountGross: "Celkem s DPH",
       Rounding: "Zaokrouhlení",
       PaymentDays: "Splatnost (dní)",
+      PaymentTerm: "Splatnost",
+      PaymentTerms: "Platební podmínky",
+      PaymentTermHelp: "Splatnost dokladů partnera. Prázdné = podle skupiny, jinak splatné ihned.",
       UnitPrice: "Cena za jednotku",
       Item: "Položka",
       Simplified: "Zjednodušený doklad",
@@ -702,7 +727,10 @@ export default defineModule({
       TaxAmount: "VAT",
       AmountGross: "Total incl. VAT",
       Rounding: "Rounding",
-      PaymentDays: "Payment terms (days)",
+      PaymentDays: "Days",
+      PaymentTerm: "Terms of payment",
+      PaymentTerms: "Terms of payment",
+      PaymentTermHelp: "Due date of the partner's documents. Empty = from the group, otherwise due immediately.",
       UnitPrice: "Unit price",
       Item: "Item",
       Simplified: "Simplified document",
