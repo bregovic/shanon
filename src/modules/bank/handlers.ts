@@ -53,7 +53,16 @@ export async function recalcStatement(data: DataApi, statementId: string) {
 const remaining = (t: RecordData) => toCents(t.amountCur ?? t.amount) - toCents(t.paidAmount);
 
 /** Výchozí pořadí, když firma kroky nemá (starší firmy před nasazením nastavení). */
-const DEFAULT_STEPS = [{ method: "vsInvoice", requireAmount: false }, { method: "vsAdvance", requireAmount: false }, { method: "counterPartner", requireAmount: false }, { method: "rules", requireAmount: false }];
+const DEFAULT_STEPS = [{ method: "vsInvoice", requireAmount: false }, { method: "vsAdvance", requireAmount: false }, { method: "vsPosReceipt", requireAmount: true }, { method: "counterPartner", requireAmount: false }, { method: "rules", requireAmount: false }];
+
+/** Účet QR plateb pokladny účtenky (prázdné = účet plateb kartou) — proti němu jde úhrada z výpisu. */
+async function posReceiptAccount(data: DataApi, receiptId: string): Promise<string> {
+  const r = await data.get("pos.receipt", receiptId);
+  const reg = r?.registerId ? await data.get("pos.register", String(r.registerId)) : null;
+  const acc = reg?.qrAccountId || reg?.cardAccountId;
+  if (!acc) throw new UserError("@SYS:InvalidValue");
+  return String(acc);
+}
 
 /** Číslo účtu pro porovnání: bez kódu banky, mezer a vodicích nul (předčíslí-číslo jako GPC). */
 const accountKey = (v: unknown) => {
@@ -122,6 +131,14 @@ export async function autoMatch(data: DataApi, statementId: string): Promise<num
         if (advs.length > 1) return "stop";
         if (!advs.length) return "next";
         return set({ [incoming ? "customerAdvanceId" : "vendorAdvanceId"]: advs[0].id, matchKind: incoming ? "customerAdvance" : "vendorAdvance" });
+      }
+      case "vsPosReceipt": {
+        // účtenka z pokladny placená QR platbou: stejný VS a přesně částka účtenky (jen příjem)
+        if (!line.vs || !incoming) return "next";
+        const rs = await safe(() => data.find("pos.receipt", { vs: line.vs, paymentMethod: "qr", payStatus: "awaiting" }, { take: 2 }), [] as RecordData[]);
+        if (rs.length > 1) return "stop";
+        if (!rs.length || toCents(rs[0].amountPaid) !== amount) return "next";
+        return set({ posReceiptId: rs[0].id, matchKind: "posReceipt" });
       }
       case "counterPartner": {
         const subjectId = await subjectByAccount(line.counterAccount);
@@ -246,6 +263,7 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
     else if (l.matchKind === "vendorAdvance") other = await advanceAccount(data, "vendor", String(l.vendorAdvanceId));
     else if (l.matchKind === "customerAccount") other = await summaryAccount(data, { customerId: l.customerId }, "customer");
     else if (l.matchKind === "vendorAccount") other = await summaryAccount(data, { vendorId: l.vendorId }, "vendor");
+    else if (l.matchKind === "posReceipt") other = await posReceiptAccount(data, String(l.posReceiptId));
     else other = String(l.offsetAccountId);
     posting.push({ accountId: String(account.glAccountId), amount: String(l.amount), currencyId: cur, text });
     posting.push({ accountId: other, amount: fromCents(-toCents(l.amount)), currencyId: cur, text });
@@ -262,6 +280,11 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
   // úhrady do salda: položka „Úhrada“ + navýšení Uhrazeno u faktury
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
+    // QR platba účtenky z pokladny: účtenka je zaplacená
+    if (l.matchKind === "posReceipt") {
+      await data.update("pos.receipt", String(l.posReceiptId), { payStatus: "paid", paidDate: l.date });
+      continue;
+    }
     if (l.matchKind === "customerAdvance" || l.matchKind === "vendorAdvance") {
       const isCust = l.matchKind === "customerAdvance";
       const sign = isCust ? BigInt(1) : BigInt(-1);
@@ -403,14 +426,14 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
     async beforeSave(ctx, data): Promise<ValidationErrors | void> {
       await assertDraft(ctx.data, data.statementId);
       // ruční vazba na doklad nahradí účet z předkontace
-      if (data.postingRuleId && ["customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "customerId", "vendorId"].some((f) => data[f])) {
+      if (data.postingRuleId && ["customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "customerId", "vendorId", "posReceiptId"].some((f) => data[f])) {
         data.offsetAccountId = null;
         data.postingRuleId = null;
       }
       // konkrétní doklad má přednost před partnerem bez faktury
       if ((data.customerTransId || data.customerAdvanceId) && data.customerId) data.customerId = null;
       if ((data.vendorTransId || data.vendorAdvanceId) && data.vendorId) data.vendorId = null;
-      const filled = ["customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "customerId", "vendorId", "offsetAccountId"].filter((f) => data[f]);
+      const filled = ["customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "customerId", "vendorId", "posReceiptId", "offsetAccountId"].filter((f) => data[f]);
       if (filled.length > 1) return { [filled[1]]: "@BANK:OneMatch" };
       const amount = toCents(data.amount);
       if (data.customerTransId && amount < zero) return { customerTransId: "@BANK:WrongDirection" };
@@ -419,6 +442,12 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
       if (data.vendorAdvanceId && amount > zero) return { vendorAdvanceId: "@BANK:WrongDirection" };
       if (data.customerId && amount < zero) return { customerId: "@BANK:WrongDirection" };
       if (data.vendorId && amount > zero) return { vendorId: "@BANK:WrongDirection" };
+      if (data.posReceiptId) {
+        if (amount < zero) return { posReceiptId: "@BANK:WrongDirection" };
+        const r = await ctx.data.get("pos.receipt", String(data.posReceiptId));
+        if (!r || r.paymentMethod !== "qr" || r.payStatus !== "awaiting") throw new UserError("@BANK:PosReceiptClosed", { doc: String(r?.receiptNum ?? "") });
+        if (toCents(r.amountPaid) !== amount) throw new UserError("@BANK:PosReceiptAmount", { doc: String(r.receiptNum), amount: String(r.amountPaid) });
+      }
       for (const [f, obj] of [["customerAdvanceId", "ar.advance"], ["vendorAdvanceId", "ap.advance"]] as const) {
         if (!data[f]) continue;
         const a = await ctx.data.get(obj, String(data[f]));
@@ -441,6 +470,8 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
                 ? "customerAccount"
                 : data.vendorId
                   ? "vendorAccount"
+                  : data.posReceiptId
+                    ? "posReceipt"
                   : data.offsetAccountId
                 ? data.postingRuleId
                   ? "rule"

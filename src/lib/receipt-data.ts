@@ -41,6 +41,10 @@ export function receiptData(r: ReceiptPrint, extra: { email?: string; phone?: st
       change: r.change ?? "",
       footer: r.footer ?? "",
       fik: r.eet?.pok ?? "",
+      // QR platba čekající na úhradu: QR kód, VS a výzva k platbě
+      qr: r.qr ?? "",
+      vs: r.vs ?? "",
+      qrNote: r.qr ? "Čeká na platbu – naskenujte QR kód v bankovní aplikaci." : "",
     },
     lines: r.lines.map((l) => ({ description: l.description, qty: l.qty, unit: l.unit, unitPrice: l.unitPrice, gross: l.amount, rate: l.rate })),
     vat: r.vat.map((v) => ({ rate: v.rate, base: v.base, tax: v.tax, gross: (Number(v.base) + Number(v.tax)).toFixed(2) })),

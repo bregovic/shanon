@@ -1168,6 +1168,7 @@ model GlAccount {
   cashVoucher_offsetAccount           CashVoucher[]          @relation("CashVoucher_offsetAccount")
   posRegister_cashAccount             PosRegister[]          @relation("PosRegister_cashAccount")
   posRegister_cardAccount             PosRegister[]          @relation("PosRegister_cardAccount")
+  posRegister_qrAccount               PosRegister[]          @relation("PosRegister_qrAccount")
   posReceiptLine_revenueAccount       PosReceiptLine[]       @relation("PosReceiptLine_revenueAccount")
   whsParameters_stockAccount          WhsParameters[]        @relation("WhsParameters_stockAccount")
   whsParameters_inTransitAccount      WhsParameters[]        @relation("WhsParameters_inTransitAccount")
@@ -3074,6 +3075,7 @@ model BankAccount {
   bankStatement_bankAccount       BankStatement[]      @relation("BankStatement_bankAccount")
   bankPaymentMethod_bankAccount   BankPaymentMethod[]  @relation("BankPaymentMethod_bankAccount")
   bankPaymentOrder_bankAccount    BankPaymentOrder[]   @relation("BankPaymentOrder_bankAccount")
+  posRegister_qrBankAccount       PosRegister[]        @relation("PosRegister_qrBankAccount")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -3168,6 +3170,7 @@ model BankStatementLine {
   offsetAccountId   String?  @map("offset_account_id") @db.Uuid
   customerId        String?  @map("customer_id") @db.Uuid
   vendorId          String?  @map("vendor_id") @db.Uuid
+  posReceiptId      String?  @map("pos_receipt_id") @db.Uuid
   postingRuleId     String?  @map("posting_rule_id") @db.Uuid
   journalId         String?  @map("journal_id") @db.Uuid
   ext               Json     @default("{}")
@@ -3186,6 +3189,7 @@ model BankStatementLine {
   offsetAccount   GlAccount?       @relation("BankStatementLine_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
   customer        ArCustomer?      @relation("BankStatementLine_customer", fields: [customerId], references: [id], onDelete: Restrict)
   vendor          ApVendor?        @relation("BankStatementLine_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  posReceipt      PosReceipt?      @relation("BankStatementLine_posReceipt", fields: [posReceiptId], references: [id], onDelete: Restrict)
   postingRule     BankPostingRule? @relation("BankStatementLine_postingRule", fields: [postingRuleId], references: [id], onDelete: Restrict)
   journal         GlJournal?       @relation("BankStatementLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
 
@@ -3198,6 +3202,7 @@ model BankStatementLine {
   @@index([offsetAccountId])
   @@index([customerId])
   @@index([vendorId])
+  @@index([posReceiptId])
   @@index([postingRuleId])
   @@index([journalId])
   @@map("bank_statement_line")
@@ -3475,29 +3480,33 @@ model CashVoucher {
 
 /// pos.register — generováno z definice objektu
 model PosRegister {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  tenantId      String   @map("tenant_id") @db.Uuid
-  companyId     String   @map("company_id") @db.Uuid
-  code          String   @db.VarChar(20)
-  name          String   @db.VarChar(120)
-  template      String   @default("counter") @db.VarChar(40)
-  warehouseId   String?  @map("warehouse_id") @db.Uuid
-  cashAccountId String   @map("cash_account_id") @db.Uuid
-  cardAccountId String   @map("card_account_id") @db.Uuid
-  receiptFooter String?  @map("receipt_footer") @db.VarChar(255)
-  pin           String?  @db.VarChar(200)
-  blocked       Boolean  @default(false)
-  ext           Json     @default("{}")
-  version       Int      @default(1)
-  createdAt     DateTime @default(now()) @map("created_at")
-  createdBy     String?  @map("created_by") @db.Uuid
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy     String?  @map("updated_by") @db.Uuid
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  code            String   @db.VarChar(20)
+  name            String   @db.VarChar(120)
+  template        String   @default("counter") @db.VarChar(40)
+  warehouseId     String?  @map("warehouse_id") @db.Uuid
+  cashAccountId   String   @map("cash_account_id") @db.Uuid
+  cardAccountId   String   @map("card_account_id") @db.Uuid
+  qrAccountId     String?  @map("qr_account_id") @db.Uuid
+  qrBankAccountId String?  @map("qr_bank_account_id") @db.Uuid
+  receiptFooter   String?  @map("receipt_footer") @db.VarChar(255)
+  pin             String?  @db.VarChar(200)
+  blocked         Boolean  @default(false)
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
 
   company                SysCompany      @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
   warehouse              WhsWarehouse?   @relation("PosRegister_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
   cashAccount            GlAccount       @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
   cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
+  qrAccount              GlAccount?      @relation("PosRegister_qrAccount", fields: [qrAccountId], references: [id], onDelete: Restrict)
+  qrBankAccount          BankAccount?    @relation("PosRegister_qrBankAccount", fields: [qrBankAccountId], references: [id], onDelete: Restrict)
   posShift_register      PosShift[]      @relation("PosShift_register")
   posReceipt_register    PosReceipt[]    @relation("PosReceipt_register")
   posBasket_register     PosBasket[]     @relation("PosBasket_register")
@@ -3508,6 +3517,8 @@ model PosRegister {
   @@index([warehouseId])
   @@index([cashAccountId])
   @@index([cardAccountId])
+  @@index([qrAccountId])
+  @@index([qrBankAccountId])
   @@map("pos_register")
 }
 
@@ -3526,6 +3537,7 @@ model PosShift {
   taxAmount     Decimal? @map("tax_amount") @db.Decimal(18, 2)
   cashTotal     Decimal? @map("cash_total") @db.Decimal(18, 2)
   cardTotal     Decimal? @map("card_total") @db.Decimal(18, 2)
+  qrTotal       Decimal? @map("qr_total") @db.Decimal(18, 2)
   roundingTotal Decimal? @map("rounding_total") @db.Decimal(18, 2)
   expectedCash  Decimal? @map("expected_cash") @db.Decimal(18, 2)
   voucherId     String?  @map("voucher_id") @db.Uuid
@@ -3549,48 +3561,53 @@ model PosShift {
 
 /// pos.receipt — generováno z definice objektu
 model PosReceipt {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  tenantId      String   @map("tenant_id") @db.Uuid
-  companyId     String   @map("company_id") @db.Uuid
-  receiptNum    String   @map("receipt_num") @db.VarChar(20)
-  registerId    String   @map("register_id") @db.Uuid
-  shiftId       String   @map("shift_id") @db.Uuid
-  date          DateTime @default(now()) @db.Date
-  paymentMethod String   @map("payment_method") @db.VarChar(40)
-  amountNet     Decimal? @map("amount_net") @db.Decimal(18, 2)
-  taxAmount     Decimal? @map("tax_amount") @db.Decimal(18, 2)
-  amountGross   Decimal? @map("amount_gross") @db.Decimal(18, 2)
-  rounding      Decimal? @db.Decimal(18, 2)
-  amountPaid    Decimal? @map("amount_paid") @db.Decimal(18, 2)
-  cashGiven     Decimal? @map("cash_given") @db.Decimal(18, 2)
-  change        Decimal? @db.Decimal(18, 2)
-  paymentRef    String?  @map("payment_ref") @db.VarChar(255)
-  customerId    String?  @map("customer_id") @db.Uuid
-  buyerName     String?  @map("buyer_name") @db.VarChar(255)
-  buyerStreet   String?  @map("buyer_street") @db.VarChar(255)
-  buyerZip      String?  @map("buyer_zip") @db.VarChar(20)
-  buyerCity     String?  @map("buyer_city") @db.VarChar(255)
-  eetStatus     String?  @map("eet_status") @db.VarChar(40)
-  eetPok        String?  @map("eet_pok") @db.VarChar(255)
-  eetMessage    String?  @map("eet_message") @db.VarChar(255)
-  ext           Json     @default("{}")
-  version       Int      @default(1)
-  createdAt     DateTime @default(now()) @map("created_at")
-  createdBy     String?  @map("created_by") @db.Uuid
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy     String?  @map("updated_by") @db.Uuid
+  id            String    @id @default(uuid(7)) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  receiptNum    String    @map("receipt_num") @db.VarChar(20)
+  registerId    String    @map("register_id") @db.Uuid
+  shiftId       String    @map("shift_id") @db.Uuid
+  date          DateTime  @default(now()) @db.Date
+  paymentMethod String    @map("payment_method") @db.VarChar(40)
+  amountNet     Decimal?  @map("amount_net") @db.Decimal(18, 2)
+  taxAmount     Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  amountGross   Decimal?  @map("amount_gross") @db.Decimal(18, 2)
+  rounding      Decimal?  @db.Decimal(18, 2)
+  amountPaid    Decimal?  @map("amount_paid") @db.Decimal(18, 2)
+  cashGiven     Decimal?  @map("cash_given") @db.Decimal(18, 2)
+  change        Decimal?  @db.Decimal(18, 2)
+  paymentRef    String?   @map("payment_ref") @db.VarChar(255)
+  vs            String?   @db.VarChar(10)
+  payStatus     String?   @map("pay_status") @db.VarChar(40)
+  paidDate      DateTime? @map("paid_date") @db.Date
+  customerId    String?   @map("customer_id") @db.Uuid
+  buyerName     String?   @map("buyer_name") @db.VarChar(255)
+  buyerStreet   String?   @map("buyer_street") @db.VarChar(255)
+  buyerZip      String?   @map("buyer_zip") @db.VarChar(20)
+  buyerCity     String?   @map("buyer_city") @db.VarChar(255)
+  eetStatus     String?   @map("eet_status") @db.VarChar(40)
+  eetPok        String?   @map("eet_pok") @db.VarChar(255)
+  eetMessage    String?   @map("eet_message") @db.VarChar(255)
+  ext           Json      @default("{}")
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     String?   @map("created_by") @db.Uuid
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?   @map("updated_by") @db.Uuid
 
-  company                SysCompany       @relation("PosReceipt_company", fields: [companyId], references: [id], onDelete: Restrict)
-  register               PosRegister      @relation("PosReceipt_register", fields: [registerId], references: [id], onDelete: Restrict)
-  shift                  PosShift         @relation("PosReceipt_shift", fields: [shiftId], references: [id], onDelete: Restrict)
-  customer               ArCustomer?      @relation("PosReceipt_customer", fields: [customerId], references: [id], onDelete: Restrict)
-  posReceiptLine_receipt PosReceiptLine[] @relation("PosReceiptLine_receipt")
-  posBasket_receipt      PosBasket[]      @relation("PosBasket_receipt")
+  company                      SysCompany          @relation("PosReceipt_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register                     PosRegister         @relation("PosReceipt_register", fields: [registerId], references: [id], onDelete: Restrict)
+  shift                        PosShift            @relation("PosReceipt_shift", fields: [shiftId], references: [id], onDelete: Restrict)
+  customer                     ArCustomer?         @relation("PosReceipt_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  bankStatementLine_posReceipt BankStatementLine[] @relation("BankStatementLine_posReceipt")
+  posReceiptLine_receipt       PosReceiptLine[]    @relation("PosReceiptLine_receipt")
+  posBasket_receipt            PosBasket[]         @relation("PosBasket_receipt")
 
   @@index([tenantId, companyId])
   @@index([registerId])
   @@index([shiftId])
   @@index([customerId])
+  @@index([tenantId, companyId, vs])
   @@map("pos_receipt")
 }
 

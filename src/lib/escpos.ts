@@ -80,6 +80,16 @@ export class EscPos {
   drawer() {
     return this.raw(ESC, 0x70, 0, 25, 250);
   }
+  /** QR kód příkazem tiskárny (GS ( k, model 2, oprava M); text jen ASCII (QR platba) */
+  qr(text: string, moduleSize = 6) {
+    const data = [...text].map((c) => (c.charCodeAt(0) < 128 ? c.charCodeAt(0) : 63));
+    const len = data.length + 3;
+    return this.raw(GS, 0x28, 0x6b, 4, 0, 0x31, 0x41, 0x32, 0) // model 2
+      .raw(GS, 0x28, 0x6b, 3, 0, 0x31, 0x43, moduleSize) // velikost modulu
+      .raw(GS, 0x28, 0x6b, 3, 0, 0x31, 0x45, 0x31) // oprava chyb M
+      .raw(GS, 0x28, 0x6b, len & 0xff, len >> 8, 0x31, 0x50, 0x30, ...data) // uložit data
+      .raw(GS, 0x28, 0x6b, 3, 0, 0x31, 0x51, 0x30); // vytisknout
+  }
 }
 
 export function receiptEscPos(
@@ -118,8 +128,14 @@ export function receiptEscPos(
   p.sep();
   if (Number(r.rounding) !== 0) p.pair(L.Rounding, fmt(r.rounding));
   p.bold(true).big(true).pair(L.Total, fmt(r.paid)).big(false).bold(false);
-  p.pair(r.payment === "cash" ? L.Cash : L.Card, fmt(r.cashGiven ?? r.paid));
+  p.pair(r.payment === "cash" ? L.Cash : r.payment === "qr" ? L.QrPayment : L.Card, fmt(r.cashGiven ?? r.paid));
   if (r.change && Number(r.change) > 0) p.pair(L.ChangeDue, fmt(r.change));
+  // QR platba čekající na úhradu: výzva, QR kód a VS
+  if (r.qr) {
+    p.sep().align("center").bold(true).line(L.QrAwaitingNote).bold(false).qr(r.qr).raw(0x0a);
+    if (r.vs) p.line(`VS ${r.vs}`);
+    p.align("left");
+  }
   if (r.vatPayer === false) p.sep().line(L.NonPayerNote);
   else {
     p.sep().line(L.VatRecap);

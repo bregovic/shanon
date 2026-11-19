@@ -510,7 +510,8 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
       let eetQueue: number | undefined;
       if (withInt) {
         const conns = await connectionsFor(api, sale.registerId);
-        if (conns.eet) {
+        // QR platba je převod na účet — do EET nepatří (eviduje se hotovost a karta)
+        if (conns.eet && sale.payment !== "qr") {
           await eetRegisterReceipt(api, s.ctx.companyId, conns.eet, (await api.get("pos.receipt", receiptId))!, true);
           eetQueue = (await eetResendPending(api, s.ctx.companyId, sale.registerId, 5)).pending;
         }
@@ -592,7 +593,7 @@ function saleInput(input: SaleInput): SaleInput {
       !input.customerId && input.buyer
         ? { name: String(input.buyer.name ?? ""), street: String(input.buyer.street ?? ""), zip: String(input.buyer.zip ?? ""), city: String(input.buyer.city ?? "") }
         : null,
-    payment: input.payment === "card" ? "card" : "cash",
+    payment: input.payment === "card" ? "card" : input.payment === "qr" ? "qr" : "cash",
     cashGiven: input.cashGiven ? String(input.cashGiven) : null,
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,
     basketId: input.basketId ? String(input.basketId) : null,
@@ -686,6 +687,7 @@ export async function posShiftSummaryAction(registerId: string): Promise<ActionR
         tax: fromCents(t.tax),
         cash: fromCents(t.cash),
         card: fromCents(t.card),
+        qr: fromCents(t.qr),
         rounding: fromCents(t.rounding),
         openingCash: String(sh.openingCash ?? "0.00"),
         expectedCash: fromCents(toCents(sh.openingCash) + t.cash),

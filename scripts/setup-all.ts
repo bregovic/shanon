@@ -14,7 +14,9 @@ import { companyModules } from "../src/server/modules";
 
 async function main() {
   const client = createPrisma();
-  const tenants = await client.sysTenant.findMany({ include: { modules: true, users: { where: { role: "admin" }, take: 1 } } });
+  // volitelně jen jeden tenant: tsx scripts/setup-all.ts <kód>
+  const only = process.argv[2];
+  const tenants = await client.sysTenant.findMany({ where: only ? { code: only } : {}, include: { modules: true, users: { where: { role: "admin" }, take: 1 } } });
   for (const t of tenants) {
     const modules = dependencyClosure(registry, ["sys", ...t.modules.map((m) => m.moduleId)]);
     // nosné firmy virtuálních společností nedostávají výchozí nastavení (jen sdílená data);

@@ -43,6 +43,7 @@ Specifikace KB je připravená. Pro jinou banku založte novou podle jejího vzo
 Po načtení zkuste u výpisu **Automaticky spárovat**. Ve sloupci **Párování** je u každé transakce vidět, co se našlo:
 
 - **Faktura / záloha odběratele či dodavatele** – podle VS (jen jednoznačná shoda),
+- **Účtenka (QR platba)** – příjem s VS a přesnou částkou účtenky z pokladny, která čeká na QR platbu; po zaúčtování výpisu je účtenka **Zaplaceno** (účtuje se proti účtu QR plateb pokladny, výchozí 261),
 - **Předkontace** – transakce bez dokladu podle pravidla v [Předkontace transakcí](/bank/postingRule): text zprávy obsahuje (např. „poplatek“), protiúčet obsahuje, směr příjem / výdaj → účet hlavní knihy. Připravené jsou bankovní poplatky (568) a úroky (662),
 - **Účet** – protiúčet zadaný ručně v detailu transakce,
 - **Nespárováno** – doplníte v deníku.

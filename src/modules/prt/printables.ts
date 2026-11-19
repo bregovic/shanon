@@ -1064,8 +1064,25 @@ export const advancePrintable: PrintableDef = {
  * Účtenka = zjednodušený daňový doklad (§ 30 ZDPH): obchodní firma, sídlo, IČO, DIČ,
  * evidenční číslo, datum, předmět plnění se sazbou, celkem, rekapitulace DPH po
  * sazbách; s EET kód POK. Malé logo nahoře, bez zkratky firmy.
+ * QR platba čekající na úhradu: pod platbou výzva, QR kód a variabilní symbol (jinak se nezobrazí).
  */
 function receiptLayout(): PrintLayout {
+  const v5 = receiptLayoutV5();
+  const at = 87; // pod řádkem platby — vše níž se posune o blok QR
+  const dy = 44;
+  return {
+    ...v5,
+    elements: [
+      ...v5.elements.map((e) => (e.y >= at ? { ...e, y: e.y + dy } : e)),
+      { ...T("qrNote", 2, at, 68, 5, "{doc.qrNote}", { bold: true, align: "center", size: 8 }), showIf: "doc.qr" },
+      { id: "qr", type: "qr", x: 19, y: at + 6, w: 34, h: 34, field: "doc.qr", showIf: "doc.qr" },
+      { ...T("qrVs", 2, at + 40, 68, 4, "VS {doc.vs}", { align: "center", size: 8 }), showIf: "doc.qr" },
+    ],
+  };
+}
+
+/** Účtenka v5 (18. 11. 2026, bez QR platby) — neupravené šablony se převedou. */
+export function receiptLayoutV5(): PrintLayout {
   return {
     paper: "receipt80",
     fontSize: 8.5,
@@ -1408,6 +1425,9 @@ export const receiptPrintable: PrintableDef = {
     { path: "doc.fik", label: "@PRT:Fik" },
     { path: "doc.footer", label: "@PRT:Footer" },
     { path: "doc.title", label: "@PRT:DocTitle" },
+    { path: "doc.qr", label: "@PRT:QrPayment" },
+    { path: "doc.qrNote", label: "@PRT:QrNote" },
+    { path: "doc.vs", label: "@PRT:Vs" },
     { path: "customer.name", label: "@PRT:CustomerName" },
     { path: "customer.address", label: "@PRT:CustomerAddress" },
     { path: "customer.ids", label: "@PRT:CustomerIds" },
@@ -1424,7 +1444,7 @@ export const receiptPrintable: PrintableDef = {
     return receiptData(await receiptPrint(data, companyId, id));
   },
   defaultLayout: receiptLayout,
-  legacyLayouts: [legacyReceiptLayout(), receiptLayoutV1(), receiptLayoutV2(), receiptLayoutV3(), receiptLayoutV4()],
+  legacyLayouts: [legacyReceiptLayout(), receiptLayoutV1(), receiptLayoutV2(), receiptLayoutV3(), receiptLayoutV4(), receiptLayoutV5()],
 };
 
 // ---------------------------------------------------------------------------

@@ -50,7 +50,9 @@ export async function printJob(ctx: Ctx, docType: string, recordId: string, temp
       const data = await p.dataset(api, ctx.companyId, recordId);
       // způsob platby účtenky v jazyce uživatele
       const doc = data.doc as Record<string, unknown> | undefined;
-      if (doc && (doc.payment === "cash" || doc.payment === "card")) doc.payment = resolveLabel(labelTable, doc.payment === "cash" ? "@POS:Cash" : "@POS:Card", ctx.lang ?? "cs");
+      const payLabels: Record<string, string> = { cash: "@POS:Cash", card: "@POS:Card", qr: "@POS:QrPayment" };
+      if (doc && typeof doc.payment === "string" && payLabels[doc.payment]) doc.payment = resolveLabel(labelTable, payLabels[doc.payment], ctx.lang ?? "cs");
+      if (doc?.qr) doc.qrNote = resolveLabel(labelTable, "@POS:QrAwaitingNote", ctx.lang ?? "cs");
       const record = (await api.get(docType, recordId)) as RecordData;
       // logo firmy (příloha Organizace) → data: URL pro sestavu
       const co = data.company as Record<string, unknown> | undefined;

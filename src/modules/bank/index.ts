@@ -65,6 +65,7 @@ export const MatchKind = defineEnum({
     { value: "customerAccount", label: "@BANK:MatchCustomerAccount", color: "warning" },
     { value: "vendorAccount", label: "@BANK:MatchVendorAccount", color: "warning" },
     { value: "rule", label: "@BANK:MatchRule", color: "informative" },
+    { value: "posReceipt", label: "@BANK:MatchPosReceipt", color: "success" },
   ],
 });
 
@@ -286,6 +287,8 @@ export const statementLine = defineObject({
     /** partner podle bankovního účtu protistrany — úhrada na jeho účet bez konkrétní faktury */
     customerId: { edt: refEdt("ar.customer", "@BANK:Customer") },
     vendorId: { edt: refEdt("ap.vendor", "@BANK:Vendor") },
+    /** účtenka pokladny placená QR platbou (VS = číslice čísla účtenky) */
+    posReceiptId: { edt: refEdt("pos.receipt", "@BANK:PosReceipt"), optionalRef: true },
     /** předkontace, podle které se řádek spároval (poplatky, úroky…) */
     postingRuleId: { edt: refEdt("bank.postingRule", "@BANK:PostingRule"), readOnly: true },
     /** deník hlavní knihy, do kterého řádek přešel */
@@ -296,7 +299,7 @@ export const statementLine = defineObject({
   list: ["lineNum", "date", "amount", "vs", "counterAccount", "message", "matchKind", "offsetAccountId", "journalId"],
   form: [
     { label: "@SYS:General", fields: ["statementId", "lineNum", "date", "amount", "vs", "counterAccount", "message"] },
-    { label: "@BANK:Matching", fields: ["matchKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "customerId", "vendorId", "offsetAccountId", "postingRuleId", "journalId"] },
+    { label: "@BANK:Matching", fields: ["matchKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "customerId", "vendorId", "posReceiptId", "offsetAccountId", "postingRuleId", "journalId"] },
   ],
   defaultSort: { field: "lineNum", dir: "asc" },
   // vybrané řádky (třeba jen spárované) → deník banky
@@ -351,6 +354,7 @@ export const MatchMethod = defineEnum({
   values: [
     { value: "vsInvoice", label: "@BANK:MmVsInvoice" },
     { value: "vsAdvance", label: "@BANK:MmVsAdvance" },
+    { value: "vsPosReceipt", label: "@BANK:MmVsPosReceipt" },
     { value: "counterPartner", label: "@BANK:MmCounterPartner" },
     { value: "rules", label: "@BANK:MmRules" },
   ],
@@ -555,8 +559,14 @@ async function ruleSetup(data: DataApi) {
 /** Výchozí pořadí párování (jen když firma žádné nemá). */
 async function stepSetup(data: DataApi) {
   if ((await data.find("bank.matchStep", {}, { take: 1 })).length) return;
-  for (const [sequence, method] of [[10, "vsInvoice"], [20, "vsAdvance"], [30, "counterPartner"], [40, "rules"]] as const)
-    await data.create("bank.matchStep", { sequence, method, requireAmount: false, active: true });
+  const have = await data.find("bank.matchStep", {}, { take: 50 });
+  if (!have.length) {
+    for (const [sequence, method] of [[10, "vsInvoice"], [20, "vsAdvance"], [25, "vsPosReceipt"], [30, "counterPartner"], [40, "rules"]] as const)
+      await data.create("bank.matchStep", { sequence, method, requireAmount: false, active: true });
+    return;
+  }
+  // QR platby z pokladny (přibyly 19. 11. 2026): doplnit krok firmám, které pořadí už mají
+  if (!have.some((x) => x.method === "vsPosReceipt")) await data.create("bank.matchStep", { sequence: 25, method: "vsPosReceipt", requireAmount: true, active: true });
 }
 
 async function bankSetup(data: DataApi) {
@@ -733,6 +743,11 @@ export default defineModule({
       MatchVendor: "Dodavatel",
       MatchLedger: "Účet",
       MatchRule: "Předkontace",
+      MatchPosReceipt: "Účtenka (QR platba)",
+      PosReceipt: "Účtenka (QR platba)",
+      MmVsPosReceipt: "VS a částka → účtenka placená QR platbou",
+      PosReceiptClosed: "Účtenka {doc} nečeká na QR platbu.",
+      PosReceiptAmount: "Částka neodpovídá účtence {doc} ({amount}).",
       DeleteStatement: "Smazat výpis",
       StatementJournalPosted: "Výpis je v zaúčtovaném deníku — smazat ho nejde.",
       MatchCustomerAccount: "Odběratel (bez faktury)",
@@ -916,6 +931,11 @@ export default defineModule({
       MatchVendor: "Vendor",
       MatchLedger: "Account",
       MatchRule: "Posting rule",
+      MatchPosReceipt: "Receipt (QR payment)",
+      PosReceipt: "Receipt (QR payment)",
+      MmVsPosReceipt: "VS and amount → receipt paid by QR payment",
+      PosReceiptClosed: "Receipt {doc} is not awaiting a QR payment.",
+      PosReceiptAmount: "The amount does not match receipt {doc} ({amount}).",
       DeleteStatement: "Delete statement",
       StatementJournalPosted: "The statement is in a posted journal and cannot be deleted.",
       MatchCustomerAccount: "Customer (no invoice)",

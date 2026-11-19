@@ -222,6 +222,11 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
       const tr = l.vendorTransId ? await data.get("ap.trans", String(l.vendorTransId)) : null;
       const adv = l.vendorAdvanceId ? await data.get("ap.advance", String(l.vendorAdvanceId)) : null;
       Object.assign(base, { offsetType: "vendor", offsetVendorId: tr?.vendorId ?? adv?.vendorId ?? null });
+    } else if (l.matchKind === "posReceipt" && l.posReceiptId) {
+      // QR platba účtenky: protiúčet = účet QR plateb pokladny (stav účtenky mění jen zaúčtování výpisu)
+      const r = await data.get("pos.receipt", String(l.posReceiptId));
+      const reg = r?.registerId ? await data.get("pos.register", String(r.registerId)) : null;
+      Object.assign(base, { offsetType: "ledger", offsetAccountId: reg?.qrAccountId ?? reg?.cardAccountId ?? null });
     } else if ((l.matchKind === "ledger" || l.matchKind === "rule") && l.offsetAccountId) {
       Object.assign(base, { offsetType: "ledger", offsetAccountId: l.offsetAccountId });
     } else {

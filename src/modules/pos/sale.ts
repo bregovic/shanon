@@ -11,6 +11,9 @@
  *   s českým DIČ od 10 000 Kč jde do KH jednotlivě (A.4).
  * - Známý odběratel: placeno hned → účtenka s odběratelem (tiskne se jako faktura – daňový doklad),
  *   „na fakturu“ → zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele (bez účtenky).
+ * - QR platba: účtenka s QR kódem (SPAYD, VS = číslice čísla účtenky) čeká na platbu; uzávěrka ji
+ *   účtuje na účet QR plateb pokladny (jinak účet karet, peníze na cestě), bankovní výpis ji podle VS
+ *   a částky spáruje proti stejnému účtu a označí jako zaplacenou.
  */
 import type { ScaleLine } from "./scale-line";
 import { convertPrice } from "@/modules/gl/posting";
@@ -23,6 +26,7 @@ import { closeBasket } from "./basket";
 import { ar } from "@/modules/ar";
 import { postInvoice } from "@/modules/tax/document";
 import { vatPayer } from "@/modules/tax/orders";
+import { czIban, spayd } from "@/core/print";
 
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -37,8 +41,8 @@ export interface SaleInput {
    * vážené zboží v kg jde prodat jen s údaji z váhy
    */
   verifiedScale?: { name: string; serial: string | null; protocol: string } | null;
-  /** invoice = na fakturu (odběratel zaplatí později) */
-  payment: "cash" | "card" | "invoice";
+  /** invoice = na fakturu (odběratel zaplatí později), qr = QR platba převodem (účtenka čeká na platbu) */
+  payment: "cash" | "card" | "qr" | "invoice";
   /** známý odběratel (Odběratelé) — na účtence / faktuře */
   customerId?: string | null;
   /** odběratel bez evidence — jen vytisknout na účtenku (doklad zůstává zjednodušený) */
@@ -169,6 +173,36 @@ async function customerOf(data: DataApi, customerId: string | null | undefined):
   return c;
 }
 
+/** Účet QR plateb pokladny do doby úhrady (prázdné = účet plateb kartou). */
+export const qrAccountOf = (reg: RecordData) => String(reg.qrAccountId || reg.cardAccountId);
+
+/**
+ * Bankovní účet pro QR platbu: zadaný u pokladny, jinak výchozí účet firmy v účetní měně (Banka → Bankovní účty),
+ * jinak první účet v účetní měně, jinak účet z Organizace. Vrací IBAN a kód měny, nebo null.
+ */
+export async function qrBankAccount(data: DataApi, reg: RecordData): Promise<{ iban: string; currency: string } | null> {
+  const base = await accountingCurrencyId(data, data.companyId ?? null);
+  const cur = base ? await data.get("sys.currency", base) : null;
+  const currency = String(cur?.code ?? "CZK");
+  const ibanOf = (a: RecordData | null | undefined) => (a ? String(a.iban || czIban(String(a.accountNum ?? "")) || "").replace(/\s/g, "") : "");
+  let accs: RecordData[] = [];
+  try {
+    if (reg.qrBankAccountId) {
+      const own = await data.get("bank.account", String(reg.qrBankAccountId));
+      if (ibanOf(own)) return { iban: ibanOf(own), currency };
+    }
+    accs = await data.find("bank.account", { blocked: false }, { take: 20, orderBy: { code: "asc" } });
+  } catch {
+    accs = []; // Banka není zapnutá
+  }
+  const inBase = accs.filter((a) => ibanOf(a) && (!a.currencyId || a.currencyId === base));
+  const pick = inBase.find((a) => a.isDefault) ?? inBase[0];
+  if (pick) return { iban: ibanOf(pick), currency };
+  const org = await orgOf(data);
+  const iban = String(org?.iban || czIban(String(org?.bankAccount ?? "")) || "").replace(/\s/g, "");
+  return iban ? { iban, currency } : null;
+}
+
 /**
  * Prodej na fakturu: vydaná faktura odběrateli s cenami s DPH (stejné ceny a slevy jako na pokladně),
  * zaúčtovaná (saldo, DPH, vyskladnění). Hotovost ani karta se nepohybují, účtenka nevzniká.
@@ -200,6 +234,8 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
   const customer = await customerOf(data, input.customerId);
   const { reg, shift, lines, gross, net, paid } = await quote(data, input);
   const cash = input.payment === "cash";
+  const qr = input.payment === "qr";
+  if (qr && !(await qrBankAccount(data, reg))) throw new UserError("@POS:QrNoAccount");
   let given: bigint | null = null;
   if (cash && input.cashGiven) {
     given = toCents(String(input.cashGiven).replace(",", "."));
@@ -219,8 +255,15 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
     cashGiven: given === null ? null : fromCents(given),
     change: given === null ? null : fromCents(given - paid),
     paymentRef: input.payment === "card" ? (input.paymentRef ?? null) : null,
+    ...(qr ? { payStatus: "awaiting" } : {}),
     ...(customer ? { customerId: customer.id } : buyerFields(input.buyer)),
   });
+  // VS QR platby = číslice čísla účtenky (číslo přidělí řada až při založení)
+  if (qr) {
+    const vs = String(receipt.receiptNum ?? "").replace(/\D/g, "").slice(-10);
+    await data.update("pos.receipt", String(receipt.id), { vs });
+    receipt.vs = vs;
+  }
   for (const l of lines) {
     await data.create("pos.receiptLine", {
       receiptId: receipt.id,
@@ -250,6 +293,7 @@ export interface ShiftTotals {
   tax: bigint;
   cash: bigint;
   card: bigint;
+  qr: bigint;
   rounding: bigint;
   /** účet tržeb → základ */
   revenue: Map<string, bigint>;
@@ -259,12 +303,13 @@ export interface ShiftTotals {
 
 export async function shiftTotals(data: DataApi, shiftId: string): Promise<ShiftTotals> {
   const receipts = await data.find("pos.receipt", { shiftId }, { take: 100000 });
-  const t: ShiftTotals = { receiptCount: receipts.length, gross: zero, tax: zero, cash: zero, card: zero, rounding: zero, revenue: new Map(), taxes: new Map() };
+  const t: ShiftTotals = { receiptCount: receipts.length, gross: zero, tax: zero, cash: zero, card: zero, qr: zero, rounding: zero, revenue: new Map(), taxes: new Map() };
   for (const r of receipts) {
     t.gross += toCents(r.amountGross);
     t.tax += toCents(r.taxAmount);
     t.rounding += toCents(r.rounding);
     if (r.paymentMethod === "cash") t.cash += toCents(r.amountPaid);
+    else if (r.paymentMethod === "qr") t.qr += toCents(r.amountPaid);
     else t.card += toCents(r.amountPaid);
     for (const l of await data.find("pos.receiptLine", { receiptId: r.id }, { take: 10000 })) {
       const net = toCents(l.amountNet);
@@ -292,6 +337,7 @@ export async function closeShift(data: DataApi, shift: RecordData) {
     const lines: PostingLine[] = [];
     if (t.cash) lines.push({ accountId: String(reg.cashAccountId), amount: fromCents(t.cash), text: String(reg.name) });
     if (t.card) lines.push({ accountId: String(reg.cardAccountId), amount: fromCents(t.card), text: String(reg.name) });
+    if (t.qr) lines.push({ accountId: qrAccountOf(reg), amount: fromCents(t.qr), text: String(reg.name) });
     for (const [acc, net] of t.revenue) {
       if (!acc) throw new UserError("@SYS:FixErrors", {}, { revenueAccountId: "@SYS:Required" });
       if (net) lines.push({ accountId: acc, amount: fromCents(-net) });
@@ -380,6 +426,7 @@ export async function closeShift(data: DataApi, shift: RecordData) {
     taxAmount: fromCents(t.tax),
     cashTotal: fromCents(t.cash),
     cardTotal: fromCents(t.card),
+    qrTotal: fromCents(t.qr),
     roundingTotal: fromCents(t.rounding),
     expectedCash: fromCents(toCents(shift.openingCash) + t.cash),
     voucherId,
@@ -430,6 +477,9 @@ export interface ReceiptPrint {
   eet: { status: string | null; pok: string | null } | null;
   /** počet neodeslaných tržeb EET pokladny (vyplní akce prodeje) */
   eetQueue?: number;
+  /** QR platba čekající na úhradu: řetězec QR platby (SPAYD) a variabilní symbol */
+  qr?: string | null;
+  vs?: string | null;
 }
 
 /** Podklady pro tisk účtenky (zjednodušený daňový doklad). */
@@ -520,7 +570,17 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
     change: (r.change as string) ?? null,
     footer: (reg?.receiptFooter as string) ?? null,
     eet: r.eetStatus ? { status: String(r.eetStatus), pok: (r.eetPok as string) ?? null } : null,
+    ...(await receiptQr(data, r, reg)),
   };
+}
+
+/** QR kód účtenky, která čeká na QR platbu (zaplacená ho už netiskne). */
+async function receiptQr(data: DataApi, r: RecordData, reg: RecordData | null): Promise<Pick<ReceiptPrint, "qr" | "vs">> {
+  if (r.paymentMethod !== "qr" || r.payStatus !== "awaiting" || !reg) return { qr: null, vs: (r.vs as string) ?? null };
+  const acc = await qrBankAccount(data, reg);
+  const vs = (r.vs as string) ?? null;
+  if (!acc) return { qr: null, vs };
+  return { qr: spayd({ iban: acc.iban, amount: String(r.amountPaid), currency: acc.currency, vs, message: `Uctenka ${r.receiptNum}` }), vs };
 }
 
 /** Nejčastěji prodávané položky pokladny za posledních `days` dní (počet řádků účtenek). */

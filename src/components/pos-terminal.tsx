@@ -41,6 +41,7 @@ import {
   LockClosed24Regular,
   Money24Regular,
   Payment24Regular,
+  QrCode24Regular,
   Print24Regular,
   Scales24Regular,
   Search24Regular,
@@ -64,7 +65,7 @@ import {
 } from "@/app/actions";
 import type { BasketView } from "@/modules/pos/basket";
 import type { PrintLayout } from "@/core/print";
-import { PrintDocument } from "@/lib/print-render";
+import { PrintDocument, QrSvg } from "@/lib/print-render";
 import { receiptData } from "@/lib/receipt-data";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
@@ -763,7 +764,7 @@ export function PosTerminal(p: {
   // vážený řádek z ověřené váhy: hmotnost a cena jdou na server tak, jak je vrátila váha
   const saleLines = () => lines.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null }));
 
-  const finishSale = async (payment: "cash" | "card", paymentRef: string | null) => {
+  const finishSale = async (payment: "cash" | "card" | "qr", paymentRef: string | null) => {
     setBusy(true);
     setError(undefined);
     const res = await posSellAction({
@@ -826,6 +827,13 @@ export function PosTerminal(p: {
       if (st.data?.state === "successful") return finishSale("card", ref);
       if (st.data?.state === "failed") return setCard({ ref, state: "declined", message: st.data.message });
     }
+  };
+
+  /** QR platba: účtenka s QR kódem a VS, zákazník zaplatí převodem (zaplacení spáruje bankovní výpis). */
+  const payByQr = () => {
+    setError(undefined);
+    if (scalePending(vState)) return setError(L.ScalePending);
+    return finishSale("qr", null);
   };
 
   /** Prodej na fakturu: zaúčtovaná vydaná faktura odběrateli (bez platby na pokladně). */
@@ -1127,6 +1135,10 @@ export function PosTerminal(p: {
                   {L.PayCard}
                 </Button>
               </div>
+              {/* QR platba převodem: účtenka s QR kódem, čeká na platbu (spáruje bankovní výpis) */}
+              <Button className={st.payBtn} style={{ marginTop: 8, width: "100%" }} icon={<QrCode24Regular />} disabled={!lines.length || busy} onClick={() => void payByQr()}>
+                {L.PayQr}
+              </Button>
               {customer && (
                 <Button className={st.payBtn} style={{ marginTop: 8, width: "100%" }} icon={<DocumentText24Regular />} disabled={!lines.length || busy} onClick={() => void payOnInvoice()}>
                   {L.OnInvoice}
@@ -1324,14 +1336,14 @@ export function PosTerminal(p: {
         <DialogSurface>
           <DialogBody>
             <DialogTitle>
-              {L.Paid}
+              {receipt?.qr ? L.PayAwaiting : L.Paid}
               {receipt?.change && Number(receipt.change) > 0 ? ` · ${L.ChangeDue} ${fmt(receipt.change)}` : ""}
             </DialogTitle>
             <DialogContent>
               {receipt &&
                 (p.receiptLayout ? (
                   <div className={mergeClasses("pos-receipt", st.receipt)} style={{ width: "auto" }}>
-                    <PrintDocument layout={p.receiptLayout} data={receiptData(receipt, {}, { cash: L.Cash, card: L.Card })} locale={locale} />
+                    <PrintDocument layout={p.receiptLayout} data={receiptData(receipt, {}, { cash: L.Cash, card: L.Card, qr: L.QrPayment })} locale={locale} />
                   </div>
                 ) : (
                   <Receipt r={receipt} L={L} fmt={fmt} st={st} locale={locale} />
@@ -1440,6 +1452,12 @@ export function PosTerminal(p: {
                   <span>{fmt(summary.cash)}</span>
                   <span>{L.CardTotal}</span>
                   <span>{fmt(summary.card)}</span>
+                  {Number(summary.qr) ? (
+                    <>
+                      <span>{L.QrTotal}</span>
+                      <span>{fmt(summary.qr)}</span>
+                    </>
+                  ) : null}
                   <span>{L.Rounding}</span>
                   <span>{fmt(summary.rounding)}</span>
                   <span>{L.OpeningCash}</span>
@@ -1737,9 +1755,16 @@ function Receipt({
         <span>{fmt(r.paid)}</span>
       </div>
       <div className={st.rRow}>
-        <span>{r.payment === "cash" ? L.Cash : L.Card}</span>
+        <span>{r.payment === "cash" ? L.Cash : r.payment === "qr" ? L.QrPayment : L.Card}</span>
         <span>{fmt(r.cashGiven ?? r.paid)}</span>
       </div>
+      {r.qr && (
+        <div className={st.rCenter} style={{ marginTop: 6 }}>
+          <div className={st.rBold}>{L.QrAwaitingNote}</div>
+          <div style={{ display: "flex", justifyContent: "center" }}><QrSvg text={r.qr} size={34} /></div>
+          {r.vs && <div>VS {r.vs}</div>}
+        </div>
+      )}
       {r.change && Number(r.change) > 0 && (
         <div className={st.rRow}>
           <span>{L.ChangeDue}</span>

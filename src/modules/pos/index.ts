@@ -24,6 +24,18 @@ export const PaymentMethod = defineEnum({
   values: [
     { value: "cash", label: "@POS:Cash" },
     { value: "card", label: "@POS:Card" },
+    // QR platba převodem: účtenka s QR kódem, čeká na platbu, zaplacení spáruje bankovní výpis podle VS
+    { value: "qr", label: "@POS:QrPayment" },
+  ],
+});
+
+/** Stav úhrady účtenky placené QR platbou (hotově a kartou je zaplaceno hned). */
+export const ReceiptPayStatus = defineEnum({
+  id: "PosReceiptPayStatus",
+  label: "@POS:PayStatus",
+  values: [
+    { value: "awaiting", label: "@POS:PayAwaiting", color: "warning" },
+    { value: "paid", label: "@POS:PayPaid", color: "success" },
   ],
 });
 
@@ -62,6 +74,10 @@ export const register = defineObject({
     warehouseId: { edt: refEdt("whs.warehouse", "@POS:Warehouse"), optionalRef: true },
     cashAccountId: { edt: AccountRef("@POS:CashAccount"), mandatory: true },
     cardAccountId: { edt: AccountRef("@POS:CardAccount"), mandatory: true },
+    /** QR platby do doby úhrady (prázdné = účet plateb kartou, peníze na cestě) */
+    qrAccountId: { edt: AccountRef("@POS:QrAccount") },
+    /** účet, na který zákazník posílá QR platbu (prázdné = výchozí bankovní účet firmy) */
+    qrBankAccountId: { edt: refEdt("bank.account", "@POS:QrBankAccount"), optionalRef: true },
     /** hotovost se zaokrouhluje na celé koruny (mince pod 1 Kč nejsou) */
     receiptFooter: { edt: Edts.Description, label: "@POS:ReceiptFooter" },
     // čtyřmístný PIN: pokladnu lze zamknout bez uzávěrky (šifrovaně, ven jen maska)
@@ -72,7 +88,7 @@ export const register = defineObject({
   list: ["code", "name", "template", "cashAccountId", "cardAccountId", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["code", "name", "template", "warehouseId", "receiptFooter", "pin", "blocked"] },
-    { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId"] },
+    { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId", "qrAccountId", "qrBankAccountId"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -96,6 +112,7 @@ export const shift = defineObject({
     taxAmount: { edt: Edts.Amount, label: "@TAX:TaxAmount", readOnly: true },
     cashTotal: { edt: Edts.Amount, label: "@POS:CashTotal", readOnly: true },
     cardTotal: { edt: Edts.Amount, label: "@POS:CardTotal", readOnly: true },
+    qrTotal: { edt: Edts.Amount, label: "@POS:QrTotal", readOnly: true },
     roundingTotal: { edt: Edts.Amount, label: "@POS:Rounding", readOnly: true },
     expectedCash: { edt: Edts.Balance, label: "@POS:ExpectedCash", readOnly: true },
     voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher"), readOnly: true },
@@ -105,7 +122,7 @@ export const shift = defineObject({
   list: ["shiftNum", "registerId", "openDate", "status", "receiptCount", "salesGross", "cashTotal", "cardTotal", "taxAmount"],
   form: [
     { label: "@SYS:General", fields: ["shiftNum", "registerId", "openDate", "status", "openingCash"] },
-    { label: "@POS:Totals", fields: ["receiptCount", "salesGross", "taxAmount", "cashTotal", "cardTotal", "roundingTotal", "expectedCash", "voucherId"] },
+    { label: "@POS:Totals", fields: ["receiptCount", "salesGross", "taxAmount", "cashTotal", "cardTotal", "qrTotal", "roundingTotal", "expectedCash", "voucherId"] },
   ],
   numberSeq: { field: "shiftNum", seq: "POSSHIFT" },
   defaultSort: { field: "shiftNum", dir: "desc" },
@@ -207,6 +224,10 @@ export const receipt = defineObject({
     change: { edt: Edts.AmountCur, label: "@POS:Change" },
     /** platba kartou: id transakce terminálu */
     paymentRef: { edt: Edts.Description, label: "@POS:PaymentRef" },
+    /** QR platba: variabilní symbol (číslice z čísla účtenky), stav a datum úhrady (spáruje výpis) */
+    vs: { edt: defineEdt({ id: "PosVs", kind: "string", label: "@POS:Vs", maxLength: 10 }), readOnly: true },
+    payStatus: { edt: enumEdt(ReceiptPayStatus), readOnly: true },
+    paidDate: { edt: Edts.TransDate, label: "@POS:PaidDate", readOnly: true },
     /** známý odběratel (účtenka = faktura – daňový doklad) */
     customerId: { edt: refEdt("ar.customer", "@POS:Customer"), optionalRef: true },
     /** odběratel bez evidence: jen vytisknout na účtenku (zjednodušený doklad zůstává zjednodušeným) */
@@ -219,15 +240,18 @@ export const receipt = defineObject({
     eetMessage: { edt: Edts.Description, label: "@POS:EetMessage" },
   },
   titleField: "receiptNum",
-  list: ["receiptNum", "date", "registerId", "paymentMethod", "customerId", "amountNet", "taxAmount", "amountPaid", "eetStatus"],
+  list: ["receiptNum", "date", "registerId", "paymentMethod", "payStatus", "customerId", "amountNet", "taxAmount", "amountPaid", "eetStatus"],
   form: [
     { label: "@SYS:General", fields: ["receiptNum", "registerId", "shiftId", "date", "paymentMethod", "customerId"] },
     { label: "@POS:Buyer", fields: ["buyerName", "buyerStreet", "buyerZip", "buyerCity"] },
     { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "rounding", "amountPaid", "cashGiven", "change", "paymentRef"] },
+    { label: "@POS:QrPayment", fields: ["vs", "payStatus", "paidDate"], visibleWhen: { field: "paymentMethod", in: ["qr"] } },
     { label: "@POS:Eet", fields: ["eetStatus", "eetPok", "eetMessage"] },
   ],
   numberSeq: { field: "receiptNum", seq: "POSRCPT" },
   defaultSort: { field: "receiptNum", dir: "desc" },
+  // párování QR plateb z výpisu podle VS
+  indexes: [["vs"]],
   lines: [{ object: "pos.receiptLine", field: "receiptId", label: "@TAX:Lines" }],
 });
 
@@ -305,7 +329,7 @@ export default defineModule({
   description: "@POS:ModuleDesc",
   icon: "Cart",
   dependsOn: ["inv", "gl", "tax", "prt"],
-  enums: [PosTemplate, PaymentMethod, ShiftStatus, EetStatus, BasketStatus],
+  enums: [PosTemplate, PaymentMethod, ReceiptPayStatus, ShiftStatus, EetStatus, BasketStatus],
   objects: [register, shift, receipt, receiptLine, box, basket, basketLine],
   menu: [
     { label: "@POS:Module", items: [{ href: "/kasa", label: "@POS:Terminal" }, { object: "pos.receipt" }, { object: "pos.shift" }, { object: "pos.basket" }] },
@@ -360,6 +384,18 @@ export default defineModule({
       TemplateCounter: "Pult s váhou",
       CashAccount: "Účet hotovosti",
       CardAccount: "Účet plateb kartou",
+      QrAccount: "Účet QR plateb",
+      QrBankAccount: "Bankovní účet pro QR platby",
+      QrPayment: "QR platba",
+      PayQr: "QR platba",
+      QrTotal: "QR platbou",
+      PayStatus: "Úhrada",
+      PayAwaiting: "Čeká na platbu",
+      PayPaid: "Zaplaceno",
+      PaidDate: "Zaplaceno dne",
+      Vs: "Variabilní symbol",
+      QrNoAccount: "Pro QR platbu chybí bankovní účet. Zadejte ho u pokladny nebo v Bance → Bankovní účty.",
+      QrAwaitingNote: "Čeká na platbu – naskenujte QR kód v bankovní aplikaci.",
       RoundingGain: "Účet zaokrouhlení (výnos)",
       RoundingLoss: "Účet zaokrouhlení (náklad)",
       RoundCash: "Hotovost zaokrouhlit na koruny",
@@ -573,6 +609,18 @@ export default defineModule({
       TemplateCounter: "Counter with scale",
       CashAccount: "Cash account",
       CardAccount: "Card payments account",
+      QrAccount: "QR payments account",
+      QrBankAccount: "Bank account for QR payments",
+      QrPayment: "QR payment",
+      PayQr: "QR payment",
+      QrTotal: "QR payment",
+      PayStatus: "Payment",
+      PayAwaiting: "Awaiting payment",
+      PayPaid: "Paid",
+      PaidDate: "Paid on",
+      Vs: "Variable symbol",
+      QrNoAccount: "No bank account for the QR payment. Set it on the register or in Bank → Bank accounts.",
+      QrAwaitingNote: "Awaiting payment – scan the QR code in your banking app.",
       RoundingGain: "Rounding account (gain)",
       RoundingLoss: "Rounding account (loss)",
       RoundCash: "Round cash to whole units",

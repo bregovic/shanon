@@ -34,7 +34,7 @@ export function fillText(text: string, data: PrintData, locale: string): string 
 }
 
 /** QR kód jako SVG cesta (synchronně, bez canvasu). */
-function QrSvg({ text, size }: { text: string; size: number }) {
+export function QrSvg({ text, size }: { text: string; size: number }) {
   if (!text) return null;
   const qr = QRCode.create(text, { errorCorrectionLevel: "M" });
   const n = qr.modules.size;

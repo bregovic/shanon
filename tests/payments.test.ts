@@ -130,7 +130,7 @@ describe("hromadný import výpisů", () => {
     await runAction(T, "bank.statement", String(st1a.id), "match", client);
     const l1 = (await rows(T, "bank.statementLine", { statementId: st1a.id }))[0];
     expect([l1.matchKind, l1.customerId]).toEqual(["customerAccount", cust.id]);
-    expect((await rows(T, "bank.matchStep")).map((x) => x.method)).toEqual(["vsInvoice", "vsAdvance", "counterPartner", "rules"]);
+    expect((await rows(T, "bank.matchStep")).map((x) => x.method)).toEqual(["vsInvoice", "vsAdvance", "vsPosReceipt", "counterPartner", "rules"]);
     // předkontace: výdaj „Poplatek“ bez VS → účet poplatků (výchozí předkontace POPL)
     const sts0 = await rows(T, "bank.statement", { bankAccountId: bank.id });
     const st3 = sts0.find((x) => x.statementNum === "003")!;
