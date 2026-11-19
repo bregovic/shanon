@@ -38,7 +38,7 @@ const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", gap: "12px" },
   file: { display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" },
   cols: { display: "flex", flexWrap: "wrap", gap: "6px" },
-  errors: { maxHeight: "260px", overflowY: "auto", border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium },
+  errors: { maxHeight: "260px", overflow: "auto", border: `1px solid ${tokens.colorNeutralStroke2}`, borderRadius: tokens.borderRadiusMedium },
 });
 
 type L = UiLabels["importer"];

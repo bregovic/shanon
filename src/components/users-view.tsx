@@ -249,7 +249,8 @@ export function UsersView({
           </MessageBar>
         )}
         <div className={s.card}>
-          <Table size="small">
+          {/* šířka sloupců podle obsahu; na úzké obrazovce se karta posouvá do strany (pevné rozvržení dávalo texty přes sebe) */}
+          <Table size="small" style={{ tableLayout: "auto", minWidth: 640 }}>
             <TableHeader>
               <TableRow>
                 <TableHeaderCell>{labels.name}</TableHeaderCell>
@@ -276,7 +277,7 @@ export function UsersView({
                       {u.name}
                     </Button>
                   </TableCell>
-                  <TableCell>{u.email}</TableCell>
+                  <TableCell style={{ whiteSpace: "nowrap" }}>{u.email}</TableCell>
                   <TableCell>
                     {u.superUser ? (
                       <Badge appearance="tint" color="brand">
@@ -392,22 +393,27 @@ export function UsersView({
                 )}
               </div>
             </DrawerBody>
-            <DrawerFooter style={{ flexWrap: "wrap" }}>
-              <Button onClick={() => setEdit(null)}>{labels.cancel}</Button>
-              <span style={{ flex: 1 }} />
-              {edit.id && users.find((u) => u.id === edit.id)?.invited && (
-                <Button disabled={busy} onClick={() => sendMail("invite")}>
-                  {labels.inviteAgain}
-                </Button>
-              )}
+            <DrawerFooter style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+              {/* pozvánka a reset hesla v samostatném řádku — na mobilu se tlačítka nerozsypou */}
               {edit.id && (
-                <Button disabled={busy} onClick={() => setConfirmReset(true)}>
-                  {labels.resetPassword}
-                </Button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {users.find((u) => u.id === edit.id)?.invited && (
+                    <Button disabled={busy} onClick={() => sendMail("invite")}>
+                      {labels.inviteAgain}
+                    </Button>
+                  )}
+                  <Button disabled={busy} onClick={() => setConfirmReset(true)}>
+                    {labels.resetPassword}
+                  </Button>
+                </div>
               )}
-              <Button appearance="primary" disabled={busy} onClick={save}>
-                {labels.save}
-              </Button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button onClick={() => setEdit(null)}>{labels.cancel}</Button>
+                <span style={{ flex: 1 }} />
+                <Button appearance="primary" disabled={busy} onClick={save}>
+                  {labels.save}
+                </Button>
+              </div>
             </DrawerFooter>
           </>
         )}
