@@ -164,3 +164,25 @@ Návod: Nápověda → E-shop."
 - Po zavírací hodině obchodu (Vyzvednutí do) se „Dnes, co nejdřív“ už nenabízí — nejbližší den je zítra."
 2026-11-18;fix;Vytěžování dokladů;Dar z vytěžení a přepnutí na Dar;;1754111;"- Potvrzení o daru / darovací smlouva se vytěží jako přijatý doklad typu **Dar**: bez čísla dokladu, účet 543100, bez DPH.
 - Změna typu přijatého dokladu na Dar převede řádky s výchozím účtem skupiny na účet darů (ručně zvolený účet zůstane)."
+2026-11-18;fix;Přihlášení;Zamčení účtu po neúspěšných pokusech;;1b22b19;"- Po 5 neúspěšných pokusech se přihlášení na chvíli zamkne; hláška řekne, za kolik minut to jde znovu.
+- Nové heslo nebo e-mail nastavený správcem zámek zruší."
+2026-11-19;feature;Workflow;Moje úkoly a úkoly z vytěžování;CR-097;7332a75;"- **Moje úkoly** v Přehledu: úkoly k dokladům a záznamům přiřazené vám, s termínem; řešitel dostane upozornění ve zvonečku.
+- Vytěžování: jistě přečtený a připravený doklad se zalistuje sám a vznikne úkol **Zkontrolovat**; nejistý nebo s výhradami → úkol **Doplnit údaje** pro toho, kdo doklad nahrál (portál → odpovědná osoba portálu).
+- Pole typu uživatel ve formulářích (výběr z uživatelů firmy, filtr „já“)."
+2026-11-19;feature;Správa systému;Uživatelé: pozvánka e-mailem, reset hesla, smazání;CR-099, CR-101;088ad8f;"- Nový uživatel dostane **pozvánku e-mailem** s odkazem na nastavení hesla (platí 7 dní); pozvánka jmenuje firmy, ke kterým má přístup.
+- **Resetovat heslo** u uživatele pošle odkaz na nové heslo (2 dny). Na přihlášení **Nemůžu se přihlásit** pošle žádost správci.
+- **Smazat uživatele** (ne sebe ani posledního superuživatele); jeho otevřené úkoly zůstanou nepřiřazené.
+- Na mobilu se seznam uživatelů posouvá do strany a texty se nepřekrývají.
+- Přísnější kontrola e-mailových adres."
+2026-11-19;feature;Testování a vývoj;Náměty a zpětná vazba;CR-101;088ad8f;"- Nová evidence **Náměty a zpětná vazba** (NAM-…); z námětu jde jedním tlačítkem vytvořit požadavek."
+2026-11-19;feature;Obecné;Kontrola před smazáním a hromadný tisk;CR-100;328f39c;"- **Smazat** nejdřív ukáže, co smazat půjde a kde jsou ostatní záznamy použité (doklad, řádek); smaže jen volné.
+- **Tisk** v seznamu vytiskne vybrané doklady najednou (tisková stránka nebo jedno PDF, až 100 dokladů).
+- Nepoužitá čísla souvislé řady jde smazat (Smazat vybraná čísla)."
+2026-11-19;feature;Odběratelé, Dodavatelé;Platební podmínky (splatnost);CR-103;420c3ae;"- Nový číselník **Platební podmínky** (Nastavení odběratelů i dodavatelů): Ihned, 14 dní, 30 dní, další si přidáte.
+- Na odběrateli, dodavateli i skupině se vybírá **Splatnost**; dosavadní počty dní se převedly samy.
+- Faktura a záloha nabídnou splatnost podle podmínky partnera, jinak jeho skupiny; bez podmínky je splatné v den vystavení."
+2026-11-19;feature;Pokladna;QR platba s QR kódem na účtence;CR-104;d54e954;"- Tlačítko **QR platba**: účtenka se vytiskne s QR kódem pro bankovní aplikaci a variabilním symbolem a je ve stavu **Čeká na platbu** (i na termotiskárně).
+- Peníze jdou na bankovní účet zadaný u pokladny, jinak na výchozí účet firmy; uzávěrka účtuje QR tržby zvlášť (účet QR plateb, výchozí 261), do EET se neposílají.
+- Bankovní výpis podle VS a částky spáruje platbu s účtenkou (Účtenka – QR platba) a po zaúčtování je účtenka **Zaplaceno**."
+2026-11-19;feature;Pokladna;Panel Váha a odběratel na účtence;CR-102;9840fe9;"- Panel **Váha** pro ověřenou váhu (Dialog 06): cena za kg jde do váhy, hmotnost a cena se převezmou z váhy beze změny; zatím se simulátorem, skutečná váha po dodání specifikace.
+- Odběratel bez evidence: jméno a adresu jde jen vytisknout na účtenku (doklad zůstává zjednodušený)."
