@@ -28,7 +28,7 @@ SYS-MODULES;Zapínání a vypínání modulů;Správa systému;fat;;Zapnutí s v
 QA;Testování a vývoj;Testování;fat;;Tato evidence: funkce, scénáře FAT/UAT, požadavky a chyby.
 INT-ISDOC;ISDOC – export a import faktur;Integrace;uat;;ISDOC 6.0.2 z vydané faktury, vložený do PDF; import .isdoc / .isdocx / PDF s ISDOC bez vytěžování.
 SYS-HELP;Nápověda k agendám;Správa systému;uat;;Návody krok za krokem (docs/help), stránka Nápověda, „?“ u modulů a formulářů, hledání Ctrl+K.
-INT-MAIL;Odesílání dokladů e-mailem;Integrace;uat;;Napojení pošty (SMTP, testovací schránka), Odeslaná pošta, Odeslat e-mailem na vydané faktuře a záloze (PDF s ISDOC).
+INT-MAIL;Odesílání dokladů e-mailem;Integrace;uat;;Napojení pošty (Systémová pošta Shanonu, SMTP, testovací schránka → uživateli), šablona e-mailu v Organizaci, Odeslaná pošta, Odeslat e-mailem na vydané faktuře, záloze a účtence (PDF s ISDOC), příznak Odesláno na.
 SYS-NOTICES;Upozornění (zvoneček);Správa systému;uat;;Zvoneček v hlavičce: chyby dávkových úloh, doklady ke kontrole, nespolehlivý plátce DPH, neodeslané tržby EET; přečtení po uživatelích.
 GL-JOURNAL-ENTRY;Rychlé pořizování deníku;Hlavní kniha;uat;;Číslo dokladu hned na řádku, datum z hlavičky / předchozího řádku, dorovnání nového řádku, klávesy Enter / šipky, zkratky data (d, d+1, 15, 1511), deníky po modulech.
 INT-PORTAL;Dodavatelský portál;Integrace;uat;;Veřejná stránka pro nahrání dokladů dodavateli, kontroly a limity, doklady ke zpracování.

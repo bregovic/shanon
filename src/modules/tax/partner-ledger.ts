@@ -294,6 +294,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     advanceId: { edt: refEdt(id("advance"), L("Advance")) },
     advanceAmount: { edt: Edts.Amount, label: "@TAX:AdvanceDeducted", readOnly: true },
     emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
+    emailedTo: { edt: Edts.Description, label: "@TAX:EmailedTo", readOnly: true },
   };
   const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType"] : []), partnerId, "taxGroupId", "postingProfileId", ...(sp.side === 1 ? ["pricesInclTax"] : []), "description", "orderId", "advanceId"];
   const invoice = defineObject({
@@ -308,7 +309,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     form: [
       { label: "@TAX:Header", fields: headerFields },
       { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs", ...(sp.side === 1 ? ["bankAccountId", "paymentMethodId"] : [])] },
-      { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "roundingAmount", "amountGross", "advanceAmount", "paidAmount", "status", "voucherId", ...(sp.side === 1 ? ["emailedAt"] : [])] },
+      { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "roundingAmount", "amountGross", "advanceAmount", "paidAmount", "status", "voucherId", ...(sp.side === 1 ? ["emailedAt", "emailedTo"] : [])] },
     ],
     numberSeq: { field: "invoiceNum", seq: sp.invoiceSeq },
     defaultSort: { field: "invoiceDate", dir: "desc" },

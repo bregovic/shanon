@@ -196,3 +196,30 @@ export function portalLinkMail(t: T, p: { link: string; minutes: number; compani
     footer: t("@INT:MailPortalLinkFooter"),
   });
 }
+
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * E-mail dokladu firmy (faktura, záloha, účtenka, objednávka z e-shopu): hlavička s názvem firmy, text ze šablony
+ * organizace (odstavce, odkazy jako text), kontakty organizace v patičce. Bez loga a obrázků z cizích adres —
+ * poštovní programy je blokují; doklad je v příloze.
+ */
+export function documentMailHtml(p: { company: string; text: string; contacts: string[]; note: string }): string {
+  const paras = p.text
+    .split(/\n{2,}/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => `<p style="margin:0 0 14px">${escHtml(x).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+  const contacts = p.contacts.filter(Boolean).map(escHtml).join(" &nbsp;·&nbsp; ");
+  return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml(p.company)}</title></head>
+<body style="margin:0;padding:0;background:${C.bg};font-family:Segoe UI,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};padding:24px 12px"><tr><td align="center">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid ${C.line};border-radius:10px;overflow:hidden">
+    <tr><td style="background:${C.brand};padding:18px 32px;font-size:20px;font-weight:700;color:#ffffff">${escHtml(p.company)}</td></tr>
+    <tr><td style="padding:24px 32px 8px;font-size:15px;line-height:1.6;color:${C.text}">${paras}</td></tr>
+    ${contacts ? `<tr><td style="padding:0 32px 20px"><div style="border-top:1px solid ${C.line};padding-top:12px;font-size:13px;line-height:1.6;color:${C.muted}">${contacts}</div></td></tr>` : ""}
+  </table>
+  <div style="max-width:600px;font-size:11px;color:${C.muted};padding:10px 4px">${escHtml(p.note)}</div>
+</td></tr></table></body></html>`;
+}

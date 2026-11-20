@@ -4,6 +4,7 @@
  * v rejstříku — a její provozovny. Jeden zdroj pravdy pro doklady, účtenky,
  * přiznání a e-shop. Název, IČO a DIČ se propisují do firmy (sys.company).
  */
+import { MAIL_DEFAULTS, MAIL_FIELDS } from "./mail-template";
 import { aresByIco, splitPersonName } from "@/modules/gab/ares";
 import { Edts, defineEdt, defineEnum, enumEdt } from "@/core/edt";
 import { UserError, defineModule, type DataApi, type ObjectHandlers, type ValidationErrors } from "@/core/module";
@@ -117,6 +118,14 @@ export const entity = defineObject({
     publicSlug: { edt: defineEdt({ id: "OrgPublicSlug", kind: "string", label: "@ORG:PublicSlug", maxLength: 40, pattern: /^[a-z0-9][a-z0-9-]{1,39}$/, patternMessage: "@ORG:PublicSlugHelp", transform: "lower" }) },
     // logo na tiskových sestavách (faktura, účtenka)
     logo: { edt: Str("OrgLogo", "@ORG:Logo", 36), image: true, readOnly: true },
+    // šablona e-mailu dokladů (src/modules/org/mail-template.ts): předmět a text s proměnnými, podpis
+    mailInvoiceSubject: { edt: Edts.Description, label: "@ORG:MailInvoiceSubject", help: "@ORG:MailVarsHelp" },
+    mailInvoiceBody: { edt: Edts.Notes, label: "@ORG:MailInvoiceBody" },
+    mailAdvanceSubject: { edt: Edts.Description, label: "@ORG:MailAdvanceSubject" },
+    mailAdvanceBody: { edt: Edts.Notes, label: "@ORG:MailAdvanceBody" },
+    mailReceiptSubject: { edt: Edts.Description, label: "@ORG:MailReceiptSubject" },
+    mailReceiptBody: { edt: Edts.Notes, label: "@ORG:MailReceiptBody" },
+    mailSignature: { edt: Edts.Notes, label: "@ORG:MailSignature", help: "@ORG:MailSignatureHelp" },
   },
   titleField: "legalName",
   list: ["legalName", "regNo", "vatId", "city", "email", "phone"],
@@ -131,6 +140,7 @@ export const entity = defineObject({
     { label: "@ORG:Contacts", fields: ["email", "phone", "web", "dataBoxId", "publicSlug"] },
     { label: "@ORG:Bank", fields: ["bankAccount", "iban", "bic"] },
     { label: "@ORG:Logo", fields: ["logo"] },
+    { label: "@ORG:MailTemplate", fields: ["mailInvoiceSubject", "mailInvoiceBody", "mailAdvanceSubject", "mailAdvanceBody", "mailReceiptSubject", "mailReceiptBody", "mailSignature"] },
   ],
 });
 
@@ -181,7 +191,19 @@ export async function orgOf(data: DataApi) {
 
 /** Výchozí záznam z údajů firmy (a daňových parametrů), aby organizace nebyla prázdná. */
 async function orgSetup(data: DataApi) {
-  if (!data.companyId || (await data.find("org.entity", {}, { take: 1 })).length) return;
+  if (!data.companyId) return;
+  const [have] = await data.find("org.entity", {}, { take: 1 });
+  if (have) {
+    // výchozí šablona e-mailu dokladů — jen prázdná pole (úpravy organizace zůstanou)
+    const fill: Record<string, string> = {};
+    for (const k of ["invoice", "advance", "receipt"] as const) {
+      if (!have[MAIL_FIELDS[k].subject]) fill[MAIL_FIELDS[k].subject] = MAIL_DEFAULTS[k].subject;
+      if (!have[MAIL_FIELDS[k].body]) fill[MAIL_FIELDS[k].body] = MAIL_DEFAULTS[k].body;
+    }
+    if (!have.mailSignature) fill.mailSignature = MAIL_DEFAULTS.signature;
+    if (Object.keys(fill).length) await data.update("org.entity", String(have.id), fill);
+    return;
+  }
   const c = await data.get("sys.company", data.companyId);
   if (!c) return;
   let tp: Record<string, unknown> | undefined;
@@ -191,6 +213,13 @@ async function orgSetup(data: DataApi) {
     tp = undefined; // DPH není zapnuté
   }
   await data.create("org.entity", {
+    mailInvoiceSubject: MAIL_DEFAULTS.invoice.subject,
+    mailInvoiceBody: MAIL_DEFAULTS.invoice.body,
+    mailAdvanceSubject: MAIL_DEFAULTS.advance.subject,
+    mailAdvanceBody: MAIL_DEFAULTS.advance.body,
+    mailReceiptSubject: MAIL_DEFAULTS.receipt.subject,
+    mailReceiptBody: MAIL_DEFAULTS.receipt.body,
+    mailSignature: MAIL_DEFAULTS.signature,
     legalName: c.name,
     legalForm: tp?.subjectType === "F" ? "natural" : "legal",
     firstName: tp?.firstName ?? null,
@@ -294,6 +323,16 @@ export default defineModule({
   labels: {
     cs: {
       Logo: "Logo",
+      MailTemplate: "Šablona e-mailu dokladů",
+      MailInvoiceSubject: "Faktura – předmět",
+      MailInvoiceBody: "Faktura – text",
+      MailAdvanceSubject: "Zálohová faktura – předmět",
+      MailAdvanceBody: "Zálohová faktura – text",
+      MailReceiptSubject: "Účtenka – předmět",
+      MailReceiptBody: "Účtenka – text",
+      MailSignature: "Podpis",
+      MailVarsHelp: "Proměnné: {num} číslo, {amount} částka, {currency} měna, {due} splatnost, {company} firma, {customer} odběratel.",
+      MailSignatureHelp: "Pod každým e-mailem; kontakty organizace (adresa, telefon, web) se doplní samy.",
       CompanyExists: "Firma se stejným IČO / DIČ už existuje.",
       CompanyLookup: "Založit firmu podle IČO / DIČ",
       CompanyLookupDesc: "Nová účtovaná firma z ARES (české IČO) nebo VIES (zahraniční DIČ): údaje organizace se sídlem a výchozí nastavení zapnutých modulů (účty, řady, DPH…). Kód firmy = zkratka z názvu (4 znaky, jedinečná), lze změnit.",
@@ -355,6 +394,16 @@ export default defineModule({
     },
     en: {
       Logo: "Logo",
+      MailTemplate: "Document e-mail template",
+      MailInvoiceSubject: "Invoice – subject",
+      MailInvoiceBody: "Invoice – text",
+      MailAdvanceSubject: "Advance invoice – subject",
+      MailAdvanceBody: "Advance invoice – text",
+      MailReceiptSubject: "Receipt – subject",
+      MailReceiptBody: "Receipt – text",
+      MailSignature: "Signature",
+      MailVarsHelp: "Variables: {num} number, {amount} amount, {currency} currency, {due} due date, {company} company, {customer} customer.",
+      MailSignatureHelp: "Below every e-mail; the organization's contacts (address, phone, web) are added automatically.",
       CompanyExists: "A company with the same ID / VAT ID already exists.",
       CompanyLookup: "Create company by ID / VAT ID",
       CompanyLookupDesc: "A new accounting company from ARES (Czech ID) or VIES (foreign VAT ID): organization details with registered address and default setup of enabled modules (accounts, sequences, VAT…). Company code = abbreviation of the name (4 characters, unique), can be changed.",

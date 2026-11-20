@@ -14,6 +14,7 @@ const ACTIONS: Record<string, () => Promise<OutsideAction>> = {
   "int.document:extract": async () => (await import("./doc-import")).extractDocument,
   "ar.invoice:email": async () => (await import("./mail")).invoiceMailDraft,
   "ar.advance:email": async () => (await import("./mail")).advanceMailDraft,
+  "pos.receipt:email": async () => (await import("./mail")).receiptMailDraft,
   "int.mail:send": async () => (await import("./mail")).sendMail,
   // pozvánka do aplikace Portál (systémová pošta)
   "hr.employee:invite": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./portal-app")).inviteToPortal(ctx, "hr.employee", id, client),

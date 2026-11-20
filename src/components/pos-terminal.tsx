@@ -872,7 +872,8 @@ export function PosTerminal(p: {
     setMailState(null);
     const r = await posMailAction(kind, id, mailTo);
     setBusy(false);
-    setMailState(r.ok ? { ok: true, text: `${L.EmailSent} ${mailTo}` } : { ok: false, text: r.message });
+    // testovací prostředí: zákazníkovi nic neodešlo, zpráva šla přihlášenému
+    setMailState(r.ok ? { ok: true, text: r.data?.test ? (L.EmailSentTest ?? "").replace("{to}", r.data.testTo ?? "—") : `${L.EmailSent} ${mailTo}` } : { ok: false, text: r.message });
   };
 
   const cancelCard = async () => {

@@ -71,6 +71,7 @@ export const Driver = defineEnum({
     { value: "dphreg", label: "@INT:DrvDphreg" },
     { value: "openai", label: "@INT:DrvOpenai" },
     { value: "openaiTest", label: "@INT:DrvOpenaiTest" },
+    { value: "system", label: "@INT:DrvSystemMail" },
     { value: "smtp", label: "@INT:DrvSmtp" },
     { value: "mailTest", label: "@INT:DrvMailTest" },
   ],
@@ -580,8 +581,15 @@ export const documentLine = defineObject({
   defaultSort: { field: "lineNum", dir: "asc" },
 });
 
-/** Výchozí datové služby firmy (ARES, ČNB, ECB) — veřejné, bez klíčů. */
+/** Výchozí datové služby firmy (ARES, ČNB, ECB) — veřejné, bez klíčů; pošta dokladů přes platformu. */
 async function intSetup(data: DataApi) {
+  // pošta dokladů: Systémová pošta Shanonu (jméno odesílatele = firma, odpovědi na e-mail organizace) — jen firmě
+  // bez vlastního napojení pošty; běží-li testovací prostředí, je pozastavená jako ostatní ostrá napojení
+  const mails = await data.find("int.connection", { kind: "mail" }, { take: 50 });
+  if (!mails.some((c) => !String(c.code).startsWith("TEST-"))) {
+    const testOn = mails.some((c) => String(c.code).startsWith("TEST-") && c.active);
+    await data.create("int.connection", { code: "POSTA", name: "Pošta dokladů (Shanon)", kind: "mail", driver: "system", active: !testOn, pausedByTest: testOn });
+  }
   for (const [code, driver, name] of [
     ["ARES", "ares", "ARES – registr subjektů"],
     ["CNB", "cnb", "Kurzy ČNB"],
@@ -796,6 +804,12 @@ export default defineModule({
       PortalErrKind: "Vyberte druh dokladu.",
       PortalErrEmail: "E-mail nemá správný tvar.",
       DrvSmtp: "SMTP server",
+      DrvSystemMail: "Systémová pošta Shanonu",
+      MailSystemOff: "Systémová pošta není na serveru nastavená (RESEND_API_KEY). Obraťte se na správce Shanonu.",
+      MailFooterNote: "E-mail od {company}, odeslaný ze systému Shanon. Na zprávu můžete odpovědět.",
+      MailTestFor: "Testovací prostředí — zpráva byla určena pro: {to}. Příjemci nic neodešlo.",
+      MailTestSentTo: "Testovací prostředí: odesláno na e-mail uživatele {to} místo příjemce.",
+      MailTestFlag: "{user} (test místo {to})",
       DrvMailTest: "Testovací schránka (neodesílá)",
       MailSettings: "Pošta",
       SmtpHost: "Server SMTP",
@@ -1255,6 +1269,12 @@ export default defineModule({
       PortalErrKind: "Choose the document type.",
       PortalErrEmail: "The e-mail address is not valid.",
       DrvSmtp: "SMTP server",
+      DrvSystemMail: "Shanon system mail",
+      MailSystemOff: "System mail is not configured on the server (RESEND_API_KEY). Contact the Shanon administrator.",
+      MailFooterNote: "E-mail from {company}, sent from Shanon. You can reply to this message.",
+      MailTestFor: "Test environment — the message was meant for: {to}. Nothing was sent to the recipient.",
+      MailTestSentTo: "Test environment: sent to the user's e-mail {to} instead of the recipient.",
+      MailTestFlag: "{user} (test instead of {to})",
       DrvMailTest: "Test mailbox (does not send)",
       MailSettings: "Mail",
       SmtpHost: "SMTP server",

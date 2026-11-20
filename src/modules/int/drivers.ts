@@ -41,7 +41,7 @@ import {
 
 export const DRIVERS: Record<string, string[]> = {
   ocr: ["openai", "openaiTest"],
-  mail: ["smtp", "mailTest"],
+  mail: ["system", "smtp", "mailTest"],
   eet: ["eet2", "eetSimulator"],
   printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator", "comgate", "gatewaySim"],

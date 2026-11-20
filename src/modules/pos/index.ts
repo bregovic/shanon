@@ -238,11 +238,14 @@ export const receipt = defineObject({
     eetStatus: { edt: enumEdt(EetStatus) },
     eetPok: { edt: Edts.Description, label: "@POS:EetPok" },
     eetMessage: { edt: Edts.Description, label: "@POS:EetMessage" },
+    /** odesláno e-mailem (kasa, Odeslat e-mailem): kdy a komu */
+    emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
+    emailedTo: { edt: Edts.Description, label: "@TAX:EmailedTo", readOnly: true },
   },
   titleField: "receiptNum",
-  list: ["receiptNum", "date", "registerId", "paymentMethod", "payStatus", "customerId", "amountNet", "taxAmount", "amountPaid", "eetStatus"],
+  list: ["receiptNum", "date", "registerId", "paymentMethod", "payStatus", "customerId", "amountNet", "taxAmount", "amountPaid", "eetStatus", "emailedAt"],
   form: [
-    { label: "@SYS:General", fields: ["receiptNum", "registerId", "shiftId", "date", "paymentMethod", "customerId"] },
+    { label: "@SYS:General", fields: ["receiptNum", "registerId", "shiftId", "date", "paymentMethod", "customerId", "emailedAt", "emailedTo"] },
     { label: "@POS:Buyer", fields: ["buyerName", "buyerStreet", "buyerZip", "buyerCity"] },
     { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "rounding", "amountPaid", "cashGiven", "change", "paymentRef"] },
     { label: "@POS:QrPayment", fields: ["vs", "payStatus", "paidDate"], visibleWhen: { field: "paymentMethod", in: ["qr"] } },
@@ -250,6 +253,8 @@ export const receipt = defineObject({
   ],
   numberSeq: { field: "receiptNum", seq: "POSRCPT" },
   defaultSort: { field: "receiptNum", dir: "desc" },
+  // dodatečně poslat účtenku e-mailem (koncept s PDF v Odeslané poště, příjemce z odběratele nebo ručně)
+  actions: [{ id: "email", label: "@INT:SendByEmail", outside: true, module: "int", group: "print" }],
   // párování QR plateb z výpisu podle VS
   indexes: [["vs"]],
   lines: [{ object: "pos.receiptLine", field: "receiptId", label: "@TAX:Lines" }],
@@ -437,6 +442,7 @@ export default defineModule({
       Email: "E-mail",
       SendEmail: "Odeslat e-mailem",
       EmailSent: "Odesláno na",
+      EmailSentTest: "Testovací prostředí: e-mail šel na váš e-mail {to}, zákazníkovi ne.",
       CustomerRequired: "Pro prodej na fakturu vyberte odběratele.",
       Weigh: "Zvážit",
       ScaleGroup: "Vážení",
@@ -662,6 +668,7 @@ export default defineModule({
       Email: "E-mail",
       SendEmail: "Send by e-mail",
       EmailSent: "Sent to",
+      EmailSentTest: "Test environment: the e-mail went to your address {to}, not to the customer.",
       CustomerRequired: "Select a customer to sell on invoice.",
       Weigh: "Weigh",
       ScaleGroup: "Weighing",

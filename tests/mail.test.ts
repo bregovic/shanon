@@ -90,4 +90,63 @@ describe("pošta", () => {
     expect((await getRecord(T, "int.mail", out3!.open!.id, client))!.status).toBe("draft");
     vi.unstubAllGlobals();
   }, 120_000);
+
+  it("Systémová pošta Shanonu: šablona organizace, HTML, odpovědi na firmu, příloha, příznak na účtence; testovací prostředí → uživateli", async () => {
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    vi.stubGlobal("fetch", async (url: string, init?: { body?: string }) => {
+      if (String(url).includes("api.resend.com")) {
+        calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? "{}")) });
+        return new Response(JSON.stringify({ id: `re_${calls.length}` }), { status: 200 });
+      }
+      return new Response("{}", { status: 404 });
+    });
+    const key = process.env.RESEND_API_KEY;
+    process.env.RESEND_API_KEY = "re_test";
+    try {
+      const T = (await provisionTenant(client, { code: `t-mail2-${run}`, name: "MAIL2", adminEmail: `mail2-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "int", "org", "pos"], company: { code: "M", name: "Uzeniny Vzor" } })).ctx;
+      // výchozí nastavení: napojení POSTA (Systémová pošta Shanonu) a šablona e-mailu v organizaci
+      const [posta] = (await listRecords(T, "int.connection", { filter: { kind: "mail" } }, client)).rows;
+      expect([posta.code, posta.driver, posta.active]).toEqual(["POSTA", "system", true]);
+      const [org] = (await listRecords(T, "org.entity", {}, client)).rows;
+      expect(String(org.mailInvoiceSubject)).toBe("Faktura {num} – {company}");
+      await saveRecord(T, "org.entity", String(org.id), { legalName: "Uzeniny Vzor s.r.o.", email: "obchod@vzor.test", phone: "777 111 222", mailReceiptSubject: "Vaše účtenka {num} od {company}" }, undefined, client);
+
+      const { sendDocumentNow } = await import("@/server/mail");
+      const [reg] = (await listRecords(T, "pos.register", {}, client)).rows;
+      const regId = reg ? String(reg.id) : String((await saveRecord(T, "pos.register", null, { code: "K1", name: "Kasa" }, undefined, client)).id);
+      const g = (await listRecords(T, "inv.itemGroup", {}, client)).rows[0];
+      const u = (await listRecords(T, "inv.unit", {}, client)).rows[0];
+      const item = await saveRecord(T, "inv.item", null, { itemNum: "K", name: "Klobása", groupId: g.id, unitId: u.id, salesPrice: "50", priceInclTax: true }, undefined, client);
+      await saveRecord(T, "pos.shift", null, { registerId: regId }, undefined, client);
+      const { sell } = await import("@/modules/pos/sale");
+      const { inTenant } = await import("@/server/data");
+      const r = await inTenant(T, (s) => sell(s.sys().api(), { registerId: regId, payment: "cash", lines: [{ itemId: String(item.id), qty: "2" }] }), client);
+
+      const res = await sendDocumentNow(T, "pos.receipt", String(r.id), "zakaznik@test.local", client);
+      expect([res.test, res.to]).toEqual([false, ["zakaznik@test.local"]]);
+      const b = calls.at(-1)!.body as { from: string; to: string[]; subject: string; reply_to: string; html: string; text: string; attachments: { filename: string; content: string }[] };
+      expect(b.from).toBe("Uzeniny Vzor s.r.o. <shanon@hollyhop.cz>");
+      expect([b.to, b.reply_to, b.subject]).toEqual([["zakaznik@test.local"], "obchod@vzor.test", `Vaše účtenka ${r.receiptNum} od Uzeniny Vzor s.r.o.`]);
+      expect(b.html).toContain("Uzeniny Vzor s.r.o.");
+      expect(b.html).toContain("777 111 222");
+      expect(b.text).toContain("děkujeme za váš nákup");
+      expect(Buffer.from(b.attachments[0].content, "base64").subarray(0, 5).toString()).toBe("%PDF-");
+      const rc = (await getRecord(T, "pos.receipt", String(r.id), client))!;
+      expect([!!rc.emailedAt, rc.emailedTo]).toEqual([true, "zakaznik@test.local"]);
+
+      // testovací prostředí: TEST-MAIL pošle zprávu přihlášenému uživateli, příjemce nic nedostane
+      const { enableTestEnv } = await import("@/modules/int/test-env");
+      await inTenant(T, (s) => enableTestEnv(s.sys().api(), (x) => x, false), client);
+      const res2 = await sendDocumentNow(T, "pos.receipt", String(r.id), "zakaznik@test.local", client);
+      expect([res2.test, res2.testTo]).toEqual([true, `mail2-${run}@test.local`]);
+      const b2 = calls.at(-1)!.body as { to: string[]; subject: string; text: string };
+      expect([b2.to, b2.subject.startsWith("[TEST] ")]).toEqual([[`mail2-${run}@test.local`], true]);
+      expect(b2.text).toContain("zakaznik@test.local");
+      expect(String((await getRecord(T, "pos.receipt", String(r.id), client))!.emailedTo)).toContain("test");
+    } finally {
+      if (key === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = key;
+      vi.unstubAllGlobals();
+    }
+  }, 120_000);
 });

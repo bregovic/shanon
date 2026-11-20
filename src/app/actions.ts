@@ -592,15 +592,15 @@ export async function posInvoiceAction(input: SaleInput): Promise<ActionResult<{
 }
 
 /** Odeslat účtenku nebo fakturu z pokladny e-mailem (PDF, napojení pošty). */
-export async function posMailAction(kind: "receipt" | "invoice", id: string, to: string): Promise<ActionResult> {
+export async function posMailAction(kind: "receipt" | "invoice", id: string, to: string): Promise<ActionResult<{ test: boolean; testTo: string | null }>> {
   const s = await requireSession();
   try {
     assertCan(s.ctx.perms, "pos.receipt", "write");
     if (!s.ctx.modules.has("int")) throw new UserError("@INT:MailNoConnection");
     const email = String(to ?? "").trim();
     if (!isEmail(email)) throw new UserError("@SYS:InvalidEmail");
-    await sendDocumentNow(s.ctx, kind === "invoice" ? "ar.invoice" : "pos.receipt", String(id), email);
-    return { ok: true, data: undefined };
+    const sent = await sendDocumentNow(s.ctx, kind === "invoice" ? "ar.invoice" : "pos.receipt", String(id), email);
+    return { ok: true, data: { test: sent.test, testTo: sent.testTo } };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

@@ -76,3 +76,63 @@ export async function sendSystemMail(m: SystemMail): Promise<boolean> {
   await t.sendMail({ from: from(), to: m.to, replyTo: m.replyTo, subject: m.subject, text: m.text, html: m.html });
   return true;
 }
+
+export interface PlatformMail {
+  to: string[];
+  cc?: string[];
+  subject: string;
+  text: string;
+  html?: string;
+  /** jméno odesílatele (firma); adresa je vždy adresa platformy (ověřená doména) */
+  fromName?: string;
+  /** kam jdou odpovědi (e-mail firmy) */
+  replyTo?: string;
+  attachments?: { filename: string; content: Buffer; contentType?: string }[];
+}
+
+/**
+ * Pošta dokladů firmy přes platformu (napojení pošty s ovladačem „Systémová pošta Shanonu“): odesílá adresa
+ * platformy se jménem firmy, odpovědi na e-mail firmy. Vrací id zprávy; bez nastavené pošty jen log (vývoj, testy).
+ */
+export async function sendPlatformMail(m: PlatformMail): Promise<string> {
+  const address = fromAddress();
+  const sender = m.fromName ? `${m.fromName.replace(/[<>"]/g, "").slice(0, 80)} <${address}>` : from();
+  const key = process.env.RESEND_API_KEY;
+  if (key) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: sender,
+        to: m.to,
+        ...(m.cc?.length ? { cc: m.cc } : {}),
+        subject: m.subject,
+        text: m.text,
+        ...(m.html ? { html: m.html } : {}),
+        ...(m.replyTo ? { reply_to: m.replyTo } : {}),
+        ...(m.attachments?.length ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) } : {}),
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const j = (await res.json().catch(() => ({}))) as { id?: string };
+    return String(j.id ?? `resend-${Date.now()}`);
+  }
+  if (!process.env.SHANON_SMTP_HOST) {
+    console.log(`[platform-mail] (neodesláno, chybí RESEND_API_KEY i SHANON_SMTP_HOST) → ${m.to.join(", ")}: ${m.subject}`);
+    return `local-${Date.now()}@shanon.local`;
+  }
+  const port = Number(process.env.SHANON_SMTP_PORT || 587);
+  const t = nodemailer.createTransport({
+    host: process.env.SHANON_SMTP_HOST,
+    port,
+    secure: port === 465,
+    requireTLS: port !== 465,
+    auth: process.env.SHANON_SMTP_USER ? { user: process.env.SHANON_SMTP_USER, pass: process.env.SHANON_SMTP_PASS ?? "" } : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
+  });
+  const info = await t.sendMail({ from: sender, to: m.to, cc: m.cc, replyTo: m.replyTo, subject: m.subject, text: m.text, html: m.html, attachments: m.attachments });
+  return String(info.messageId ?? "");
+}
