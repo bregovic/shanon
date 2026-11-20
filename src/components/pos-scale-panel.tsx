@@ -7,9 +7,20 @@
  */
 import { beep } from "@/lib/beep";
 import { useEffect, useRef, useState } from "react";
-import { Badge, Button, Spinner, makeStyles, tokens } from "@fluentui/react-components";
+import {
+  Badge,
+  Button,
+  Spinner,
+  makeStyles,
+  tokens,
+} from "@fluentui/react-components";
 import { Scales24Regular } from "@fluentui/react-icons";
-import { ScaleDriver, WebSerialTransport, type ScaleState, type ScaleWeighing } from "@/lib/scale-driver";
+import {
+  ScaleDriver,
+  WebSerialTransport,
+  type ScaleState,
+  type ScaleWeighing,
+} from "@/lib/scale-driver";
 import { SimScaleTransport } from "@/lib/scale-sim";
 import { connectScalePort, scalePort } from "@/lib/scale";
 
@@ -25,17 +36,57 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorBrandBackground2,
   },
-  head: { display: "flex", alignItems: "center", gap: "6px", fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, minWidth: 0 },
-  product: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  unit: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
+  head: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase300,
+    minWidth: 0,
+  },
+  product: {
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  unit: {
+    color: tokens.colorNeutralForeground3,
+    fontWeight: tokens.fontWeightRegular,
+  },
   nums: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" },
-  big: { fontSize: "26px", lineHeight: "32px", fontWeight: tokens.fontWeightBold, fontVariantNumeric: "tabular-nums", textAlign: "right" },
+  big: {
+    fontSize: "26px",
+    lineHeight: "32px",
+    fontWeight: tokens.fontWeightBold,
+    fontVariantNumeric: "tabular-nums",
+    textAlign: "right",
+  },
   dim: { color: tokens.colorNeutralForegroundDisabled },
-  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, textAlign: "right" },
+  label: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    textAlign: "right",
+  },
   msg: { minHeight: "20px", fontSize: tokens.fontSizeBase300 },
-  problem: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
-  stable: { color: tokens.colorPaletteGreenForeground1, fontWeight: tokens.fontWeightSemibold, display: "inline-flex", alignItems: "center", gap: "6px" },
-  dot: { width: "10px", height: "10px", borderRadius: "50%", backgroundColor: tokens.colorPaletteGreenBackground3 },
+  problem: {
+    color: tokens.colorPaletteRedForeground1,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  stable: {
+    color: tokens.colorPaletteGreenForeground1,
+    fontWeight: tokens.fontWeightSemibold,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  dot: {
+    width: "10px",
+    height: "10px",
+    borderRadius: "50%",
+    backgroundColor: tokens.colorPaletteGreenBackground3,
+  },
   actions: { display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px" },
   addBtn: { minHeight: "44px", fontSize: tokens.fontSizeBase400 },
 });
@@ -64,7 +115,11 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
     const d = new ScaleDriver(
       cfg.driver === "scaleSim"
         ? new SimScaleTransport()
-        : new WebSerialTransport(() => scalePort(), cfg.baudRate || 9600, { dataBits: cfg.dataBits ?? 8, parity: cfg.parity ?? "none", stopBits: cfg.stopBits ?? 1 }),
+        : new WebSerialTransport(() => scalePort(), cfg.baudRate || 9600, {
+            dataBits: cfg.dataBits ?? 8,
+            parity: cfg.parity ?? "none",
+            stopBits: cfg.stopBits ?? 1,
+          }),
     );
     d.confirmMode = !!cfg.confirm;
     const off = d.subscribe(setState);
@@ -75,12 +130,20 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
       off();
       void d.dispose();
     };
-  }, [cfg?.driver, cfg?.baudRate, cfg?.dataBits, cfg?.parity, cfg?.stopBits, cfg?.confirm]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    cfg?.driver,
+    cfg?.baudRate,
+    cfg?.dataBits,
+    cfg?.parity,
+    cfg?.stopBits,
+    cfg?.confirm,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
   return { driver, state };
 }
 
 /** Je na váze nepřidaná položka? (upozornění při placení) */
-export const scalePending = (s: ScaleState | null) => !!s?.product && (s.phase === "stable" || s.phase === "weighing");
+export const scalePending = (s: ScaleState | null) =>
+  !!s?.product && (s.phase === "stable" || s.phase === "weighing");
 
 export function ScalePanel({
   driver,
@@ -181,7 +244,10 @@ export function ScalePanel({
             : null
       : phase === "ready"
         ? state.lastAdded
-          ? L.ScaleAdded.replace("{what}", `${state.lastAdded.name} · ${state.lastAdded.weight.replace(".", ",")} kg · ${fmtMoney(state.lastAdded.total)}`)
+          ? L.ScaleAdded.replace(
+              "{what}",
+              `${state.lastAdded.name} · ${state.lastAdded.weight.replace(".", ",")} kg · ${fmtMoney(state.lastAdded.total)}`,
+            )
           : L.ScalePick
         : phase === "sending"
           ? L.ScaleSending
@@ -213,7 +279,10 @@ export function ScalePanel({
         <span className={st.product}>
           {product ? (
             <>
-              {product.name} <span className={st.unit}>· {fmtMoney(product.unitPrice)} / kg</span>
+              {product.name}{" "}
+              <span className={st.unit}>
+                · {fmtMoney(product.unitPrice)} / kg
+              </span>
             </>
           ) : (
             <span className={st.unit}>{L.ScalePick}</span>
@@ -221,22 +290,42 @@ export function ScalePanel({
         </span>
         {conn}
       </div>
-      <div className={st.nums}>
-        <div>
-          <div className={st.label}>{L.Weight}</div>
-          <div className={`${st.big} ${stable ? "" : st.dim}`} data-testid="scale-weight">
-            {weight.replace(".", ",")} kg
+      {/* vážení na Hotovo: do zvážení údaje jen na displeji váhy (pokladna se váhy neptá) */}
+      {confirmMode &&
+      product &&
+      (phase === "waiting" || phase === "sending") ? (
+        <div className={st.label} style={{ textAlign: "left" }}>
+          {L.ScaleOnDisplay}
+        </div>
+      ) : (
+        <div className={st.nums}>
+          <div>
+            <div className={st.label}>{L.Weight}</div>
+            <div
+              className={`${st.big} ${stable ? "" : st.dim}`}
+              data-testid="scale-weight"
+            >
+              {weight.replace(".", ",")} kg
+            </div>
+          </div>
+          <div>
+            <div className={st.label}>{L.ScaleTotal}</div>
+            <div
+              className={`${st.big} ${stable ? "" : st.dim}`}
+              data-testid="scale-total"
+            >
+              {total ? fmtMoney(total) : "—"}
+            </div>
           </div>
         </div>
-        <div>
-          <div className={st.label}>{L.ScaleTotal}</div>
-          <div className={`${st.big} ${stable ? "" : st.dim}`} data-testid="scale-total">
-            {total ? fmtMoney(total) : "—"}
-          </div>
-        </div>
-      </div>
+      )}
       <div className={st.msg}>
-        {phase === "sending" && <Spinner size="tiny" style={{ display: "inline-flex", marginRight: 6 }} />}
+        {phase === "sending" && (
+          <Spinner
+            size="tiny"
+            style={{ display: "inline-flex", marginRight: 6 }}
+          />
+        )}
         {problemText && phase !== "weighing" ? (
           <span className={st.problem}>
             {problemText}
@@ -253,19 +342,37 @@ export function ScalePanel({
       </div>
       <div className={st.actions}>
         {phase === "disconnected" ? (
-          <Button appearance="primary" className={st.addBtn} onClick={() => void connectScalePort().then(() => driver.connect())}>
+          <Button
+            appearance="primary"
+            className={st.addBtn}
+            onClick={() => void connectScalePort().then(() => driver.connect())}
+          >
             {L.ScaleConnect}
           </Button>
         ) : phase === "error" && problem === "noResponse" ? (
-          <Button appearance="primary" className={st.addBtn} onClick={() => void driver.retry()}>
+          <Button
+            appearance="primary"
+            className={st.addBtn}
+            onClick={() => void driver.retry()}
+          >
             {L.ScaleRetry}
           </Button>
         ) : confirmMode && product && phase !== "stable" ? (
-          <Button appearance="primary" className={st.addBtn} disabled={phase !== "waiting"} onClick={() => driver.confirm()}>
+          <Button
+            appearance="primary"
+            className={st.addBtn}
+            disabled={phase !== "waiting"}
+            onClick={() => driver.confirm()}
+          >
             {L.ScaleConfirm}
           </Button>
         ) : (
-          <Button appearance="primary" className={st.addBtn} disabled={!stable} onClick={() => reading && (beepOn && beep(), onAdd(reading))}>
+          <Button
+            appearance="primary"
+            className={st.addBtn}
+            disabled={!stable}
+            onClick={() => reading && (beepOn && beep(), onAdd(reading))}
+          >
             {L.ScaleAdd}
           </Button>
         )}
