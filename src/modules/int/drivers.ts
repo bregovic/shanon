@@ -89,15 +89,18 @@ export async function connectionsFor(
   data: DataApi,
   registerId: string,
 ): Promise<Partial<Record<"eet" | "printer" | "payment" | "scale", RecordData>>> {
+  const reg = await data.get("pos.register", registerId).catch(() => null);
   const all = (
     await data.find("int.connection", { active: true }, { take: 200 })
-  ).filter((c) => !c.registerId || c.registerId === registerId);
+  ).filter((c) => !c.registerId || c.registerId === registerId || c.id === reg?.scaleConnId || c.id === reg?.printerConnId);
   const out: Partial<Record<"eet" | "printer" | "payment" | "scale", RecordData>> = {};
   for (const kind of ["eet", "printer", "payment", "scale"] as const) {
     // brána Comgate jen s volbou Platba QR na pokladně (jinak slouží e-shopu)
     const gateway = (c: RecordData) => c.driver === "comgate" || c.driver === "gatewaySim";
     const list = all.filter((c) => c.kind === kind && (!gateway(c) || c.posQr));
-    const pick = list.find((c) => c.registerId === registerId) ?? list.find(gateway) ?? list[0];
+    // váha a tiskárna: napojení vybrané na pokladně má přednost
+    const chosen = kind === "scale" ? reg?.scaleConnId : kind === "printer" ? reg?.printerConnId : null;
+    const pick = (chosen ? list.find((c) => c.id === chosen) : undefined) ?? list.find((c) => c.registerId === registerId) ?? list.find(gateway) ?? list[0];
     if (pick) out[kind] = pick;
   }
   return out;

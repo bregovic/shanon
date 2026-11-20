@@ -76,8 +76,11 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
   return { driver, state };
 }
 
-/** Je na váze nepřidaná položka? (upozornění při placení) */
-export const scalePending = (s: ScaleState | null) => !!s?.product && (s.phase === "stable" || s.phase === "weighing");
+/** Zkušební vážení na pokladně (ne zboží z nabídky). */
+export const SCALE_TEST_ID = "__scale-test";
+
+/** Je na váze nepřidaná položka? (upozornění při placení; zkušební vážení ne) */
+export const scalePending = (s: ScaleState | null) => !!s?.product && s.product.id !== SCALE_TEST_ID && (s.phase === "stable" || s.phase === "weighing");
 
 export function ScalePanel({
   driver,
@@ -100,13 +103,15 @@ export function ScalePanel({
 }) {
   const st = useStyles();
   const { phase, product, reading, problem } = state;
+  // zkušební vážení (100 Kč/kg): stejný průběh jako prodej, do nákupu se nic nepřidá
+  const test = product?.id === SCALE_TEST_ID;
   const stable = phase === "stable" && !!reading;
 
   // volba napojení: přidat samo po N s ustálení (výchozí vypnuto)
   const [left, setLeft] = useState<number | null>(null);
   const added = useRef<string | null>(null);
   useEffect(() => {
-    if (!stable || !autoAddSec || added.current === reading!.raw) return;
+    if (!stable || !autoAddSec || test || added.current === reading!.raw) return;
     let n = autoAddSec;
     const t = setInterval(() => {
       n -= 1;
@@ -124,7 +129,7 @@ export function ScalePanel({
       clearInterval(t);
       setLeft(null);
     };
-  }, [stable, reading, autoAddSec, onAdd, beepOn]);
+  }, [stable, reading, autoAddSec, onAdd, beepOn, test]);
 
   const conn =
     phase === "disconnected" ? (
@@ -241,6 +246,14 @@ export function ScalePanel({
         ) : phase === "error" && problem === "noResponse" ? (
           <Button appearance="primary" className={st.addBtn} onClick={() => void driver.retry()}>
             {L.ScaleRetry}
+          </Button>
+        ) : test ? (
+          <Button appearance="primary" className={st.addBtn} disabled={!stable} onClick={() => (beepOn && beep(), void driver.clear(true))}>
+            {L.ScaleTestDone}
+          </Button>
+        ) : phase === "ready" && !product ? (
+          <Button className={st.addBtn} onClick={() => void driver.setUnitPrice({ id: SCALE_TEST_ID, name: L.ScaleTestItem, unitPrice: "100.00" })}>
+            {L.ScaleTestStart}
           </Button>
         ) : (
           <Button appearance="primary" className={st.addBtn} disabled={!stable} onClick={() => reading && (beepOn && beep(), onAdd(reading))}>

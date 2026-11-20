@@ -60,7 +60,7 @@ interface Hit {
   probe: string;
   bytes: number[];
   /** rozpoznaný protokol a hmotnost (null = odpověď neznámého tvaru) */
-  parsed: { protocol: ScaleProtocol | "dialog06"; kg: number | null; stable: boolean; note?: string } | null;
+  parsed: { protocol: ScaleProtocol | "dialog06"; kg: number | null; stable: boolean; note?: string; code?: string } | null;
 }
 
 /** Dialog 06 (ověřená váha TEM): cena za kg → ACK, pak EOT ENQ → hmotnost a cena z váhy, nebo stav */
@@ -72,8 +72,10 @@ function recognizeDialog06(bytes: number[]): Hit["parsed"] {
     if (!r) break;
     rest = rest.slice(r.used);
     const m = r.msg;
-    if (m.kind === "data") return { protocol: "dialog06", kg: Number(m.weight.replace(",", ".")), stable: true, note: `${m.unitPrice} Kč/kg → ${m.total} Kč` };
-    if (m.kind === "status") best = { protocol: "dialog06", kg: null, stable: false, note: `stav ${m.code} (${m.status})` };
+    // hmotnost s nulovou cenou = zboží leželo na váze dřív než cena (vážení neplatí)
+    if (m.kind === "data" && Number(m.total) > 0) return { protocol: "dialog06", kg: Number(m.weight.replace(",", ".")), stable: true, note: `${m.unitPrice} Kč/kg → ${m.total} Kč` };
+    if (m.kind === "data") best = { protocol: "dialog06", kg: null, stable: false, note: "noZero", code: "02" };
+    if (m.kind === "status") best = { protocol: "dialog06", kg: null, stable: false, note: m.status, code: m.code };
     if (m.kind === "ack" && !best) best = { protocol: "dialog06", kg: null, stable: false, note: "ACK" };
     if (m.kind === "nak" && !best) best = { protocol: "dialog06", kg: null, stable: false, note: "NAK" };
   }
@@ -233,7 +235,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
         const conn = connections.find((x) => x.id === connId);
         const hit: Hit = { ...d06, parsed: { protocol: "dialog06", kg: null, stable: false } };
         const saved = conn ? await save(hit, true) : false;
-        const status = recognizeDialog06(d06.bytes.slice(1))?.note ?? "—";
+        const status = "";
         setVerdict({
           ok: true,
           lines: [(saved ? L.DiagD06Saved : L.DiagD06).replace("{settings}", settingsText(d06.settings)).replace("{conn}", conn?.code ?? "").replace("{status}", status)],
@@ -294,10 +296,11 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           setVerdict({ ok: true, lines: [text] });
           return;
         }
-        text = parsed?.note ? `${L.WeighStatus} ${parsed.note}` : hex(bytes) || L.NoAnswer;
-        if (text !== last) add(`← ${hex(bytes)}  ${text}`);
+        // stav váhy lidsky (kód jen v záznamu Pro servis)
+        text = parsed?.code ? (L[`Stat_${parsed.note}`] ?? `${L.WeighStatus} ${parsed.code}`) : hex(bytes) || L.NoAnswer;
+        if (text !== last) add(`← ${hex(bytes)}  ${parsed?.code ? `[${parsed.code}] ` : ""}${text}`);
         last = text;
-        setLive(`${L.WeighPlace} · ${text}`);
+        setLive(text);
         await new Promise((w) => setTimeout(w, 50));
       }
       setLive(L.WeighTimeout.replace("{last}", last));

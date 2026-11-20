@@ -3554,6 +3554,8 @@ model PosRegister {
   receiptFooter   String?  @map("receipt_footer") @db.VarChar(255)
   pin             String?  @db.VarChar(200)
   blocked         Boolean  @default(false)
+  scaleConnId     String?  @map("scale_conn_id") @db.Uuid
+  printerConnId   String?  @map("printer_conn_id") @db.Uuid
   ext             Json     @default("{}")
   version         Int      @default(1)
   createdAt       DateTime @default(now()) @map("created_at")
@@ -3567,6 +3569,8 @@ model PosRegister {
   cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
   qrAccount              GlAccount?      @relation("PosRegister_qrAccount", fields: [qrAccountId], references: [id], onDelete: Restrict)
   qrBankAccount          BankAccount?    @relation("PosRegister_qrBankAccount", fields: [qrBankAccountId], references: [id], onDelete: Restrict)
+  scaleConn              IntConnection?  @relation("PosRegister_scaleConn", fields: [scaleConnId], references: [id], onDelete: Restrict)
+  printerConn            IntConnection?  @relation("PosRegister_printerConn", fields: [printerConnId], references: [id], onDelete: Restrict)
   posShift_register      PosShift[]      @relation("PosShift_register")
   posReceipt_register    PosReceipt[]    @relation("PosReceipt_register")
   posBasket_register     PosBasket[]     @relation("PosBasket_register")
@@ -3579,6 +3583,8 @@ model PosRegister {
   @@index([cardAccountId])
   @@index([qrAccountId])
   @@index([qrBankAccountId])
+  @@index([scaleConnId])
+  @@index([printerConnId])
   @@map("pos_register")
 }
 
@@ -4193,11 +4199,13 @@ model IntConnection {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy       String?   @map("updated_by") @db.Uuid
 
-  company                SysCompany    @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
-  register               PosRegister?  @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
-  intLog_connection      IntLog[]      @relation("IntLog_connection")
-  intDocument_connection IntDocument[] @relation("IntDocument_connection")
-  intMail_connection     IntMail[]     @relation("IntMail_connection")
+  company                 SysCompany    @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register                PosRegister?  @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
+  posRegister_scaleConn   PosRegister[] @relation("PosRegister_scaleConn")
+  posRegister_printerConn PosRegister[] @relation("PosRegister_printerConn")
+  intLog_connection       IntLog[]      @relation("IntLog_connection")
+  intDocument_connection  IntDocument[] @relation("IntDocument_connection")
+  intMail_connection      IntMail[]     @relation("IntMail_connection")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
