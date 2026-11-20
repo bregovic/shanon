@@ -70,6 +70,8 @@ export class ScaleDriver {
   private connected = false;
   private polling = 0; // číslo běžící smyčky dotazů (nová smyčka ukončí starou)
   private sawZero = true;
+  /** váha odmítla vážení (zboží leželo dřív než cena) a cenu zahodila → po vyprázdnění poslat cenu znovu */
+  private rearm = false;
   /** váha bere cenu s názvem zboží (záznam 04); false = jen cena (01) — TEM EGE-M doplňky odmítá NAKem */
   private withText = true;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -196,6 +198,12 @@ export class ScaleDriver {
       // pod minimem / bez zboží = váha je prázdná → další vážení povoleno
       if (m.status === "belowMin") {
         this.sawZero = true;
+        // zboží zvednuto po odmítnutí: cenu poslat znovu do prázdné váhy (bez nového klepnutí na zboží)
+        if (product && this.rearm) {
+          this.rearm = false;
+          void this.setUnitPrice(product);
+          return;
+        }
         // „pod minimem“ hlásit jen když na váze něco bylo (prázdná váha hlásí totéž)
         return this.set({ phase: "waiting", reading: null, problem: this.state.reading || this.state.phase === "weighing" ? "belowMin" : null });
       }
@@ -203,6 +211,7 @@ export class ScaleDriver {
       // od posledního vážení se váha nevrátila na nulu → sundat zboží
       if (m.status === "noZero") {
         this.sawZero = false;
+        this.rearm = true;
         return this.set({ phase: "needZero", reading: null, problem: null });
       }
       return this.set({ phase: "error", reading: null, problem: m.status });
@@ -210,7 +219,18 @@ export class ScaleDriver {
     if (m.kind !== "data") return;
     if (isZero(m.weight)) {
       this.sawZero = true;
+      if (product && this.rearm) {
+        this.rearm = false;
+        void this.setUnitPrice(product);
+        return;
+      }
       return this.set({ phase: "waiting", reading: null, problem: null });
+    }
+    // hmotnost bez ceny = váha cenu nemá (zahodila ji): zvednout zboží, cena se pošle znovu do prázdné váhy
+    if (product && cents(m.unitPrice) === 0 && !(this.state.phase === "stable" && this.state.reading)) {
+      this.sawZero = false;
+      this.rearm = true;
+      return this.set({ phase: "needZero", reading: null, problem: null });
     }
     // zboží z minulého vážení ještě leží na váze
     if (!this.sawZero) return this.set({ phase: "needZero", reading: null, problem: null });

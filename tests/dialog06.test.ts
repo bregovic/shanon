@@ -197,6 +197,38 @@ describe("ScaleDriver se simulátorem váhy", () => {
     await d.dispose();
   });
 
+  it("po odmítnutí váha cenu zahodí: zvednout → pokladna pošle cenu znovu → položit → hmotnost (bez nového klepnutí)", async () => {
+    let price = false;
+    let goods = true;
+    let prices = 0;
+    let enq = 0;
+    const t: ScaleTransport = {
+      open: async () => {},
+      close: async () => {},
+      exchange: async (req): Promise<Dialog06Message | null> => {
+        if (req[1] !== ENQ) {
+          prices++;
+          price = !goods; // cena do zatížené váhy neplatí
+          return { kind: "ack" };
+        }
+        enq++;
+        if (enq === 3) goods = false; // zvednuto
+        if (enq === 6) goods = true; // položeno zpět
+        if (!goods) return parseDialog06(bytes(STX, "09", ESC, "31", ETX))!.msg;
+        if (!price) return enq < 3 ? parseDialog06(bytes(STX, "09", ESC, "33", ETX))!.msg : parseDialog06(bytes(STX, "02", ESC, "3", ESC, "00500", ESC, "000000", ESC, "000000", ETX))!.msg;
+        return parseDialog06(bytes(STX, "02", ESC, "3", ESC, "00500", ESC, "031900", ESC, "015950", ETX))!.msg;
+      },
+    };
+    const d = new ScaleDriver(t);
+    await d.connect();
+    await d.setUnitPrice(HAM);
+    await until(d, (x) => x.phase === "needZero");
+    const s = await until(d, (x) => x.phase === "stable");
+    expect(s.reading?.total).toBe("159.50");
+    expect(prices).toBe(2);
+    await d.dispose();
+  });
+
   it("váha neodpovídá 3× → Chyba", async () => {
     const t: ScaleTransport = { open: async () => {}, close: async () => {}, exchange: async () => null };
     const d = new ScaleDriver(t);
