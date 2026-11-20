@@ -164,7 +164,6 @@ const useStyles = makeStyles({
     "@media (max-width: 900px)": { gridTemplateColumns: "1fr", gridTemplateRows: "1fr auto", overflowY: "auto" },
   },
   // s panelem Váha: zboží | váha (~320 px) | nákup
-  mainScale: { gridTemplateColumns: "1fr 320px 380px", "@media (max-width: 1200px)": { gridTemplateColumns: "1fr 300px 340px" } },
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
   // jedna posuvná řada (i při mnoha boxech zůstane místo pro zboží a košík)
@@ -207,6 +206,8 @@ const useStyles = makeStyles({
     ":hover": { backgroundColor: tokens.colorNeutralBackground1Hover },
     ":active": { backgroundColor: tokens.colorBrandBackground2 },
   },
+  tileWeighed: { border: `1px dashed ${tokens.colorBrandStroke2}` },
+  tileWeighing: { border: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   regular: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
   tileImg: { width: "100%", height: "96px", objectFit: "contain", borderRadius: tokens.borderRadiusMedium, flexShrink: 0 },
   tileName: { fontWeight: tokens.fontWeightSemibold, lineHeight: tokens.lineHeightBase400 },
@@ -982,7 +983,7 @@ export function PosTerminal(p: {
           </Button>
         </div>
       ) : (
-        <div className={mergeClasses(st.main, verified && st.mainScale)}>
+        <div className={st.main}>
           <section className={st.catalog}>
             <Input
               ref={search}
@@ -1032,7 +1033,14 @@ export function PosTerminal(p: {
             {!p.items.length && <p className={st.empty}>{L.NoItems}</p>}
             <div className={st.tiles}>
               {visible.map((i) => (
-                <button key={i.id} type="button" className={st.tile} {...pressHandlers(() => pick(i), () => pickQty(i))} onContextMenu={(e) => e.preventDefault()}>
+                <button
+                  key={i.id}
+                  type="button"
+                  // vážené zboží: čárkované ohraničení; právě vážené: plná linka
+                  className={mergeClasses(st.tile, i.weighed && st.tileWeighed, verified && vState?.product?.id === i.id && st.tileWeighing)}
+                  {...pressHandlers(() => pick(i), () => pickQty(i))}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
                   {i.image && (
                     // eslint-disable-next-line @next/next/no-img-element -- soubor za přihlášením, prohlížeč ho cachuje
                     <img src={`/api/files/${i.image}`} alt="" loading="lazy" className={st.tileImg} />
@@ -1049,9 +1057,9 @@ export function PosTerminal(p: {
             </div>
           </section>
 
-          {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} beepOn={p.verifiedScale?.beep !== false} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
-
           <aside className={st.cart} aria-label={L.Cart}>
+            {/* Váha (Dialog 06): kompaktně nahoře v Nákupu */}
+            {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} beepOn={p.verifiedScale?.beep !== false} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
             <div className={st.baskets}>
               <Button size="small" shape="circular" appearance={active ? "secondary" : "primary"} onClick={() => void openFree()}>
                 {L.FreeSale}

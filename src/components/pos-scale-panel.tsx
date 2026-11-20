@@ -14,28 +14,30 @@ import { SimScaleTransport } from "@/lib/scale-sim";
 import { connectScalePort, scalePort } from "@/lib/scale";
 
 const useStyles = makeStyles({
+  // kompaktní panel nahoře ve sloupci Nákup (ne samostatný sloupec)
   panel: {
     display: "flex",
     flexDirection: "column",
-    minHeight: 0,
-    gap: "12px",
-    padding: "12px 16px",
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
-    "@media (max-width: 900px)": { borderLeft: "none", borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+    gap: "6px",
+    padding: "10px 12px",
+    margin: "8px 8px 0",
+    border: `1px solid ${tokens.colorBrandStroke2}`,
+    borderRadius: tokens.borderRadiusLarge,
+    backgroundColor: tokens.colorBrandBackground2,
   },
-  head: { display: "flex", alignItems: "center", gap: "8px", fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase400 },
-  product: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold, minHeight: "24px" },
-  unit: { color: tokens.colorNeutralForeground3 },
-  big: { fontSize: "40px", lineHeight: "48px", fontWeight: tokens.fontWeightBold, fontVariantNumeric: "tabular-nums", textAlign: "right" },
+  head: { display: "flex", alignItems: "center", gap: "6px", fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300, minWidth: 0 },
+  product: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  unit: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
+  nums: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" },
+  big: { fontSize: "26px", lineHeight: "32px", fontWeight: tokens.fontWeightBold, fontVariantNumeric: "tabular-nums", textAlign: "right" },
   dim: { color: tokens.colorNeutralForegroundDisabled },
-  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
-  msg: { minHeight: "40px", fontSize: tokens.fontSizeBase300 },
+  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, textAlign: "right" },
+  msg: { minHeight: "20px", fontSize: tokens.fontSizeBase300 },
   problem: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
   stable: { color: tokens.colorPaletteGreenForeground1, fontWeight: tokens.fontWeightSemibold, display: "inline-flex", alignItems: "center", gap: "6px" },
   dot: { width: "10px", height: "10px", borderRadius: "50%", backgroundColor: tokens.colorPaletteGreenBackground3 },
-  actions: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "auto" },
-  addBtn: { minHeight: "56px", fontSize: tokens.fontSizeBase500 },
+  actions: { display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px" },
+  addBtn: { minHeight: "44px", fontSize: tokens.fontSizeBase400 },
 });
 
 export interface VerifiedScaleConfig {
@@ -184,29 +186,29 @@ export function ScalePanel({
     <section className={st.panel} aria-label={L.ScalePanel}>
       <div className={st.head}>
         <Scales24Regular />
-        {L.ScalePanel}
-        <span style={{ flex: 1 }} />
+        <span className={st.product}>
+          {product ? (
+            <>
+              {product.name} <span className={st.unit}>· {fmtMoney(product.unitPrice)} / kg</span>
+            </>
+          ) : (
+            <span className={st.unit}>{L.ScalePick}</span>
+          )}
+        </span>
         {conn}
       </div>
-      <div className={st.product}>
-        {product ? (
-          <>
-            {product.name} <span className={st.unit}>· {fmtMoney(product.unitPrice)} / kg</span>
-          </>
-        ) : (
-          <span className={st.unit}>{L.ScalePick}</span>
-        )}
-      </div>
-      <div>
-        <div className={st.label}>{L.Weight}</div>
-        <div className={`${st.big} ${stable ? "" : st.dim}`} data-testid="scale-weight">
-          {weight.replace(".", ",")} kg
+      <div className={st.nums}>
+        <div>
+          <div className={st.label}>{L.Weight}</div>
+          <div className={`${st.big} ${stable ? "" : st.dim}`} data-testid="scale-weight">
+            {weight.replace(".", ",")} kg
+          </div>
         </div>
-      </div>
-      <div>
-        <div className={st.label}>{L.ScaleTotal}</div>
-        <div className={`${st.big} ${stable ? "" : st.dim}`} data-testid="scale-total">
-          {total ? fmtMoney(total) : "—"}
+        <div>
+          <div className={st.label}>{L.ScaleTotal}</div>
+          <div className={`${st.big} ${stable ? "" : st.dim}`} data-testid="scale-total">
+            {total ? fmtMoney(total) : "—"}
+          </div>
         </div>
       </div>
       <div className={st.msg}>
