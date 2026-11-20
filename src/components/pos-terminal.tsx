@@ -39,6 +39,8 @@ import {
   CloudArrowUp24Regular,
   Delete24Regular,
   LockClosed24Regular,
+  FullScreenMaximize24Regular,
+  FullScreenMinimize24Regular,
   Money24Regular,
   Payment24Regular,
   QrCode24Regular,
@@ -360,6 +362,24 @@ export function PosTerminal(p: {
   const [group, setGroup] = useState(p.top.length ? "top" : "all");
   const [sub, setSub] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  // celá obrazovka: prohlížeč ji dovolí až po akci uživatele → při prvním dotyku / kliknutí po otevření pokladny
+  const [fullscreen, setFullscreen] = useState(false);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
+  useEffect(() => {
+    const sync = () => setFullscreen(!!document.fullscreenElement);
+    const first = () => {
+      if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => undefined);
+    };
+    document.addEventListener("fullscreenchange", sync);
+    document.addEventListener("pointerdown", first, { once: true, capture: true });
+    return () => {
+      document.removeEventListener("fullscreenchange", sync);
+      document.removeEventListener("pointerdown", first, { capture: true });
+    };
+  }, []);
   const [lines, setLines] = useState<Line[]>([]);
   // ověřená váha (Dialog 06): klepnutí na vážené zboží pošle cenu za kg do váhy, panel Váha převezme výsledek
   const { driver: vDriver, state: vState } = useVerifiedScale(p.verifiedScale ?? null);
@@ -707,6 +727,8 @@ export function PosTerminal(p: {
       if (!item || !vDriver) return;
       setLines((ls) => [...ls, { item, qty: Number(r.weight), scale: { weight: r.weight, unitPrice: r.unitPrice, total: r.total, raw: r.raw, weighedAt: r.at } }]);
       setFlash((f) => ({ id: item.id, n: (f?.n ?? 0) + 1 }));
+      // další zboží: hledání od začátku
+      setQ("");
       void vDriver.clear(true);
     },
     [vDriver, itemById],
@@ -948,6 +970,13 @@ export function PosTerminal(p: {
             {L.PrinterConnect}
           </Button>
         )}
+        <Button
+          appearance="subtle"
+          icon={fullscreen ? <FullScreenMinimize24Regular /> : <FullScreenMaximize24Regular />}
+          title={fullscreen ? L.FullscreenExit : L.Fullscreen}
+          aria-label={fullscreen ? L.FullscreenExit : L.Fullscreen}
+          onClick={toggleFullscreen}
+        />
         {p.canLock && (
           <Button
             icon={<LockClosed24Regular />}

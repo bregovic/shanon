@@ -130,14 +130,8 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
       off();
       void d.dispose();
     };
-  }, [
-    cfg?.driver,
-    cfg?.baudRate,
-    cfg?.dataBits,
-    cfg?.parity,
-    cfg?.stopBits,
-    cfg?.confirm,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nový driver jen při změně nastavení napojení
+  }, [cfg?.driver, cfg?.baudRate, cfg?.dataBits, cfg?.parity, cfg?.stopBits, cfg?.confirm]);
   return { driver, state };
 }
 
@@ -357,7 +351,7 @@ export function ScalePanel({
           >
             {L.ScaleRetry}
           </Button>
-        ) : confirmMode && product && phase !== "stable" ? (
+        ) : confirmMode && product ? (
           <Button
             appearance="primary"
             className={st.addBtn}
