@@ -620,7 +620,7 @@ function saleInput(input: SaleInput): SaleInput {
     cashGiven: input.cashGiven ? String(input.cashGiven) : null,
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,
     basketId: input.basketId ? String(input.basketId) : null,
-    lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty), scale: scaleLineOf(l.scale) })),
+    lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty), scale: scaleLineOf(l.scale), manual: l.manual === true })),
   };
 }
 

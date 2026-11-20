@@ -62,6 +62,9 @@ describe("pokladna s ověřenou vahou", () => {
     await expect(api((a) => sell(a, { registerId: regId, payment: "card", verifiedScale: VERIFIED, lines: [{ itemId: ids.ham, qty: "0.5" }] }))).rejects.toMatchObject({ label: "@POS:WeighOnScale" });
     const r = await api((a) => sell(a, { registerId: regId, payment: "card", verifiedScale: VERIFIED, lines: [{ itemId: ids.water, qty: "1" }] }));
     expect(r.amountGross).toBe("20.00");
+    // váha nepřipojená: hmotnost zadaná ručně (manual) projde
+    const m = await api((a) => sell(a, { registerId: regId, payment: "card", verifiedScale: VERIFIED, lines: [{ itemId: ids.ham, qty: "0.5", manual: true }] }));
+    expect(Number(m.amountGross)).toBeGreaterThan(0);
     // údaje z váhy u kusového zboží = odmítnuto
     await expect(api((a) => sell(a, { registerId: regId, payment: "card", lines: [{ itemId: ids.water, qty: "1", scale: READ }] }))).rejects.toMatchObject({ label: "@POS:ScaleNotWeighed" });
     // nečíselné údaje z váhy
