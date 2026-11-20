@@ -178,6 +178,9 @@ export class ScaleDriver {
         return;
       }
       this.handle(m);
+      // ověřená váha vydá výsledek jednou (pak cenu sama vynuluje) → hotové vážení držet, dál se neptat;
+      // nové vážení začne klepnutím na zboží (Přidat / Zrušit)
+      if (this.state.phase === "stable") return;
       await new Promise((r) => setTimeout(r, POLL_MS));
     }
   }
@@ -206,6 +209,8 @@ export class ScaleDriver {
     }
     // zboží z minulého vážení ještě leží na váze
     if (!this.sawZero) return this.set({ phase: "needZero", reading: null, problem: null });
+    // výsledek už je vydaný a váha cenu vynulovala (TEM EGE-M) — hotové vážení platí
+    if (this.state.phase === "stable" && this.state.reading && cents(m.unitPrice) === 0) return;
     // cena za kg z váhy musí být ta, kterou pokladna poslala (porovnání textu v haléřích, ne výpočet)
     if (!product || cents(m.unitPrice) !== cents(product.unitPrice)) {
       this.set({ phase: "error", reading: null, problem: "priceMismatch" });
