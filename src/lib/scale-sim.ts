@@ -36,7 +36,7 @@ export class SimScaleTransport implements ScaleTransport {
     }
     // dotaz na stav: EOT ENQ
     if (b.length === 2 && b[1] === ENQ) {
-      if (!this.priceCents) return parseDialog06(frame("09", "32"))!.msg; // bez ceny
+      if (!this.priceCents) return parseDialog06(frame("09", "11"))!.msg; // bez ceny
       if (!this.grams && this.placeAt && now >= this.placeAt) {
         this.grams = 100 + Math.floor(Math.random() * 1400);
         this.unstableLeft = 2;
@@ -48,9 +48,9 @@ export class SimScaleTransport implements ScaleTransport {
       const total = Math.round((this.grams * this.priceCents) / 1000);
       return parseDialog06(frame("02", "3", String(this.grams).padStart(5, "0"), String(this.priceCents).padStart(6, "0"), String(total).padStart(6, "0")))!.msg;
     }
-    // cena za kg: EOT STX "01"|"04" ESC cena ESC … ETX
+    // cena za kg: EOT STX "03"|"05" ESC cena ESC tára ESC … ETX (i starší 01 / 04 bez táry)
     const text = String.fromCharCode(...b.filter((x) => x >= 0x20 && x < 0x7f && x !== ESC));
-    const m = /^(01|04)(\d{6})/.exec(text);
+    const m = /^(01|03|04|05)(\d{6})/.exec(text);
     if (!m) return parseDialog06([NAK])!.msg;
     this.priceCents = Number(m[2]);
     if (this.priceCents) {

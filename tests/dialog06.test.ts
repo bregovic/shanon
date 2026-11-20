@@ -6,15 +6,18 @@ import { SimScaleTransport } from "../src/lib/scale-sim";
 const bytes = (...parts: (number | string)[]) => parts.flatMap((p) => (typeof p === "number" ? [p] : [...p].map((c) => c.charCodeAt(0))));
 
 describe("Dialog 06 — kodek (předběžné rámce)", () => {
-  it("cena za kg: EOT STX 01 ESC 6 číslic (haléře) ESC ETX", () => {
-    expect(Array.from(encodeUnitPrice(31900))).toEqual(bytes(EOT, STX, "01", ESC, "031900", ESC, ETX));
+  it("cena za kg s tárou: EOT STX 03 ESC 6 číslic (haléře) ESC tára 4 číslice (g) ESC ETX", () => {
+    expect(Array.from(encodeUnitPrice(31900))).toEqual(bytes(EOT, STX, "03", ESC, "031900", ESC, "0000", ESC, ETX));
+    // bez táry (starší záznam 01) — ověřená váha TEM ho odmítne stavem 12
+    expect(Array.from(encodeUnitPrice(31900, undefined, null))).toEqual(bytes(EOT, STX, "01", ESC, "031900", ESC, ETX));
   });
-  it("cena + název: zpráva 04, text bez diakritiky, nejvýš 13 znaků", () => {
-    expect(Array.from(encodeUnitPrice(31900, "Pražská šunka na kosti"))).toEqual(bytes(EOT, STX, "04", ESC, "031900", ESC, "Prazska sunka", ESC, ETX));
+  it("cena + tára + název: zpráva 05, text bez diakritiky, nejvýš 13 znaků", () => {
+    expect(Array.from(encodeUnitPrice(31900, "Pražská šunka na kosti"))).toEqual(bytes(EOT, STX, "05", ESC, "031900", ESC, "0000", ESC, "Prazska sunka", ESC, ETX));
+    expect(Array.from(encodeUnitPrice(31900, "Šunka", null))).toEqual(bytes(EOT, STX, "04", ESC, "031900", ESC, "Sunka", ESC, ETX));
     expect(scaleText("Žluťoučký kůň")).toBe("Zlutoucky kun");
   });
   it("vymazání ceny a dotaz na stav", () => {
-    expect(Array.from(encodeClear())).toEqual(bytes(EOT, STX, "01", ESC, "000000", ESC, ETX));
+    expect(Array.from(encodeClear())).toEqual(bytes(EOT, STX, "03", ESC, "000000", ESC, "0000", ESC, ETX));
     expect(Array.from(encodeStatusRequest())).toEqual([EOT, ENQ]);
   });
   it("datová zpráva: hmotnost a ceny jako text přesně z váhy", () => {
@@ -23,7 +26,8 @@ describe("Dialog 06 — kodek (předběžné rámce)", () => {
     expect((r?.msg as { raw: string }).raw).toMatch(/^02 30 32 1b/);
   });
   it("stav, ACK, nedokončená zpráva", () => {
-    expect(parseDialog06(bytes(STX, "09", ESC, "30", ETX))?.msg).toMatchObject({ kind: "status", status: "overload", code: "30" });
+    expect(parseDialog06(bytes(STX, "09", ESC, "32", ETX))?.msg).toMatchObject({ kind: "status", status: "overload", code: "32" });
+    expect(parseDialog06(bytes(STX, "09", ESC, "21", ETX))?.msg).toMatchObject({ kind: "status", status: "noZero", code: "21" });
     expect(parseDialog06(bytes(STX, "09", ESC, "99", ETX))?.msg).toMatchObject({ kind: "status", status: "error" });
     expect(parseDialog06([ACK])?.msg).toEqual({ kind: "ack" });
     expect(parseDialog06(bytes(STX, "02", ESC, "3"))).toBeNull();

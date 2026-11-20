@@ -185,6 +185,11 @@ export class ScaleDriver {
         return this.set({ phase: "waiting", reading: null, problem: this.state.reading || this.state.phase === "weighing" ? "belowMin" : null });
       }
       if (m.status === "unstable") return this.set({ phase: this.sawZero ? "weighing" : "needZero", problem: null });
+      // od posledního vážení se váha nevrátila na nulu → sundat zboží
+      if (m.status === "noZero") {
+        this.sawZero = false;
+        return this.set({ phase: "needZero", reading: null, problem: null });
+      }
       return this.set({ phase: "error", reading: null, problem: m.status });
     }
     if (m.kind !== "data") return;

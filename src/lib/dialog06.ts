@@ -31,16 +31,23 @@ export const ESC = 0x1b;
  */
 export const DIALOG06_LINE = { dataBits: 8 as const, parity: "none" as const, stopBits: 1 as const };
 
-export type Dialog06Status = "unstable" | "belowMin" | "overload" | "negative" | "noPrice" | "error";
+export type Dialog06Status = "unstable" | "belowMin" | "overload" | "negative" | "noPrice" | "noZero" | "error";
 
-/** Kódy stavů ve zprávě 09 → význam. PŘEDBĚŽNÉ — ověřit podle specifikace TEM. */
+/**
+ * Kódy stavů ve zprávě 09 → význam. Podle popisu protokolu Dialog (Mettler Toledo / Bizerba), který TEM přebírá;
+ * TEM EGE-M 20. 11. 2026 vrátil 12 na cenu bez táry (záznam 01) → posíláme cenu s tárou (03 / 05).
+ * 00 bez chyby, 01 obecná chyba, 02 parita / délka, 10 špatné číslo záznamu, 11 neplatná cena, 12 neplatná tára,
+ * 13 neplatný text, 20 neustálená, 21 od posledního vážení se nevrátila na nulu, 22 cena ještě není spočítaná,
+ * 30 pod minimem, 31 záporná / podtížení, 32 přetížení.
+ */
 export const STATUS: Record<string, Dialog06Status> = {
+  "11": "noPrice",
   "20": "unstable",
-  "21": "belowMin",
-  "22": "negative",
-  "30": "overload",
-  "31": "belowMin",
-  "32": "noPrice",
+  "21": "noZero",
+  "22": "unstable",
+  "30": "belowMin",
+  "31": "negative",
+  "32": "overload",
 };
 
 export type Dialog06Message =
@@ -61,11 +68,14 @@ export function scaleText(s: string): string {
     .slice(0, 13);
 }
 
-/** Cena za kg do váhy (v haléřích); s textem jako zpráva 04, jinak 01. */
-export function encodeUnitPrice(priceCents: number, text?: string): Uint8Array {
+/**
+ * Cena za kg do váhy (v haléřích) s tárou v gramech: záznam 03 (cena + tára), s textem 05 (cena + tára + text).
+ * Ověřená váha bez táry odmítne vážit (stav 12). `tareGrams` null = starší záznamy 01 / 04 bez táry.
+ */
+export function encodeUnitPrice(priceCents: number, text?: string, tareGrams: number | null = 0): Uint8Array {
   const price = digits(priceCents, 6);
   const t = text ? scaleText(text) : "";
-  const body = t ? ["04", price, t] : ["01", price];
+  const body = tareGrams === null ? (t ? ["04", price, t] : ["01", price]) : t ? ["05", price, digits(tareGrams, 4), t] : ["03", price, digits(tareGrams, 4)];
   return Uint8Array.from([EOT, STX, ...body.flatMap((p, i) => (i ? [ESC, ...ascii(p)] : ascii(p))), ESC, ETX]);
 }
 

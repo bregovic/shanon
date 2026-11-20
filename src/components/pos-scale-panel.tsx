@@ -142,6 +142,7 @@ export function ScalePanel({
         priceMismatch: L.ScaleMismatch,
         disconnected: L.ScaleDisconnected,
         unstable: L.ScaleWeighing,
+        noZero: L.ScaleRemoveGoods,
         error: L.ScaleOther,
       }[problem]
     : null;

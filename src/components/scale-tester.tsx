@@ -159,20 +159,29 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           let got: number[] = [];
           try {
             if (id === "Dialog 06") {
-              got = await serialExchange(port, settings, encodeUnitPrice(10000), 600);
-              // cena přijata (ACK) → dotazy na hmotnost; NAK = zeptat se na stav (proč ne)
-              if (got.includes(0x06)) {
+              // záznam ceny: 03 (cena + tára 0 g), 05 (+ text), 01 (bez táry) — první, se kterým váha dá hmotnost
+              const variants: [string, Uint8Array][] = [["03", encodeUnitPrice(10000)], ["05", encodeUnitPrice(10000, "ZKOUSKA")], ["01", encodeUnitPrice(10000, undefined, null)]];
+              for (const [rec, frame] of variants) {
+                const ack = await serialExchange(port, settings, frame, 600);
+                add(`→ [${settingsText(settings)}] Dialog 06 záznam ${rec} (100,00 Kč/kg)  ${hex([...frame])}  ← ${hex(ack) || L.NoAnswer}`);
+                got = [...got, ...ack];
+                if (!ack.includes(0x06)) continue;
+                let weight = false;
                 for (let k = 0; k < 5; k++) {
                   const r = await serialExchange(port, settings, encodeStatusRequest(), 700);
                   got = [...got, ...r];
-                  if (r.includes(0x02)) break; // data / stav z váhy
+                  if (r.includes(0x02) && String.fromCharCode(...r).includes("02")) {
+                    weight = true;
+                    break;
+                  }
                   if (r.includes(0x15)) {
                     const st = await serialExchange(port, settings, encodeStatusQuery(), 700);
                     got = [...got, ...st];
-                    add(`← [${settingsText(settings)}] Dialog 06 stav: ${ascii(st)}   HEX ${hex(st)}`);
+                    add(`← [${settingsText(settings)}] Dialog 06 záznam ${rec} stav: ${ascii(st)}   HEX ${hex(st)}`);
                   }
                   await new Promise((w) => setTimeout(w, 400));
                 }
+                if (weight) break;
               }
             } else {
               const p = PROBES.find((x) => x.id === id)!;
