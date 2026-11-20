@@ -1,9 +1,10 @@
 /**
  * Protokol Dialog 06 pro pokladní váhy se stanoveným měřidlem (cenu počítá váha, pokladna jen posílá cenu za kg).
  *
- * POZOR — PŘEDBĚŽNÉ RÁMCE. Zatím podle obecně publikované podoby Dialog 06 (Mettler Toledo a kompatibilní);
- * oficiální specifikace pro TEM EGE (vahy-praha.cz) se teprve shání. Po jejím dodání se mění jen tento
- * soubor (konstanty rámců a tabulka STATUS), zbytek pokladny pracuje s `Dialog06Message`.
+ * OVĚŘENO na TEM EGE-M (20. 11. 2026, 9600 8N1): cena záznamem 01 → ACK, EOT ENQ → NAK + stav (EOT STX 08 ETX →
+ * 09: 31 prázdná, 20 neustálená, 33 zboží už při ceně) → po ustálení 02 ESC 3 ESC 00330 ESC 010000 ESC 003300
+ * (0,330 kg × 100,00 = 33,00 Kč). Oficiální specifikace TEM nemáme; jiné kódy stavů podle Mettler / Bizerba.
+ * Změny protokolu jen v tomto souboru, zbytek pokladny pracuje s `Dialog06Message`.
  *
  * Výměna pro jednu položku (řídí vždy pokladna, váha sama nic neposílá):
  *   pokladna → váha   EOT STX "01" ESC cena(6, haléře) ESC ETX             cena za kg      → ACK / NAK

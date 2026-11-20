@@ -24,6 +24,10 @@ describe("Dialog 06 — kodek (předběžné rámce)", () => {
     expect(r?.msg).toMatchObject({ kind: "data", weight: "0.384", unitPrice: "319.00", total: "122.50" });
     expect((r?.msg as { raw: string }).raw).toMatch(/^02 30 32 1b/);
   });
+  it("skutečná odpověď TEM EGE-M: 0,330 kg × 100,00 Kč/kg = 33,00 Kč", () => {
+    const r = parseDialog06([0x02, 0x30, 0x32, 0x1b, 0x33, 0x1b, 0x30, 0x30, 0x33, 0x33, 0x30, 0x1b, 0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x1b, 0x30, 0x30, 0x33, 0x33, 0x30, 0x30, 0x03]);
+    expect(r?.msg).toMatchObject({ kind: "data", weight: "0.330", unitPrice: "100.00", total: "33.00" });
+  });
   it("stav, ACK, nedokončená zpráva", () => {
     expect(parseDialog06(bytes(STX, "09", ESC, "32", ETX))?.msg).toMatchObject({ kind: "status", status: "overload", code: "32" });
     expect(parseDialog06(bytes(STX, "09", ESC, "21", ETX))?.msg).toMatchObject({ kind: "status", status: "noZero", code: "21" });
