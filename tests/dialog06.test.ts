@@ -123,6 +123,29 @@ describe("ScaleDriver se simulátorem váhy", () => {
     await d.dispose();
   });
 
+  it("váha odmítne cenu s názvem (04) → pošle jen cenu (01) a dál už bez názvu (TEM EGE-M)", async () => {
+    const recs: string[] = [];
+    const t: ScaleTransport = {
+      open: async () => {},
+      close: async () => {},
+      exchange: async (req): Promise<Dialog06Message | null> => {
+        if (req[1] === ENQ) return parseDialog06(bytes(STX, "09", ESC, "31", ETX))!.msg;
+        const rec = String.fromCharCode(req[2], req[3]);
+        recs.push(rec);
+        return rec === "01" ? { kind: "ack" } : { kind: "nak" };
+      },
+    };
+    const d = new ScaleDriver(t);
+    await d.connect();
+    await d.setUnitPrice(HAM);
+    expect(d.snapshot.problem).toBeNull();
+    expect(recs).toEqual(["04", "04", "04", "01"]);
+    await d.setUnitPrice(HAM);
+    expect(recs.at(-1)).toBe("01");
+    expect(recs.filter((r) => r === "04").length).toBe(3);
+    await d.dispose();
+  });
+
   it("váha neodpovídá 3× → Chyba", async () => {
     const t: ScaleTransport = { open: async () => {}, close: async () => {}, exchange: async () => null };
     const d = new ScaleDriver(t);

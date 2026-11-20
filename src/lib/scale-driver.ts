@@ -68,6 +68,8 @@ export class ScaleDriver {
   private connected = false;
   private polling = 0; // číslo běžící smyčky dotazů (nová smyčka ukončí starou)
   private sawZero = true;
+  /** váha bere cenu s názvem zboží (záznam 04); false = jen cena (01) — TEM EGE-M doplňky odmítá NAKem */
+  private withText = true;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private busy: Promise<unknown> = Promise.resolve();
   private disposed = false;
@@ -152,7 +154,12 @@ export class ScaleDriver {
     const loop = ++this.polling;
     this.set({ product, reading: null, phase: "sending", problem: null });
     if (!this.connected) return this.set({ phase: "disconnected", problem: "disconnected" });
-    const ok = await this.ask(encodeUnitPrice(cents(product.unitPrice), product.name), true);
+    // cena s názvem; když ji váha odmítne, jen cena (a příště rovnou bez názvu)
+    let ok = this.withText ? await this.ask(encodeUnitPrice(cents(product.unitPrice), product.name), true) : null;
+    if (!ok && loop === this.polling && this.connected) {
+      ok = await this.ask(encodeUnitPrice(cents(product.unitPrice)), true);
+      if (ok) this.withText = false;
+    }
     if (loop !== this.polling) return;
     if (!ok) {
       if (this.connected) this.set({ phase: "error", problem: "noResponse" });
