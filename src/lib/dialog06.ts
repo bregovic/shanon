@@ -36,7 +36,7 @@ export type Dialog06Status = "unstable" | "belowMin" | "overload" | "negative" |
 /**
  * Kódy stavů ve zprávě 09 → význam. Podle popisu protokolu Dialog (Mettler Toledo / Bizerba), který TEM přebírá;
  * TEM EGE-M (20. 11. 2026): cenu bere záznamem 01 (ACK), záznamy s tárou 03 / 05 odmítá (NAK); stav 12 hlásí při
- * tárování na váze, 31 bez zátěže (podtížení).
+ * tárování na váze, 31 prázdná váha, 33 zboží na váze už při zadání ceny (sundat a položit znovu).
  * 00 bez chyby, 01 obecná chyba, 02 parita / délka, 10 špatné číslo záznamu, 11 neplatná cena, 12 neplatná tára,
  * 13 neplatný text, 20 neustálená, 21 od posledního vážení se nevrátila na nulu, 22 cena ještě není spočítaná,
  * 30 pod minimem, 31 záporná / podtížení, 32 přetížení.
@@ -47,8 +47,10 @@ export const STATUS: Record<string, Dialog06Status> = {
   "21": "noZero",
   "22": "unstable",
   "30": "belowMin",
-  "31": "negative",
+  // TEM EGE-M (ověřeno 20. 11. 2026): 31 = prázdná váha / podtížení, 33 = zboží leželo na váze už při zadání ceny
+  "31": "belowMin",
   "32": "overload",
+  "33": "noZero",
 };
 
 export type Dialog06Message =

@@ -27,6 +27,9 @@ describe("Dialog 06 — kodek (předběžné rámce)", () => {
   it("stav, ACK, nedokončená zpráva", () => {
     expect(parseDialog06(bytes(STX, "09", ESC, "32", ETX))?.msg).toMatchObject({ kind: "status", status: "overload", code: "32" });
     expect(parseDialog06(bytes(STX, "09", ESC, "21", ETX))?.msg).toMatchObject({ kind: "status", status: "noZero", code: "21" });
+    // TEM EGE-M: 31 prázdná váha, 33 zboží na váze už při zadání ceny
+    expect(parseDialog06(bytes(STX, "09", ESC, "31", ETX))?.msg).toMatchObject({ kind: "status", status: "belowMin" });
+    expect(parseDialog06(bytes(STX, "09", ESC, "33", ETX))?.msg).toMatchObject({ kind: "status", status: "noZero" });
     expect(parseDialog06(bytes(STX, "09", ESC, "99", ETX))?.msg).toMatchObject({ kind: "status", status: "error" });
     expect(parseDialog06([ACK])?.msg).toEqual({ kind: "ack" });
     expect(parseDialog06(bytes(STX, "02", ESC, "3"))).toBeNull();
