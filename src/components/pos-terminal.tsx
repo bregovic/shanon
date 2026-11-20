@@ -370,14 +370,17 @@ export function PosTerminal(p: {
   };
   useEffect(() => {
     const sync = () => setFullscreen(!!document.fullscreenElement);
-    const first = () => {
-      if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => undefined);
+    const first = (e: Event) => {
+      document.removeEventListener("click", first, { capture: true });
+      // první klepnutí na přepínač celé obrazovky řeší přepínač sám
+      if ((e.target as HTMLElement | null)?.closest?.("[data-fullscreen-toggle]")) return;
+      if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.({ navigationUI: "hide" }).catch(() => undefined);
     };
     document.addEventListener("fullscreenchange", sync);
-    document.addEventListener("pointerdown", first, { once: true, capture: true });
+    document.addEventListener("click", first, { capture: true });
     return () => {
       document.removeEventListener("fullscreenchange", sync);
-      document.removeEventListener("pointerdown", first, { capture: true });
+      document.removeEventListener("click", first, { capture: true });
     };
   }, []);
   const [lines, setLines] = useState<Line[]>([]);
@@ -642,6 +645,7 @@ export function PosTerminal(p: {
     setMethod(m);
     setDue(m === "cash" ? roundCash(total, p.register.cashRounding) : total);
     setPayDlg(m);
+    void vDriver?.forgetLast();
   };
   const toPay = due;
   const givenNum = Number(given.replace(",", ".")) || 0;
@@ -976,6 +980,7 @@ export function PosTerminal(p: {
           title={fullscreen ? L.FullscreenExit : L.Fullscreen}
           aria-label={fullscreen ? L.FullscreenExit : L.Fullscreen}
           onClick={toggleFullscreen}
+          data-fullscreen-toggle
         />
         {p.canLock && (
           <Button

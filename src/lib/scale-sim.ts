@@ -46,6 +46,8 @@ export class SimScaleTransport implements ScaleTransport {
       if (this.unstableLeft-- > 0) return parseDialog06(frame("09", "20"))!.msg;
       // VÁHA počítá cenu (simulace stanoveného měřidla)
       const total = Math.round((this.grams * this.priceCents) / 1000);
+      // po zvážení obsluha zboží za chvíli sundá
+      if (!this.removeAt) this.removeAt = now + 1500;
       return parseDialog06(frame("02", "3", String(this.grams).padStart(5, "0"), String(this.priceCents).padStart(6, "0"), String(total).padStart(6, "0")))!.msg;
     }
     // cena za kg: EOT STX "03"|"05" ESC cena ESC tára ESC … ETX (i starší 01 / 04 bez táry)

@@ -263,8 +263,11 @@ export function ScalePanel({
                   : null;
 
   // hmotnost a cena: text z váhy; neustáleno = šedě poslední hodnota, čekání = 0,000
-  const weight = reading?.weight ?? "0.000";
-  const total = reading?.total ?? null;
+  // po přidání zůstane naposledy zvážené (do výběru dalšího zboží nebo platby)
+  const shown = reading ?? (phase === "ready" ? state.lastAdded : null) ?? null;
+  const weight = shown?.weight ?? "0.000";
+  const total = shown?.total ?? null;
+  const solid = stable || (!reading && !!shown);
 
   return (
     <section className={st.panel} aria-label={L.ScalePanel}>
@@ -296,7 +299,7 @@ export function ScalePanel({
           <div>
             <div className={st.label}>{L.Weight}</div>
             <div
-              className={`${st.big} ${stable ? "" : st.dim}`}
+              className={`${st.big} ${solid ? "" : st.dim}`}
               data-testid="scale-weight"
             >
               {weight.replace(".", ",")} kg
@@ -305,7 +308,7 @@ export function ScalePanel({
           <div>
             <div className={st.label}>{L.ScaleTotal}</div>
             <div
-              className={`${st.big} ${stable ? "" : st.dim}`}
+              className={`${st.big} ${solid ? "" : st.dim}`}
               data-testid="scale-total"
             >
               {total ? fmtMoney(total) : "—"}

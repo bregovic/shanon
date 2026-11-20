@@ -279,6 +279,14 @@ export class ScaleDriver {
     const r = this.state.reading;
     const lastAdded = added && r && this.state.product ? { name: this.state.product.name, weight: r.weight, total: r.total } : null;
     this.set({ lastAdded, product: null, reading: null, phase: this.connected ? "ready" : "disconnected", problem: this.connected ? null : "disconnected" });
+    // po přidání nechat údaje na displeji váhy (vymaže je až další zboží / platba); Zrušit cenu ve váze smaže
+    if (this.connected && !added) await this.ask(encodeClear(), true);
+  }
+
+  /** Platba: zapomenout naposledy přidané a vymazat cenu ve váze. */
+  async forgetLast(): Promise<void> {
+    if (this.state.product) return;
+    if (this.state.lastAdded) this.set({ lastAdded: null });
     if (this.connected) await this.ask(encodeClear(), true);
   }
 
