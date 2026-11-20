@@ -51,6 +51,8 @@ export interface VerifiedScaleConfig {
   autoAddSec: number;
   /** pípnout při přidání váženého zboží do nákupu (výchozí ano) */
   beep?: boolean;
+  /** vážit až po Hotovo (postupné přidávání zboží), pak přidat do nákupu samo */
+  confirm?: boolean;
 }
 
 /** Driver ověřené váhy pro pokladnu: simulátor nebo Web Serial; po připojení stránky se sám připojí. */
@@ -64,6 +66,7 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
         ? new SimScaleTransport()
         : new WebSerialTransport(() => scalePort(), cfg.baudRate || 9600, { dataBits: cfg.dataBits ?? 8, parity: cfg.parity ?? "none", stopBits: cfg.stopBits ?? 1 }),
     );
+    d.confirmMode = !!cfg.confirm;
     const off = d.subscribe(setState);
     void d.connect();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- driver vzniká s napojením (vnější zdroj)
@@ -72,7 +75,7 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
       off();
       void d.dispose();
     };
-  }, [cfg?.driver, cfg?.baudRate, cfg?.dataBits, cfg?.parity, cfg?.stopBits]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cfg?.driver, cfg?.baudRate, cfg?.dataBits, cfg?.parity, cfg?.stopBits, cfg?.confirm]); // eslint-disable-line react-hooks/exhaustive-deps
   return { driver, state };
 }
 
@@ -84,6 +87,7 @@ export function ScalePanel({
   state,
   autoAddSec,
   beepOn = true,
+  confirmMode = false,
   L,
   fmtMoney,
   onAdd,
@@ -93,6 +97,8 @@ export function ScalePanel({
   autoAddSec: number;
   /** pípnutí při přidání (napojení váhy) */
   beepOn?: boolean;
+  /** vážení na potvrzení (Hotovo), po ustálení přidat hned */
+  confirmMode?: boolean;
   L: Record<string, string>;
   /** formát Kč pro text z váhy (jen zobrazení) */
   fmtMoney: (v: string) => string;
@@ -106,7 +112,15 @@ export function ScalePanel({
   const [left, setLeft] = useState<number | null>(null);
   const added = useRef<string | null>(null);
   useEffect(() => {
-    if (!stable || !autoAddSec || added.current === reading!.raw) return;
+    if (!stable || added.current === reading!.raw) return;
+    // na potvrzení: Hotovo už obsluha řekla → přidat hned
+    if (confirmMode) {
+      added.current = reading!.raw;
+      if (beepOn) beep();
+      onAdd(reading!);
+      return;
+    }
+    if (!autoAddSec) return;
     let n = autoAddSec;
     const t = setInterval(() => {
       n -= 1;
@@ -124,7 +138,7 @@ export function ScalePanel({
       clearInterval(t);
       setLeft(null);
     };
-  }, [stable, reading, autoAddSec, onAdd, beepOn]);
+  }, [stable, reading, autoAddSec, onAdd, beepOn, confirmMode]);
 
   const conn =
     phase === "disconnected" ? (
@@ -170,7 +184,9 @@ export function ScalePanel({
         : phase === "sending"
           ? L.ScaleSending
           : phase === "waiting"
-            ? L.ScaleWaitGoods
+            ? confirmMode
+              ? L.ScaleWaitConfirm
+              : L.ScaleWaitGoods
             : phase === "needZero"
               ? // zboží leželo na váze dřív než cena (ověřená váha ho nepřijme): zvednout a vrátit, pokladna pokračuje sama
                 product
@@ -241,6 +257,10 @@ export function ScalePanel({
         ) : phase === "error" && problem === "noResponse" ? (
           <Button appearance="primary" className={st.addBtn} onClick={() => void driver.retry()}>
             {L.ScaleRetry}
+          </Button>
+        ) : confirmMode && product && phase !== "stable" ? (
+          <Button appearance="primary" className={st.addBtn} disabled={phase !== "waiting"} onClick={() => driver.confirm()}>
+            {L.ScaleConfirm}
           </Button>
         ) : (
           <Button appearance="primary" className={st.addBtn} disabled={!stable} onClick={() => reading && (beepOn && beep(), onAdd(reading))}>

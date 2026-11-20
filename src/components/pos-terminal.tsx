@@ -1059,7 +1059,7 @@ export function PosTerminal(p: {
 
           <aside className={st.cart} aria-label={L.Cart}>
             {/* Váha (Dialog 06): kompaktně nahoře v Nákupu */}
-            {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} beepOn={p.verifiedScale?.beep !== false} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
+            {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} beepOn={p.verifiedScale?.beep !== false} confirmMode={!!p.verifiedScale?.confirm} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
             <div className={st.baskets}>
               <Button size="small" shape="circular" appearance={active ? "secondary" : "primary"} onClick={() => void openFree()}>
                 {L.FreeSale}

@@ -4153,6 +4153,7 @@ model IntConnection {
   baudRate        Int?      @default(9600) @map("baud_rate")
   scaleProtocol   String?   @default("toledo8217") @map("scale_protocol") @db.VarChar(40)
   scaleSerial     String?   @map("scale_serial") @db.VarChar(60)
+  scaleConfirm    Boolean   @default(true) @map("scale_confirm")
   scaleBeep       Boolean   @default(true) @map("scale_beep")
   scaleAutoAddSec Int?      @default(2) @map("scale_auto_add_sec")
   dataBits        Int?      @default(8) @map("data_bits")

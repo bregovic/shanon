@@ -129,6 +129,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
               stopBits: Number(data.conns.scale.stopBits) === 2 ? 2 : 1,
               autoAddSec: Math.max(0, Number(data.conns.scale.scaleAutoAddSec ?? 0)),
               beep: data.conns.scale.scaleBeep !== false,
+              confirm: data.conns.scale.scaleConfirm === true,
             }
           : null
       }

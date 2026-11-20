@@ -229,6 +229,30 @@ describe("ScaleDriver se simulátorem váhy", () => {
     await d.dispose();
   });
 
+  it("vážení na Hotovo: po ceně se váhy neptá (postupné přidávání), Hotovo zváží", async () => {
+    let enq = 0;
+    const t: ScaleTransport = {
+      open: async () => {},
+      close: async () => {},
+      exchange: async (req): Promise<Dialog06Message | null> => {
+        if (req[1] !== ENQ) return { kind: "ack" };
+        enq++;
+        return parseDialog06(bytes(STX, "02", ESC, "3", ESC, "00500", ESC, "031900", ESC, "015950", ETX))!.msg;
+      },
+    };
+    const d = new ScaleDriver(t);
+    d.confirmMode = true;
+    await d.connect();
+    await d.setUnitPrice(HAM);
+    await new Promise((r) => setTimeout(r, 800));
+    expect(d.snapshot.phase).toBe("waiting");
+    expect(enq).toBe(0);
+    d.confirm();
+    const s = await until(d, (x) => x.phase === "stable");
+    expect(s.reading?.total).toBe("159.50");
+    await d.dispose();
+  });
+
   it("váha neodpovídá 3× → Chyba", async () => {
     const t: ScaleTransport = { open: async () => {}, close: async () => {}, exchange: async () => null };
     const d = new ScaleDriver(t);

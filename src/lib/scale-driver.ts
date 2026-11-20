@@ -72,6 +72,12 @@ export class ScaleDriver {
   private sawZero = true;
   /** váha odmítla vážení (zboží leželo dřív než cena) a cenu zahodila → po vyprázdnění poslat cenu znovu */
   private rearm = false;
+  /**
+   * Vážení na potvrzení: po zadání ceny se váhy neptáme (ověřená váha vydá výsledek jen jednou), obsluha přidává zboží
+   * a sleduje displej váhy; teprve Hotovo (`confirm`) se zeptá na ustálenou hmotnost a cenu.
+   */
+  confirmMode = false;
+  private armed = false;
   /** váha bere cenu s názvem zboží (záznam 04); false = jen cena (01) — TEM EGE-M doplňky odmítá NAKem */
   private withText = true;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -159,6 +165,7 @@ export class ScaleDriver {
   /** Vybrané vážené zboží: cena za kg (a název) do váhy, pak dotazy na stav. Jiné zboží během vážení = výměna. */
   async setUnitPrice(product: { id: string; name: string; unitPrice: string }): Promise<void> {
     const loop = ++this.polling;
+    this.armed = false;
     this.set({ product, reading: null, phase: "sending", problem: null });
     if (!this.connected) return this.set({ phase: "disconnected", problem: "disconnected" });
     // cena s názvem; když ji váha odmítne, jen cena (a příště rovnou bez názvu)
@@ -173,6 +180,17 @@ export class ScaleDriver {
       return;
     }
     this.set({ phase: this.sawZero ? "waiting" : "needZero" });
+    // na potvrzení: s prázdnou vahou čekat na Hotovo (zatížená = hlídat zvednutí)
+    if (this.confirmMode && this.sawZero) return;
+    void this.poll(loop);
+  }
+
+  /** Hotovo (vážení na potvrzení): zeptat se váhy na ustálenou hmotnost a cenu. */
+  confirm(): void {
+    if (!this.connected || !this.state.product || this.state.phase === "stable") return;
+    this.armed = true;
+    const loop = ++this.polling;
+    this.set({ phase: "weighing", problem: null });
     void this.poll(loop);
   }
 
@@ -188,6 +206,8 @@ export class ScaleDriver {
       // ověřená váha vydá výsledek jednou (pak cenu sama vynuluje) → hotové vážení držet, dál se neptat;
       // nové vážení začne klepnutím na zboží (Přidat / Zrušit)
       if (this.state.phase === "stable") return;
+      // na potvrzení: po zvednutí a nové ceně zase čekat na Hotovo
+      if (this.confirmMode && !this.armed && this.state.phase === "waiting") return;
       await new Promise((r) => setTimeout(r, POLL_MS));
     }
   }
@@ -252,6 +272,7 @@ export class ScaleDriver {
    */
   async clear(added: boolean): Promise<void> {
     this.polling++;
+    this.armed = false;
     if (added) this.sawZero = false;
     this.set({ product: null, reading: null, phase: this.connected ? "ready" : "disconnected", problem: this.connected ? null : "disconnected" });
     if (this.connected) await this.ask(encodeClear(), true);
