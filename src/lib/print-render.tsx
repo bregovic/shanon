@@ -209,8 +209,9 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
           <ElementView key={el.id} el={el} data={data} locale={locale} fontSize={fs} />
         ))}
       </div>
-      {/* tabulka zabere aspoň navrženou výšku → souhrn zůstane dole, posune se jen při přetečení */}
-      <div style={{ marginLeft: `${table.x}mm`, minHeight: `${table.h}mm` }}>
+      {/* pevná stránka: tabulka zabere aspoň navrženou výšku → souhrn zůstane dole, posune se jen při přetečení;
+          role (účtenka): tabulka jen podle obsahu, souhrn hned pod ní — bez prázdného papíru */}
+      <div style={{ marginLeft: `${table.x}mm`, minHeight: paper.h ? `${table.h}mm` : undefined }}>
         <Table el={table} rows={rows} locale={locale} fontSize={fs} />
       </div>
       <div style={{ position: "relative", height: `${restH + 2}mm`, breakInside: "avoid" }}>
@@ -222,9 +223,14 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
   );
 }
 
-/** CSS pro tisk: velikost papíru, bez okrajů prohlížeče. */
+/**
+ * CSS pro tisk. Pevný papír (A4, A5, štítek): velikost stránky, bez okrajů prohlížeče.
+ * Účtenka (role 80 / 58 mm, výška podle obsahu): velikost se nenastavuje — tiskne se na papír tiskárny
+ * (role v ovladači účtenkové tiskárny i obyčejná A4), okraj 4 mm = potisknutelná šířka role (72 / 48 mm)
+ * a na A4 je účtenka celá vlevo nahoře, nic se neořízne.
+ */
 export function printCss(layout: PrintLayout): string {
   const p = PAPERS[layout.paper] ?? PAPERS.a4;
-  const size = p.h ? `${p.w}mm ${p.h}mm` : `${layout.paper === "receipt58" ? 58 : 80}mm auto`;
-  return `@page { size: ${size}; margin: ${p.h ? "0" : "0 4mm"}; } @media print { body { margin: 0 !important; background: #fff !important; } .no-print { display: none !important; } }`;
+  const page = p.h ? `@page { size: ${p.w}mm ${p.h}mm; margin: 0; }` : `@page { margin: 4mm; }`;
+  return `${page} @media print { html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; } .no-print { display: none !important; } .print-page { break-inside: auto; } }`;
 }

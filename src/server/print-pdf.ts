@@ -208,7 +208,8 @@ function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string)
     const bottom = table.y + table.h;
     const restH = Math.max(0, ...rest.map((e) => e.y - bottom + e.h));
     // prvky pod tabulkou zůstanou na navržené pozici (dolní část stránky), posunou se jen při přetečení
-    let base = Math.max(endY + 2, bottom);
+    // role (účtenka): souhrn hned pod tabulkou, bez navržené mezery
+    let base = flow ? endY + 2 : Math.max(endY + 2, bottom);
     if (!flow && base + restH > pageH - MARGIN / 2) base = newPage() / MM;
     for (const el of rest) drawElement(doc, el, data, locale, fs, base - bottom);
   }

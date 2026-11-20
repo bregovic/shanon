@@ -14,7 +14,11 @@ export default async function Home() {
   return (
     <HomeTiles
       tasks={tasks}
-      taskLabels={{ title: t("@WF:Overview"), empty: t("@WF:OverviewEmpty"), unassigned: t("@WF:OverviewUnassigned"), all: t("@WF:OverviewAll"), overdue: t("@WF:OverviewOverdue") }}
+      taskLabels={{
+        title: t("@WF:Overview"), empty: t("@WF:OverviewEmpty"), unassigned: t("@WF:OverviewUnassigned"), all: t("@WF:OverviewAll"), overdue: t("@WF:OverviewOverdue"),
+        approve: t("@WF:Approve"), reject: t("@WF:Reject"), done: t("@WF:Done"), open: t("@WF:OverviewOpen"), today: t("@WF:OverviewToday"),
+        daysAgo: t("@WF:OverviewDaysAgo"), due: t("@WF:OverviewDue"), overdueCount: t("@WF:OverviewOverdueCount"),
+      }}
       title={t("@SYS:Modules")}
       modules={modules}
       menu={menuIndex(s, t)}

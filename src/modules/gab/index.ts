@@ -183,6 +183,7 @@ export const contact = defineObject({
 
 export default defineModule({
   id: "gab",
+  starter: true,
   label: "@GAB:Module",
   description: "@GAB:ModuleDesc",
   icon: "BuildingBank",

@@ -3,6 +3,8 @@
  * odeslání), platební terminál (simulátor), tajné údaje, tisk ESC/POS.
  * Síť je nahrazená — skutečný Playground ověřuje ruční skript (viz AGENTS.md).
  */
+import { enableModulesWithSetup } from "@/server/company-modules";
+import { companyModules } from "@/server/modules";
 import { createHash, createPublicKey, generateKeyPairSync, verify } from "node:crypto";
 import forge from "node-forge";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -883,6 +885,10 @@ describe("založení firmy z rejstříku", () => {
     const c = (await getRecord(T, "sys.company", id, client))!;
     expect([c.code, c.name, c.vatId]).toEqual(["UZEN", "Uzenářství s.r.o.", "CZ27079864"]);
     const C2 = { ...T, companyId: id };
+    // nová firma má jen minimum modulů (jádro, organizace, adresář); hlavní knihu zapne správce
+    const mods = await companyModules(T.tenantId, id, [], client);
+    expect([mods.has("org"), mods.has("gab"), mods.has("gl")]).toEqual([true, true, false]);
+    await enableModulesWithSetup(T, id, ["gl"], "cs", client);
     const [org] = (await listRecords(C2, "org.entity", {}, client)).rows;
     expect([org.legalName, org.street, org.houseNo, org.orientNo, org.city, org.zipCode]).toEqual(["Uzenářství s.r.o.", "Na náměstí", "97", "3", "Davle", "252 06"]);
     expect((await listRecords(C2, "gl.account", { pageSize: 1 }, client)).total).toBeGreaterThan(10);
@@ -998,7 +1004,11 @@ describe("výběr odběratele", () => {
 describe("oddělení firem a virtuální společnosti", () => {
   it("adresář po firmách; sdílení ve virtuální společnosti; osamostatnění přepojí doklady", async () => {
     const T = (await provisionTenant(client, { code: `t-vc-${run}`, name: "VC", adminEmail: `vc-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar"], company: { code: "A", name: "A" } })).ctx;
-    const mk = async (code: string) => String((await saveRecord(T, "sys.company", null, { code, name: code, currency: "CZK", country: "CZ" }, undefined, client)).id);
+    const mk = async (code: string) => {
+      const id = String((await saveRecord(T, "sys.company", null, { code, name: code, currency: "CZK", country: "CZ" }, undefined, client)).id);
+      await enableModulesWithSetup(T, id, ["ar"], "cs", client);
+      return id;
+    };
     const [b, c, d] = [await mk("B"), await mk("C"), await mk("D")];
     const at = (companyId: string) => ({ ...T, companyId });
     const names = async (companyId: string) => (await listRecords(at(companyId), "gab.subject", {}, client)).rows.map((r) => r.name).sort();

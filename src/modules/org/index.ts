@@ -278,6 +278,7 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
 
 export default defineModule({
   id: "org",
+  starter: true,
   label: "@ORG:Module",
   description: "@ORG:ModuleDesc",
   icon: "Building",

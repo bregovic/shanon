@@ -13,7 +13,7 @@ import { deleteCheck, usedInText } from "@/server/delete-check";
 import { requestLoginHelp, sendPasswordLink, setPasswordByToken, unusablePasswordHash } from "@/server/user-invite";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { dependencyClosure, dependents, UserError, type RecordData } from "@/core/module";
+import { dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
 import { clearLoginLock, isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
 import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, previewRecord, refOptions, runAction, saveRecord } from "@/server/data";
@@ -35,6 +35,7 @@ import { objectHref } from "@/server/ui";
 import { listNotices, markNoticesRead, type NoticeView } from "@/server/notices";
 import { previewPosting, type PostingPreview } from "@/server/posting-preview";
 import { actOnWorkItem, cancelWorkflowRun } from "@/server/workflow-bar";
+import { enableModulesWithSetup } from "@/server/company-modules";
 
 export interface FormState {
   message?: string;
@@ -162,12 +163,8 @@ export async function toggleModuleAction(form: FormData) {
   const tenantId = s.ctx.tenantId;
   const companyId = s.ctx.companyId;
   if (form.get("enable") === "1") {
-    const all = [...dependencyClosure(registry, [id])].filter((m) => !s.ctx.modules.has(m));
-    // firma bez vlastního nastavení (starší data): nejdřív její dosavadní moduly, pak nové
-    await enableCompanyModules(tenantId, companyId, [...s.ctx.modules, ...all]);
-    // výchozí nastavení nově zapnutých modulů v této firmě
-    const enabled = new Set([...s.ctx.modules, ...all]);
-    await inTenant({ ...s.ctx, modules: enabled }, (sess) => setupCompany(sess.sys().api(), new Set(all), s.lang));
+    // i se závislostmi a výchozím nastavením nově zapnutých modulů v této firmě
+    await enableModulesWithSetup(s.ctx, companyId, [id], s.lang);
   } else {
     // vypnout i zapnuté moduly, které na něm stojí (uživatel je potvrdil v náhledu);
     // data zůstávají a po opětovném zapnutí se vrátí

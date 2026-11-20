@@ -40,7 +40,8 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Zapnuté moduly jsou **po firmách** (agenda firmy): `sys_company_module`, `sys_tenant_module` = souhrn (modul zapnutý aspoň
   v jedné firmě, rychlé předfiltrum veřejných vstupů). `Ctx.modules` = moduly aktuální firmy — vždy přes `companyModules()`
   (`src/server/modules.ts`, i veřejné vstupy, API, dávky podle firmy úlohy); zapnutí / vypnutí `enableCompanyModules` /
-  `disableCompanyModules`; nová firma převezme moduly firmy, ze které vzniká; `setup-all` doplní firmám bez nastavení moduly tenanta.
+  `disableCompanyModules`, se setupem `enableModulesWithSetup` (`src/server/company-modules.ts`); další firma organizace dostane jen minimum
+  (jádro + `ModuleDef.starter`: Organizace, Adresář), první firma při založení organizace zadané moduly; `setup-all` doplní firmám bez nastavení moduly tenanta.
 - Žádný vlastní CRUD v modulech. Čtení/zápis jen přes `src/server/data.ts`;
   byznys logika přes události (`ObjectHandlers`) a `DataApi`.
 - Do hlavní knihy jen přes `postVoucher()` (`src/modules/gl/posting.ts`) — hlídá

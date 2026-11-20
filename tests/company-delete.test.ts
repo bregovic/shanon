@@ -2,6 +2,7 @@
  * Smazání firmy i s daty (zkušební firma): zaúčtované doklady, zápisy HK, DPH, saldo, přílohy, číselníky
  * a přiřazení uživatelů zmizí; jiná firma tenanta zůstane netknutá; vlastní (přihlášenou) firmu smazat nejde.
  */
+import { enableModulesWithSetup } from "@/server/company-modules";
 import { describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
 import { listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
@@ -30,6 +31,8 @@ describe("smazání firmy s daty", () => {
   it("smaže zkušební firmu i se zaúčtovanými doklady, druhou firmu nechá", async () => {
     const A = (await provisionTenant(client, { code: `t-del-${run}`, name: "Del", adminEmail: `del-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "inv"], company: { code: "A", name: "Ostrá" } })).ctx;
     const b = await saveRecord(A, "sys.company", null, { code: "ZK", name: "Zkušební", currency: "CZK", country: "CZ" }, undefined, client);
+    // další firma organizace začíná s minimem modulů — zapnout agendu jako ve Správě systému → Moduly
+    await enableModulesWithSetup(A, String(b.id), ["ar", "ap", "inv"], "cs", client);
     const B: Ctx = { ...A, companyId: String(b.id) };
 
     // zkušební firma: odběratel, zaúčtovaná faktura s přílohou, skupina položek

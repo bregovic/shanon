@@ -43,6 +43,8 @@ export interface ModuleDef {
   icon: string;
   /** vždy zapnutý (systém) */
   core?: boolean;
+  /** základ nové firmy: další firma organizace dostane jen jádro a tyto moduly (+ závislosti), ostatní se zapínají ve Správě systému → Moduly */
+  starter?: boolean;
   dependsOn: string[];
   labels: LabelFile;
   enums?: EnumDef[];

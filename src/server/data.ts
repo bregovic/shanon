@@ -35,6 +35,7 @@ import { fieldWhere, orderByFor } from "./filter-where";
 import { setupCompany } from "./setup";
 import { defaultStorage, storageFor } from "./storage";
 import { flushWorkflow, queueWorkflow, workflowLock } from "./workflow";
+import { moduleSet } from "./modules";
 import { SECRET_MASK, isEncrypted, sealSecret } from "./secrets";
 import { detachMember, virtualBeforeSave } from "./virtual";
 
@@ -779,10 +780,13 @@ export class Session {
     if (isNew) queueWorkflow(this, { kind: "created", objectId, id: String(result.id) });
     // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
     if (isNew && def.id === "sys.company" && !result.virtual) {
-      // agenda nové firmy = moduly firmy, ze které vzniká (pak jde upravit ve Správě systému → Moduly)
-      const ids = [...this.ctx.modules].filter((m) => registry.modules.has(m));
+      // agenda nové firmy: další firma organizace = jen minimum (jádro + moduly `starter` se závislostmi), zbytek
+      // se zapne ve Správě systému → Moduly; první firma při založení organizace (bez firmy v kontextu) = zadané moduly
+      const ids = this.ctx.companyId
+        ? [...moduleSet([...registry.modules.values()].filter((m) => m.core || m.starter).map((m) => m.id))]
+        : [...this.ctx.modules].filter((m) => registry.modules.has(m));
       await this.tx.sysCompanyModule.createMany({ data: ids.map((moduleId) => ({ tenantId: this.ctx.tenantId, companyId: String(result.id), moduleId })), skipDuplicates: true });
-      await setupCompany(new Session(this.tx, { ...this.ctx, companyId: String(result.id) }, true).api(), this.ctx.modules);
+      await setupCompany(new Session(this.tx, { ...this.ctx, companyId: String(result.id), modules: new Set(ids) }, true).api(), new Set(ids));
     }
     return result;
   }

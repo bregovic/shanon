@@ -66,6 +66,7 @@ import {
 import type { BasketView } from "@/modules/pos/basket";
 import type { PrintLayout } from "@/core/print";
 import { PrintDocument, QrSvg } from "@/lib/print-render";
+import { printInFrame } from "@/lib/print-frame";
 import { receiptData } from "@/lib/receipt-data";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
@@ -309,10 +310,12 @@ const useStyles = makeStyles({
   rBold: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase400 },
 });
 
-const PRINT_CSS = `@media print {
+// náhradní tisk vestavěné účtenky (bez šablony): jen účtenka, od horního okraje, stránka se může zalomit
+const PRINT_CSS = `@page { margin: 4mm; }
+@media print {
   body * { visibility: hidden !important; }
   .pos-receipt, .pos-receipt * { visibility: visible !important; }
-  .pos-receipt { position: fixed; left: 0; top: 0; width: 72mm; border: none !important; }
+  .pos-receipt { position: absolute; left: 0; top: 0; width: 72mm; border: none !important; box-shadow: none !important; }
 }`;
 
 export function PosTerminal(p: {
@@ -569,7 +572,9 @@ export function PosTerminal(p: {
         : receiptEscPos(r, L, fmt, { width, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale });
     await writeToPort(port, bytes, pr.baudRate || 9600).catch((e) => setError(String(e)));
   };
-  const printReceipt = (r: ReceiptPrint) => (serialPrinter ? escpos(r) : window.print());
+  // tisk z prohlížeče: stejná tisková stránka jako ze seznamu účtenek (šablona, papír) — skrytým rámem
+  const browserPrint = (r: ReceiptPrint) => (r.id && p.receiptLayout ? printInFrame(`/print/pos.receipt/${r.id}`) : window.print());
+  const printReceipt = (r: ReceiptPrint) => (serialPrinter ? escpos(r) : browserPrint(r));
   const connectScale = async () => {
     if (!serialSupported()) return setError(L.PrinterUnsupported);
     setScaleReady(!!(await connectScalePort()));
@@ -803,7 +808,7 @@ export function PosTerminal(p: {
     if (typeof res.data.eetQueue === "number") setEetPending(res.data.eetQueue);
     if (p.printer?.autoPrint) {
       if (serialPrinter) void escpos(res.data);
-      else setTimeout(() => window.print(), 300);
+      else setTimeout(() => void browserPrint(res.data), 300);
     } else if (serialPrinter && p.printer?.openDrawer && payment === "cash") void escpos(null, true);
   };
 

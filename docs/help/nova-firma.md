@@ -8,10 +8,14 @@ summary: Založení účtované firmy z IČO, výchozí nastavení, uživatelé 
 ## Založení firmy
 
 1. Správa systému → [Založit firmu podle IČO / DIČ](/system/company-lookup). Zadejte IČO (české) nebo DIČ (zahraniční) a **Najít**.
-2. **Založit** – vznikne firma s údaji organizace a sídlem a spustí se výchozí nastavení zapnutých modulů: účtový rozvrh, číselné řady, deníky, daňové kódy, sklad, platební metody…
-3. Když firma už existuje, nabídne se **Aktualizovat z registru** (obnoví údaje a doplní bankovní účet z registru DPH).
-4. V [Organizaci](/org/entity) doplňte bankovní účet, kontakty a **logo** (tiskne se na fakturách a účtenkách).
-5. V [Uživatelé](/system/users) přidělte firmu uživatelům (role, správce firmy).
+2. **Založit** – vznikne firma s údaji organizace a sídlem. Nová firma má zapnuté jen **minimum modulů** (Systém,
+   Organizace, Adresář).
+3. Přepněte se na ni (výběr firmy v hlavičce) a ve **Správě systému → [Moduly](/system/modules)** zapněte agendy, které
+   firma potřebuje (Hlavní kniha, Odběratelé, Pokladna…). Zapnutí spustí jejich výchozí nastavení: účtový rozvrh, číselné
+   řady, deníky, daňové kódy, sklad, platební metody, workflow…
+4. Když firma už existuje, nabídne se **Aktualizovat z registru** (obnoví údaje a doplní bankovní účet z registru DPH).
+5. V [Organizaci](/org/entity) doplňte bankovní účet, kontakty a **logo** (tiskne se na fakturách a účtenkách).
+6. V [Uživatelé](/system/users) přidělte firmu uživatelům (role, správce firmy).
 
 ## Dodavatelé a položky importem
 
