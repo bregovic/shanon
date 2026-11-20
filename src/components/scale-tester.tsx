@@ -4,7 +4,7 @@
  * a automatické hledání nastavení (rychlost × parita × dotaz běžných protokolů). Nalezené nastavení jde
  * uložit do napojení váhy. Slouží k rozchození nové váhy, než se zná její protokol.
  */
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { Badge, Button, Dropdown, Field, Input, makeStyles, MessageBar, MessageBarBody, Option, ProgressBar, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Text, tokens } from "@fluentui/react-components";
 import { PlugConnected24Regular, Search24Regular, Send24Regular } from "@fluentui/react-icons";
 import { saveRecordAction } from "@/app/actions";
@@ -107,6 +107,9 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
   const [hits, setHits] = useState<Hit[]>([]);
   const [custom, setCustom] = useState("");
   const [verdict, setVerdict] = useState<{ ok: boolean; lines: string[] } | null>(null);
+  // zkušební vážení (Dialog 06): průběžný stav váhy; stop = ukončit
+  const [live, setLive] = useState<string | null>(null);
+  const stopLive = useRef(false);
   const [connId, setConnId] = useState(connections[0]?.id ?? "");
   // podpora sériového portu jen v prohlížeči (na serveru null → nic, bez nesouladu při hydrataci)
   const supported = useSyncExternalStore(
@@ -208,6 +211,8 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           setHits([...found]);
           add(`← [${settingsText(settings)}] ${id}: ${ascii(got)}   HEX ${hex(got)}   (${L[`K_${c.kind}`]})`);
           if (c.kind === "weight") break outer;
+          // váha potvrdila cenu Dialog 06 = protokol i linka známé; dál už jen Zkusit vážení
+          if (id === "Dialog 06" && got.includes(0x06)) break outer;
         }
       }
       const weight = found.find((h) => h.kind === "weight");
@@ -251,6 +256,56 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       });
     });
 
+  /**
+   * Zkušební vážení (Dialog 06) jako na pokladně: prázdná váha → cena 100,00 Kč/kg → výzva položit zboží →
+   * dotazy po 0,5 s (30 s); průběžně ukazuje stav / hmotnost a kód stavu, konec u hmotnosti s cenou z váhy.
+   */
+  const weighTest = () =>
+    run(async () => {
+      if (!port) return;
+      // nastavení linky: z poslední odpovědi Dialog 06 v diagnostice, jinak ruční (Pro servis)
+      const d06 = hits.find((h) => h.probe === "Dialog 06" && h.bytes.includes(0x06));
+      const line = d06?.settings ?? s;
+      stopLive.current = false;
+      const ack = await serialExchange(port, line, encodeUnitPrice(10000), 700);
+      add(`→ [${settingsText(line)}] ${L.WeighPrice}  ← ${hex(ack) || L.NoAnswer}`);
+      if (!ack.includes(0x06)) {
+        setLive(L.WeighNoAck);
+        return;
+      }
+      setLive(L.WeighPlace);
+      let last = "";
+      for (let k = 0; k < 60 && !stopLive.current; k++) {
+        const r = await serialExchange(port, line, encodeStatusRequest(), 450);
+        let text = "";
+        let bytes = r;
+        if (r.includes(0x15)) {
+          const st = await serialExchange(port, line, encodeStatusQuery(), 450);
+          bytes = [...r, ...st];
+        }
+        const parsed = recognizeDialog06(bytes);
+        if (parsed?.kg !== null && parsed?.kg !== undefined) {
+          text = L.WeighDone.replace("{kg}", parsed.kg.toFixed(3)).replace("{price}", parsed.note ?? "");
+          setLive(text);
+          add(`← ${hex(bytes)}  ${text}`);
+          const hit: Hit = { settings: line, probe: "Dialog 06", bytes, parsed: { ...parsed, protocol: "dialog06" } };
+          setHits((h) => [...h, hit]);
+          if (connections.length) await save(hit, true);
+          setVerdict({ ok: true, lines: [text] });
+          return;
+        }
+        text = parsed?.note ? `${L.WeighStatus} ${parsed.note}` : hex(bytes) || L.NoAnswer;
+        if (text !== last) add(`← ${hex(bytes)}  ${text}`);
+        last = text;
+        setLive(`${L.WeighPlace} · ${text}`);
+        await new Promise((w) => setTimeout(w, 50));
+      }
+      setLive(L.WeighTimeout.replace("{last}", last));
+    }).finally(() => {
+      // vymazat cenu ve váze (záznam 01 s cenou 0)
+      if (port) void serialExchange(port, hits.find((h) => h.probe === "Dialog 06")?.settings ?? s, encodeUnitPrice(0), 300).catch(() => undefined);
+    });
+
   const save = async (h: Hit, silent = false): Promise<boolean> => {
     if (!h.parsed || !connId) return false;
     const c = connections.find((x) => x.id === connId);
@@ -276,6 +331,14 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           {port ? L.Reconnect : L.Connect}
         </Button>
         {port && <Badge color="success">{L.Connected}</Badge>}
+        {hits.some((h) => h.probe === "Dialog 06" && h.bytes.includes(0x06)) &&
+          (busy && live !== null ? (
+            <Button onClick={() => (stopLive.current = true)}>{L.WeighStop}</Button>
+          ) : (
+            <Button appearance="primary" disabled={!port || busy} onClick={weighTest}>
+              {L.WeighTest}
+            </Button>
+          ))}
         <Button appearance="primary" icon={<Search24Regular />} disabled={!port || busy} onClick={scan}>
           {L.Scan}
         </Button>
@@ -293,6 +356,11 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       </div>
       {!connections.length && <Text size={200}>{L.NoConnection}</Text>}
       {progress !== null && <ProgressBar value={progress} />}
+      {live && (
+        <MessageBar intent="info">
+          <MessageBarBody>{live}</MessageBarBody>
+        </MessageBar>
+      )}
       {verdict && (
         <MessageBar intent={verdict.ok ? "success" : "warning"} layout="multiline">
           <MessageBarBody>

@@ -12,7 +12,7 @@ export const metadata = { title: "Zkouška váhy" };
 const KEYS = [
   "Intro", "Connect", "Reconnect", "Connected", "Baud", "Frame", "Manual", "Listen", "CustomHint", "Send", "Scan", "ScanHint", "ScanDone", "ScanNothing",
   "Settings", "Probe", "Answer", "Weight", "Use", "SaveTo", "NoConnection", "Log", "NoAnswer", "Unsupported", "Saved", "Unstable",
-  "P_toledo8217", "P_casEcr", "P_continuous", "P_dialog06", "Dialog06", "Dialog06All", "K_weight", "K_ack", "K_nak", "K_text", "K_noise", "DiagWeight", "DiagLine", "DiagText", "DiagNoise", "DiagSilent", "DiagNext", "DiagSaved", "DiagReacted", "PortBusy", "Service", "DiagD06", "DiagD06Saved",
+  "P_toledo8217", "P_casEcr", "P_continuous", "P_dialog06", "Dialog06", "Dialog06All", "K_weight", "K_ack", "K_nak", "K_text", "K_noise", "DiagWeight", "DiagLine", "DiagText", "DiagNoise", "DiagSilent", "DiagNext", "DiagSaved", "DiagReacted", "PortBusy", "Service", "DiagD06", "DiagD06Saved", "WeighTest", "WeighStop", "WeighPrice", "WeighNoAck", "WeighPlace", "WeighStatus", "WeighDone", "WeighTimeout",
 ];
 
 export default async function ScaleTestPage({ searchParams }: { searchParams: Promise<{ conn?: string }> }) {
