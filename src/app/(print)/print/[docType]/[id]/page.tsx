@@ -8,9 +8,9 @@ import { printJob } from "@/server/print";
 
 export const metadata = { title: "Tisk" };
 
-export default async function PrintPage({ params, searchParams }: { params: Promise<{ docType: string; id: string }>; searchParams: Promise<{ template?: string; auto?: string }> }) {
+export default async function PrintPage({ params, searchParams }: { params: Promise<{ docType: string; id: string }>; searchParams: Promise<{ template?: string; auto?: string; embed?: string }> }) {
   const { docType, id } = await params;
-  const { template, auto } = await searchParams;
+  const { template, auto, embed } = await searchParams;
   const s = await requireSession();
   const t = await getT(s.lang, s.ctx.tenantId);
   let job;
@@ -28,6 +28,7 @@ export default async function PrintPage({ params, searchParams }: { params: Prom
         templates={job.templates}
         templateId={job.templateId}
         autoPrint={auto === "1"}
+        embed={embed === "1"}
         pdfHref={`/api/pdf/${docType}/${id}`}
         labels={{ print: t("@PRT:Print"), template: t("@PRT:Template1"), back: t("@PRT:Back"), pdf: t("@PRT:Pdf") }}
       />

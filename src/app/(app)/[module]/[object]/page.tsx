@@ -85,6 +85,8 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       }
       printHref={s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/batch` : undefined}
       printLabel={t("@PRT:Print")}
+      printDialog={{ title: t("@PRT:Print"), print: t("@PRT:Print"), pdf: t("@PRT:Pdf"), email: t("@INT:SendByEmail"), newWindow: t("@PRT:OpenNewWindow"), close: t("@PRT:Close") }}
+      emailAction={can(s.ctx.perms, def.id, "write") && (def.actions ?? []).some((a) => a.id === "email" && (!a.module || s.ctx.modules.has(a.module)))}
       bulkDoneLabel={t("@SYS:BulkDone")}
       lang={s.lang}
       labels={uiLabels(t)}

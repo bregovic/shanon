@@ -9,9 +9,9 @@ import { batchIds, printJob } from "@/server/print";
 
 export const metadata = { title: "Tisk" };
 
-export default async function PrintBatchPage({ params, searchParams }: { params: Promise<{ docType: string }>; searchParams: Promise<{ ids?: string; template?: string; auto?: string }> }) {
+export default async function PrintBatchPage({ params, searchParams }: { params: Promise<{ docType: string }>; searchParams: Promise<{ ids?: string; template?: string; auto?: string; embed?: string }> }) {
   const { docType } = await params;
-  const { ids: raw, template, auto } = await searchParams;
+  const { ids: raw, template, auto, embed } = await searchParams;
   const s = await requireSession();
   const t = await getT(s.lang, s.ctx.tenantId);
   const jobs = [];
@@ -32,6 +32,7 @@ export default async function PrintBatchPage({ params, searchParams }: { params:
         templates={first.templates}
         templateId={first.templateId}
         autoPrint={auto === "1"}
+        embed={embed === "1"}
         pdfHref={`/api/pdf/${docType}/batch?ids=${jobs.length ? encodeURIComponent(String(raw)) : ""}`}
         labels={{ print: t("@PRT:Print"), template: t("@PRT:Template1"), back: t("@PRT:Back"), pdf: t("@PRT:Pdf") }}
       />

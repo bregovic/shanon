@@ -31,6 +31,7 @@ import {
   Text,
 } from "@fluentui/react-components";
 import { actionIcon } from "./action-icon";
+import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
 import { WorkflowBar, type WorkflowBarLabels } from "./workflow-bar";
 import type { WorkflowBarData } from "@/server/workflow-bar";
 import type { ActionIcon as ActionIconName } from "@/core/object";
@@ -98,6 +99,8 @@ export interface ObjectDetailProps {
   canDuplicate?: boolean;
   /** tisk podle šablony (Tiskové sestavy) */
   printHref?: string;
+  /** texty tiskového dialogu */
+  printDialog?: PrintDialogLabels;
   /** hlavička jako kompaktní pruh (deník), řádky přes celou stránku */
   compactHeader?: boolean;
   collapseHeader?: boolean;
@@ -319,6 +322,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   const [busy, start] = useTransition();
   const [confirm, setConfirm] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [printing, setPrinting] = useState(false);
   // uložený doklad s mřížkou řádků (deník): hlavička sbalená do souhrnu, rozbalí se tlačítkem
   const collapsible = !!p.compactHeader && !!p.id && (p.lines.some((l) => l.inline) || (!!p.collapseHeader && p.lines.length > 0));
   const [headerOpen, setHeaderOpen] = useState(!collapsible);
@@ -497,7 +501,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           const printItems = [
             ...(p.printHref
               ? [
-                  <MenuItem key="print" icon={<Print24Regular />} onClick={() => window.open(p.printHref, "_blank")}>
+                  <MenuItem key="print" icon={<Print24Regular />} onClick={() => setPrinting(true)}>
                     {p.labels.actions.print}
                   </MenuItem>,
                   <MenuItem key="pdf" icon={<DocumentPdf24Regular />} onClick={() => window.open(p.printHref!.replace(/^\/print\//, "/api/pdf/"), "_blank")}>
@@ -628,6 +632,16 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           ))}
       </PageContent>
 
+      {p.printHref && p.printDialog && p.id && (
+        <PrintDialog
+          open={printing}
+          onClose={() => setPrinting(false)}
+          src={p.printHref}
+          pdfHref={p.printHref.replace(/^\/print\//, "/api/pdf/")}
+          email={p.actions.some((a) => a.id === "email" && !a.disabled) ? { objectId: p.objectId, id: p.id } : null}
+          labels={p.printDialog}
+        />
+      )}
       {p.postingPreview && p.id && <PostingPreviewDrawer objectId={p.objectId} id={p.id} open={posting} onClose={() => setPosting(false)} labels={p.labels.posting} lang={p.lang} />}
 
       {unsaved.dialog(p.labels.drawer.unsaved)}

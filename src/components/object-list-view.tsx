@@ -22,6 +22,7 @@ import {
   ToolbarDivider,
 } from "@fluentui/react-components";
 import { actionIcon } from "./action-icon";
+import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
 import type { ActionIcon as ActionIconName } from "@/core/object";
 import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction } from "@/app/actions";
@@ -68,6 +69,10 @@ export interface ObjectListProps {
   bulkActions?: { id: string; label: string; icon?: ActionIconName }[];
   /** hromadný tisk vybraných dokladů (tisknutelný objekt): adresa `/print/<objekt>/batch` */
   printHref?: string;
+  /** texty tiskového dialogu */
+  printDialog?: PrintDialogLabels;
+  /** objekt má akci Odeslat e-mailem (nabídne ji tiskový dialog u jednoho dokladu) */
+  emailAction?: boolean;
   printLabel?: string;
   /** „Hotovo {ok} z {n}.“ */
   bulkDoneLabel?: string;
@@ -171,6 +176,8 @@ export function ObjectListView(p: ObjectListProps) {
 
   const [info, setInfo] = useState<string>();
   const [bulkBusy, setBulkBusy] = useState(false);
+  // tiskový dialog: vybrané záznamy (null = zavřený)
+  const [printing, setPrinting] = useState<string[] | null>(null);
   const bulk = async (actionId: string) => {
     setBulkBusy(true);
     // po jednom záznamu (vytěžení dokladu trvá desítky sekund) — průběh „3/10“
@@ -241,7 +248,7 @@ export function ObjectListView(p: ObjectListProps) {
           <Button
             icon={<Print24Regular />}
             disabled={!selected.length || selected.length > 100}
-            onClick={() => window.open(`${p.printHref}?ids=${selected.map((x) => String(x.id)).join(",")}`, "_blank")}
+            onClick={() => setPrinting(selected.map((x) => String(x.id)))}
           >
             {p.printLabel}
           </Button>
@@ -319,6 +326,17 @@ export function ObjectListView(p: ObjectListProps) {
           onViewChange={setView}
         />
       </PageContent>
+
+      {p.printHref && p.printDialog && printing && (
+        <PrintDialog
+          open
+          onClose={() => setPrinting(null)}
+          src={`${p.printHref}?ids=${printing.join(",")}`}
+          pdfHref={`${p.printHref.replace(/^\/print\//, "/api/pdf/")}?ids=${printing.join(",")}`}
+          email={p.emailAction && printing.length === 1 ? { objectId: p.objectId, id: printing[0] } : null}
+          labels={p.printDialog}
+        />
+      )}
 
       {merge && mergeTarget && (
         <Dialog open onOpenChange={(_, d) => !d.open && setMerge(false)}>
