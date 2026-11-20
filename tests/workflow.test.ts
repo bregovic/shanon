@@ -1,7 +1,7 @@
 /**
- * Workflow — pracovní položky: založení bez duplicit, uzavření, akce Hotovo, osobní upozornění, filtr „me“;
- * vytěžování: jistý doklad se zalistuje sám s úkolem Zkontrolovat, nejistý / chybný → úkol Doplnit údaje,
- * zalistování úkoly uzavře, odmítnutí je zruší, portál → úkol odpovědné osobě bez zalistování.
+ * Workflow — pracovní položky (založení bez duplicit, uzavření, Hotovo, upozornění, filtr „me“) a výchozí workflow:
+ * doklad z integrace → založit partnera a zalistovat, jinak úkol původci (Hotovo krok zopakuje, ruční zalistování ho dokončí);
+ * přijatá faktura → schválení vlastníkem (zamčené Zaúčtovat) → zaúčtování, zamítnutí; chyba vytěžení, odmítnutí, portál.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPrisma } from "@/server/db";
@@ -11,6 +11,9 @@ import { provisionTenant } from "@/server/provision";
 import { processPendingDocuments } from "@/server/doc-import";
 import { listNotices } from "@/server/notices";
 import { closeWorkItems, createWorkItem } from "@/modules/wf/work";
+import { applyExtraction } from "@/modules/int/documents";
+import type { OcrResult } from "@/modules/int/ocr";
+import { fireWorkflowEvent } from "@/server/workflow";
 
 const client = createPrisma();
 const run = Date.now().toString(36);
@@ -84,28 +87,46 @@ describe("workflow — pracovní položky", () => {
     expect((await tasks(T, { status: "open" })).length).toBe(0);
   }, 120_000);
 
-  it("vytěžování: jistý → zalistovat + Zkontrolovat; nejistý / chyba → Doplnit údaje; zalistování a odmítnutí úkoly uzavřou; portál", async () => {
+  it("výchozí workflow: doklad z integrace → partner + zalistování nebo úkol původci; přijatá faktura → schválení vlastníkem → zaúčtování", async () => {
     process.env.SHANON_TEST_OCR_KEY = "sk-test";
     const T = (await provisionTenant(client, { code: `t-wfo-${run}`, name: "WfO", adminEmail: `wfo-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap", "int"], company: { code: "U", name: "Uzeniny Test" } })).ctx;
     expect(T.modules.has("wf")).toBe(true); // Integrace závisí na Workflow
+    // výchozí nastavení: typy účastníků a dvě workflow
+    expect((await listRecords(T, "wf.definition", {}, client)).rows.map((d) => d.code)).toEqual(["WF-DOKLADY", "WF-PRIJATE"]);
+    const owners = (await listRecords(T, "wf.participantType", {}, client)).rows;
+    expect(owners.map((p) => p.code)).toEqual(["ACCOUNTANT", "OWNER"]);
+    const ownerUser = await client.sysUser.create({ data: { tenantId: T.tenantId, email: `wfown-${run}@test.local`, name: "Olga Vlastník", passwordHash: "x" } });
+    await client.sysUserCompany.create({ data: { tenantId: T.tenantId, userId: ownerUser.id, companyId: T.companyId! } });
+    await saveRecord(T, "wf.participantType", String(owners.find((p) => p.code === "OWNER")!.id), { userId: ownerUser.id }, undefined, client);
+    const O: Ctx = { ...T, userId: ownerUser.id, userName: "Olga Vlastník" };
+
     await saveRecord(T, "sys.company", T.companyId!, { regNo: "87654321" }, undefined, client);
     await saveRecord(T, "int.connection", null, { code: "OCR", name: "OCR", kind: "ocr", driver: "openaiTest", dailyLimit: 100 }, undefined, client);
     const subj = await saveRecord(T, "gab.subject", null, { name: "Masna Novák s.r.o.", regNo: "12345678" }, undefined, client);
     const [grp] = (await listRecords(T, "ap.group", {}, client)).rows;
     await saveRecord(T, "ap.vendor", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const runsOf = async (refId: string) => (await listRecords(T, "wf.instance", { filter: { refId }, pageSize: 10 }, client)).rows;
 
-    // 1) jistý a připravený → zalistováno + úkol Zkontrolovat (původci = kdo nahrál) s odkazem na fakturu
+    // 1) jistý a připravený → zalistováno; faktura čeká na schválení vlastníkem, ručně zaúčtovat nejde
     fakeOpenAi(() => invoice());
     const d1 = await newDoc(T);
-    const r1 = (await runAction(T, "int.document", String(d1.id), "extract", client)) as unknown;
-    void r1;
+    await runAction(T, "int.document", String(d1.id), "extract", client);
     const x1 = (await getRecord(T, "int.document", String(d1.id), client))!;
     expect([x1.status, x1.confidence, x1.resultObject]).toEqual(["listed", "high", "ap.invoice"]);
-    const [rev] = await tasks(T, { status: "open", kind: "review" });
-    expect([rev.refObject, rev.refId, rev.assignedTo]).toEqual(["ap.invoice", x1.resultId, T.userId]);
-    expect((await listNotices(T, "cs")).items.some((n) => n.href === `/wf/workItem/${rev.id}`)).toBe(true);
+    expect((await runsOf(String(d1.id))).map((r) => r.status)).toEqual(["completed"]);
+    const [run1] = await runsOf(String(x1.resultId));
+    expect([run1.status, run1.stepName]).toEqual(["waiting", "Kontrola a schválení"]);
+    const [appr] = await tasks(T, { status: "open", kind: "approval" });
+    expect([appr.refObject, appr.refId, appr.assignedTo, appr.instanceId]).toEqual(["ap.invoice", x1.resultId, ownerUser.id, run1.id]);
+    expect((await listNotices(O, "cs")).items.some((n) => n.href === `/wf/workItem/${appr.id}`)).toBe(true);
+    await expect(runAction(T, "ap.invoice", String(x1.resultId), "post", client)).rejects.toMatchObject({ label: "@WF:Locked" });
+    // schválit → zaúčtuje se samo
+    await runAction(O, "wf.workItem", String(appr.id), "approve", client);
+    expect((await getRecord(T, "ap.invoice", String(x1.resultId), client))!.status).toBe("posted");
+    expect((await runsOf(String(x1.resultId)))[0].status).toBe("completed");
 
-    // 2) nejistý → ke kontrole s vyjmenovanými poli + úkol Doplnit údaje; ruční zalistování ho uzavře
+    // 2) nejistý → ke kontrole + úkol Doplnit údaje původci (kdo nahrál); ruční zalistování krok dokončí;
+    //    zamítnutá faktura zůstane v konceptu a jde zaúčtovat ručně
     fakeOpenAi(() => invoice({ confidence: "medium", uncertainFields: ["amountGross", "issueDate"] }));
     const d2 = await newDoc(T);
     await runAction(T, "int.document", String(d2.id), "extract", client);
@@ -113,30 +134,59 @@ describe("workflow — pracovní položky", () => {
     expect([x2.status, x2.uncertain]).toEqual(["attention", "amountGross, issueDate"]);
     expect(String(x2.message)).toContain("Nejisté údaje: amountGross, issueDate");
     const [fix] = await tasks(T, { status: "open", kind: "fix" });
-    expect([fix.refObject, fix.refId, String(fix.title)]).toEqual(["int.document", String(d2.id), `Doplnit údaje dokladu ${x2.docNum}`]);
+    expect([fix.refObject, fix.refId, fix.assignedTo]).toEqual(["int.document", String(d2.id), T.userId]);
+    expect(String(fix.title)).toContain(`Doplnit údaje: ${x2.docNum}`);
+    expect(String(fix.description)).toContain("Nejisté údaje");
     await runAction(T, "int.document", String(d2.id), "list", client);
     expect((await getRecord(T, "wf.workItem", String(fix.id), client))!.status).toBe("done");
+    expect((await runsOf(String(d2.id)))[0].status).toBe("completed");
+    const inv2 = String((await getRecord(T, "int.document", String(d2.id), client))!.resultId);
+    const appr2 = (await tasks(T, { status: "open", kind: "approval" })).find((w) => w.refId === inv2)!;
+    await runAction(O, "wf.workItem", String(appr2.id), "reject", client);
+    expect((await runsOf(inv2))[0].status).toBe("rejected");
+    expect((await getRecord(T, "ap.invoice", inv2, client))!.status).toBe("draft");
+    await runAction(T, "ap.invoice", inv2, "post", client);
 
-    // 3) chyba vytěžení → úkol „vytěžení selhalo“; odmítnutí dokladu úkol zruší
-    fakeOpenAi(() => null, 500);
+    // 3) nový dodavatel s IČO → založí se sám; chybí číslo dokladu → úkol, po doplnění Hotovo krok zopakuje
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 404 })); // registr nedostupný
     const d3 = await newDoc(T);
-    await expect(runAction(T, "int.document", String(d3.id), "extract", client)).rejects.toThrow();
-    const failed = (await tasks(T, { status: "open", kind: "fix" })).find((w) => w.refId === String(d3.id))!;
+    await inTenant(T, async (s) => {
+      const api = s.sys().api();
+      const company = await api.get("sys.company", T.companyId!);
+      await applyExtraction(api, (await api.get("int.document", String(d3.id)))!, invoice({ docNumber: null, issuer: { ...invoice().issuer, name: "Pekárna Nová", regNo: "99887766", vatId: null } }) as OcrResult, company, s.sys().eventCtx("int.document").t);
+    }, client);
+    await inTenant(T, (s) => fireWorkflowEvent(s.sys(), "int.document", String(d3.id), "extracted"), client);
+    const fix3 = (await tasks(T, { status: "open", kind: "fix" })).find((w) => w.refId === String(d3.id))!;
+    expect(String(fix3.description)).toContain("číslo");
+    await saveRecord(T, "int.document", String(d3.id), { docNumber: "PN-77" }, undefined, client);
+    await runAction(T, "wf.workItem", String(fix3.id), "done", client);
+    const x3 = (await getRecord(T, "int.document", String(d3.id), client))!;
+    expect([x3.status, x3.resultObject]).toEqual(["listed", "ap.invoice"]);
+    expect((await listRecords(T, "ap.vendor", {}, client)).total).toBe(2);
+
+    // 4) chyba vytěžení → úkol „vytěžení selhalo“; odmítnutí dokladu úkol zruší
+    fakeOpenAi(() => null, 500);
+    const d4 = await newDoc(T);
+    await expect(runAction(T, "int.document", String(d4.id), "extract", client)).rejects.toThrow();
+    const failed = (await tasks(T, { status: "open", kind: "fix" })).find((w) => w.refId === String(d4.id))!;
     expect(String(failed.title)).toContain("selhalo");
     expect(String(failed.description)).toContain("model overloaded");
-    await runAction(T, "int.document", String(d3.id), "reject", client);
+    await runAction(T, "int.document", String(d4.id), "reject", client);
     expect((await getRecord(T, "wf.workItem", String(failed.id), client))!.status).toBe("cancelled");
 
-    // 4) portál: připravený doklad se nezalistuje sám, úkol dostane odpovědná osoba portálu (dávka)
+    // 5) portál: připravený doklad se nezalistuje sám, úkol dostane odpovědná osoba portálu (dávka)
     const resp = await client.sysUser.create({ data: { tenantId: T.tenantId, email: `wfo2-${run}@test.local`, name: "Jana Nákup", passwordHash: "x" } });
     const portal = await saveRecord(T, "int.portal", null, { name: "Portál", responsible: resp.id }, undefined, client);
-    const d4 = await newDoc(T);
-    await client.intDocument.update({ where: { id: String(d4.id) }, data: { source: "portal", portalId: String(portal.id) } });
-    fakeOpenAi(() => invoice());
+    const d5 = await newDoc(T);
+    await client.intDocument.update({ where: { id: String(d5.id) }, data: { source: "portal", portalId: String(portal.id) } });
+    fakeOpenAi(() => invoice({ docNumber: "FA-PORTAL" }));
     await processPendingDocuments(T, client);
-    const x4 = (await getRecord(T, "int.document", String(d4.id), client))!;
-    expect(x4.status).toBe("ready");
-    const t4 = (await tasks(T, { status: "open" })).find((w) => w.refId === String(d4.id))!;
-    expect([t4.kind, t4.assignedTo]).toEqual(["review", resp.id]);
-  }, 180_000);
+    const x5 = (await getRecord(T, "int.document", String(d5.id), client))!;
+    expect(x5.status).toBe("ready");
+    const t5 = (await tasks(T, { status: "open" })).find((w) => w.refId === String(d5.id))!;
+    expect([t5.kind, t5.assignedTo]).toEqual(["fix", resp.id]);
+    // vlastní zalistování z portálu krok dokončí
+    await runAction(T, "int.document", String(d5.id), "list", client);
+    expect((await getRecord(T, "wf.workItem", String(t5.id), client))!.status).toBe("done");
+  }, 240_000);
 });

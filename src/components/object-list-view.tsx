@@ -21,7 +21,9 @@ import {
   MessageBarBody,
   ToolbarDivider,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
+import { actionIcon } from "./action-icon";
+import type { ActionIcon as ActionIconName } from "@/core/object";
+import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
@@ -63,7 +65,7 @@ export interface ObjectListProps {
   /** Sloučit vybrané záznamy (ObjectDef.mergeable) */
   mergeable?: boolean;
   /** akce nad víc vybranými záznamy (výpisy → deník HK) */
-  bulkActions?: { id: string; label: string }[];
+  bulkActions?: { id: string; label: string; icon?: ActionIconName }[];
   /** hromadný tisk vybraných dokladů (tisknutelný objekt): adresa `/print/<objekt>/batch` */
   printHref?: string;
   printLabel?: string;
@@ -231,7 +233,7 @@ export function ObjectListView(p: ObjectListProps) {
           </Button>
         )}
         {(p.bulkActions ?? []).map((a) => (
-          <Button key={a.id} icon={<Play24Regular />} disabled={!selected.length || bulkBusy} onClick={() => void bulk(a.id)}>
+          <Button key={a.id} icon={actionIcon(a)} disabled={!selected.length || bulkBusy} onClick={() => void bulk(a.id)}>
             {a.label}
           </Button>
         ))}

@@ -259,7 +259,6 @@ export const connection = defineObject({
     // vytěžování dokladů
     model: { edt: Str("OcrModel", "@INT:Model", 60), visibleWhen: OCR },
     dailyLimit: { edt: Edts.Int, label: "@INT:DailyLimit", default: 50, visibleWhen: OCR },
-    autoList: { edt: Edts.NoYes, label: "@INT:AutoList", default: true, visibleWhen: OCR },
     /** komu jdou úkoly k dokladům bez původce (dávka, e-mail) */
     responsible: { edt: Edts.User, label: "@INT:Responsible", visibleWhen: OCR },
     // pošta (SMTP)
@@ -288,7 +287,7 @@ export const connection = defineObject({
     { label: "@INT:GatewaySimSettings", fields: ["posQr"], visibleWhen: { field: "driver", in: ["gatewaySim"] } },
     { label: "@INT:ScaleSettings", fields: ["scaleProtocol", "scaleSerial", "scaleAutoAddSec", "baudRate", "dataBits", "parity", "stopBits"], visibleWhen: { field: "driver", in: ["scaleSerial", "scaleSim"] } },
     { label: "@INT:ApiSettings", fields: ["scopes", "tokenPrefix"], visibleWhen: API },
-    { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "autoList", "responsible"], visibleWhen: OCR },
+    { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "responsible"], visibleWhen: OCR },
     { label: "@INT:MailSettings", fields: ["smtpHost", "smtpPort", "smtpSecurity", "smtpUser", "smtpPassword", "fromEmail", "fromName", "replyTo", "bccSelf", "signature"], visibleWhen: MAIL },
     { label: "@INT:State", fields: ["lastCheckAt", "lastResult"] },
   ],
@@ -445,9 +444,8 @@ export const document = defineObject({
   actions: [
     { id: "extract", label: "@INT:Extract", outside: true, bulk: true },
     { id: "check", label: "@INT:Check" },
-    { id: "createPartner", label: "@INT:CreatePartner", module: "gab" },
     // po zalistování / zamítnutí v detailu rovnou další doklad ke zpracování
-    { id: "list", label: "@INT:ListDoc", outside: true, bulk: true, next: { field: "status", in: ["new", "attention", "ready", "error"] } },
+    { id: "list", label: "@INT:ListDoc", bulk: true, next: { field: "status", in: ["new", "attention", "ready", "error"] } },
     { id: "reject", label: "@INT:Reject", next: { field: "status", in: ["new", "attention", "ready", "error"] } },
   ],
   lockedWhen: { field: "status", equals: "listed" },
@@ -706,7 +704,6 @@ export default defineModule({
       DrvOpenaiTest: "OpenAI – testovací klíč serveru",
       Model: "Model",
       DailyLimit: "Denní limit dokladů",
-      AutoList: "Zalistovat jistě vytěžené automaticky",
       Responsible: "Odpovědná osoba",
       Confidence: "Jistota vytěžení",
       ConfidenceHigh: "Jisté",
@@ -790,7 +787,8 @@ export default defineModule({
       DocImportOpenList: "Doklady ke zpracování",
       DocImportUploading: "Nahrávám…",
       DocNoTarget: "Vyberte, jako co doklad zalistovat.",
-      DocNoPartner: "Partner {name} není v agendě — založte ho.",
+      DocNoPartner: "Partner {name} není v agendě a doklad nemá IČO ani DIČ — doplňte je, nebo partnera založte.",
+      DocNewPartner: "Partner {name} se při zalistování založí podle IČO / DIČ.",
       DocModuleOff: "Agenda pro tento doklad není zapnutá.",
       DocNoDate: "Chybí datum vystavení.",
       DocNoNumber: "Chybí číslo dokladu.",
@@ -1057,7 +1055,6 @@ export default defineModule({
       DrvOpenaiTest: "OpenAI – server test key",
       Model: "Model",
       DailyLimit: "Daily document limit",
-      AutoList: "List confidently extracted documents automatically",
       Responsible: "Responsible person",
       Confidence: "Extraction confidence",
       ConfidenceHigh: "Confident",
@@ -1141,7 +1138,8 @@ export default defineModule({
       DocImportOpenList: "Incoming documents",
       DocImportUploading: "Uploading…",
       DocNoTarget: "Choose what to list the document as.",
-      DocNoPartner: "Partner {name} is not in the ledger — create it.",
+      DocNoPartner: "Partner {name} is not in the ledger and the document has no ID or VAT ID — fill them in or create the partner.",
+      DocNewPartner: "Partner {name} will be created from the ID / VAT ID when listing.",
       DocModuleOff: "The ledger for this document is not enabled.",
       DocNoDate: "Issue date missing.",
       DocNoNumber: "Document number missing.",

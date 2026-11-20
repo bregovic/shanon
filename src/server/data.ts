@@ -33,7 +33,8 @@ import { can, type Level, type Perms } from "@/core/security";
 import { prisma, withTenant, type Tx } from "./db";
 import { fieldWhere, orderByFor } from "./filter-where";
 import { setupCompany } from "./setup";
-import { storageFor } from "./storage";
+import { defaultStorage, storageFor } from "./storage";
+import { flushWorkflow, queueWorkflow, workflowLock } from "./workflow";
 import { SECRET_MASK, isEncrypted, sealSecret } from "./secrets";
 import { detachMember, virtualBeforeSave } from "./virtual";
 
@@ -308,7 +309,66 @@ export class Session {
         const text = fillLabel(resolveLabel(labelTable, ref, this.ctx.lang ?? "cs"), params);
         if (this.ctx.warnings && !this.ctx.warnings.includes(text)) this.ctx.warnings.push(text);
       },
+      createdBy: (o, id) => s.createdBy(o, id),
+      copyAttachments: (fo, fid, to, tid) => s.copyAttachments(fo, fid, to, tid),
     };
+  }
+
+  /** kdo záznam založil — jen skutečný uživatel tenanta, jinak null (dávka, API, portál) */
+  async createdBy(objectId: string, id: string): Promise<string | null> {
+    const def = getObject(objectId);
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+    const row = await delegate(this.tx, def).findFirst({ where: { id, ...scopeWhere(this.ctx, def) }, select: { createdBy: true } });
+    const by = (row?.createdBy as string | null | undefined) ?? null;
+    if (!by) return null;
+    return (await this.tx.sysUser.count({ where: { id: by, tenantId: this.ctx.tenantId } })) ? by : null;
+  }
+
+  /** původce záznamu pro workflow: obsluha objektu (`originator`), jinak kdo záznam založil */
+  async originator(objectId: string, record: RecordData): Promise<string | null> {
+    const ectx = this.eventCtx(objectId);
+    for (const h of handlersFor(this.ctx, objectId)) {
+      const u = await h.originator?.(ectx, record);
+      if (u) return u;
+    }
+    return this.createdBy(objectId, String(record.id));
+  }
+
+  /** zahodit paměť čtení transakce (po návratu k savepointu) */
+  forget() {
+    forgetReads(this.tx);
+  }
+
+  /** Soubory příloh záznamu zkopírovat k jinému záznamu (v téže transakci). */
+  async copyAttachments(fromObject: string, fromId: string, toObject: string, toId: string): Promise<number> {
+    const refs = await this.tx.sysDocuRef.findMany({ where: { tenantId: this.ctx.tenantId, objectId: fromObject, recordId: fromId, kind: "file" }, orderBy: { createdAt: "asc" } });
+    const storage = defaultStorage();
+    let n = 0;
+    for (const r of refs) {
+      if (!r.storageKey) continue;
+      const data = await storageFor(r.storage).get(this.tx, this.ctx.tenantId, r.storageKey);
+      if (!data) continue;
+      const key = await storage.put(this.tx, this.ctx.tenantId, data);
+      const c = await this.tx.sysDocuRef.create({
+        data: { tenantId: this.ctx.tenantId, objectId: toObject, recordId: toId, kind: "file", name: r.name, mime: r.mime, size: r.size, storage: storage.id, storageKey: key, createdBy: this.ctx.userId },
+      });
+      await this.audit(toObject, toId, "docuref", null, { [`docuref:${c.id}`]: r.name });
+      n++;
+    }
+    return n;
+  }
+
+  /** Splňuje záznam podmínku (pole → výraz ve tvaru filtru sloupce seznamu)? Prázdná podmínka = ano. */
+  async matches(objectId: string, id: string, pairs: [string, string][]): Promise<boolean> {
+    const def = getObject(objectId);
+    const and: RecordData[] = [];
+    for (const [k, expr] of pairs) {
+      if (!(k in def.fields)) return false;
+      const w = def.fields[k].edt.user ? await this.userWhere(k, expr) : fieldWhere(def, k, expr, this.ctx.lang ?? "cs");
+      if (w) and.push(w);
+    }
+    if (!and.length) return true;
+    return (await delegate(this.tx, def).count({ where: { id, ...scopeWhere(this.ctx, def), AND: and } })) > 0;
   }
 
   /** Jedinečný klíč napříč tenanty (sys_global_key, bez RLS) — ve stejné transakci jako uložení záznamu. */
@@ -715,6 +775,8 @@ export class Session {
     forgetReads(this.tx, [objectId]);
     await this.audit(objectId, String(result.id), isNew ? "create" : "update", existing && maskSecrets(def, existing), maskSecrets(def, result));
     for (const h of handlersFor(this.ctx, objectId)) await h.afterSave?.(ectx, result, isNew);
+    // workflow se spouštěčem „založení záznamu“ — po dokončení operace (doklad už má řádky), viz inTenant
+    if (isNew) queueWorkflow(this, { kind: "created", objectId, id: String(result.id) });
     // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
     if (isNew && def.id === "sys.company" && !result.virtual) {
       // agenda nové firmy = moduly firmy, ze které vzniká (pak jde upravit ve Správě systému → Moduly)
@@ -762,7 +824,7 @@ export class Session {
   }
 
   /** `checkOnly` = jen oprávnění a podmínky (akce mimo transakci, `src/server/outside.ts`) */
-  async action(objectId: string, id: string, actionId: string, file?: ActionFile, checkOnly = false): Promise<void | ActionOutcome> {
+  async action(objectId: string, id: string, actionId: string, file?: ActionFile, checkOnly = false, opts: { workflow?: boolean } = {}): Promise<void | ActionOutcome> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system);
     const a = def.actions?.find((x) => x.id === actionId);
@@ -772,6 +834,8 @@ export class Session {
     const record = await this.sys().get(objectId, id);
     if (!record) throw new UserError("@SYS:NotFound");
     if (a.when && record[a.when.field] !== a.when.equals) throw new UserError("@SYS:Locked");
+    // záznam čeká ve workflow, které akci zamyká (Zaúčtovat během schvalování) — automatický krok smí
+    if (!opts.workflow) await workflowLock(this, objectId, id, actionId);
     if (checkOnly) return;
     if (a.outside) throw new UserError("@SYS:InvalidValue");
     // osamostatnění firmy z virtuální společnosti (jádro: přímý přístup k datům všech firem)
@@ -779,7 +843,10 @@ export class Session {
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];
     if (!fn) throw new UserError("@SYS:InvalidValue");
     if (a.upload && !file) throw new UserError("@SYS:Required");
-    return fn(this.eventCtx(objectId), record, file);
+    const out = await fn(this.eventCtx(objectId), record, file);
+    // provedená akce: spouštěč „akce“, pokračování čekajícího kroku, dokončení úkolu workflow
+    queueWorkflow(this, { kind: "action", objectId, id, name: actionId, byWorkflow: !!opts.workflow });
+    return out;
   }
 
   /** Akce se souborem ke stažení — stačí právo číst záznam. */
@@ -817,7 +884,13 @@ export class Session {
 export function inTenant<T>(ctx: Ctx, fn: (s: Session) => Promise<T>, client?: PrismaClient): Promise<T> {
   return withTenant(
     ctx.tenantId,
-    async (tx) => fn(new Session(tx, ctx.shared || !ctx.companyId ? ctx : { ...ctx, shared: await sharedMap(tx, ctx.tenantId, ctx.companyId) })),
+    async (tx) => {
+      const s = new Session(tx, ctx.shared || !ctx.companyId ? ctx : { ...ctx, shared: await sharedMap(tx, ctx.tenantId, ctx.companyId) });
+      const out = await fn(s);
+      // spouštěče workflow nasbírané během operace (založení, akce) — ve stejné transakci
+      await flushWorkflow(s);
+      return out;
+    },
     client ?? prisma,
   );
 }

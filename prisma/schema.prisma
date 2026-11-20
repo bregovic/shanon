@@ -360,6 +360,10 @@ model SysCompany {
   shopOrder_company                ShopOrder[]                @relation("ShopOrder_company")
   shopPick_company                 ShopPick[]                 @relation("ShopPick_company")
   wfWorkItem_company               WfWorkItem[]               @relation("WfWorkItem_company")
+  wfParticipantType_company        WfParticipantType[]        @relation("WfParticipantType_company")
+  wfDefinition_company             WfDefinition[]             @relation("WfDefinition_company")
+  wfDefinitionStep_company         WfDefinitionStep[]         @relation("WfDefinitionStep_company")
+  wfInstance_company               WfInstance[]               @relation("WfInstance_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -4110,7 +4114,6 @@ model IntConnection {
   tokenHash       String?   @map("token_hash") @db.VarChar(64)
   model           String?   @db.VarChar(60)
   dailyLimit      Int?      @default(50) @map("daily_limit")
-  autoList        Boolean   @default(true) @map("auto_list")
   responsible     String?   @db.VarChar(36)
   smtpHost        String?   @map("smtp_host") @db.VarChar(200)
   smtpPort        Int?      @default(587) @map("smtp_port")
@@ -4607,6 +4610,8 @@ model WfWorkItem {
   refTitle    String?   @map("ref_title") @db.VarChar(120)
   href        String?   @db.VarChar(255)
   sourceKey   String?   @map("source_key") @db.VarChar(120)
+  instanceId  String?   @map("instance_id") @db.Uuid
+  stepNum     Int?      @map("step_num")
   result      String?   @db.VarChar(255)
   completedAt DateTime? @map("completed_at")
   completedBy String?   @map("completed_by") @db.VarChar(36)
@@ -4617,13 +4622,136 @@ model WfWorkItem {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy   String?   @map("updated_by") @db.Uuid
 
-  company SysCompany @relation("WfWorkItem_company", fields: [companyId], references: [id], onDelete: Restrict)
+  company  SysCompany  @relation("WfWorkItem_company", fields: [companyId], references: [id], onDelete: Restrict)
+  instance WfInstance? @relation("WfWorkItem_instance", fields: [instanceId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
+  @@index([instanceId])
   @@index([tenantId, companyId, assignedTo, status])
   @@index([tenantId, companyId, sourceKey, status])
   @@index([tenantId, companyId, refObject, refId])
+  @@index([tenantId, companyId, instanceId])
   @@map("wf_work_item")
+}
+
+/// wf.participantType — generováno z definice objektu
+model WfParticipantType {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  userId      String?  @map("user_id") @db.VarChar(36)
+  description String?  @db.VarChar(255)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company                          SysCompany         @relation("WfParticipantType_company", fields: [companyId], references: [id], onDelete: Restrict)
+  wfDefinitionStep_participantType WfDefinitionStep[] @relation("WfDefinitionStep_participantType")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("wf_participant_type")
+}
+
+/// wf.definition — generováno z definice objektu
+model WfDefinition {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  objectId    String   @map("object_id") @db.VarChar(60)
+  trigger     String   @default("created") @db.VarChar(40)
+  triggerName String?  @map("trigger_name") @db.VarChar(40)
+  condition   String?  @db.VarChar(500)
+  lockActions String?  @map("lock_actions") @db.VarChar(120)
+  active      Boolean  @default(true)
+  description String?
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company                     SysCompany         @relation("WfDefinition_company", fields: [companyId], references: [id], onDelete: Restrict)
+  wfDefinitionStep_definition WfDefinitionStep[] @relation("WfDefinitionStep_definition")
+  wfInstance_definition       WfInstance[]       @relation("WfInstance_definition")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("wf_definition")
+}
+
+/// wf.definitionStep — generováno z definice objektu
+model WfDefinitionStep {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  definitionId      String   @map("definition_id") @db.Uuid
+  lineNum           Int      @map("line_num")
+  name              String   @db.VarChar(120)
+  kind              String   @default("approval") @db.VarChar(40)
+  action            String?  @db.VarChar(40)
+  checkAction       String?  @map("check_action") @db.VarChar(40)
+  precondition      String?  @db.VarChar(500)
+  condition         String?  @db.VarChar(500)
+  assignTo          String   @default("originator") @map("assign_to") @db.VarChar(40)
+  participantTypeId String?  @map("participant_type_id") @db.Uuid
+  userId            String?  @map("user_id") @db.VarChar(36)
+  dueDays           Int?     @map("due_days")
+  ext               Json     @default("{}")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at")
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  company         SysCompany         @relation("WfDefinitionStep_company", fields: [companyId], references: [id], onDelete: Restrict)
+  definition      WfDefinition       @relation("WfDefinitionStep_definition", fields: [definitionId], references: [id], onDelete: Restrict)
+  participantType WfParticipantType? @relation("WfDefinitionStep_participantType", fields: [participantTypeId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([definitionId])
+  @@index([participantTypeId])
+  @@map("wf_definition_step")
+}
+
+/// wf.instance — generováno z definice objektu
+model WfInstance {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  definitionId String    @map("definition_id") @db.Uuid
+  refObject    String?   @map("ref_object") @db.VarChar(60)
+  refId        String?   @map("ref_id") @db.VarChar(36)
+  refTitle     String?   @map("ref_title") @db.VarChar(120)
+  href         String?   @db.VarChar(255)
+  status       String    @default("running") @db.VarChar(40)
+  stepNum      Int?      @map("step_num")
+  stepName     String?   @map("step_name") @db.VarChar(120)
+  message      String?   @db.VarChar(255)
+  completedAt  DateTime? @map("completed_at")
+  ext          Json      @default("{}")
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by") @db.Uuid
+
+  company             SysCompany   @relation("WfInstance_company", fields: [companyId], references: [id], onDelete: Restrict)
+  definition          WfDefinition @relation("WfInstance_definition", fields: [definitionId], references: [id], onDelete: Restrict)
+  wfWorkItem_instance WfWorkItem[] @relation("WfWorkItem_instance")
+
+  @@index([tenantId, companyId])
+  @@index([definitionId])
+  @@index([tenantId, companyId, refObject, refId, status])
+  @@map("wf_instance")
 }
 
 /// qa.feature — generováno z definice objektu

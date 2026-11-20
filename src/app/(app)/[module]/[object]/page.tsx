@@ -80,7 +80,7 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       helpLabel={t("@SYS:HelpOpen")}
       bulkActions={
         can(s.ctx.perms, def.id, "write")
-          ? (def.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label) }))
+          ? (def.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon }))
           : []
       }
       printHref={s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/batch` : undefined}

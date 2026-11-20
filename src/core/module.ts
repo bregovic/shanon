@@ -124,6 +124,10 @@ export interface DataApi {
   claimGlobalKey?(namespace: string, key: string | null, ownerId: string): Promise<boolean>;
   /** nezávazné varování uživateli (uložení / akce proběhne, hláška se ukáže po ní) */
   warn?(ref: string, params?: Record<string, string>): void;
+  /** kdo záznam založil — jen skutečný uživatel tenanta (ne dávka, API, portál), jinak null */
+  createdBy?(objectId: string, id: string): Promise<string | null>;
+  /** zkopírovat soubory příloh záznamu k jinému záznamu (zalistování dokladu) */
+  copyAttachments?(fromObject: string, fromId: string, toObject: string, toId: string): Promise<number>;
 }
 
 export interface EventContext {
@@ -185,6 +189,8 @@ export interface ObjectHandlers {
   actions?: Record<string, (ctx: EventContext, record: RecordData, file?: ActionFile) => Promise<void | ActionOutcome>>;
   /** akce, které vrací soubor ke stažení (XML pro úřad, PDF…); klíč = id akce */
   downloads?: Record<string, (ctx: EventContext, record: RecordData) => Promise<DownloadFile>>;
+  /** původce záznamu pro workflow (komu jde úkol), když to není ten, kdo ho založil — null = nevím */
+  originator?: (ctx: EventContext, record: RecordData) => Promise<string | null>;
 }
 
 export interface ExtensionDef {

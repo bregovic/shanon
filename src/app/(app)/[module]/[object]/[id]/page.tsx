@@ -105,7 +105,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               // řádek s akcemi (Osamostatnit…) se otevírá na své stránce
               openInPage: !!ld.actions?.some((a) => !a.bulk),
               // hromadné akce nad vybranými řádky (deník z vybraných řádků výpisu…)
-              bulkActions: can(s.ctx.perms, ld.id, "write") ? (ld.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label) })) : [],
+              bulkActions: can(s.ctx.perms, ld.id, "write") ? (ld.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon })) : [],
               sortField: ld.defaultSort?.field,
               editable: l.owned !== false && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               initial: { rows: initial.rows, total: initial.total, totals: initial.totals },
@@ -163,7 +163,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
           ? []
           : (def.actions ?? [])
               .filter((a) => (!a.module || s.ctx.modules.has(a.module)) && (!a.adminOnly || s.ctx.perms.admin))
-              .map((a) => ({ id: a.id, label: t(a.label), upload: a.upload, download: a.download, group: a.group ?? (a.download ? "print" : "process"), confirm: a.confirm ? { value: String(record[a.confirm.field] ?? ""), text: t(a.confirm.text) } : undefined, disabled: !!a.when && record[a.when.field] !== a.when.equals }))
+              .map((a) => ({ id: a.id, label: t(a.label), icon: a.icon, upload: a.upload, download: a.download, group: a.group ?? (a.download ? "print" : "process"), confirm: a.confirm ? { value: String(record[a.confirm.field] ?? ""), text: t(a.confirm.text) } : undefined, disabled: !!a.when && record[a.when.field] !== a.when.equals }))
       }
       titleField={def.titleField}
       postingPreview={

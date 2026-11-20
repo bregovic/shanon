@@ -177,12 +177,15 @@ export interface ObjectDef {
    * process = tlačítko v liště (Zaúčtovat, Potvrdit…), print = nabídka Tisk (soubory, e-mail),
    * inquiry = nabídka Zobrazit, more = nabídka Další. Výchozí: soubor ke stažení → print, jinak process.
    */
-  actions?: { id: string; label: LabelRef; when?: { field: string; equals: unknown }; upload?: string; download?: boolean; downloadNeedsWrite?: boolean; module?: string; outside?: boolean; bulk?: boolean; group?: ActionGroup; /** jen superuživatel (oprava zaúčtovaného dokladu) */ adminOnly?: boolean; /** po akci v detailu otevřít další záznam ve frontě (pole ∈ hodnoty, podle čísla) */ next?: { field: string; in: string[] }; /** nevratná akce: uživatel musí opsat hodnotu pole (kód firmy) */ confirm?: { field: string; text: LabelRef } }[];
+  actions?: { id: string; label: LabelRef; /** ikona tlačítka (`ActionIcon`); bez ní podle druhu akce */ icon?: ActionIcon; when?: { field: string; equals: unknown }; upload?: string; download?: boolean; downloadNeedsWrite?: boolean; module?: string; outside?: boolean; bulk?: boolean; group?: ActionGroup; /** jen superuživatel (oprava zaúčtovaného dokladu) */ adminOnly?: boolean; /** po akci v detailu otevřít další záznam ve frontě (pole ∈ hodnoty, podle čísla) */ next?: { field: string; in: string[] }; /** nevratná akce: uživatel musí opsat hodnotu pole (kód firmy) */ confirm?: { field: string; text: LabelRef } }[];
   /** akce, kterou jde spustit nanečisto a ukázat vzniklé účetní zápisy a DPH (Náhled dokladu) */
   postingPreview?: string;
   /** záznam (i jeho řádky) nelze měnit ani mazat, když pole má danou hodnotu */
   lockedWhen?: { field: string; equals: unknown };
 }
+
+/** ikony tlačítek akcí (mapování na ikony Fluentu v `src/components/action-icon.tsx`) */
+export type ActionIcon = "post" | "unpost" | "approve" | "reject" | "send" | "list" | "scan" | "check" | "partner" | "cancel" | "done" | "open" | "refresh" | "calc" | "money" | "link" | "key" | "test" | "copy" | "stock" | "upload" | "print" | "mail" | "run";
 
 /** skupiny akcí v liště formuláře */
 export type ActionGroup = "process" | "print" | "inquiry" | "more";

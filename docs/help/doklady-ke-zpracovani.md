@@ -15,13 +15,23 @@ summary: Nahrání faktur a dalších dokladů, vytěžení, kontrola, založen�
 
 1. [Načíst doklady](/int/doc-import) (také z menu Dodavatelé). Zvolte **Zalistovat jako** (nebo nechte *Rozpoznat*) a nahrajte soubory – i víc najednou.
 2. Každý soubor se objeví v [Dokladech ke zpracování](/int/document) se stavem:
-   - **Připraveno** – vše sedí, lze zalistovat,
-   - **Ke kontrole** – výhrada ve sloupci *Výhrady* (chybí partner, nesedí součty, duplicita…),
+   - **Připraveno** – vše sedí, lze zalistovat (chybějící dodavatel s IČO / DIČ se při zalistování založí sám),
+   - **Ke kontrole** – výhrada ve sloupci *Výhrady* (nejisté vytěžení, chybí IČO i DIČ, nesedí součty, duplicita…),
    - **Chyba** – vytěžení se nepovedlo (zkuste **Vytěžit** znovu).
-3. Otevřete doklad, opravte údaje nebo řádky a dejte **Zkontrolovat**. Když dodavatel v agendě chybí, **Založit partnera** ho vytvoří z registru (IČO/DIČ).
-4. **Zalistovat** – vznikne koncept faktury, zálohy nebo objednávky s řádky, DPH a přiloženým souborem. Ten pak jen zkontrolujete a zaúčtujete.
+3. Otevřete doklad, opravte údaje nebo řádky a dejte **Zkontrolovat**.
+4. **Zalistovat** – chybějícího dodavatele / odběratele založí z registru (ARES podle IČO, VIES podle DIČ, jinak z vytěžených
+   údajů) a vznikne koncept faktury, zálohy nebo objednávky s řádky, DPH a přiloženým souborem.
 
-> Dávka *Vytěžení a kontrola nových dokladů* běží každých 15 minut. V napojení OCR lze zapnout **Zalistovat připravené automaticky**.
+## Automatické zpracování (workflow)
+
+Po vytěžení převezme doklad [workflow](/wf/definition) **WF-DOKLADY**: připravený doklad (ISDOC nebo vytěžení bez
+výhrad) se zalistuje sám i se založením partnera. Když údaj chybí nebo je nejistý, dostane úkol **Doplnit údaje** ten,
+kdo doklad nahrál (portál → odpovědná osoba portálu, dávka → odpovědná osoba napojení), jinak vlastník firmy. Po doplnění
+údajů dejte u úkolu **Hotovo** – doklad se znovu zkontroluje a zalistuje; nebo ho zalistujte ručně. Doklady z
+dodavatelského portálu se samy nezalistují. Na vzniklou přijatou fakturu pak naváže schválení (viz [Úkoly](/help/workflow)).
+
+> Dávka *Vytěžení a kontrola nových dokladů* běží každých 15 minut: vytěží nové doklady a předá workflow i vytěžené
+> doklady, které ho ještě nemají.
 
 ## Na co si dát pozor
 

@@ -96,6 +96,21 @@ export async function applyExtraction(data: DataApi, doc: RecordData, r: OcrResu
   return data.update("int.document", String(doc.id), { status: "attention", message: [note, checked.message].filter(Boolean).join(" · ").slice(0, 255) });
 }
 
+/**
+ * Původce dokladu (komu jdou úkoly): portál → jeho odpovědná osoba; jinak kdo doklad nahrál (je-li to uživatel);
+ * jinak odpovědná osoba napojení vytěžování; jinak nikdo.
+ */
+export async function docOriginator(data: DataApi, doc: RecordData): Promise<string | null> {
+  if (doc.source === "portal" && doc.portalId) {
+    const p = await data.get("int.portal", String(doc.portalId));
+    return (p?.responsible as string) || null;
+  }
+  const by = await data.createdBy?.("int.document", String(doc.id));
+  if (by) return by;
+  const conn = doc.connectionId ? await data.get("int.connection", String(doc.connectionId)) : null;
+  return (conn?.responsible as string) || null;
+}
+
 /** Subjekt adresáře podle IČO, jinak DIČ. */
 async function findSubject(data: DataApi, doc: RecordData): Promise<RecordData | null> {
   if (doc.regNo) {
@@ -115,6 +130,7 @@ async function findSubject(data: DataApi, doc: RecordData): Promise<RecordData |
  */
 export async function checkDocument(data: DataApi, doc: RecordData, t: T): Promise<RecordData> {
   const issues: string[] = [];
+  const notes: string[] = [];
   const tg = TARGETS[String(doc.target)];
   let partnerId: string | null = null;
   let subjectId: string | null = null;
@@ -125,7 +141,9 @@ export async function checkDocument(data: DataApi, doc: RecordData, t: T): Promi
       subjectId = subj ? String(subj.id) : null;
       const [p] = subj ? await data.find(tg.partner, { subjectId: subj.id }, { take: 1 }) : [];
       partnerId = p ? String(p.id) : null;
-      if (!partnerId) issues.push(t("@INT:DocNoPartner", { name: String(doc.partnerName ?? doc.regNo ?? "?") }));
+      // partner chybí: s IČO / DIČ ho zalistování založí samo (z registru), bez nich ne
+      if (!partnerId && !doc.regNo && !doc.vatId) issues.push(t("@INT:DocNoPartner", { name: String(doc.partnerName ?? "?") }));
+      else if (!partnerId) notes.push(t("@INT:DocNewPartner", { name: String(doc.partnerName ?? doc.regNo ?? doc.vatId) }));
       else if (p.blocked) issues.push(t("@SYS:PartnerBlocked"));
     } catch {
       issues.push(t("@INT:DocModuleOff"));
@@ -155,7 +173,7 @@ export async function checkDocument(data: DataApi, doc: RecordData, t: T): Promi
     subjectId,
     [tg?.field === "customerId" ? "customerId" : "vendorId"]: partnerId,
     status: issues.length ? "attention" : "ready",
-    message: issues.join(" · ").slice(0, 255) || null,
+    message: [...issues, ...notes].join(" · ").slice(0, 255) || null,
   });
 }
 
@@ -195,6 +213,20 @@ const rateOf = (doc: RecordData) => {
   const r = (x / n) * 100;
   return [0, 10, 12, 15, 21].reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a), 0);
 };
+
+/**
+ * Zalistovat (tlačítko i automatický krok workflow): chybějící partner se založí (registr podle IČO / DIČ),
+ * vznikne koncept dokladu v agendě s řádky a přiloží se k němu původní soubor.
+ */
+export async function listDocumentFull(data: DataApi, doc: RecordData, t: T): Promise<{ object: string; id: string; title: string }> {
+  if (doc.status !== "ready" && doc.status !== "attention") throw new UserError("@SYS:Locked");
+  let d = await checkDocument(data, doc, t);
+  const tg = TARGETS[String(d.target)];
+  if (tg && !d[tg.field] && (d.regNo || d.vatId)) d = await createDocPartner(data, d, t);
+  const out = await listDocument(data, d, t);
+  await data.copyAttachments?.("int.document", String(doc.id), out.object, out.id);
+  return out;
+}
 
 /** Zalistovat: koncept dokladu v agendě (faktura, záloha, objednávka) s řádky. */
 export async function listDocument(data: DataApi, doc: RecordData, t: T): Promise<{ object: string; id: string; title: string }> {

@@ -72,23 +72,16 @@ describe("vytěžování dokladů", () => {
     expect(content[0].text).toContain("87654321"); // ví, kdo jsme
     expect(content[1].type).toBe("input_file");
     let doc = (await getRecord(T, "int.document", String(d0.id), client))!;
-    // nákupní faktura (vystavitel není naše firma), partner zatím v agendě není
-    expect([doc.target, doc.status, doc.partnerName, doc.regNo, doc.amountGross]).toEqual(["apInvoice", "attention", "Masna Novák s.r.o.", "12345678", "1815.00"]);
-    expect(doc.message).toContain("Masna Novák");
+    // nákupní faktura (vystavitel není naše firma); partner v agendě nebyl → workflow WF-DOKLADY ho založil
+    // (registr nedostupný → subjekt z vytěžených údajů) a doklad zalistoval
+    expect([doc.target, doc.status, doc.partnerName, doc.regNo, doc.amountGross, doc.message]).toEqual(["apInvoice", "listed", "Masna Novák s.r.o.", "12345678", "1815.00", null]);
+    expect(doc.vendorId).toBeTruthy();
     const lines = (await listRecords(T, "int.documentLine", { filter: { documentId: d0.id } }, client)).rows;
     expect(lines.map((l) => [l.description, l.qty, l.amountNet])).toEqual([["Vepřová plec", "10.0000", "1200.00"], ["Doprava", "1.0000", "300.00"]]);
     const log = (await listRecords(T, "int.log", { filter: { operation: "ocr.extract" } }, client)).rows;
     expect(log.map((l) => l.status)).toEqual(["ok"]);
 
-    // partner bez IČO v registru: subjekt z vytěžených údajů + dodavatel
-    vi.stubGlobal("fetch", async () => new Response("{}", { status: 404 }));
-    await runAction(T, "int.document", String(d0.id), "createPartner", client);
-    doc = (await getRecord(T, "int.document", String(d0.id), client))!;
-    expect([doc.status, doc.message]).toEqual(["ready", null]);
-    expect(doc.vendorId).toBeTruthy();
-
-    // zalistovat: koncept přijaté faktury s řádky, DPH a přiloženým souborem
-    await runAction(T, "int.document", String(d0.id), "list", client);
+    // zalistováno: koncept přijaté faktury s řádky, DPH a přiloženým souborem
     doc = (await getRecord(T, "int.document", String(d0.id), client))!;
     expect([doc.status, doc.resultObject]).toEqual(["listed", "ap.invoice"]);
     const inv = (await getRecord(T, "ap.invoice", String(doc.resultId), client))!;
@@ -115,7 +108,7 @@ describe("vytěžování dokladů", () => {
     process.env.SHANON_TEST_OCR_KEY = "sk-test";
     const T = (await provisionTenant(client, { code: `t-ocr2-${run}`, name: "OCR2", adminEmail: `ocr2-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap", "ar", "int"], company: { code: "U", name: "Uzeniny Test" } })).ctx;
     await saveRecord(T, "sys.company", T.companyId!, { regNo: "87654321" }, undefined, client);
-    await saveRecord(T, "int.connection", null, { code: "OCR", name: "OCR", kind: "ocr", driver: "openaiTest", autoList: true }, undefined, client);
+    await saveRecord(T, "int.connection", null, { code: "OCR", name: "OCR", kind: "ocr", driver: "openaiTest" }, undefined, client);
     const subj = await saveRecord(T, "gab.subject", null, { name: "Masna Novák s.r.o.", regNo: "12345678" }, undefined, client);
     const [grp] = (await listRecords(T, "ap.group", {}, client)).rows;
     await saveRecord(T, "ap.vendor", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);

@@ -8,15 +8,16 @@
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { UserError, type RecordData } from "@/core/module";
-import { applyExtraction, listDocument } from "@/modules/int/documents";
+import { applyExtraction } from "@/modules/int/documents";
 import { writeLog } from "@/modules/int/drivers";
 import { extractWithOpenAi } from "@/modules/int/ocr";
 import { isdocFromFile, parseIsdoc } from "@/modules/prt/isdoc";
-import { addFile, readFile } from "./docuref";
+import { readFile } from "./docuref";
 import { ADMIN } from "@/core/security";
 import { notify } from "@/modules/sys/notify";
 import { closeWorkItems, createWorkItem } from "@/modules/wf/work";
-import { inTenant, type Ctx, type Session } from "./data";
+import { inTenant, type Ctx } from "./data";
+import { fireWorkflowEvent } from "./workflow";
 
 /** Zpracovávaný doklad, který visí déle než 10 minut (pád serveru), jde zpracovat znovu. */
 const STALE_MS = 10 * 60_000;
@@ -47,28 +48,10 @@ async function pickConnection(ctx: Ctx, client?: PrismaClient) {
   );
 }
 
-/**
- * Komu jdou úkoly k dokladu: portál → jeho odpovědná osoba; jinak kdo doklad nahrál (je-li to uživatel);
- * jinak odpovědná osoba napojení vytěžování; jinak nikdo (nepřiřazený úkol vidí správci v Přehledu).
- */
-async function docOwner(s: Session, doc: RecordData): Promise<string | null> {
-  const api = s.sys().api();
-  if (doc.source === "portal" && doc.portalId) {
-    const p = await api.get("int.portal", String(doc.portalId));
-    return (p?.responsible as string) || null;
-  }
-  // kdo doklad nahrál (systémové pole — datová služba ho do záznamu nedává)
-  const by = (await s.tx.intDocument.findFirst({ where: { id: String(doc.id), tenantId: s.ctx.tenantId }, select: { createdBy: true } }))?.createdBy;
-  if (by && (await s.tx.sysUser.count({ where: { id: by, tenantId: s.ctx.tenantId } }))) return by;
-  const conn = doc.connectionId ? await api.get("int.connection", String(doc.connectionId)) : null;
-  return (conn?.responsible as string) || null;
-}
-
 const fixKey = (id: string) => `int.document:${id}:fix`;
-const reviewKey = (id: string) => `int.document:${id}:review`;
 
-/** Úkol „doplnit údaje“ k dokladu (chyba vytěžení, výhrady kontroly, nejisté údaje). */
-async function fixTask(ctx: Ctx, id: string, failed: boolean, client?: PrismaClient) {
+/** Úkol „vytěžení selhalo“ původci dokladu (chyba sítě / vytěžení — workflow se ještě nespustilo). */
+async function failedTask(ctx: Ctx, id: string, client?: PrismaClient) {
   await inTenant(
     ctx,
     async (s) => {
@@ -77,9 +60,9 @@ async function fixTask(ctx: Ctx, id: string, failed: boolean, client?: PrismaCli
       const t = s.sys().eventCtx("int.document").t;
       await createWorkItem(api, {
         kind: "fix",
-        title: t(failed ? "@INT:TaskFailed" : "@INT:TaskFix", { num: String(doc.docNum) }),
+        title: t("@INT:TaskFailed", { num: String(doc.docNum) }),
         description: (doc.message as string) ?? null,
-        assignedTo: await docOwner(s, doc),
+        assignedTo: await s.sys().originator("int.document", doc),
         ref: { object: "int.document", id, title: [doc.docNum, doc.partnerName ?? doc.fileName].filter(Boolean).join(" · ") },
         sourceKey: fixKey(id),
       });
@@ -89,67 +72,33 @@ async function fixTask(ctx: Ctx, id: string, failed: boolean, client?: PrismaCli
 }
 
 /**
- * Po vytěžení: jistě vytěžený a připravený doklad se zalistuje sám (napojení „Zalistovat automaticky“, ne z portálu)
- * a vznikne úkol Zkontrolovat; připravený, ale nezalistovaný → úkol Zkontrolovat a zalistovat; jinak úkol Doplnit údaje.
+ * Po vytěžení: událost „extracted“ spustí workflow dokladu (výchozí WF-DOKLADY: jistý doklad založí partnera
+ * a zalistuje se, jinak úkol Doplnit údaje původci / vlastníkovi). Bez workflow doklad zůstane k ručnímu zpracování.
  */
-async function settleDocument(ctx: Ctx, doc: RecordData, client?: PrismaClient): Promise<RecordData> {
-  const id = String(doc.id);
-  if (doc.status !== "ready") {
-    await fixTask(ctx, id, false, client);
-    return doc;
-  }
-  const conn = doc.connectionId ? await inTenant(ctx, (s) => s.sys().api().get("int.connection", String(doc.connectionId)), client) : null;
-  const auto = doc.confidence !== "low" && doc.confidence !== "medium" && doc.source !== "portal" && conn?.autoList !== false;
-  if (auto) {
-    const res = await listDocumentWithFile(ctx, id, client);
-    await inTenant(
-      ctx,
-      async (s) => {
-        const api = s.sys().api();
-        const fresh = (await api.get("int.document", id))!;
-        const t = s.sys().eventCtx("int.document").t;
-        await createWorkItem(api, {
-          kind: "review",
-          title: t("@INT:TaskReview", { num: res.title }),
-          description: [fresh.partnerName, fresh.docNumber, fresh.amountGross ? `${fresh.amountGross} ${fresh.currencyCode ?? ""}`.trim() : null].filter(Boolean).join(" · ") || null,
-          assignedTo: await docOwner(s, fresh),
-          ref: { object: res.object, id: res.id, title: [res.title, fresh.partnerName].filter(Boolean).join(" · ") },
-          sourceKey: reviewKey(id),
-        });
-      },
-      client,
-    );
-    return (await inTenant(ctx, (s) => s.sys().api().get("int.document", id), client))!;
-  }
-  await inTenant(
+async function settleDocument(ctx: Ctx, id: string, client?: PrismaClient): Promise<RecordData> {
+  return inTenant(
     ctx,
     async (s) => {
       const api = s.sys().api();
-      const t = s.sys().eventCtx("int.document").t;
-      await closeWorkItems(api, { sourceKey: fixKey(id) });
-      await createWorkItem(api, {
-        kind: "review",
-        title: t("@INT:TaskListDoc", { num: String(doc.docNum) }),
-        description: [doc.partnerName, doc.docNumber].filter(Boolean).join(" · ") || null,
-        assignedTo: await docOwner(s, doc),
-        ref: { object: "int.document", id, title: [doc.docNum, doc.partnerName].filter(Boolean).join(" · ") },
-        sourceKey: reviewKey(id),
-      });
+      // úkoly z doby před workflow (Doplnit údaje / Zkontrolovat a zalistovat) nahradí kroky workflow
+      await closeWorkItems(api, { sourceKey: fixKey(id) }, "done");
+      await closeWorkItems(api, { sourceKey: `int.document:${id}:review` }, "done");
+      await fireWorkflowEvent(s.sys(), "int.document", id, "extracted");
+      return (await api.get("int.document", id))!;
     },
     client,
   );
-  return doc;
 }
 
-/** Vytěžit jeden doklad (akce Vytěžit, nahrání, dávka) a podle výsledku zalistovat / založit úkol. */
+/** Vytěžit jeden doklad (akce Vytěžit, nahrání, dávka) a předat ho workflow. */
 export async function extractDocument(ctx: Ctx, id: string, client?: PrismaClient): Promise<RecordData> {
-  const doc = await extractOnly(ctx, id, client).catch(async (e) => {
-    // chyba vytěžení (ne zamčený / zpracovávaný doklad, ne vyčerpaný limit) → úkol doplnit údaje původci
+  await extractOnly(ctx, id, client).catch(async (e) => {
+    // chyba vytěžení (ne zamčený / zpracovávaný doklad, ne vyčerpaný limit) → úkol původci
     const label = (e as UserError).label;
-    if (!["@SYS:Locked", "@SYS:Conflict", "@SYS:NotFound", "@INT:OcrDailyLimit"].includes(label)) await fixTask(ctx, id, true, client).catch(() => undefined);
+    if (!["@SYS:Locked", "@SYS:Conflict", "@SYS:NotFound", "@INT:OcrDailyLimit"].includes(label)) await failedTask(ctx, id, client).catch(() => undefined);
     throw e;
   });
-  return settleDocument(ctx, doc, client);
+  return settleDocument(ctx, id, client);
 }
 
 async function extractOnly(ctx: Ctx, id: string, client?: PrismaClient): Promise<RecordData> {
@@ -218,32 +167,10 @@ async function extractOnly(ctx: Ctx, id: string, client?: PrismaClient): Promise
   }
 }
 
-/** Zalistovat doklad do agendy a přiložit k výsledku původní soubor (úkoly k dokladu se uzavřou). */
-export async function listDocumentWithFile(ctx: Ctx, id: string, client?: PrismaClient): Promise<{ object: string; id: string; title: string }> {
-  const res = await inTenant(
-    ctx,
-    async (s) => {
-      const api = s.sys().api();
-      const doc = await api.get("int.document", id);
-      if (!doc) throw new UserError("@SYS:NotFound");
-      const out = await listDocument(api, doc, s.sys().eventCtx("int.document").t);
-      const by = (await s.tx.sysUser.count({ where: { id: ctx.userId, tenantId: ctx.tenantId } })) ? ctx.userId : null;
-      await closeWorkItems(api, { sourceKey: fixKey(id) }, "done", out.title, by);
-      await closeWorkItems(api, { sourceKey: reviewKey(id) }, "done", out.title, by);
-      return out;
-    },
-    client,
-  );
-  const refs = await inTenant(ctx, (s) => s.tx.sysDocuRef.findMany({ where: { tenantId: ctx.tenantId, objectId: "int.document", recordId: id, kind: "file" } }), client);
-  const sysCtx = { ...ctx, perms: ADMIN };
-  for (const r of refs) {
-    const f = await readFile(sysCtx, r.id, client);
-    await addFile(sysCtx, res.object, res.id, { name: f.name, type: f.mime, data: f.data }, client);
-  }
-  return res;
-}
-
-/** Dávka: vytěžit nové doklady, připravené zalistovat (má-li napojení Zalistovat automaticky). */
+/**
+ * Dávka: vytěžit nové doklady a předat je workflow; vytěžené doklady bez běhu workflow (z doby před ním,
+ * nebo workflow vzniklo později) mu předá taky.
+ */
 export async function processPendingDocuments(ctx: Ctx, client?: PrismaClient): Promise<string> {
   const ids = await inTenant(ctx, async (s) => (await s.sys().api().find("int.document", { status: "new" }, { take: 20, orderBy: { docNum: "asc" } })).map((d) => String(d.id)), client);
   let done = 0;
@@ -258,7 +185,7 @@ export async function processPendingDocuments(ctx: Ctx, client?: PrismaClient): 
         const portal = await inTenant(ctx, (s) => s.sys().api().get("int.portal", String(before.portalId)), client);
         if (portal && portal.autoExtract === false) continue;
       }
-      // vytěžení samo zalistuje jistý doklad nebo založí úkol (settleDocument)
+      // vytěžení předá doklad workflow (zalistuje jistý doklad nebo založí úkol)
       const doc = await extractDocument(ctx, id, client);
       done++;
       if (doc.status === "attention") attention++;
@@ -269,6 +196,29 @@ export async function processPendingDocuments(ctx: Ctx, client?: PrismaClient): 
       const label = (e as UserError).label;
       if (label === "@INT:OcrDailyLimit" || label === "@INT:OcrNoConnection") break;
     }
+  }
+  // vytěžené, ale bez workflow
+  const waiting = await inTenant(
+    ctx,
+    async (s) => {
+      const api = s.sys().api();
+      const docs = [...(await api.find("int.document", { status: "ready" }, { take: 50 })), ...(await api.find("int.document", { status: "attention" }, { take: 50 }))];
+      if (!docs.length) return [];
+      let runs: RecordData[] = [];
+      try {
+        runs = await api.find("wf.instance", { refObject: "int.document", refId: { in: docs.map((d) => String(d.id)) } }, { take: 1000 });
+      } catch {
+        return []; // Workflow vypnuté
+      }
+      const has = new Set(runs.map((r) => String(r.refId)));
+      return docs.filter((d) => !has.has(String(d.id))).map((d) => String(d.id)).slice(0, 20);
+    },
+    client,
+  );
+  for (const id of waiting) {
+    const doc = await settleDocument(ctx, id, client).catch(() => null);
+    if (doc?.status === "listed") listed++;
+    else if (doc?.status === "attention") attention++;
   }
   if (attention || failed)
     await inTenant(

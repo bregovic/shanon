@@ -12,7 +12,6 @@ const outcome = (r: unknown): ActionOutcome | undefined => (r && typeof r === "o
 
 const ACTIONS: Record<string, () => Promise<OutsideAction>> = {
   "int.document:extract": async () => (await import("./doc-import")).extractDocument,
-  "int.document:list": async () => (await import("./doc-import")).listDocumentWithFile,
   "ar.invoice:email": async () => (await import("./mail")).invoiceMailDraft,
   "ar.advance:email": async () => (await import("./mail")).advanceMailDraft,
   "int.mail:send": async () => (await import("./mail")).sendMail,

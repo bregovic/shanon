@@ -130,11 +130,17 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Síť mimo transakci (transakce max. 20 s): akce `outside: true` / úloha `JobDef.outside`
   — obsluha v `src/server/outside.ts`, oprávnění ověří `runAction` předem (`checkOnly`).
 - Workflow (`src/modules/wf`): pracovní položka `wf.workItem` = obecný úkol k záznamu libovolného objektu (`refObject` + `refId`,
-  druh, řešitel, termín, výsledek). Zakládat jen přes `createWorkItem(data, …)` (otevřený úkol se stejným `sourceKey` se nezakládá
-  znovu, řešitel dostane osobní upozornění `notify({ userId })`), uzavírat `closeWorkItems`. Moje úkoly = panel v Přehledu
-  (`src/server/work-items.ts`). Vytěžování: chyba / nejistota (`confidence`, `uncertainFields` z OCR) / výhrady → úkol Doplnit údaje
-  původci (portál → `int.portal.responsible`, dávka → `int.connection.responsible`); jistý a připravený doklad se zalistuje sám
-  (`settleDocument`, ne z portálu, napojení `autoList`) + úkol Zkontrolovat. Schvalování = CR-098 (návrh v `docs/help/workflow.md`).
+  druh, řešitel, termín, výsledek, běh `instanceId` + `stepNum`). Zakládat jen přes `createWorkItem(data, …)` (otevřený úkol se stejným
+  `sourceKey` se nezakládá znovu, řešitel dostane osobní upozornění `notify({ userId })`), uzavírat `closeWorkItems`. Moje úkoly = panel
+  v Přehledu (`src/server/work-items.ts`). Definice (`wf.definition` + kroky `wf.definitionStep`, typy účastníků `wf.participantType`,
+  běhy `wf.instance`) řídí jádro `src/server/workflow.ts`: spouštěče sbírá datová služba (`queueWorkflow` při založení záznamu a po akci,
+  modul `fireWorkflowEvent` — `int.document` „extracted“) a vyhodnotí je `flushWorkflow` na konci `inTenant` ve stejné transakci.
+  Automatický krok = akce objektu (`Session.action(…, { workflow: true })`, v savepointu, nesplněný předpoklad / chyba → úkol Doplnit
+  údaje), úkol, schválení; podmínky zápisem filtru sloupce (`parseCondition` + `Session.matches`). Zamčené akce běhu hlídá
+  `workflowLock` v `Session.action`. Původce = `ObjectHandlers.originator` (int: portál → kdo nahrál → napojení; zalistovaný doklad →
+  původce dokladu ke zpracování), jinak `DataApi.createdBy`. Nová vlastnost workflow = obecně v jádru, ne kód pro jeden objekt.
+  Výchozí workflow firmy (`wf/setup.ts`, jen firmě bez definic): WF-DOKLADY (vytěžený připravený doklad → `list`: založit partnera +
+  zalistovat; jinak úkol původci / vlastníkovi) a WF-PRIJATE (přijatá faktura → schválení vlastníkem → `post`).
 - Pole typu uživatel: `Edts.User` (`Edt.user`, VARCHAR 36) — formulář výběr z `Ctx.users` (uživatelé firmy, načtení v `auth.ts`),
   filtr seznamu jménem / e-mailem / `me` (`Session.userWhere`), uložení od člověka ověří uživatele tenanta. Aplikační role čte
   ze `sys_user` jen id, jméno, e-mail, aktivní, roli (grant po sloupcích + RLS v `scripts/rls.ts`), nikdy heslo.
@@ -142,8 +148,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Vytěžování dokladů (`src/modules/int/ocr.ts`, `documents.ts`, `src/server/doc-import.ts`):
   napojení druhu „ocr“ (OpenAI Responses API, strukturovaný výstup; `openaiTest` = klíč
   `SHANON_TEST_OCR_KEY` z prostředí, nikdy v DB), mezitabulka `int.document` (+ řádky),
-  Vytěžit → kontrola (partner podle IČO/DIČ, součty, duplicita) → Zalistovat = koncept
-  dokladu v agendě s přiloženým souborem. Denní limit napojení, dávka `int.processDocuments`.
+  Vytěžit → kontrola (partner podle IČO/DIČ, součty, duplicita) → Zalistovat (`listDocumentFull`: chybějící partner z registru,
+  koncept dokladu v agendě, `DataApi.copyAttachments` souboru) — vše v transakci. ISDOC v PDF (`isdocFromPdf`): klíčové slovo `stream`
+  ne jako konec `endstream`. Denní limit napojení, dávka `int.processDocuments` (nové + vytěžené bez běhu workflow).
 - Dodavatelský portál (`int.portal`, veřejně `/portal/<tenantId>/<klíč>` + `/api/portal/...`, mimo přihlášení v
   `src/proxy.ts`): `src/server/supplier-portal.ts` najde portál podle klíče (zapnutý), kontroluje druh souboru podle obsahu
   (`sniffPortalFile`), velikost, počet, limit za hodinu z adresy (otisk IP) a za den, zakládá `int.document` se zdrojem

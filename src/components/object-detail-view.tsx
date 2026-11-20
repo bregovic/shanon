@@ -30,7 +30,9 @@ import {
   ToolbarDivider,
   Text,
 } from "@fluentui/react-components";
-import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, DocumentSearch24Regular, Edit24Regular, Eye24Regular, MoreHorizontal24Regular, Open24Regular, Play24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
+import { actionIcon } from "./action-icon";
+import type { ActionIcon as ActionIconName } from "@/core/object";
+import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, DocumentSearch24Regular, Edit24Regular, Eye24Regular, MoreHorizontal24Regular, Open24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
 import { PostingPreviewDrawer } from "./posting-preview";
 import type { LineDims } from "./dims-dialog";
 import { ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons";
@@ -72,7 +74,7 @@ export interface LineSpec {
   /** řádek má akce — dvojklik otevře jeho stránku */
   openInPage?: boolean;
   /** hromadné akce nad vybranými řádky */
-  bulkActions?: { id: string; label: string }[];
+  bulkActions?: { id: string; label: string; icon?: ActionIconName }[];
   sortField?: string;
   initial: { rows: Row[]; total: number; totals?: Record<string, string> };
 }
@@ -104,7 +106,7 @@ export interface ObjectDetailProps {
   autoCreate?: boolean;
   /** text místo řádků u nového dokladu */
   newLinesHint?: string;
-  actions: { id: string; label: string; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more"; confirm?: { value: string; text: string } }[];
+  actions: { id: string; label: string; icon?: ActionIconName; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more"; confirm?: { value: string; text: string } }[];
   /** Náhled dokladu (zaúčtování nanečisto) — dokud jde zaúčtovat */
   postingPreview?: boolean;
   /** pole s číslem / kódem záznamu (souhrn sbalené hlavičky, klik = uložit nový doklad) */
@@ -163,6 +165,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
           <Button
             key={a.id}
             appearance="primary"
+            icon={actionIcon(a)}
             disabled={!selected.length}
             onClick={async () => {
               const r = await bulkRecordAction(spec.objectId, selected.map((x) => String(x.id)), a.id);
@@ -470,7 +473,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
                 {a.label}
               </Button>
             ) : (
-              <Button key={a.id} icon={<Play24Regular />} disabled={busy || a.disabled} onClick={() => act(a.id)}>
+              <Button key={a.id} icon={actionIcon(a)} disabled={busy || a.disabled} onClick={() => act(a.id)}>
                 {a.label}
               </Button>
             ),
@@ -480,7 +483,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           const item = (a: (typeof p.actions)[number]) => (
             <MenuItem
               key={a.id}
-              icon={a.download ? <ArrowDownload24Regular /> : <Play24Regular />}
+              icon={actionIcon(a)}
               disabled={busy || a.disabled}
               onClick={() => (a.download ? download(a.id) : act(a.id))}
             >

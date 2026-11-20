@@ -5,7 +5,7 @@
  *
  * Každá komunikace s vnější službou se zapíše do protokolu int.log.
  */
-import { checkDocument, createDocPartner } from "./documents";
+import { checkDocument, docOriginator, listDocumentFull, TARGETS } from "./documents";
 import { testOpenAi } from "./ocr";
 import { randomUUID } from "node:crypto";
 import {
@@ -27,7 +27,7 @@ import { viesLookup } from "@/modules/gab/registry-lookup";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
 import { fetchCnb, fetchEcb } from "@/modules/sys/currency";
 import { registry } from "@/registry";
-import { closeWorkItems } from "@/modules/wf/work";
+import { cancelWorkflows, closeWorkItems } from "@/modules/wf/work";
 import {
   EET_RESEND_HOURS,
   buildEetMessage,
@@ -540,16 +540,37 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         if (doc.status === "listed") throw new UserError("@SYS:Locked");
         await checkDocument(ctx.data, doc, ctx.t);
       },
-      async createPartner(ctx, doc) {
-        await createDocPartner(ctx.data, doc, ctx.t);
+      // zalistovat = i založit chybějícího partnera; úkoly k dokladu se uzavřou (workflow pokračuje samo)
+      async list(ctx, doc) {
+        const out = await listDocumentFull(ctx.data, doc, ctx.t);
+        for (const k of ["fix", "review"]) await closeWorkItems(ctx.data, { sourceKey: `int.document:${doc.id}:${k}` }, "done", out.title, ctx.userId);
       },
       async reject(ctx, doc) {
         await ctx.data.update("int.document", String(doc.id), { status: "rejected" });
-        // úkoly k odmítnutému dokladu už nejsou potřeba
+        // úkoly a workflow k odmítnutému dokladu už nejsou potřeba
         for (const k of ["fix", "review"]) await closeWorkItems(ctx.data, { sourceKey: `int.document:${doc.id}:${k}` }, "cancelled", undefined, ctx.userId);
+        await cancelWorkflows(ctx.data, "int.document", String(doc.id), ctx.userId);
       },
     },
+    originator: (ctx, doc) => docOriginator(ctx.data, doc),
   },
+  // doklad zalistovaný z integrace: původcem je původce dokladu ke zpracování
+  ...Object.fromEntries(
+    [...new Set(Object.values(TARGETS).map((x) => x.object))].map((object) => [
+      object,
+      {
+        async originator(ctx: EventContext, rec: RecordData) {
+          let src: RecordData[] = [];
+          try {
+            src = await ctx.data.find("int.document", { resultObject: object, resultId: String(rec.id) }, { take: 1 });
+          } catch {
+            return null; // Integrace ve firmě vypnutá
+          }
+          return src[0] ? docOriginator(ctx.data, src[0]) : null;
+        },
+      } satisfies ObjectHandlers,
+    ]),
+  ),
   "int.connection": {
     beforeSave(_ctx, d) {
       const e: Record<string, string> = {};

@@ -1,14 +1,20 @@
 /**
- * Workflow — pracovní položky (úkoly) a později schvalování (CR-098).
+ * Workflow — pracovní položky (úkoly), definice workflow s kroky a jejich běhy (CR-098).
  *
  * Pracovní položka = obecný úkol pro člověka: co udělat, komu (uživatel), odkaz na záznam libovolného
  * objektu (`refObject` + `refId`), druh, stav, termín, výsledek. Zakládá je logika modulů přes
- * `createWorkItem` (src/modules/wf/work.ts) — vytěžování dokladů, později kroky schvalování.
+ * `createWorkItem` (src/modules/wf/work.ts) a kroky workflow.
+ *
+ * Definice workflow (jako v AX): objekt + spouštěč (založení záznamu, událost modulu, provedená akce)
+ * + podmínka zápisem filtru seznamu + kroky za sebou: automatická akce (akce objektu, např. Zaúčtovat),
+ * úkol, schválení. Komu: původce záznamu, typ účastníka firmy (Vlastník, Účetní) nebo uživatel.
+ * Běh (`wf.instance`) a postup kroky řídí jádro `src/server/workflow.ts`.
  * Přehled „Moje úkoly“ je na úvodní stránce aplikace.
  */
-import { defineEdt, defineEnum, Edts, enumEdt } from "@/core/edt";
+import { defineEdt, defineEnum, Edts, enumEdt, refEdt } from "@/core/edt";
 import { defineModule } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { wfSetup } from "./setup";
 
 export const WorkItemKind = defineEnum({
   id: "WfWorkItemKind",
@@ -32,11 +38,164 @@ export const WorkItemStatus = defineEnum({
   ],
 });
 
+export const InstanceStatus = defineEnum({
+  id: "WfInstanceStatus",
+  label: "@WF:Status",
+  values: [
+    { value: "running", label: "@WF:InstRunning", color: "brand" },
+    { value: "waiting", label: "@WF:InstWaiting", color: "warning" },
+    { value: "completed", label: "@WF:InstCompleted", color: "success" },
+    { value: "rejected", label: "@WF:InstRejected", color: "danger" },
+    { value: "cancelled", label: "@WF:StatusCancelled", color: "subtle" },
+  ],
+});
+
+export const Trigger = defineEnum({
+  id: "WfTrigger",
+  label: "@WF:Trigger",
+  values: [
+    { value: "created", label: "@WF:TriggerCreated" },
+    { value: "event", label: "@WF:TriggerEvent" },
+    { value: "action", label: "@WF:TriggerAction" },
+  ],
+});
+
+export const StepKind = defineEnum({
+  id: "WfStepKind",
+  label: "@WF:StepKind",
+  values: [
+    { value: "auto", label: "@WF:StepAuto", color: "brand" },
+    { value: "task", label: "@WF:KindTask", color: "subtle" },
+    { value: "approval", label: "@WF:KindApproval", color: "important" },
+  ],
+});
+
+export const AssignTo = defineEnum({
+  id: "WfAssignTo",
+  label: "@WF:AssignTo",
+  values: [
+    { value: "originator", label: "@WF:AssignOriginator" },
+    { value: "participant", label: "@WF:AssignParticipant" },
+    { value: "user", label: "@WF:AssignUser" },
+  ],
+});
+
 const RefObject = defineEdt({ id: "WfRefObject", kind: "string", label: "@WF:RefObject", maxLength: 60 });
 const RefId = defineEdt({ id: "WfRefId", kind: "string", label: "@WF:RefId", maxLength: 36 });
 const RefTitle = defineEdt({ id: "WfRefTitle", kind: "string", label: "@WF:Record", maxLength: 120 });
 const Href = defineEdt({ id: "WfHref", kind: "string", label: "@WF:Href", maxLength: 255 });
 const SourceKey = defineEdt({ id: "WfSourceKey", kind: "string", label: "@WF:SourceKey", maxLength: 120 });
+const ActionId = defineEdt({ id: "WfActionId", kind: "string", label: "@WF:Action", maxLength: 40 });
+const Condition = defineEdt({ id: "WfCondition", kind: "string", label: "@WF:Condition", maxLength: 500 });
+const ActionList = defineEdt({ id: "WfActionList", kind: "string", label: "@WF:LockActions", maxLength: 120 });
+
+/** Typ účastníka (Vlastník, Účetní…) a jeho obsazení ve firmě — kroky workflow přidělují úkoly typu, ne jménu. */
+export const participantType = defineObject({
+  id: "wf.participantType",
+  table: "wf_participant_type",
+  label: "@WF:ParticipantType",
+  labelPlural: "@WF:ParticipantTypes",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    userId: { edt: Edts.User, label: "@WF:ParticipantUser" },
+    description: { edt: Edts.Description },
+  },
+  titleField: "code",
+  list: ["code", "name", "userId", "description"],
+  form: [{ label: "@WF:ParticipantType", fields: ["code", "name", "userId", "description"] }],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+});
+
+/** Definice workflow: objekt, spouštěč, podmínka, zamčené akce, kroky. */
+export const definition = defineObject({
+  id: "wf.definition",
+  table: "wf_definition",
+  label: "@WF:Definition",
+  labelPlural: "@WF:Definitions",
+  scope: "company",
+  fields: {
+    code: { edt: Edts.Code, mandatory: true },
+    name: { edt: Edts.Name, mandatory: true },
+    objectId: { edt: RefObject, label: "@WF:Object", mandatory: true, help: "@WF:ObjectHelp" },
+    trigger: { edt: enumEdt(Trigger), mandatory: true, default: "created" },
+    triggerName: { edt: ActionId, label: "@WF:TriggerName", help: "@WF:TriggerNameHelp" },
+    condition: { edt: Condition, help: "@WF:ConditionHelp" },
+    lockActions: { edt: ActionList, help: "@WF:LockActionsHelp" },
+    active: { edt: Edts.NoYes, default: true },
+    description: { edt: Edts.Notes },
+  },
+  titleField: "code",
+  list: ["code", "name", "objectId", "trigger", "triggerName", "condition", "active"],
+  form: [
+    { label: "@WF:Definition", fields: ["code", "name", "objectId", "active", "description"] },
+    { label: "@WF:Start", fields: ["trigger", "triggerName", "condition", "lockActions"] },
+  ],
+  unique: [["code"]],
+  defaultSort: { field: "code", dir: "asc" },
+  lines: [{ object: "wf.definitionStep", field: "definitionId", label: "@WF:Steps" }],
+});
+
+/** Krok definice: pořadí, druh, akce / úkol, komu, podmínka kroku a předpoklad automatické akce. */
+export const definitionStep = defineObject({
+  id: "wf.definitionStep",
+  table: "wf_definition_step",
+  label: "@WF:Step",
+  labelPlural: "@WF:Steps",
+  scope: "company",
+  fields: {
+    definitionId: { edt: refEdt("wf.definition", "@WF:Definition"), mandatory: true },
+    lineNum: { edt: Edts.Int, label: "@WF:StepNum", mandatory: true },
+    name: { edt: Edts.Name, label: "@WF:StepName", mandatory: true },
+    kind: { edt: enumEdt(StepKind), mandatory: true, default: "approval" },
+    action: { edt: ActionId, help: "@WF:ActionHelp" },
+    checkAction: { edt: ActionId, label: "@WF:CheckAction", help: "@WF:CheckActionHelp" },
+    precondition: { edt: Condition, label: "@WF:Precondition", help: "@WF:PreconditionHelp" },
+    condition: { edt: Condition, label: "@WF:StepCondition", help: "@WF:StepConditionHelp" },
+    assignTo: { edt: enumEdt(AssignTo), mandatory: true, default: "originator" },
+    participantTypeId: { edt: refEdt("wf.participantType", "@WF:ParticipantType"), help: "@WF:ParticipantHelp" },
+    userId: { edt: Edts.User, label: "@WF:AssignUser" },
+    dueDays: { edt: Edts.Int, label: "@WF:DueDays" },
+  },
+  titleField: "name",
+  list: ["lineNum", "name", "kind", "action", "precondition", "condition", "assignTo", "participantTypeId", "dueDays"],
+  form: [{ label: "@WF:Step", fields: ["definitionId", "lineNum", "name", "kind", "action", "checkAction", "precondition", "condition", "assignTo", "participantTypeId", "userId", "dueDays"] }],
+  defaultSort: { field: "lineNum", dir: "asc" },
+});
+
+/** Běh workflow nad jedním záznamem: aktuální krok, stav, úkoly. Zakládá a posouvá jen jádro (src/server/workflow.ts). */
+export const instance = defineObject({
+  id: "wf.instance",
+  table: "wf_instance",
+  label: "@WF:Instance",
+  labelPlural: "@WF:Instances",
+  scope: "company",
+  systemOnly: true,
+  fields: {
+    definitionId: { edt: refEdt("wf.definition", "@WF:Definition"), mandatory: true, readOnly: true },
+    refObject: { edt: RefObject, readOnly: true },
+    refId: { edt: RefId, readOnly: true },
+    refTitle: { edt: RefTitle, readOnly: true },
+    href: { edt: Href, readOnly: true },
+    status: { edt: enumEdt(InstanceStatus), mandatory: true, default: "running", readOnly: true },
+    stepNum: { edt: Edts.Int, label: "@WF:StepNum", readOnly: true },
+    stepName: { edt: Edts.Name, label: "@WF:StepName", readOnly: true },
+    message: { edt: Edts.Description, label: "@WF:Message", readOnly: true },
+    completedAt: { edt: Edts.DateTime, label: "@WF:CompletedAt", readOnly: true },
+  },
+  titleField: "refTitle",
+  list: ["refTitle", "definitionId", "status", "stepName", "message", "completedAt"],
+  form: [{ label: "@WF:Instance", fields: ["refTitle", "definitionId", "status", "stepNum", "stepName", "message", "completedAt"] }],
+  defaultSort: { field: "createdAt", dir: "desc" },
+  lines: [{ object: "wf.workItem", field: "instanceId", label: "@WF:WorkItems", owned: false }],
+  actions: [
+    { id: "openRecord", label: "@WF:OpenRecord", group: "inquiry" },
+    { id: "cancel", label: "@WF:CancelInstance", when: { field: "status", equals: "waiting" }, group: "more" },
+  ],
+  indexes: [["refObject", "refId", "status"]],
+});
 
 export const workItem = defineObject({
   id: "wf.workItem",
@@ -57,6 +216,9 @@ export const workItem = defineObject({
     href: { edt: Href, readOnly: true },
     /** zdroj a klíč pro dohledání (int.document:<id>:fix) — otevřený úkol se stejným klíčem se nezakládá znovu */
     sourceKey: { edt: SourceKey, readOnly: true },
+    /** běh workflow a krok, ze kterého úkol vznikl (dokončení pokračuje dalším krokem) */
+    instanceId: { edt: refEdt("wf.instance", "@WF:Instance"), readOnly: true },
+    stepNum: { edt: Edts.Int, label: "@WF:StepNum", readOnly: true },
     result: { edt: Edts.Description, label: "@WF:Result" },
     completedAt: { edt: Edts.DateTime, label: "@WF:CompletedAt", readOnly: true },
     completedBy: { edt: Edts.User, label: "@WF:CompletedBy", readOnly: true },
@@ -65,15 +227,18 @@ export const workItem = defineObject({
   list: ["title", "kind", "status", "assignedTo", "refTitle", "dueDate"],
   form: [
     { label: "@WF:WorkItem", fields: ["title", "kind", "status", "assignedTo", "dueDate", "refTitle", "description"] },
-    { label: "@WF:Result", fields: ["result", "completedAt", "completedBy"] },
+    { label: "@WF:Result", fields: ["result", "completedAt", "completedBy", "instanceId"] },
   ],
   actions: [
     { id: "openRecord", label: "@WF:OpenRecord", group: "inquiry" },
+    // schválení: Schválit / Zamítnout; ostatní úkoly Hotovo
+    { id: "approve", label: "@WF:Approve", when: { field: "kind", equals: "approval" } },
+    { id: "reject", label: "@WF:Reject", when: { field: "kind", equals: "approval" } },
     { id: "done", label: "@WF:Done", when: { field: "status", equals: "open" } },
     { id: "cancel", label: "@WF:Cancel", when: { field: "status", equals: "open" }, group: "more" },
   ],
   defaultSort: { field: "createdAt", dir: "desc" },
-  indexes: [["assignedTo", "status"], ["sourceKey", "status"], ["refObject", "refId"]],
+  indexes: [["assignedTo", "status"], ["sourceKey", "status"], ["refObject", "refId"], ["instanceId"]],
 });
 
 export default defineModule({
@@ -82,8 +247,9 @@ export default defineModule({
   description: "@WF:ModuleDesc",
   icon: "TaskList",
   dependsOn: ["sys"],
-  enums: [WorkItemKind, WorkItemStatus],
-  objects: [workItem],
+  enums: [WorkItemKind, WorkItemStatus, InstanceStatus, Trigger, StepKind, AssignTo],
+  objects: [workItem, participantType, definition, definitionStep, instance],
+  setup: wfSetup,
   menu: [
     {
       label: "@WF:WorkItems",
@@ -91,13 +257,15 @@ export default defineModule({
         { object: "wf.workItem", href: "/wf/workItem?filter.assignedTo=me&filter.status=open", label: "@WF:MyWorkItems" },
         { object: "wf.workItem", href: "/wf/workItem?filter.status=open", label: "@WF:OpenWorkItems" },
         { object: "wf.workItem" },
+        { object: "wf.instance" },
       ],
     },
+    { label: "@SYS:Setup", kind: "setup", items: [{ object: "wf.definition" }, { object: "wf.participantType" }] },
   ],
   labels: {
     cs: {
       Module: "Workflow",
-      ModuleDesc: "Úkoly k dokončení, kontrola a schvalování dokladů",
+      ModuleDesc: "Úkoly, kontrola a schvalování dokladů, automatické zpracování",
       WorkItem: "Pracovní položka",
       WorkItems: "Pracovní položky",
       MyWorkItems: "Moje úkoly",
@@ -127,6 +295,8 @@ export default defineModule({
       OpenRecord: "Otevřít záznam",
       Done: "Hotovo",
       Cancel: "Zrušit úkol",
+      Approve: "Schválit",
+      Reject: "Zamítnout",
       NoRecord: "Úkol nemá odkaz na záznam.",
       Overview: "Moje úkoly",
       OverviewEmpty: "Nemáte žádné otevřené úkoly.",
@@ -134,10 +304,68 @@ export default defineModule({
       OverviewAll: "Všechny úkoly",
       OverviewOverdue: "po termínu",
       NotifyAssigned: "Nový úkol: {title}",
+      NotifyRejected: "Zamítnuto: {title}",
+      ParticipantType: "Typ účastníka",
+      ParticipantTypes: "Typy účastníků",
+      ParticipantUser: "Obsazení (uživatel)",
+      ParticipantHelp: "Komu jde úkol, když krok přiděluje typu účastníka; bez obsazení dostane úkol původce.",
+      Definition: "Workflow",
+      Definitions: "Definice workflow",
+      Object: "Objekt",
+      ObjectHelp: "Id objektu, např. ap.invoice (přijatá faktura) nebo int.document (doklad ke zpracování).",
+      Start: "Spuštění",
+      Trigger: "Spustit při",
+      TriggerCreated: "Založení záznamu",
+      TriggerEvent: "Události modulu",
+      TriggerAction: "Provedení akce",
+      TriggerName: "Událost / akce",
+      TriggerNameHelp: "U události její název (int.document: extracted = vytěženo), u akce id akce (post, list…).",
+      Condition: "Podmínka",
+      ConditionHelp: "Zápis jako filtr sloupce, víc podmínek oddělit středníkem: amountGross: >50000; docType: invoice. Prázdné = vždy.",
+      LockActions: "Zamčené akce",
+      LockActionsHelp: "Akce, které během čekání na krok nejdou spustit ručně (např. post = Zaúčtovat).",
+      Steps: "Kroky",
+      Step: "Krok",
+      StepNum: "Pořadí",
+      StepName: "Název kroku",
+      StepKind: "Druh kroku",
+      StepAuto: "Automatická akce",
+      Action: "Akce",
+      ActionHelp: "Automatická akce: id akce objektu (post = Zaúčtovat, list = Zalistovat).",
+      CheckAction: "Kontrola při opakování",
+      CheckActionHelp: "Akce, která po doplnění údajů (Hotovo u úkolu) záznam znovu zkontroluje před předpokladem (check = Zkontrolovat).",
+      Precondition: "Předpoklad akce",
+      PreconditionHelp: "Automatická akce proběhne jen při splnění (zápis jako filtr); jinak vznikne úkol Doplnit údaje.",
+      StepCondition: "Podmínka kroku",
+      StepConditionHelp: "Krok se provede jen při splnění, jinak se přeskočí (např. schválení jen nad částku).",
+      AssignTo: "Komu",
+      AssignOriginator: "Původce dokladu",
+      AssignParticipant: "Typ účastníka",
+      AssignUser: "Uživatel",
+      DueDays: "Termín (dní)",
+      Instance: "Běh workflow",
+      Instances: "Běhy workflow",
+      InstRunning: "Probíhá",
+      InstWaiting: "Čeká",
+      InstCompleted: "Dokončeno",
+      InstRejected: "Zamítnuto",
+      Message: "Zpráva",
+      CancelInstance: "Zrušit workflow",
+      TaskFix: "Doplnit údaje: {title}",
+      TaskStep: "{step}: {title}",
+      PreconditionFailed: "Nesplněno: {condition}",
+      Locked: "Doklad čeká ve workflow „{name}“ (krok {step}) — akci nejde spustit ručně.",
+      BadObject: "Neznámý objekt.",
+      BadAction: "Objekt takovou akci nemá (nebo ji nejde spustit automaticky).",
+      BadCondition: "Podmínka: neznámé pole „{field}“.",
+      NeedAction: "Automatický krok potřebuje akci.",
+      NeedParticipant: "Vyberte typ účastníka.",
+      NeedUser: "Vyberte uživatele.",
+      NeedTriggerName: "Vyplňte událost nebo akci.",
     },
     en: {
       Module: "Workflow",
-      ModuleDesc: "Tasks to complete, document review and approval",
+      ModuleDesc: "Tasks, document review and approval, automatic processing",
       WorkItem: "Work item",
       WorkItems: "Work items",
       MyWorkItems: "My tasks",
@@ -167,6 +395,8 @@ export default defineModule({
       OpenRecord: "Open record",
       Done: "Done",
       Cancel: "Cancel task",
+      Approve: "Approve",
+      Reject: "Reject",
       NoRecord: "The task has no linked record.",
       Overview: "My tasks",
       OverviewEmpty: "You have no open tasks.",
@@ -174,6 +404,64 @@ export default defineModule({
       OverviewAll: "All tasks",
       OverviewOverdue: "overdue",
       NotifyAssigned: "New task: {title}",
+      NotifyRejected: "Rejected: {title}",
+      ParticipantType: "Participant type",
+      ParticipantTypes: "Participant types",
+      ParticipantUser: "Assigned user",
+      ParticipantHelp: "Who gets the task when the step is assigned to a participant type; without a user the originator gets it.",
+      Definition: "Workflow",
+      Definitions: "Workflow definitions",
+      Object: "Object",
+      ObjectHelp: "Object id, e.g. ap.invoice (vendor invoice) or int.document (document to process).",
+      Start: "Start",
+      Trigger: "Start on",
+      TriggerCreated: "Record created",
+      TriggerEvent: "Module event",
+      TriggerAction: "Action performed",
+      TriggerName: "Event / action",
+      TriggerNameHelp: "For an event its name (int.document: extracted), for an action the action id (post, list…).",
+      Condition: "Condition",
+      ConditionHelp: "Written like a column filter, separate several with a semicolon: amountGross: >50000; docType: invoice. Empty = always.",
+      LockActions: "Locked actions",
+      LockActionsHelp: "Actions that cannot be run manually while a step is waiting (e.g. post).",
+      Steps: "Steps",
+      Step: "Step",
+      StepNum: "Order",
+      StepName: "Step name",
+      StepKind: "Step kind",
+      StepAuto: "Automatic action",
+      Action: "Action",
+      ActionHelp: "Automatic action: the object's action id (post, list).",
+      CheckAction: "Check on retry",
+      CheckActionHelp: "Action that re-checks the record before the precondition after details were completed (check).",
+      Precondition: "Precondition",
+      PreconditionHelp: "The automatic action runs only when met (filter syntax); otherwise a Complete details task is created.",
+      StepCondition: "Step condition",
+      StepConditionHelp: "The step runs only when met, otherwise it is skipped (e.g. approval above an amount).",
+      AssignTo: "Assign to",
+      AssignOriginator: "Document originator",
+      AssignParticipant: "Participant type",
+      AssignUser: "User",
+      DueDays: "Due (days)",
+      Instance: "Workflow run",
+      Instances: "Workflow runs",
+      InstRunning: "Running",
+      InstWaiting: "Waiting",
+      InstCompleted: "Completed",
+      InstRejected: "Rejected",
+      Message: "Message",
+      CancelInstance: "Cancel workflow",
+      TaskFix: "Complete details: {title}",
+      TaskStep: "{step}: {title}",
+      PreconditionFailed: "Not met: {condition}",
+      Locked: "The document is waiting in workflow “{name}” (step {step}) — the action cannot be run manually.",
+      BadObject: "Unknown object.",
+      BadAction: "The object has no such action (or it cannot run automatically).",
+      BadCondition: "Condition: unknown field “{field}”.",
+      NeedAction: "An automatic step needs an action.",
+      NeedParticipant: "Select a participant type.",
+      NeedUser: "Select a user.",
+      NeedTriggerName: "Fill in the event or action.",
     },
   },
 });
