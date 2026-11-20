@@ -7,20 +7,9 @@
  */
 import { beep } from "@/lib/beep";
 import { useEffect, useRef, useState } from "react";
-import {
-  Badge,
-  Button,
-  Spinner,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
+import { Badge, Button, Spinner, makeStyles, tokens } from "@fluentui/react-components";
 import { Scales24Regular } from "@fluentui/react-icons";
-import {
-  ScaleDriver,
-  WebSerialTransport,
-  type ScaleState,
-  type ScaleWeighing,
-} from "@/lib/scale-driver";
+import { ScaleDriver, WebSerialTransport, type ScaleState, type ScaleWeighing } from "@/lib/scale-driver";
 import { SimScaleTransport } from "@/lib/scale-sim";
 import { connectScalePort, scalePort } from "@/lib/scale";
 
@@ -136,8 +125,7 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
 }
 
 /** Je na váze nepřidaná položka? (upozornění při placení) */
-export const scalePending = (s: ScaleState | null) =>
-  !!s?.product && (s.phase === "stable" || s.phase === "weighing");
+export const scalePending = (s: ScaleState | null) => !!s?.product && (s.phase === "stable" || s.phase === "weighing");
 
 export function ScalePanel({
   driver,
@@ -238,10 +226,7 @@ export function ScalePanel({
             : null
       : phase === "ready"
         ? state.lastAdded
-          ? L.ScaleAdded.replace(
-              "{what}",
-              `${state.lastAdded.name} · ${state.lastAdded.weight.replace(".", ",")} kg · ${fmtMoney(state.lastAdded.total)}`,
-            )
+          ? L.ScaleAdded.replace("{what}", `${state.lastAdded.name} · ${state.lastAdded.weight.replace(".", ",")} kg · ${fmtMoney(state.lastAdded.total)}`)
           : L.ScalePick
         : phase === "sending"
           ? L.ScaleSending
@@ -276,10 +261,7 @@ export function ScalePanel({
         <span className={st.product}>
           {product ? (
             <>
-              {product.name}{" "}
-              <span className={st.unit}>
-                · {fmtMoney(product.unitPrice)} / kg
-              </span>
+              {product.name} <span className={st.unit}>· {fmtMoney(product.unitPrice)} / kg</span>
             </>
           ) : (
             <span className={st.unit}>{L.ScalePick}</span>
@@ -288,41 +270,24 @@ export function ScalePanel({
         {conn}
       </div>
       {/* vážení na Hotovo: do zvážení údaje jen na displeji váhy (pokladna se váhy neptá) */}
-      {confirmMode &&
-      product &&
-      (phase === "waiting" || phase === "sending") ? (
-        <div className={st.label} style={{ textAlign: "left" }}>
-          {L.ScaleOnDisplay}
-        </div>
-      ) : (
+      {confirmMode && product && (phase === "waiting" || phase === "sending") ? null : (
         <div className={st.nums}>
           <div>
             <div className={st.label}>{L.Weight}</div>
-            <div
-              className={`${st.big} ${solid ? "" : st.dim}`}
-              data-testid="scale-weight"
-            >
+            <div className={`${st.big} ${solid ? "" : st.dim}`} data-testid="scale-weight">
               {weight.replace(".", ",")} kg
             </div>
           </div>
           <div>
             <div className={st.label}>{L.ScaleTotal}</div>
-            <div
-              className={`${st.big} ${solid ? "" : st.dim}`}
-              data-testid="scale-total"
-            >
+            <div className={`${st.big} ${solid ? "" : st.dim}`} data-testid="scale-total">
               {total ? fmtMoney(total) : "—"}
             </div>
           </div>
         </div>
       )}
       <div className={st.msg}>
-        {phase === "sending" && (
-          <Spinner
-            size="tiny"
-            style={{ display: "inline-flex", marginRight: 6 }}
-          />
-        )}
+        {phase === "sending" && <Spinner size="tiny" style={{ display: "inline-flex", marginRight: 6 }} />}
         {problemText && phase !== "weighing" ? (
           <span className={st.problem}>
             {problemText}
@@ -339,37 +304,19 @@ export function ScalePanel({
       </div>
       <div className={st.actions}>
         {phase === "disconnected" ? (
-          <Button
-            appearance="primary"
-            className={st.addBtn}
-            onClick={() => void connectScalePort().then(() => driver.connect())}
-          >
+          <Button appearance="primary" className={st.addBtn} onClick={() => void connectScalePort().then(() => driver.connect())}>
             {L.ScaleConnect}
           </Button>
         ) : phase === "error" && problem === "noResponse" ? (
-          <Button
-            appearance="primary"
-            className={st.addBtn}
-            onClick={() => void driver.retry()}
-          >
+          <Button appearance="primary" className={st.addBtn} onClick={() => void driver.retry()}>
             {L.ScaleRetry}
           </Button>
         ) : confirmMode && product ? (
-          <Button
-            appearance="primary"
-            className={st.addBtn}
-            disabled={phase !== "waiting"}
-            onClick={() => driver.confirm()}
-          >
+          <Button appearance="primary" className={st.addBtn} disabled={phase !== "waiting"} onClick={() => driver.confirm()}>
             {L.ScaleConfirm}
           </Button>
         ) : (
-          <Button
-            appearance="primary"
-            className={st.addBtn}
-            disabled={!stable}
-            onClick={() => reading && (beepOn && beep(), onAdd(reading))}
-          >
+          <Button appearance="primary" className={st.addBtn} disabled={!stable} onClick={() => reading && (beepOn && beep(), onAdd(reading))}>
             {L.ScaleAdd}
           </Button>
         )}

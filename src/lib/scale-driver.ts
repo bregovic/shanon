@@ -59,6 +59,8 @@ const POLL_MS = 250;
 const TIMEOUT_MS = 1000;
 const TRIES = 3;
 const RECONNECT_MS = 5000;
+/** vážení na Hotovo: jak často hlídat stav váhy (výměna zboží) */
+const WATCH_MS = 700;
 
 const cents = (price: string) => {
   const [i, f = ""] = String(price).replace(",", ".").split(".");
@@ -138,8 +140,8 @@ export class ScaleDriver {
   }
 
   /** jedna výměna s opakováním; null = váha 3× neodpověděla (nebo NAK) */
-  private async ask(req: Uint8Array, wantAck: boolean): Promise<Dialog06Message | null> {
-    for (let i = 0; i < TRIES; i++) {
+  private async ask(req: Uint8Array, wantAck: boolean, tries = TRIES): Promise<Dialog06Message | null> {
+    for (let i = 0; i < tries; i++) {
       let m: Dialog06Message | null;
       try {
         m = await this.serial(() => this.transport.exchange(req, TIMEOUT_MS));
@@ -183,8 +185,28 @@ export class ScaleDriver {
     }
     this.set({ phase: this.sawZero ? "waiting" : "needZero" });
     // na potvrzení: s prázdnou vahou čekat na Hotovo (zatížená = hlídat zvednutí)
-    if (this.confirmMode && this.sawZero) return;
+    if (this.confirmMode && this.sawZero) return void this.watch(loop, product);
     void this.poll(loop);
+  }
+
+  /**
+   * Vážení na Hotovo: hlídat stav váhy dotazem 08 (nespotřebuje výsledek vážení). Váha po sundání zboží cenu zahodí —
+   * když se po zatížení vrátí na prázdnou, pošle se cena znovu, aby vybrané zboží čekalo na Hotovo i po výměně.
+   */
+  private async watch(loop: number, product: { id: string; name: string; unitPrice: string }) {
+    let loaded = false;
+    while (loop === this.polling && this.connected && !this.disposed && !this.armed) {
+      await new Promise((r) => setTimeout(r, WATCH_MS));
+      if (loop !== this.polling || this.armed) return;
+      const m = await this.ask(encodeStatusQuery(), false, 1);
+      if (loop !== this.polling || this.armed || !m || m.kind !== "status") continue;
+      if (m.status === "belowMin") {
+        if (!loaded) continue;
+        loaded = false;
+        const ok = await this.ask(encodeUnitPrice(cents(product.unitPrice), this.withText ? product.name : undefined), true);
+        if (!ok && this.withText && loop === this.polling) await this.ask(encodeUnitPrice(cents(product.unitPrice)), true);
+      } else loaded = true;
+    }
   }
 
   /** Hotovo (vážení na potvrzení): zeptat se váhy na ustálenou hmotnost a cenu. */

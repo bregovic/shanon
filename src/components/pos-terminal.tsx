@@ -146,6 +146,11 @@ function MailRow({ st, L, value, onChange, busy, state, onSend }: { st: ReturnTy
 
 const useStyles = makeStyles({
   root: { height: "100dvh", display: "flex", flexDirection: "column", backgroundColor: tokens.colorNeutralBackground2, color: tokens.colorNeutralForeground1 },
+  mobileHide: { "@media (max-width: 900px)": { display: "none" } },
+  mobileBar: {
+    display: "none",
+    "@media (max-width: 900px)": { display: "flex", gap: "8px", padding: "8px 12px", borderTop: `1px solid ${tokens.colorNeutralStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
+  },
   bar: {
     display: "flex",
     alignItems: "center",
@@ -154,6 +159,8 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorBrandBackground,
     color: tokens.colorNeutralForegroundOnBrand,
     flexWrap: "wrap",
+    // mobil: lišta v jednom řádku, posouvá se do strany
+    "@media (max-width: 600px)": { flexWrap: "nowrap", overflowX: "auto", gap: "8px", padding: "6px 8px", "& > *": { flexShrink: 0 } },
   },
   barTitle: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold },
   barInfo: { opacity: 0.85, fontSize: tokens.fontSizeBase300 },
@@ -163,11 +170,12 @@ const useStyles = makeStyles({
     minHeight: 0,
     display: "grid",
     gridTemplateColumns: "1fr 380px",
-    "@media (max-width: 900px)": { gridTemplateColumns: "1fr", gridTemplateRows: "1fr auto", overflowY: "auto" },
+    "@media (max-width: 900px)": { gridTemplateColumns: "1fr", gridTemplateRows: "1fr auto" },
   },
   // s panelem Váha: zboží | váha (~320 px) | nákup
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
+  subTabs: { marginTop: "-6px", paddingLeft: "12px", borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
   // jedna posuvná řada (i při mnoha boxech zůstane místo pro zboží a košík)
   baskets: { display: "flex", gap: "6px", flexWrap: "nowrap", overflowX: "auto", flexShrink: 0, padding: "8px 12px 4px", "& > *": { flexShrink: 0 } },
   wUnits: { display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px", alignItems: "center" },
@@ -179,6 +187,7 @@ const useStyles = makeStyles({
     overflowY: "auto",
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+    "@media (max-width: 600px)": { gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "8px" },
     gridAutoRows: "max-content",
     gap: "10px",
     alignContent: "start",
@@ -194,6 +203,7 @@ const useStyles = makeStyles({
     touchAction: "manipulation",
     userSelect: "none",
     minHeight: "104px",
+    "@media (max-width: 600px)": { minHeight: "84px", padding: "8px 10px", fontSize: tokens.fontSizeBase300 },
     overflow: "hidden",
     textAlign: "left",
     padding: "10px 12px",
@@ -211,7 +221,7 @@ const useStyles = makeStyles({
   tileWeighed: { border: `1px dashed ${tokens.colorBrandStroke2}` },
   tileWeighing: { border: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   regular: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
-  tileImg: { width: "100%", height: "96px", objectFit: "contain", borderRadius: tokens.borderRadiusMedium, flexShrink: 0 },
+  tileImg: { "@media (max-width: 600px)": { height: "64px" }, width: "100%", height: "96px", objectFit: "contain", borderRadius: tokens.borderRadiusMedium, flexShrink: 0 },
   tileName: { fontWeight: tokens.fontWeightSemibold, lineHeight: tokens.lineHeightBase400 },
   tilePrice: { display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   cart: {
@@ -365,6 +375,8 @@ export function PosTerminal(p: {
   const [group, setGroup] = useState(p.top.length ? "top" : "all");
   const [sub, setSub] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  // mobil (do 900 px): jen jeden sloupec — zboží, nebo nákup (spodní lišta)
+  const [mobileCart, setMobileCart] = useState(false);
   // celá obrazovka jen tlačítkem v liště (automatické zapnutí rušilo klepání na tabletu)
   const [fullscreen, setFullscreen] = useState(false);
   const toggleFullscreen = () => {
@@ -749,8 +761,11 @@ export function PosTerminal(p: {
   const pick = (item: PosItem) => {
     setError(undefined);
     // ověřená váha: cena za kg (ceníková, ne akční — sleva by šla samostatným řádkem) do váhy
-    if (verified && item.weighed && isKg(item)) {
-      void vDriver?.setUnitPrice({ id: item.id, name: item.name, unitPrice: item.regular || item.price });
+    // ověřená váha nepřipojená: hmotnost ručně (původní dialog), řádek jde jako ruční
+    if (verified && item.weighed && isKg(item) && vDriver && vState?.phase !== "disconnected") {
+      void vDriver.setUnitPrice({ id: item.id, name: item.name, unitPrice: item.regular || item.price });
+      // mobil: panel Váha je v Nákupu
+      setMobileCart(true);
       return;
     }
     if (item.weighed) {
@@ -762,7 +777,7 @@ export function PosTerminal(p: {
   /** podržení dlaždice: zadat množství rovnou */
   const pickQty = (item: PosItem) => {
     setError(undefined);
-    if (verified && item.weighed && isKg(item)) return pick(item);
+    if (verified && item.weighed && isKg(item) && vDriver && vState?.phase !== "disconnected") return pick(item);
     setWeigh({ item, value: "", idx: null });
   };
 
@@ -787,7 +802,14 @@ export function PosTerminal(p: {
   };
 
   // vážený řádek z ověřené váhy: hmotnost a cena jdou na server tak, jak je vrátila váha
-  const saleLines = () => lines.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null }));
+  const saleLines = () =>
+    lines.map((l) => ({
+      itemId: l.item.id,
+      qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))),
+      scale: l.scale ?? null,
+      // vážené kg bez údajů z ověřené váhy = hmotnost zadaná ručně (váha nebyla připojená)
+      manual: !!verified && !l.scale && l.item.weighed && isKg(l.item),
+    }));
 
   const finishSale = async (payment: "cash" | "card" | "qr", paymentRef: string | null) => {
     setBusy(true);
@@ -973,6 +995,7 @@ export function PosTerminal(p: {
           title={fullscreen ? L.FullscreenExit : L.Fullscreen}
           aria-label={fullscreen ? L.FullscreenExit : L.Fullscreen}
           onClick={toggleFullscreen}
+          style={{ color: "inherit" }}
         />
         {p.canLock && (
           <Button
@@ -1010,7 +1033,7 @@ export function PosTerminal(p: {
         </div>
       ) : (
         <div className={st.main}>
-          <section className={st.catalog}>
+          <section className={mergeClasses(st.catalog, mobileCart && st.mobileHide)}>
             <Input
               ref={search}
               value={q}
@@ -1044,16 +1067,15 @@ export function PosTerminal(p: {
               ))}
             </TabList>
             {useCats && !q.trim() && group !== "all" && group !== "top" && children(group).length > 0 && (
-              <div className={st.chips}>
-                <Button size="large" shape="circular" appearance={sub === null ? "primary" : "secondary"} onClick={() => setSub(null)}>
-                  {L.All}
-                </Button>
+              // podkategorie: druhá řada záložek stejného vzhledu, odsazená pod hlavní kategorií
+              <TabList className={mergeClasses(st.tabs, st.subTabs)} selectedValue={sub ?? "__all"} onTabSelect={(_, d) => setSub(d.value === "__all" ? null : String(d.value))}>
+                <Tab value="__all">{L.All}</Tab>
                 {children(group).map((c) => (
-                  <Button key={c.id} size="large" shape="circular" appearance={sub === c.id ? "primary" : "secondary"} onClick={() => setSub(c.id)}>
+                  <Tab key={c.id} value={c.id}>
                     {c.name}
-                  </Button>
+                  </Tab>
                 ))}
-              </div>
+              </TabList>
             )}
             {q.trim() && <Text className={st.searchInfo}>{L.SearchResults.replace("{n}", String(visible.length))}</Text>}
             {!p.items.length && <p className={st.empty}>{L.NoItems}</p>}
@@ -1083,7 +1105,7 @@ export function PosTerminal(p: {
             </div>
           </section>
 
-          <aside className={st.cart} aria-label={L.Cart}>
+          <aside className={mergeClasses(st.cart, !mobileCart && st.mobileHide)} aria-label={L.Cart}>
             {/* Váha (Dialog 06): kompaktně nahoře v Nákupu */}
             {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} beepOn={p.verifiedScale?.beep !== false} confirmMode={!!p.verifiedScale?.confirm} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
             <div className={st.baskets}>
@@ -1187,6 +1209,11 @@ export function PosTerminal(p: {
               {error && customer && !payDlg && <div style={{ color: "var(--colorPaletteRedForeground1)", marginTop: 6 }}>{error}</div>}
             </div>
           </aside>
+          <div className={st.mobileBar}>
+            <Button appearance={mobileCart ? "secondary" : "primary"} size="large" style={{ flex: 1 }} onClick={() => setMobileCart((v) => !v)}>
+              {mobileCart ? L.MobileGoods : `${L.Cart} · ${lines.length} · ${fmt(total)}`}
+            </Button>
+          </div>
         </div>
       )}
 

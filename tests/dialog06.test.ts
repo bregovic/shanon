@@ -253,6 +253,33 @@ describe("ScaleDriver se simulátorem váhy", () => {
     await d.dispose();
   });
 
+  it("vážení na Hotovo: výměna zboží (zatíženo → prázdná) pošle cenu znovu, Hotovo pak zváží", async () => {
+    const seq = ["20", "33", "31", "31"];
+    let q = 0;
+    let prices = 0;
+    const t: ScaleTransport = {
+      open: async () => {},
+      close: async () => {},
+      exchange: async (req): Promise<Dialog06Message | null> => {
+        if (req[1] === ENQ) return parseDialog06(bytes(STX, "02", ESC, "3", ESC, "00500", ESC, "031900", ESC, "015950", ETX))!.msg;
+        if (req[2] === 0x30 && req[3] === 0x38) return parseDialog06(bytes(STX, "09", ESC, seq[Math.min(q++, seq.length - 1)], ETX))!.msg; // 08 → stav
+        prices++;
+        return { kind: "ack" };
+      },
+    };
+    const d = new ScaleDriver(t);
+    d.confirmMode = true;
+    await d.connect();
+    await d.setUnitPrice(HAM);
+    await new Promise((r) => setTimeout(r, 3200));
+    expect(prices).toBe(2);
+    expect(d.snapshot.phase).toBe("waiting");
+    d.confirm();
+    const s = await until(d, (x) => x.phase === "stable");
+    expect(s.reading?.total).toBe("159.50");
+    await d.dispose();
+  }, 10000);
+
   it("váha neodpovídá 3× → Chyba", async () => {
     const t: ScaleTransport = { open: async () => {}, close: async () => {}, exchange: async () => null };
     const d = new ScaleDriver(t);

@@ -36,7 +36,8 @@ export type { ScaleLine } from "./scale-line";
 
 export interface SaleInput {
   registerId: string;
-  lines: { itemId: string; qty: string; scale?: ScaleLine | null }[];
+  /** manual = hmotnost zadaná ručně, ověřená váha pokladny nebyla připojená (zvážení na jiné váze) */
+  lines: { itemId: string; qty: string; scale?: ScaleLine | null; manual?: boolean }[];
   /**
    * pokladna s ověřenou vahou (napojení s protokolem Dialog 06; doplní akce z napojení, ne terminál):
    * vážené zboží v kg jde prodat jen s údaji z váhy
@@ -65,12 +66,12 @@ export async function openShiftOf(data: DataApi, registerId: string): Promise<Re
 /** tvar čísel z váhy: hmotnost na 3 desetinná místa, ceny na 2 (jak je poslala váha) */
 const DEC: Record<number, RegExp> = { 2: /^\d{1,6}\.\d{2}$/, 3: /^\d{1,6}\.\d{3}$/ };
 
-async function saleLine(data: DataApi, itemId: string, qtyRaw: string, scale?: ScaleLine | null, verified?: SaleInput["verifiedScale"]) {
+async function saleLine(data: DataApi, itemId: string, qtyRaw: string, scale?: ScaleLine | null, verified?: SaleInput["verifiedScale"], manual?: boolean) {
   const item = await data.get("inv.item", itemId);
   if (!item) throw new UserError("@SYS:NotFound");
   if (item.blocked) throw new UserError("@POS:ItemBlocked", { item: String(item.name) });
   if (item.priceGross === null || item.priceGross === undefined) throw new UserError("@POS:NoPrice", { item: String(item.name) });
-  if (scale || (verified && item.weighed && (await isKgItem(data, item)))) return scaleSaleLine(data, item, scale ?? null, verified ?? null);
+  if (scale || (verified && !manual && item.weighed && (await isKgItem(data, item)))) return scaleSaleLine(data, item, scale ?? null, verified ?? null);
   const qty = String(qtyRaw).replace(",", ".").trim();
   if (!/^\d+(\.\d{1,4})?$/.test(qty) || Number(qty) <= 0 || Number(qty) > 100000) throw new UserError("@POS:InvalidQty");
   const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
@@ -156,7 +157,7 @@ export async function quote(data: DataApi, input: SaleInput) {
   if (!input.lines.length) throw new UserError("@POS:EmptySale");
   if (input.lines.length > 500) throw new UserError("@POS:InvalidQty");
   const lines = [];
-  for (const l of input.lines) lines.push(await saleLine(data, String(l.itemId), String(l.qty), l.scale, input.verifiedScale));
+  for (const l of input.lines) lines.push(await saleLine(data, String(l.itemId), String(l.qty), l.scale, input.verifiedScale, l.manual === true));
   const gross = sumCents(lines.map((l) => l.gross));
   const net = sumCents(lines.map((l) => l.net));
   // hotovost: zaokrouhlení podle účetní měny (CZK na koruny), mimo základ DPH
