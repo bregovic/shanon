@@ -11,6 +11,8 @@ import { printableObjectIds } from "@/server/print";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, hiddenFields, objectHref, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
+import { workflowBar } from "@/server/workflow-bar";
+import type { WorkflowBarLabels } from "@/components/workflow-bar";
 
 type Params = { module: string; object: string; id: string };
 
@@ -130,8 +132,20 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
           }),
       );
 
+  // proužek workflow (jako v AX): běh nad záznamem, krok, tlačítka řešitele, historie
+  const wfData = isNew ? null : await workflowBar(s.ctx, def.id, id, (r) => t(r)).catch(() => null);
+  const workflow = wfData
+    ? {
+        data: wfData,
+        labels: Object.fromEntries(
+          (["workflow", "step", "assignee", "unassigned", "due", "approve", "reject", "done", "history", "openTask", "cancel", "cancelConfirm", "comment", "confirm", "back", "close", "kind", "status", "created", "completed", "completedBy", "result", "task"] as const).map((k) => [k, t(`@WF:Bar${k.charAt(0).toUpperCase()}${k.slice(1)}`)]),
+        ) as unknown as WorkflowBarLabels,
+      }
+    : null;
+
   return (
     <ObjectDetailView
+      workflow={workflow}
       related={related}
       helpHref={helpFor(def.id) ? `/help/${helpFor(def.id)!.id}` : undefined}
       helpLabel={t("@SYS:HelpOpen")}

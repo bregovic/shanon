@@ -78,8 +78,8 @@ export async function closeWorkItems(data: DataApi, by: { sourceKey?: string; re
   return rows.length;
 }
 
-/** Zrušit čekající běhy workflow záznamu i s otevřenými úkoly (doklad odmítnut). */
-export async function cancelWorkflows(data: DataApi, objectId: string, id: string, userId?: string | null): Promise<number> {
+/** Ukončit čekající běhy workflow záznamu i s otevřenými úkoly (zrušeno, nebo zamítnuto — doklad odmítnut). */
+export async function cancelWorkflows(data: DataApi, objectId: string, id: string, userId?: string | null, status: "cancelled" | "rejected" = "cancelled"): Promise<number> {
   let runs: RecordData[];
   try {
     runs = (await data.find("wf.instance", { refObject: objectId, refId: id }, { take: 20 })).filter((i) => i.status === "waiting" || i.status === "running");
@@ -88,7 +88,7 @@ export async function cancelWorkflows(data: DataApi, objectId: string, id: strin
   }
   const now = new Date().toISOString();
   for (const i of runs) {
-    await data.update("wf.instance", String(i.id), { status: "cancelled", completedAt: now });
+    await data.update("wf.instance", String(i.id), { status, completedAt: now });
     for (const w of await data.find("wf.workItem", { instanceId: i.id, status: "open" }, { take: 100 }))
       await data.update("wf.workItem", String(w.id), { status: "cancelled", completedAt: now, completedBy: userId ?? null });
   }
@@ -168,6 +168,7 @@ export const wfHandlers: Record<string, ObjectHandlers> = {
         if (d.trigger === "action" && !def.actions?.some((a) => a.id === d.triggerName)) e.triggerName = "@WF:BadAction";
         if (d.trigger === "event" && !d.triggerName) e.triggerName = "@WF:NeedTriggerName";
         if (conditionErrors(def.id, d.condition)) e.condition = "@WF:BadCondition";
+        if (d.rejectAction && !autoActionOk(def.id, String(d.rejectAction))) e.rejectAction = "@WF:BadAction";
         const bad = String(d.lockActions ?? "")
           .split(/[,\s]+/)
           .filter(Boolean)

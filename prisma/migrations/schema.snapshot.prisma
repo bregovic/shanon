@@ -4660,24 +4660,25 @@ model WfParticipantType {
 
 /// wf.definition — generováno z definice objektu
 model WfDefinition {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
-  code        String   @db.VarChar(20)
-  name        String   @db.VarChar(120)
-  objectId    String   @map("object_id") @db.VarChar(60)
-  trigger     String   @default("created") @db.VarChar(40)
-  triggerName String?  @map("trigger_name") @db.VarChar(40)
-  condition   String?  @db.VarChar(500)
-  lockActions String?  @map("lock_actions") @db.VarChar(120)
-  active      Boolean  @default(true)
-  description String?
-  ext         Json     @default("{}")
-  version     Int      @default(1)
-  createdAt   DateTime @default(now()) @map("created_at")
-  createdBy   String?  @map("created_by") @db.Uuid
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?  @map("updated_by") @db.Uuid
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  code         String   @db.VarChar(20)
+  name         String   @db.VarChar(120)
+  objectId     String   @map("object_id") @db.VarChar(60)
+  trigger      String   @default("created") @db.VarChar(40)
+  triggerName  String?  @map("trigger_name") @db.VarChar(40)
+  condition    String?  @db.VarChar(500)
+  lockActions  String?  @map("lock_actions") @db.VarChar(120)
+  rejectAction String?  @map("reject_action") @db.VarChar(40)
+  active       Boolean  @default(true)
+  description  String?
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
 
   company                     SysCompany         @relation("WfDefinition_company", fields: [companyId], references: [id], onDelete: Restrict)
   wfDefinitionStep_definition WfDefinitionStep[] @relation("WfDefinitionStep_definition")

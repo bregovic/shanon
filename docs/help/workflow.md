@@ -23,6 +23,18 @@ Nový úkol vám přijde i do zvonečku (upozornění vidíte jen vy).
 Seznam: Workflow → [Moje úkoly](/wf/workItem?filter.assignedTo=me&filter.status=open), [Otevřené úkoly](/wf/workItem?filter.status=open),
 [Pracovní položky](/wf/workItem). Ve sloupci Řešitel jde filtrovat jménem nebo `me` (já).
 
+## Proužek workflow na dokladu
+
+Má-li záznam (přijatá faktura, doklad ke zpracování…) běh workflow, je nad formulářem barevný proužek: název workflow,
+stav (žlutě čeká, zeleně dokončeno, červeně zamítnuto), aktuální krok, řešitel, termín a zpráva (co chybí).
+
+- Řešitel (nepřiřazený úkol kdokoli, kdo smí upravovat úkoly; superuživatel vždy) má v proužku tlačítka:
+  u schválení **Schválit** / **Zamítnout**, u úkolu **Hotovo** / **Zamítnout** — vždy s nepovinným komentářem.
+- **Zamítnout** ukončí běh; workflow může záznamu spustit **Akci při zamítnutí** (WF-DOKLADY doklad ke zpracování odmítne,
+  přijatá faktura zůstane v konceptu).
+- **Otevřít úkol** a **Historie workflow** – všechny kroky a úkoly (kdo, kdy zadáno a vyřízeno, komentář); v historii jde
+  běh i **Zrušit workflow**.
+
 ## Definice workflow
 
 [Definice workflow](/wf/definition) (Workflow → Nastavení) určuje, co se se záznamem stane samo:
@@ -31,6 +43,7 @@ Seznam: Workflow → [Moje úkoly](/wf/workItem?filter.assignedTo=me&filter.stat
 - **Spustit při** – *Založení záznamu*, *Události modulu* (`extracted` = doklad vytěžen) nebo *Provedení akce* (id akce).
 - **Podmínka** – zápis jako filtr sloupce, víc podmínek středníkem: `amountGross: >50000; docType: invoice`. Prázdná = vždy.
 - **Zamčené akce** – během čekání nejdou spustit ručně (`post` = Zaúčtovat během schvalování).
+- **Akce při zamítnutí** – akce záznamu po zamítnutí úkolu (`reject` = odmítnout doklad ke zpracování).
 - **Kroky** podle pořadí:
   - **Automatická akce** – akce objektu (`post` Zaúčtovat, `list` Zalistovat). **Předpoklad akce** (zápis jako filtr) musí
     platit, jinak – stejně jako při chybě akce – vznikne úkol **Doplnit údaje** a běh čeká. Hotovo u úkolu krok zopakuje
@@ -49,7 +62,8 @@ ukazují, kde který záznam čeká, se všemi úkoly; běh jde zrušit (Další
 1. **WF-DOKLADY – Zpracování dokladů z integrace** (po vytěžení): připravený doklad se zalistuje sám i se založením
    dodavatele / odběratele z ARES. Chybí-li údaj nebo je nejistý (nejisté vytěžení, chybí číslo, nesedí součty, duplicita),
    úkol **Doplnit údaje** dostane původce dokladu, jinak vlastník. Doklad z **dodavatelského portálu** se sám nezalistuje –
-   úkol dostane odpovědná osoba portálu.
+   úkol dostane odpovědná osoba portálu. Doklad, který nechcete (duplicitní sken, cizí doklad), v proužku **Zamítněte** –
+   odmítne se a běh skončí.
 2. **WF-PRIJATE – Schválení přijaté faktury** (při založení): úkol **Kontrola a schválení** vlastníkovi (termín 3 dny),
    po schválení se faktura sama **zaúčtuje**. Do té doby ji ručně zaúčtovat nejde. Zamítnutá zůstane v konceptu.
    Nezdaří-li se zaúčtování (chybí údaj), dostane úkol účetní, jinak původce.

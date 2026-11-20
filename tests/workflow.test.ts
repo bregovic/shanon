@@ -14,6 +14,7 @@ import { closeWorkItems, createWorkItem } from "@/modules/wf/work";
 import { applyExtraction } from "@/modules/int/documents";
 import type { OcrResult } from "@/modules/int/ocr";
 import { fireWorkflowEvent } from "@/server/workflow";
+import { actOnWorkItem, workflowBar } from "@/server/workflow-bar";
 
 const client = createPrisma();
 const run = Date.now().toString(36);
@@ -163,6 +164,22 @@ describe("workflow — pracovní položky", () => {
     const x3 = (await getRecord(T, "int.document", String(d3.id), client))!;
     expect([x3.status, x3.resultObject]).toEqual(["listed", "ap.invoice"]);
     expect((await listRecords(T, "ap.vendor", {}, client)).total).toBe(2);
+
+    // 3b) proužek workflow: doklad čeká na Doplnit údaje → řešitel ho zamítne s komentářem → doklad odmítnut
+    fakeOpenAi(() => invoice({ confidence: "low", uncertainFields: ["amountGross"], docNumber: "FA-ZAM" }));
+    const d6 = await newDoc(T);
+    await runAction(T, "int.document", String(d6.id), "extract", client);
+    const bar = (await workflowBar(T, "int.document", String(d6.id), (r) => r))!;
+    expect([bar.definition, bar.status, bar.stepName, bar.open.length, bar.open[0].canAct]).toEqual(["Zpracování dokladů z integrace", "waiting", "Založit partnera a zalistovat", 1, true]);
+    // jiný uživatel (ne řešitel, bez práv správce) úkol vyřídit nesmí
+    await expect(actOnWorkItem({ ...O, perms: { admin: false, levels: {} } }, bar.open[0].id, "reject", null)).rejects.toMatchObject({ label: "@SYS:NoAccess" });
+    await actOnWorkItem(T, bar.open[0].id, "reject", "Duplicitní sken");
+    expect((await getRecord(T, "int.document", String(d6.id), client))!.status).toBe("rejected");
+    const bar2 = (await workflowBar(T, "int.document", String(d6.id), (r) => r))!;
+    expect([bar2.status, bar2.open.length, bar2.history[0].status, bar2.history[0].result]).toEqual(["rejected", 0, "rejected", "Duplicitní sken"]);
+    // faktura s workflow: proužek ukazuje schválení a jeho historii
+    const bar3 = (await workflowBar(T, "ap.invoice", String(x1.resultId), (r) => r))!;
+    expect([bar3.status, bar3.history.map((h) => [h.kind, h.status, h.completedBy])]).toEqual(["completed", [["approval", "done", "Olga Vlastník"]]]);
 
     // 4) chyba vytěžení → úkol „vytěžení selhalo“; odmítnutí dokladu úkol zruší
     fakeOpenAi(() => null, 500);

@@ -34,6 +34,7 @@ import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
 import { listNotices, markNoticesRead, type NoticeView } from "@/server/notices";
 import { previewPosting, type PostingPreview } from "@/server/posting-preview";
+import { actOnWorkItem, cancelWorkflowRun } from "@/server/workflow-bar";
 
 export interface FormState {
   message?: string;
@@ -388,6 +389,30 @@ export async function mergeRecordsAction(objectId: string, ids: string[]): Promi
     const kept = await inTenant(s.ctx, (sess) => mergeRecords(sess, objectId, ids));
     revalidatePath(objectHref(objectId));
     return { ok: true, data: { id: String(kept.id), title: String(kept[def?.titleField ?? "id"] ?? "") } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Proužek workflow: vyřídit úkol (Schválit / Zamítnout / Hotovo s komentářem), záznam se pak načte znovu. */
+export async function workflowItemAction(itemId: string, action: "approve" | "reject" | "done", comment: string | null, objectId: string, recordId: string): Promise<ActionResult<undefined>> {
+  const s = await requireSession();
+  try {
+    await actOnWorkItem(s.ctx, itemId, action, comment);
+    revalidatePath(objectHref(objectId, recordId));
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Proužek workflow: zrušit běh. */
+export async function cancelWorkflowAction(instanceId: string, objectId: string, recordId: string): Promise<ActionResult<undefined>> {
+  const s = await requireSession();
+  try {
+    await cancelWorkflowRun(s.ctx, instanceId);
+    revalidatePath(objectHref(objectId, recordId));
+    return { ok: true, data: undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

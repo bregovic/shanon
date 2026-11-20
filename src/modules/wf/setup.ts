@@ -14,7 +14,13 @@ export const DEFAULT_PARTICIPANTS: [string, string][] = [
 export async function wfSetup(data: DataApi) {
   if (!(await data.find("wf.participantType", {}, { take: 1 })).length)
     for (const [code, name] of DEFAULT_PARTICIPANTS) await data.create("wf.participantType", { code, name });
-  if ((await data.find("wf.definition", {}, { take: 1 })).length) return;
+  const existing = await data.find("wf.definition", {}, { take: 1 });
+  if (existing.length) {
+    // doplnění z 20. 11. 2026: zamítnutí úkolu dokladu z integrace doklad odmítne (jen dosud neupravené výchozí workflow)
+    const [doc] = await data.find("wf.definition", { code: "WF-DOKLADY", objectId: "int.document", rejectAction: null }, { take: 1 });
+    if (doc && Number(doc.version) === 1) await data.update("wf.definition", String(doc.id), { rejectAction: "reject" });
+    return;
+  }
   const pt = async (code: string) => ((await data.find("wf.participantType", { code }, { take: 1 }))[0]?.id as string) ?? null;
   const owner = await pt("OWNER");
   const accountant = await pt("ACCOUNTANT");
@@ -25,8 +31,9 @@ export async function wfSetup(data: DataApi) {
     objectId: "int.document",
     trigger: "event",
     triggerName: "extracted",
+    rejectAction: "reject",
     active: true,
-    description: "Jistě vytěžený doklad (ISDOC nebo vytěžení bez výhrad): založí dodavatele / odběratele z ARES a zalistuje doklad. Chybí-li údaj nebo je nejistý, dostane úkol původce dokladu, jinak vlastník.",
+    description: "Jistě vytěžený doklad (ISDOC nebo vytěžení bez výhrad): založí dodavatele / odběratele z ARES a zalistuje doklad. Chybí-li údaj nebo je nejistý, dostane úkol původce dokladu, jinak vlastník. Zamítnutím úkolu se doklad odmítne.",
   });
   await data.create("wf.definitionStep", {
     definitionId: doc.id,

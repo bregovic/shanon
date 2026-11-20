@@ -140,7 +140,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `workflowLock` v `Session.action`. Původce = `ObjectHandlers.originator` (int: portál → kdo nahrál → napojení; zalistovaný doklad →
   původce dokladu ke zpracování), jinak `DataApi.createdBy`. Nová vlastnost workflow = obecně v jádru, ne kód pro jeden objekt.
   Výchozí workflow firmy (`wf/setup.ts`, jen firmě bez definic): WF-DOKLADY (vytěžený připravený doklad → `list`: založit partnera +
-  zalistovat; jinak úkol původci / vlastníkovi) a WF-PRIJATE (přijatá faktura → schválení vlastníkem → `post`).
+  zalistovat; jinak úkol původci / vlastníkovi; `rejectAction` reject) a WF-PRIJATE (přijatá faktura → schválení vlastníkem → `post`).
+  Proužek workflow nad každým detailem s během (`src/server/workflow-bar.ts` + `components/workflow-bar.tsx`): stav, krok, řešitel,
+  Schválit / Zamítnout / Hotovo s komentářem (`actOnWorkItem` — řešitel smí i bez práv na agendu úkolů), historie, Zrušit workflow.
 - Pole typu uživatel: `Edts.User` (`Edt.user`, VARCHAR 36) — formulář výběr z `Ctx.users` (uživatelé firmy, načtení v `auth.ts`),
   filtr seznamu jménem / e-mailem / `me` (`Session.userWhere`), uložení od člověka ověří uživatele tenanta. Aplikační role čte
   ze `sys_user` jen id, jméno, e-mail, aktivní, roli (grant po sloupcích + RLS v `scripts/rls.ts`), nikdy heslo.

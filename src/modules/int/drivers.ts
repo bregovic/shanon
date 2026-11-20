@@ -549,7 +549,7 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         await ctx.data.update("int.document", String(doc.id), { status: "rejected" });
         // úkoly a workflow k odmítnutému dokladu už nejsou potřeba
         for (const k of ["fix", "review"]) await closeWorkItems(ctx.data, { sourceKey: `int.document:${doc.id}:${k}` }, "cancelled", undefined, ctx.userId);
-        await cancelWorkflows(ctx.data, "int.document", String(doc.id), ctx.userId);
+        await cancelWorkflows(ctx.data, "int.document", String(doc.id), ctx.userId, "rejected");
       },
     },
     originator: (ctx, doc) => docOriginator(ctx.data, doc),

@@ -31,6 +31,8 @@ import {
   Text,
 } from "@fluentui/react-components";
 import { actionIcon } from "./action-icon";
+import { WorkflowBar, type WorkflowBarLabels } from "./workflow-bar";
+import type { WorkflowBarData } from "@/server/workflow-bar";
 import type { ActionIcon as ActionIconName } from "@/core/object";
 import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regular, Delete24Regular, DocumentPdf24Regular, DocumentSearch24Regular, Edit24Regular, Eye24Regular, MoreHorizontal24Regular, Open24Regular, Print24Regular, QuestionCircle24Regular, Save24Regular } from "@fluentui/react-icons";
 import { PostingPreviewDrawer } from "./posting-preview";
@@ -114,6 +116,8 @@ export interface ObjectDetailProps {
   /** Smazat se ukáže i u zamčeného dokladu (neaktivní) — rozložení lišty se nemění */
   showDelete?: boolean;
   lines: LineSpec[];
+  /** proužek workflow (běh nad záznamem: krok, tlačítka řešitele, historie) */
+  workflow?: { data: WorkflowBarData; labels: WorkflowBarLabels } | null;
   /** návod k agendě (Nápověda) */
   helpHref?: string;
   helpLabel?: string;
@@ -573,6 +577,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       </ActionBar>
 
       <PageContent>
+        {p.workflow && p.id && <WorkflowBar data={p.workflow.data} labels={p.workflow.labels} objectId={p.objectId} recordId={p.id} lang={p.lang} />}
         {message && (
           <MessageBar intent={message.intent}>
             <MessageBarBody>{message.text}</MessageBarBody>

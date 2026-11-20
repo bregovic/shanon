@@ -245,6 +245,12 @@ async function onWorkItem(s: Session, itemId: string, action: string) {
   }
   if (action === "reject") {
     await finish(s, inst, "rejected", (w.result as string) ?? null);
+    // akce záznamu při zamítnutí (doklad z integrace → Odmítnout); nepovede-li se, záznam zůstane
+    const def = await s.get("wf.definition", String(inst.definitionId));
+    if (def?.rejectAction)
+      await guarded(s, () => s.action(String(inst.refObject), String(inst.refId), String(def.rejectAction), undefined, false, { workflow: true })).catch((e) => {
+        if (!(e instanceof UserError)) throw e;
+      });
     const rec = await s.get(String(inst.refObject), String(inst.refId));
     const to = rec ? await s.originator(String(inst.refObject), rec) : null;
     await notify(s.api(), { kind: "warning", title: "@WF:NotifyRejected", params: { title: String(inst.refTitle ?? "") }, message: (w.result as string) ?? null, href: String(inst.href ?? ""), userId: to });
