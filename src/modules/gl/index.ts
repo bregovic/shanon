@@ -340,7 +340,7 @@ export const account = defineObject({
   form: [
     { label: "@SYS:General", fields: ["accountNum", "name", "type", "synthetic", "accountClass", "blocked"] },
     { label: "@GL:Control", fields: ["postingType", "noManualEntry", "itemTaxGroupId"] },
-    { label: "@GL:Dimensions", fields: ["dim1Req", "dim2Req", "dim3Req", "dim4Req", "dim5Req", "dim6Req"] },
+    // povinnost dimenzí se nastavuje v Pravidlech dimenzí (dimNReq je jen jejich propis pro kontrolu při účtování)
     { label: "@GL:DefaultDims", fields: ["dim1", "dim2", "dim3", "dim4", "dim5", "dim6"] },
   ],
   unique: [["accountNum"]],
