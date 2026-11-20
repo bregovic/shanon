@@ -197,3 +197,40 @@ export async function readScaleSim(attempt: number): Promise<ScaleReading> {
   if (attempt < 2) return { kg: Math.round((0.3 + Math.random()) * 1000) / 1000, stable: false, status: "motion" };
   return { kg: Math.round((0.1 + Math.random() * 1.4) * 1000) / 1000, stable: true, status: "ok" };
 }
+
+export type { ReadablePort };
+
+export interface SerialSettings {
+  baudRate: number;
+  dataBits: 7 | 8;
+  parity: "none" | "even" | "odd";
+  stopBits: 1 | 2;
+}
+
+/**
+ * Zkouška váhy: otevřít port s nastavením, poslat bajty (prázdné = jen poslouchat), sbírat vše `ms`, zavřít.
+ * Vrací přijaté bajty — stránka Zkouška váhy z nich pozná protokol a nastavení.
+ */
+export async function serialExchange(port: ReadablePort, s: SerialSettings, send: Uint8Array, ms: number): Promise<number[]> {
+  await port.open({ baudRate: s.baudRate, dataBits: s.dataBits, stopBits: s.stopBits, parity: s.parity });
+  const reader = port.readable!.getReader();
+  const bytes: number[] = [];
+  try {
+    if (send.length) {
+      const w = port.writable!.getWriter();
+      await w.write(send);
+      w.releaseLock();
+    }
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      const chunk = await Promise.race([reader.read(), new Promise<{ value?: undefined; done: true }>((r) => setTimeout(() => r({ done: true }), Math.max(10, deadline - Date.now())))]);
+      if (chunk.value) bytes.push(...chunk.value);
+      else if (chunk.done && Date.now() >= deadline) break;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+    await port.close().catch(() => undefined);
+  }
+  return bytes;
+}

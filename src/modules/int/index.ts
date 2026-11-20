@@ -6,6 +6,7 @@
  * údaje (certifikát, hesla, API klíče) jsou pole se `secret` — v databázi
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
+import { retireTestScale } from "./test-env";
 import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -583,6 +584,8 @@ export const documentLine = defineObject({
 
 /** Výchozí datové služby firmy (ARES, ČNB, ECB) — veřejné, bez klíčů; pošta dokladů přes platformu. */
 async function intSetup(data: DataApi) {
+  // simulátor váhy z testovacího prostředí pryč (skutečná váha má přednost)
+  await retireTestScale(data);
   // pošta dokladů: Systémová pošta Shanonu (jméno odesílatele = firma, odpovědi na e-mail organizace) — jen firmě
   // bez vlastního napojení pošty; běží-li testovací prostředí, je pozastavená jako ostatní ostrá napojení
   const mails = await data.find("int.connection", { kind: "mail" }, { take: 50 });
@@ -619,7 +622,7 @@ export default defineModule({
     { label: "@INT:Documents", items: [{ object: "int.document" }, { object: "int.portal" }, { object: "int.portalContact" }] },
     { label: "@INT:Mails", items: [{ object: "int.mail" }] },
     { label: "@INT:Documents", kind: "functions", items: [{ href: "/int/doc-import", label: "@INT:DocImport" }] },
-    { label: "@INT:Testing", kind: "functions", items: [{ href: "/int/test-env", label: "@INT:TestEnv" }] },
+    { label: "@INT:Testing", kind: "functions", items: [{ href: "/int/test-env", label: "@INT:TestEnv" }, { href: "/int/scale-test", label: "@INT:ScaleTest" }] },
   ],
   labels: {
     cs: {
@@ -628,6 +631,36 @@ export default defineModule({
       KindMail: "Pošta (e-mail)",
       KindScale: "Pokladní váha",
       DrvScaleSerial: "Váha na sériovém portu (RS-232 / USB)",
+      ScaleTest: "Zkouška váhy",
+      STIntro: "Připojte váhu (sériový port / převodník USB), zvolte port v nabídce prohlížeče a dejte Najít nastavení — vyzkouší obvyklé rychlosti a dotazy a ukáže, co váha odpoví. Na váhu při hledání položte zboží (ne nulovou hmotnost). Nalezené nastavení uložíte do napojení váhy tlačítkem Použít.",
+      STConnect: "Připojit váhu",
+      STReconnect: "Vybrat jiný port",
+      STConnected: "Port vybraný",
+      STBaud: "Rychlost (Bd)",
+      STFrame: "Data / parita / stop",
+      STManual: "Ruční dotaz",
+      STListen: "Jen poslouchat",
+      STCustomHint: "vlastní: text nebo HEX (57 0d)",
+      STSend: "Poslat",
+      STScan: "Najít nastavení",
+      STScanHint: "Asi 1–2 minuty; skončí po první rozpoznané hmotnosti.",
+      STScanDone: "Hotovo — odpovědí: {n}.",
+      STScanNothing: "Váha neodpověděla na žádné nastavení. Zkontrolujte kabel, převodník, zapnutí výstupu RS-232 v nastavení váhy, případně zkuste Jen poslouchat a na váze tlačítko tisku.",
+      STSettings: "Nastavení",
+      STProbe: "Dotaz",
+      STAnswer: "Odpověď (text / HEX)",
+      STWeight: "Rozpoznáno",
+      STUse: "Použít",
+      STSaveTo: "Uložit do napojení váhy",
+      STNoConnection: "Napojení váhy zatím není: Integrace → Napojení → Nový, druh Pokladní váha, ovladač Váha na sériovém portu.",
+      STLog: "Komunikace",
+      STNoAnswer: "bez odpovědi",
+      STUnsupported: "Prohlížeč nepodporuje sériový port. Otevřete Shanon v Chrome nebo Edge na počítači, ke kterému je váha připojená.",
+      STSaved: "Nastavení váhy uloženo do napojení.",
+      STUnstable: "neustálená",
+      STP_toledo8217: "Mettler Toledo 8217",
+      STP_casEcr: "CAS ECR",
+      STP_continuous: "plynulé posílání",
       DrvScaleSim: "Simulátor váhy (zkoušení)",
       ScaleSettings: "Pokladní váha",
       ScaleProtocol: "Protokol váhy",
@@ -1093,6 +1126,36 @@ export default defineModule({
       KindMail: "Mail (e-mail)",
       KindScale: "Checkout scale",
       DrvScaleSerial: "Scale on a serial port (RS-232 / USB)",
+      ScaleTest: "Scale test",
+      STIntro: "Connect the scale (serial port / USB adapter), choose the port in the browser prompt and press Find settings — it tries common speeds and requests and shows what the scale answers. Put goods on the scale while searching (non-zero weight). Save the found settings to the scale connection with Use.",
+      STConnect: "Connect scale",
+      STReconnect: "Choose another port",
+      STConnected: "Port selected",
+      STBaud: "Speed (Bd)",
+      STFrame: "Data / parity / stop",
+      STManual: "Manual request",
+      STListen: "Listen only",
+      STCustomHint: "custom: text or HEX (57 0d)",
+      STSend: "Send",
+      STScan: "Find settings",
+      STScanHint: "About 1–2 minutes; stops after the first recognized weight.",
+      STScanDone: "Done — answers: {n}.",
+      STScanNothing: "The scale did not answer with any settings. Check the cable, adapter and the RS-232 output in the scale settings, or try Listen only and press print on the scale.",
+      STSettings: "Settings",
+      STProbe: "Request",
+      STAnswer: "Answer (text / HEX)",
+      STWeight: "Recognized",
+      STUse: "Use",
+      STSaveTo: "Save to scale connection",
+      STNoConnection: "No scale connection yet: Integration → Connections → New, kind POS scale, driver Scale on serial port.",
+      STLog: "Communication",
+      STNoAnswer: "no answer",
+      STUnsupported: "The browser does not support serial ports. Open Shanon in Chrome or Edge on the computer the scale is connected to.",
+      STSaved: "Scale settings saved to the connection.",
+      STUnstable: "unstable",
+      STP_toledo8217: "Mettler Toledo 8217",
+      STP_casEcr: "CAS ECR",
+      STP_continuous: "continuous output",
       DrvScaleSim: "Scale simulator (testing)",
       ScaleSettings: "Checkout scale",
       ScaleProtocol: "Scale protocol",

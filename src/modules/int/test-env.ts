@@ -14,8 +14,6 @@ const TEST_CONNECTIONS = [
   { code: "TEST-EET", kind: "eet", driver: "eet2", name: "@INT:TestEet", extra: { unitId: "1", posId: "TEST", environment: "playground", certPassword: PLAYGROUND_CERT_PASSWORD, certData: PLAYGROUND_CERT_P12, certSubject: PLAYGROUND_CERT_DIC, certValidTo: "2027-05-14" } },
   { code: "TEST-PAY", kind: "payment", driver: "simulator", name: "@INT:TestPay", extra: {} },
   { code: "TEST-PRINT", kind: "printer", driver: "browser", name: "@INT:TestPrint", extra: { paperWidth: "80" } },
-  // pokladní váha bez hardwaru: po chvíli ustálená náhodná hmotnost
-  { code: "TEST-SCALE", kind: "scale", driver: "scaleSim", name: "@INT:TestScale", extra: {} },
   // vytěžování dokladů klíčem z prostředí serveru (do databáze se neukládá)
   { code: "TEST-OCR", kind: "ocr", driver: "openaiTest", name: "@INT:TestOcr", extra: { model: "gpt-5-mini", dailyLimit: 30 } },
   // pošta jen do protokolu (nic neodchází)
@@ -68,6 +66,17 @@ export async function enableTestEnv(data: DataApi, t: (ref: string) => string, w
   // testovací data: boxy pro odložené nákupy
   if (withPos && !(await data.find("pos.box", {}, { take: 1 })).length) {
     for (let i = 1; i <= 5; i++) await data.create("pos.box", { code: `B${String(i).padStart(2, "0")}`, name: `Box ${i}` });
+  }
+}
+
+/**
+ * Simulátor váhy už testovací prostředí nezakládá (falešné vážení se pletlo se skutečnou váhou): dříve
+ * založený TEST-SCALE vypnout a skutečné váhy pozastavené testem zapnout. Idempotentní, volá výchozí nastavení.
+ */
+export async function retireTestScale(data: DataApi): Promise<void> {
+  for (const c of await data.find("int.connection", { kind: "scale" }, { take: 50 })) {
+    if (c.code === "TEST-SCALE" && c.active) await data.update("int.connection", String(c.id), { active: false });
+    if (c.pausedByTest) await data.update("int.connection", String(c.id), { active: true, pausedByTest: false } as RecordData);
   }
 }
 

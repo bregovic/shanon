@@ -51,7 +51,13 @@ Váha se připojuje k počítači pokladny kabelem RS-232 nebo USB (převodník 
 2. Na pokladně **Připojit váhu** a v nabídce prohlížeče vyberte port váhy (pokladna si ho pamatuje, tiskárna ho nepoužije).
 3. U zboží na váhu se po klepnutí hmotnost načte sama — vezme se jen **ustálená** kladná hmotnost. **Zvážit** čtení zopakuje; hmotnost jde vždy zadat i ručně. Tárování a nulování se dělá na váze.
 
-**Testovací prostředí** založí **TEST-SCALE – simulátor váhy**: pokladna se chová, jako by byla váha připojená (chvíli kolísá, pak se ustálí náhodná hmotnost).
+**Nová váha a neznámý protokol:** [Integrace → Zkouška váhy](/int/scale-test) (Chrome nebo Edge na počítači s váhou) →
+**Připojit váhu** → položte zboží → **Najít nastavení**. Stránka zkusí obvyklé rychlosti, parity a dotazy běžných protokolů
+a ukáže, co váha odpoví; rozpoznané nastavení uložíte do napojení váhy tlačítkem **Použít**. Ručně jde poslat i vlastní
+dotaz (text nebo HEX) a sledovat komunikaci. Když váha neodpoví vůbec, zkontrolujte v nastavení váhy zapnutý výstup
+RS-232 a zkuste **Jen poslouchat** a na váze tlačítko tisku.
+
+Testovací prostředí simulátor váhy nezakládá — vždy se používá skutečná váha z napojení.
 
 **Ověřená váha (stanovené měřidlo):** při prodeji podle hmotnosti musí být váha ověřená a její displej viditelný pro zákazníka. Když pokladna přebírá hmotnost z váhy, posuzuje ČMI celou sestavu váha + pokladna (prohlášení výrobce o shodě sestavy, případně informativní štítek, že ověření platí jen pro váhu) — postup konzultujte s dodavatelem váhy. Pro ověřenou váhu s výpočtem ceny je protokol **Dialog 06** (viz níže).
 
