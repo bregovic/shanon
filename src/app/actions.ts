@@ -431,6 +431,7 @@ export async function runRecordAction(objectId: string, id: string, actionId: st
       return { ok: true, data: { open: n ? objectHref(objectId, String(n.id)) : objectHref(objectId), warnings } };
     }
     // akce může otevřít vzniklý záznam (koncept e-mailu…)
+    if (out?.href && out.href.startsWith("/")) return { ok: true, data: { open: out.href, warnings } };
     return { ok: true, data: out?.open ? { open: objectHref(out.open.object, out.open.id), warnings } : warnings ? { warnings } : undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);

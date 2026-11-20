@@ -175,6 +175,8 @@ export class UserError extends Error {
 /** Výsledek akce: po doběhnutí otevřít záznam (např. vzniklý koncept e-mailu). */
 export interface ActionOutcome {
   open?: { object: string; id: string };
+  /** otevřít stránku aplikace (např. Zkouška váhy v prohlížeči) */
+  href?: string;
 }
 
 export interface ObjectHandlers {

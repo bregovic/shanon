@@ -15,7 +15,8 @@ const KEYS = [
   "P_toledo8217", "P_casEcr", "P_continuous", "P_dialog06", "Dialog06", "Dialog06All", "K_weight", "K_ack", "K_nak", "K_text", "K_noise", "DiagWeight", "DiagLine", "DiagText", "DiagNoise", "DiagSilent", "DiagNext",
 ];
 
-export default async function ScaleTestPage() {
+export default async function ScaleTestPage({ searchParams }: { searchParams: Promise<{ conn?: string }> }) {
+  const { conn } = await searchParams;
   const s = await requireSession();
   if (!s.ctx.modules.has("int") || !s.ctx.companyId || !can(s.ctx.perms, "int.connection", "write")) notFound();
   const t = await getT(s.lang, s.ctx.tenantId);
@@ -27,7 +28,10 @@ export default async function ScaleTestPage() {
       </ActionBar>
       <PageContent>
         <ScaleTester
-          connections={conns.map((c) => ({ id: String(c.id), code: String(c.code), name: String(c.name), version: Number(c.version) }))}
+          connections={conns
+            .map((c) => ({ id: String(c.id), code: String(c.code), name: String(c.name), version: Number(c.version) }))
+            // napojení z tlačítka Test na kartě váhy první (předvybrané)
+            .sort((a, b) => Number(b.id === conn) - Number(a.id === conn))}
           L={Object.fromEntries(KEYS.map((k) => [k, t(`@INT:ST${k}`)]))}
         />
       </PageContent>

@@ -708,6 +708,8 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         }
         if (conn.driver === "eetSimulator")
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
+        // váha visí na sériovém portu počítače pokladny — zkouší se v prohlížeči (Zkouška váhy s tímto napojením)
+        if (conn.kind === "scale") return { href: `/int/scale-test?conn=${conn.id}` };
         if (conn.kind === "mail") {
           try {
             await verifyMail(conn);
