@@ -5,7 +5,8 @@
  * uložit do napojení váhy. Slouží k rozchození nové váhy, než se zná její protokol.
  */
 import { useRef, useState, useSyncExternalStore } from "react";
-import { Badge, Button, Dropdown, Field, Input, makeStyles, MessageBar, MessageBarBody, Option, ProgressBar, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Text, tokens } from "@fluentui/react-components";
+import { Badge, Button, Dropdown, Field, Input, makeStyles, MessageBar, MessageBarBody,
+  MessageBarTitle, Option, ProgressBar, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Text, tokens } from "@fluentui/react-components";
 import { PlugConnected24Regular, Search24Regular, Send24Regular } from "@fluentui/react-icons";
 import { saveRecordAction } from "@/app/actions";
 import { connectScalePort, parseScale, serialExchange, type ReadablePort, type ScaleProtocol, type SerialSettings } from "@/lib/scale";
@@ -109,6 +110,8 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
   const [hits, setHits] = useState<Hit[]>([]);
   const [custom, setCustom] = useState("");
   const [verdict, setVerdict] = useState<{ ok: boolean; lines: string[] } | null>(null);
+  // úspěšné zkušební vážení: zůstane vidět, dokud se nespustí nová diagnostika / vážení
+  const [allOk, setAllOk] = useState<string | null>(null);
   // zkušební vážení (Dialog 06): průběžný stav váhy; stop = ukončit
   const [live, setLive] = useState<string | null>(null);
   const stopLive = useRef(false);
@@ -152,6 +155,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       if (!port) return;
       setHits([]);
       setVerdict(null);
+      setAllOk(null);
       const combos = BAUDS.flatMap((baudRate) => FRAMES.map((f) => ({ ...f, baudRate, stopBits: 1 as const })));
       const probes = [...PROBES.map((p) => p.id), "Dialog 06"];
       const total = combos.length * probes.length;
@@ -269,6 +273,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       const d06 = hits.find((h) => h.probe === "Dialog 06" && h.bytes.includes(0x06));
       const line = d06?.settings ?? s;
       stopLive.current = false;
+      setAllOk(null);
       const ack = await serialExchange(port, line, encodeUnitPrice(10000), 700);
       add(`→ [${settingsText(line)}] ${L.WeighPrice}  ← ${hex(ack) || L.NoAnswer}`);
       if (!ack.includes(0x06)) {
@@ -293,7 +298,9 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           const hit: Hit = { settings: line, probe: "Dialog 06", bytes, parsed: { ...parsed, protocol: "dialog06" } };
           setHits((h) => [...h, hit]);
           if (connections.length) await save(hit, true);
-          setVerdict({ ok: true, lines: [text] });
+          setVerdict(null);
+          setLive(null);
+          setAllOk(`${text} ${settingsText(line)}`);
           return;
         }
         // stav váhy lidsky (kód jen v záznamu Pro servis)
@@ -362,6 +369,15 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       {live && (
         <MessageBar intent="info">
           <MessageBarBody>{live}</MessageBarBody>
+        </MessageBar>
+      )}
+      {allOk && (
+        <MessageBar intent="success" layout="multiline">
+          <MessageBarBody>
+            <MessageBarTitle>{L.AllOk}</MessageBarTitle>
+            <div>{allOk}</div>
+            <div>{L.AllOkText}</div>
+          </MessageBarBody>
         </MessageBar>
       )}
       {verdict && (
