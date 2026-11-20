@@ -25,8 +25,11 @@ export const ACK = 0x06;
 export const NAK = 0x15;
 export const ESC = 0x1b;
 
-/** Linka Dialog 06: 7 datových bitů, lichá parita, 1 stop bit (rychlost podle nastavení váhy, obvykle 9600). */
-export const DIALOG06_LINE = { dataBits: 7 as const, parity: "odd" as const, stopBits: 1 as const };
+/**
+ * Výchozí linka Dialog 06: 8 bitů, bez parity, 1 stop bit — ověřeno na TEM EGE-M (20. 11. 2026: cenu potvrdí ACK
+ * na 9600 8N1, na 7O1 mlčí). Skutečné nastavení bere pokladna z napojení váhy (Zkouška váhy ho uloží).
+ */
+export const DIALOG06_LINE = { dataBits: 8 as const, parity: "none" as const, stopBits: 1 as const };
 
 export type Dialog06Status = "unstable" | "belowMin" | "overload" | "negative" | "noPrice" | "error";
 
@@ -71,6 +74,9 @@ export const encodeClear = (): Uint8Array => encodeUnitPrice(0);
 
 /** Dotaz na stav / hmotnost. */
 export const encodeStatusRequest = (): Uint8Array => Uint8Array.from([EOT, ENQ]);
+
+/** Po NAK na dotaz: proč — záznam 08 (váha odpoví záznamem 09 s kódem stavu). */
+export const encodeStatusQuery = (): Uint8Array => Uint8Array.from([EOT, STX, ...ascii("08"), ETX]);
 
 export const hex = (b: ArrayLike<number>) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join(" ");
 

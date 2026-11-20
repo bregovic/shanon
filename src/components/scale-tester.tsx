@@ -10,7 +10,7 @@ import { PlugConnected24Regular, Search24Regular, Send24Regular } from "@fluentu
 import { saveRecordAction } from "@/app/actions";
 import { connectScalePort, parseScale, serialExchange, type ReadablePort, type ScaleProtocol, type SerialSettings } from "@/lib/scale";
 import { toast } from "./toast";
-import { encodeStatusRequest, encodeUnitPrice, parseDialog06 } from "@/lib/dialog06";
+import { encodeStatusQuery, encodeStatusRequest, encodeUnitPrice, parseDialog06 } from "@/lib/dialog06";
 
 const PROBES: { id: string; bytes: number[] }[] = [
   { id: "listen", bytes: [] },
@@ -73,7 +73,7 @@ function recognizeDialog06(bytes: number[]): Hit["parsed"] {
     rest = rest.slice(r.used);
     const m = r.msg;
     if (m.kind === "data") return { protocol: "dialog06", kg: Number(m.weight.replace(",", ".")), stable: true, note: `${m.unitPrice} Kč/kg → ${m.total} Kč` };
-    if (m.kind === "status") best = { protocol: "dialog06", kg: null, stable: false, note: m.status };
+    if (m.kind === "status") best = { protocol: "dialog06", kg: null, stable: false, note: `stav ${m.code} (${m.status})` };
     if (m.kind === "ack" && !best) best = { protocol: "dialog06", kg: null, stable: false, note: "ACK" };
     if (m.kind === "nak" && !best) best = { protocol: "dialog06", kg: null, stable: false, note: "NAK" };
   }
@@ -159,9 +159,21 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           let got: number[] = [];
           try {
             if (id === "Dialog 06") {
-              const a = await serialExchange(port, settings, encodeUnitPrice(10000), 600);
-              const b = await serialExchange(port, settings, encodeStatusRequest(), 900);
-              got = [...a, ...b];
+              got = await serialExchange(port, settings, encodeUnitPrice(10000), 600);
+              // cena přijata (ACK) → dotazy na hmotnost; NAK = zeptat se na stav (proč ne)
+              if (got.includes(0x06)) {
+                for (let k = 0; k < 5; k++) {
+                  const r = await serialExchange(port, settings, encodeStatusRequest(), 700);
+                  got = [...got, ...r];
+                  if (r.includes(0x02)) break; // data / stav z váhy
+                  if (r.includes(0x15)) {
+                    const st = await serialExchange(port, settings, encodeStatusQuery(), 700);
+                    got = [...got, ...st];
+                    add(`← [${settingsText(settings)}] Dialog 06 stav: ${ascii(st)}   HEX ${hex(st)}`);
+                  }
+                  await new Promise((w) => setTimeout(w, 400));
+                }
+              }
             } else {
               const p = PROBES.find((x) => x.id === id)!;
               got = await serialExchange(port, settings, Uint8Array.from(p.bytes), id === "listen" ? 1200 : 500);
@@ -199,6 +211,19 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           .replace("{kg}", weight.parsed!.kg!.toFixed(3))
           .replace("{conn}", conn?.code ?? "");
         setVerdict({ ok: true, lines: [text] });
+        return;
+      }
+      // Dialog 06 potvrzený (váha přijala cenu), hmotnost zatím ne: protokol a linku uložit, ukázat stav váhy
+      const d06 = found.find((h) => h.probe === "Dialog 06" && h.bytes[0] === 0x06);
+      if (d06) {
+        const conn = connections.find((x) => x.id === connId);
+        const hit: Hit = { ...d06, parsed: { protocol: "dialog06", kg: null, stable: false } };
+        const saved = conn ? await save(hit, true) : false;
+        const status = recognizeDialog06(d06.bytes.slice(1))?.note ?? "—";
+        setVerdict({
+          ok: true,
+          lines: [(saved ? L.DiagD06Saved : L.DiagD06).replace("{settings}", settingsText(d06.settings)).replace("{conn}", conn?.code ?? "").replace("{status}", status)],
+        });
         return;
       }
       // bez hmotnosti: jen fakta — na co váha reagovala

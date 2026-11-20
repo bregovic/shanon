@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACK, ENQ, EOT, ESC, ETX, STX, encodeClear, encodeStatusRequest, encodeUnitPrice, parseDialog06, scaleText, type Dialog06Message } from "../src/lib/dialog06";
+import { ACK, ENQ, EOT, ESC, ETX, NAK, STX, encodeClear, encodeStatusQuery, encodeStatusRequest, encodeUnitPrice, parseDialog06, scaleText, type Dialog06Message } from "../src/lib/dialog06";
 import { ScaleDriver, type ScaleState, type ScaleTransport } from "../src/lib/scale-driver";
 import { SimScaleTransport } from "../src/lib/scale-sim";
 
@@ -87,6 +87,29 @@ describe("ScaleDriver se simulátorem váhy", () => {
     await d.setUnitPrice(HAM);
     const s = await until(d, (x) => x.problem === "priceMismatch");
     expect(s.reading).toBeNull();
+    await d.dispose();
+  });
+
+  it("NAK na dotaz o hmotnost → dotaz na stav (08) → stav z váhy (09), ne chyba spojení (TEM EGE-M)", async () => {
+    expect([...encodeStatusQuery()]).toEqual(bytes(EOT, STX, "08", ETX));
+    const sent: number[][] = [];
+    const t: ScaleTransport = {
+      open: async () => {},
+      close: async () => {},
+      exchange: async (req): Promise<Dialog06Message | null> => {
+        sent.push([...req]);
+        if (req[1] === ENQ) return { kind: "nak" };
+        if (req[1] === STX && req[2] === "0".charCodeAt(0) && req[3] === "8".charCodeAt(0)) return parseDialog06(bytes(STX, "09", ESC, "20", ETX))!.msg;
+        return { kind: "ack" };
+      },
+    };
+    const d = new ScaleDriver(t);
+    await d.connect();
+    await d.setUnitPrice(HAM);
+    const s = await until(d, (x) => x.phase === "needZero" || x.phase === "weighing");
+    expect(s.problem).toBeNull();
+    expect(sent.some((r) => r[1] === STX && String.fromCharCode(r[2], r[3]) === "08")).toBe(true);
+    void NAK;
     await d.dispose();
   });
 

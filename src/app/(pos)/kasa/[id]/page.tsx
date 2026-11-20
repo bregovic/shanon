@@ -121,7 +121,14 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       // ověřená váha (Dialog 06): panel Váha místo dialogu hmotnosti; cenu počítá váha
       verifiedScale={
         data.conns.scale && data.conns.scale.scaleProtocol === "dialog06"
-          ? { driver: String(data.conns.scale.driver), baudRate: Number(data.conns.scale.baudRate ?? 9600), autoAddSec: Math.max(0, Number(data.conns.scale.scaleAutoAddSec ?? 0)) }
+          ? {
+              driver: String(data.conns.scale.driver),
+              baudRate: Number(data.conns.scale.baudRate ?? 9600),
+              dataBits: Number(data.conns.scale.dataBits) === 7 ? 7 : 8,
+              parity: (["even", "odd"].includes(String(data.conns.scale.parity)) ? data.conns.scale.parity : "none") as "none",
+              stopBits: Number(data.conns.scale.stopBits) === 2 ? 2 : 1,
+              autoAddSec: Math.max(0, Number(data.conns.scale.scaleAutoAddSec ?? 0)),
+            }
           : null
       }
       scale={

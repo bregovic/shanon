@@ -40,6 +40,10 @@ const useStyles = makeStyles({
 export interface VerifiedScaleConfig {
   driver: string;
   baudRate: number;
+  /** linka z napojení váhy */
+  dataBits?: 7 | 8;
+  parity?: "none" | "even" | "odd";
+  stopBits?: 1 | 2;
   /** přidat samo po N s ustálení (0 = vypnuto) */
   autoAddSec: number;
 }
@@ -50,7 +54,11 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
   const [state, setState] = useState<ScaleState | null>(null);
   useEffect(() => {
     if (!cfg) return;
-    const d = new ScaleDriver(cfg.driver === "scaleSim" ? new SimScaleTransport() : new WebSerialTransport(() => scalePort(), cfg.baudRate || 9600));
+    const d = new ScaleDriver(
+      cfg.driver === "scaleSim"
+        ? new SimScaleTransport()
+        : new WebSerialTransport(() => scalePort(), cfg.baudRate || 9600, { dataBits: cfg.dataBits ?? 8, parity: cfg.parity ?? "none", stopBits: cfg.stopBits ?? 1 }),
+    );
     const off = d.subscribe(setState);
     void d.connect();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- driver vzniká s napojením (vnější zdroj)
@@ -59,7 +67,7 @@ export function useVerifiedScale(cfg: VerifiedScaleConfig | null) {
       off();
       void d.dispose();
     };
-  }, [cfg?.driver, cfg?.baudRate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cfg?.driver, cfg?.baudRate, cfg?.dataBits, cfg?.parity, cfg?.stopBits]); // eslint-disable-line react-hooks/exhaustive-deps
   return { driver, state };
 }
 

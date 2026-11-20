@@ -13,7 +13,7 @@
  * Přenos je vyměnitelný (`ScaleTransport`): Web Serial v Chrome (i Android 148+), simulátor pro testovací
  * prostředí, později případně obal usb-serial-for-android se stejným rozhraním.
  */
-import { DIALOG06_LINE, encodeClear, encodeStatusRequest, encodeUnitPrice, hex, parseDialog06, type Dialog06Message, type Dialog06Status } from "./dialog06";
+import { DIALOG06_LINE, encodeClear, encodeStatusQuery, encodeStatusRequest, encodeUnitPrice, hex, parseDialog06, type Dialog06Message, type Dialog06Status } from "./dialog06";
 
 export interface ScaleTransport {
   open(): Promise<void>;
@@ -130,6 +130,16 @@ export class ScaleDriver {
         this.lost();
         return null;
       }
+      // NAK na dotaz o hmotnost = váha teď hmotnost nedá → důvod ze záznamu 09 (neustálená, pod minimem…)
+      if (m?.kind === "nak" && !wantAck) {
+        try {
+          const st = await this.serial(() => this.transport.exchange(encodeStatusQuery(), TIMEOUT_MS));
+          if (st?.kind === "status") return st;
+        } catch {
+          this.lost();
+          return null;
+        }
+      }
       if (!m || m.kind === "nak") continue;
       if (wantAck && m.kind !== "ack") continue;
       return m;
@@ -241,13 +251,15 @@ export class WebSerialTransport implements ScaleTransport {
   constructor(
     private getPort: () => Promise<SerialPortLike | null>,
     private baudRate = 9600,
+    /** linka z napojení váhy (výchozí 8N1) */
+    private line: { dataBits: 7 | 8; parity: "none" | "even" | "odd"; stopBits: 1 | 2 } = DIALOG06_LINE,
   ) {}
 
   async open() {
     const port = await this.getPort();
     if (!port) throw new Error("no port");
     if (!this.open_) {
-      await port.open({ baudRate: this.baudRate, ...DIALOG06_LINE });
+      await port.open({ baudRate: this.baudRate, ...this.line });
       this.open_ = true;
       this.failed = false;
       this.port = port;
