@@ -10,7 +10,7 @@ import { PlugConnected24Regular, Search24Regular, Send24Regular } from "@fluentu
 import { saveRecordAction } from "@/app/actions";
 import { connectScalePort, parseScale, serialExchange, type ReadablePort, type ScaleProtocol, type SerialSettings } from "@/lib/scale";
 import { toast } from "./toast";
-import { DIALOG06_LINE, encodeStatusRequest, encodeUnitPrice, parseDialog06 } from "@/lib/dialog06";
+import { encodeStatusRequest, encodeUnitPrice, parseDialog06 } from "@/lib/dialog06";
 
 const PROBES: { id: string; bytes: number[] }[] = [
   { id: "listen", bytes: [] },
@@ -137,41 +137,6 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
     }
   };
 
-  /** Dialog 06 na jednom nastavení linky: cena 100,00 Kč/kg → potvrzení → EOT ENQ; true = váha odpověděla */
-  const d06Once = async (settings: SerialSettings): Promise<boolean> => {
-    if (!port) return false;
-    const price = Array.from(encodeUnitPrice(10000));
-    add(`→ [${settingsText(settings)}] Dialog 06 cena 100,00 Kč/kg  ${hex(price)}`);
-    const a = await serialExchange(port, settings, Uint8Array.from(price), 700);
-    add(a.length ? `← ${hex(a)}   ${ascii(a)}` : `← ${L.NoAnswer}`);
-    const req = Array.from(encodeStatusRequest());
-    add(`→ [${settingsText(settings)}] Dialog 06 EOT ENQ  ${hex(req)}`);
-    const b = await serialExchange(port, settings, Uint8Array.from(req), 1200);
-    add(b.length ? `← ${hex(b)}   ${ascii(b)}` : `← ${L.NoAnswer}`);
-    if (!a.length && !b.length) return false;
-    setHits((h) => [...h, { settings, probe: "Dialog 06", bytes: [...a, ...b], parsed: recognizeDialog06([...a, ...b]) }]);
-    return true;
-  };
-
-  /** Dialog 06 na nastavené rychlosti / rámci, nebo na všech obvyklých (9600, 19200 × 7O1 7E1 8N1 8E1 8O1) */
-  const dialog06 = (all: boolean) =>
-    run(async () => {
-      const list: SerialSettings[] = all
-        ? [9600, 19200].flatMap((baudRate) =>
-            ([[7, "odd"], [7, "even"], [8, "none"], [8, "even"], [8, "odd"]] as const).map(([dataBits, parity]) => ({ baudRate, dataBits, parity, stopBits: 1 as const })),
-          )
-        : [{ baudRate: s.baudRate, ...DIALOG06_LINE }];
-      let n = 0;
-      for (const set of list) {
-        if (all) setProgress(++n / list.length);
-        try {
-          await d06Once(set);
-        } catch (e) {
-          add(`! ${settingsText(set)}: ${String((e as Error).message ?? e)}`);
-        }
-      }
-    });
-
   /**
    * Diagnostika: rychlosti z běžných vah × rámce linky × dotazy všech podporovaných protokolů (vč. Dialog 06).
    * Každou odpověď zařadí (hmotnost / potvrzení ACK / odmítnutí NAK / text s čísly / šum) a na konci napíše,
@@ -187,7 +152,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       const total = combos.length * probes.length;
       let n = 0;
       const found: (Hit & { kind: Kind; score: number })[] = [];
-      const errors = new Map<string, number>();
+      const errSeen = new Set<string>();
       outer: for (const settings of combos) {
         for (const id of probes) {
           setProgress(++n / total);
@@ -202,10 +167,17 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
               got = await serialExchange(port, settings, Uint8Array.from(p.bytes), id === "listen" ? 1200 : 500);
             }
           } catch (e) {
-            // chyba rámce / parity = data na lince jsou, ale s jiným nastavením
+            const msg = String((e as Error).message ?? e);
+            // port nejde otevřít = drží ho jiné okno / program → dál nemá smysl zkoušet
+            if (/open/i.test(msg)) {
+              add(`! ${msg}`);
+              setVerdict({ ok: false, lines: [L.PortBusy] });
+              return;
+            }
+            // chyba rámce / parity: jednou za nastavení linky
             const key = settingsText(settings);
-            errors.set(key, (errors.get(key) ?? 0) + 1);
-            add(`! ${key} ${id}: ${String((e as Error).message ?? e)}`);
+            if (!errSeen.has(key)) add(`! ${key}: ${msg}`);
+            errSeen.add(key);
             continue;
           }
           if (!got.length) continue;
@@ -217,34 +189,40 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           if (c.kind === "weight") break outer;
         }
       }
-      // diagnóza: nejlepší nastavení linky podle součtu „smysluplných“ odpovědí
-      const by = new Map<string, { settings: SerialSettings; score: number; kinds: Set<Kind>; probes: string[] }>();
-      for (const h of found) {
+      const weight = found.find((h) => h.kind === "weight");
+      if (weight) {
+        const conn = connections.find((x) => x.id === connId);
+        const saved = conn ? await save(weight, true) : false;
+        const text = (saved ? L.DiagSaved : L.DiagWeight)
+          .replace("{settings}", settingsText(weight.settings))
+          .replace("{protocol}", L[`P_${weight.parsed!.protocol}`] ?? weight.parsed!.protocol)
+          .replace("{kg}", weight.parsed!.kg!.toFixed(3))
+          .replace("{conn}", conn?.code ?? "");
+        setVerdict({ ok: true, lines: [text] });
+        return;
+      }
+      // bez hmotnosti: jen fakta — na co váha reagovala
+      const by = new Map<string, { settings: SerialSettings; score: number; kinds: Set<Kind> }>();
+      for (const h of found.filter((x) => x.kind !== "noise")) {
         const k = settingsText(h.settings);
-        const x = by.get(k) ?? { settings: h.settings, score: 0, kinds: new Set<Kind>(), probes: [] };
+        const x = by.get(k) ?? { settings: h.settings, score: 0, kinds: new Set<Kind>() };
         x.score += h.score;
         x.kinds.add(h.kind);
-        if (h.kind !== "noise") x.probes.push(h.probe);
         by.set(k, x);
       }
       const best = [...by.values()].sort((a, b) => b.score - a.score)[0];
-      const weight = found.find((h) => h.kind === "weight");
-      const lines: string[] = [];
-      if (weight) lines.push(L.DiagWeight.replace("{settings}", settingsText(weight.settings)).replace("{protocol}", L[`P_${weight.parsed!.protocol}`] ?? weight.parsed!.protocol));
-      else if (best && (best.kinds.has("ack") || best.kinds.has("nak"))) lines.push(L.DiagLine.replace("{settings}", settingsText(best.settings)).replace("{probes}", [...new Set(best.probes)].join(", ")));
-      else if (best && best.kinds.has("text")) lines.push(L.DiagText.replace("{settings}", settingsText(best.settings)));
-      else if (found.length || errors.size) lines.push(L.DiagNoise);
-      else lines.push(L.DiagSilent);
-      if (!weight) lines.push(L.DiagNext);
-      setVerdict({ ok: !!weight, lines });
-      add(found.length ? L.ScanDone.replace("{n}", String(found.length)) : L.ScanNothing);
+      setVerdict({
+        ok: false,
+        lines: [best ? L.DiagReacted.replace("{settings}", settingsText(best.settings)).replace("{kinds}", [...best.kinds].map((k) => L[`K_${k}`]).join(", ")) : found.length || errSeen.size ? L.DiagNoise : L.DiagSilent],
+      });
     });
 
-  const save = async (h: Hit) => {
-    if (!h.parsed || !connId) return;
+  const save = async (h: Hit, silent = false): Promise<boolean> => {
+    if (!h.parsed || !connId) return false;
     const c = connections.find((x) => x.id === connId);
     const r = await saveRecordAction("int.connection", connId, { scaleProtocol: h.parsed.protocol, baudRate: h.settings.baudRate, dataBits: h.settings.dataBits, parity: h.settings.parity, stopBits: h.settings.stopBits }, c?.version);
-    toast(r.ok ? L.Saved : r.message, r.ok ? "success" : "warning");
+    if (!silent || !r.ok) toast(r.ok ? L.Saved : r.message, r.ok ? "success" : "warning");
+    return r.ok;
   };
 
   if (supported === null) return null;
@@ -255,6 +233,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       </MessageBar>
     );
 
+  const shown = hits.filter((h) => classify(h.bytes, h.parsed).kind !== "noise");
   return (
     <div className={st.wrap}>
       <Text>{L.Intro}</Text>
@@ -263,69 +242,22 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           {port ? L.Reconnect : L.Connect}
         </Button>
         {port && <Badge color="success">{L.Connected}</Badge>}
-        <Field label={L.Baud}>
-          <Dropdown value={String(s.baudRate)} selectedOptions={[String(s.baudRate)]} onOptionSelect={(_, d) => setS({ ...s, baudRate: Number(d.optionValue) })}>
-            {[1200, 2400, 4800, 9600, 19200, 38400].map((b) => (
-              <Option key={b} value={String(b)}>
-                {String(b)}
-              </Option>
-            ))}
-          </Dropdown>
-        </Field>
-        <Field label={L.Frame}>
-          <Dropdown
-            value={`${s.dataBits}${s.parity[0].toUpperCase()}${s.stopBits}`}
-            selectedOptions={[`${s.dataBits}-${s.parity}-${s.stopBits}`]}
-            onOptionSelect={(_, d) => {
-              const [db, par, sb] = String(d.optionValue).split("-");
-              setS({ ...s, dataBits: Number(db) as 7 | 8, parity: par as SerialSettings["parity"], stopBits: Number(sb) as 1 | 2 });
-            }}
-          >
-            {["8-none-1", "7-even-1", "7-odd-1", "8-even-1", "8-odd-1", "8-none-2"].map((f) => (
-              <Option key={f} value={f}>
-                {f.replace(/-(\w)\w*-/, (_, p: string) => p.toUpperCase()).replace(/-/g, "")}
-              </Option>
-            ))}
-          </Dropdown>
-        </Field>
-      </div>
-
-      <Text weight="semibold">{L.Manual}</Text>
-      <div className={st.row}>
-        {PROBES.map((p) => (
-          <Button key={p.id} size="small" disabled={!port || busy} onClick={() => run(async () => void (await once(p.id, p.bytes)))}>
-            {p.id === "listen" ? L.Listen : p.id}
-          </Button>
-        ))}
-        <Input size="small" value={custom} onChange={(_, d) => setCustom(d.value)} placeholder={L.CustomHint} />
-        <Button
-          size="small"
-          icon={<Send24Regular />}
-          disabled={!port || busy || !custom}
-          onClick={() =>
-            run(async () => {
-              // „57 0d“ = HEX, jinak text (\r \n jako CR LF)
-              const bytes = /^([0-9a-f]{2}\s*)+$/i.test(custom.trim()) ? custom.trim().split(/\s+/).map((h) => parseInt(h, 16)) : [...custom.replace(/\\r/g, "\r").replace(/\\n/g, "\n")].map((c) => c.charCodeAt(0));
-              await once(custom, bytes);
-            })
-          }
-        >
-          {L.Send}
-        </Button>
-      </div>
-
-      <div className={st.row}>
-        <Button appearance="primary" disabled={!port || busy} onClick={() => dialog06(false)}>
-          {L.Dialog06}
-        </Button>
-        <Button disabled={!port || busy} onClick={() => dialog06(true)}>
-          {L.Dialog06All}
-        </Button>
-        <Button icon={<Search24Regular />} disabled={!port || busy} onClick={scan}>
+        <Button appearance="primary" icon={<Search24Regular />} disabled={!port || busy} onClick={scan}>
           {L.Scan}
         </Button>
-        <Text size={200}>{L.ScanHint}</Text>
+        {connections.length > 1 && (
+          <Field label={L.SaveTo} orientation="horizontal">
+            <Dropdown value={connections.find((c) => c.id === connId)?.code ?? ""} selectedOptions={[connId]} onOptionSelect={(_, d) => setConnId(String(d.optionValue))}>
+              {connections.map((c) => (
+                <Option key={c.id} value={c.id} text={c.code}>
+                  {`${c.code} · ${c.name}`}
+                </Option>
+              ))}
+            </Dropdown>
+          </Field>
+        )}
       </div>
+      {!connections.length && <Text size={200}>{L.NoConnection}</Text>}
       {progress !== null && <ProgressBar value={progress} />}
       {verdict && (
         <MessageBar intent={verdict.ok ? "success" : "warning"} layout="multiline">
@@ -337,9 +269,9 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
         </MessageBar>
       )}
 
-      {hits.length > 0 && (
+      {shown.length > 0 && (
         <div className={st.scroll}>
-          <Table size="small" style={{ tableLayout: "auto", minWidth: 760 }}>
+          <Table size="small" style={{ tableLayout: "auto", minWidth: 680 }}>
             <TableHeader>
               <TableRow>
                 <TableHeaderCell>{L.Settings}</TableHeaderCell>
@@ -350,7 +282,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
               </TableRow>
             </TableHeader>
             <TableBody>
-              {hits.map((h, i) => (
+              {shown.map((h, i) => (
                 <TableRow key={i}>
                   <TableCell>{settingsText(h.settings)}</TableCell>
                   <TableCell>{h.probe === "listen" ? L.Listen : h.probe}</TableCell>
@@ -362,12 +294,12 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
                   </TableCell>
                   <TableCell>
                     {h.parsed
-                      ? [h.parsed.kg !== null ? `${h.parsed.kg.toFixed(3)} kg` : null, L[`P_${h.parsed.protocol}`] ?? h.parsed.protocol, h.parsed.note, h.parsed.kg !== null && !h.parsed.stable ? L.Unstable : null].filter(Boolean).join(" · ")
-                      : "—"}
+                      ? [h.parsed.kg !== null ? `${h.parsed.kg.toFixed(3)} kg` : null, L[`P_${h.parsed.protocol}`] ?? h.parsed.protocol, h.parsed.note].filter(Boolean).join(" · ")
+                      : L[`K_${classify(h.bytes, h.parsed).kind}`]}
                   </TableCell>
                   <TableCell>
-                    {h.parsed && connections.length > 0 && (
-                      <Button size="small" appearance="primary" onClick={() => void save(h)}>
+                    {h.parsed && h.parsed.kg !== null && connections.length > 0 && (
+                      <Button size="small" onClick={() => void save(h)}>
                         {L.Use}
                       </Button>
                     )}
@@ -378,22 +310,66 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           </Table>
         </div>
       )}
-      {connections.length > 0 ? (
-        <Field label={L.SaveTo}>
-          <Dropdown value={connections.find((c) => c.id === connId)?.code ?? ""} selectedOptions={[connId]} onOptionSelect={(_, d) => setConnId(String(d.optionValue))}>
-            {connections.map((c) => (
-              <Option key={c.id} value={c.id} text={c.code}>
-                {`${c.code} · ${c.name}`}
-              </Option>
-            ))}
-          </Dropdown>
-        </Field>
-      ) : (
-        <Text size={200}>{L.NoConnection}</Text>
-      )}
 
-      <Text weight="semibold">{L.Log}</Text>
-      <div className={st.log}>{log.length ? log.join("\n") : "—"}</div>
+      {/* pro servis: ruční dotazy a celá komunikace (výpis pro dopsání protokolu) */}
+      <details>
+        <summary style={{ cursor: "pointer" }}>
+          <Text weight="semibold">{L.Service}</Text>
+        </summary>
+        <div className={st.wrap} style={{ marginTop: 8 }}>
+          <div className={st.row}>
+            <Field label={L.Baud}>
+              <Dropdown value={String(s.baudRate)} selectedOptions={[String(s.baudRate)]} onOptionSelect={(_, d) => setS({ ...s, baudRate: Number(d.optionValue) })}>
+                {[1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].map((b) => (
+                  <Option key={b} value={String(b)}>
+                    {String(b)}
+                  </Option>
+                ))}
+              </Dropdown>
+            </Field>
+            <Field label={L.Frame}>
+              <Dropdown
+                value={`${s.dataBits}${s.parity[0].toUpperCase()}${s.stopBits}`}
+                selectedOptions={[`${s.dataBits}-${s.parity}-${s.stopBits}`]}
+                onOptionSelect={(_, d) => {
+                  const [db, par, sb] = String(d.optionValue).split("-");
+                  setS({ ...s, dataBits: Number(db) as 7 | 8, parity: par as SerialSettings["parity"], stopBits: Number(sb) as 1 | 2 });
+                }}
+              >
+                {["8-none-1", "7-odd-1", "7-even-1", "8-even-1", "8-odd-1", "8-none-2"].map((f) => (
+                  <Option key={f} value={f}>
+                    {f.replace(/-(\w)\w*-/, (_, p: string) => p.toUpperCase()).replace(/-/g, "")}
+                  </Option>
+                ))}
+              </Dropdown>
+            </Field>
+          </div>
+          <div className={st.row}>
+            {PROBES.map((p) => (
+              <Button key={p.id} size="small" disabled={!port || busy} onClick={() => run(async () => void (await once(p.id, p.bytes)))}>
+                {p.id === "listen" ? L.Listen : p.id}
+              </Button>
+            ))}
+            <Input size="small" value={custom} onChange={(_, d) => setCustom(d.value)} placeholder={L.CustomHint} />
+            <Button
+              size="small"
+              icon={<Send24Regular />}
+              disabled={!port || busy || !custom}
+              onClick={() =>
+                run(async () => {
+                  // „57 0d“ = HEX, jinak text (\r \n jako CR LF)
+                  const bytes = /^([0-9a-f]{2}\s*)+$/i.test(custom.trim()) ? custom.trim().split(/\s+/).map((h) => parseInt(h, 16)) : [...custom.replace(/\\r/g, "\r").replace(/\\n/g, "\n")].map((c) => c.charCodeAt(0));
+                  await once(custom, bytes);
+                })
+              }
+            >
+              {L.Send}
+            </Button>
+          </div>
+          <Text weight="semibold">{L.Log}</Text>
+          <div className={st.log}>{log.length ? log.join("\n") : "—"}</div>
+        </div>
+      </details>
     </div>
   );
 }
