@@ -139,9 +139,20 @@ function remembered(): string | null {
 
 /** Zapamatovaný port váhy (bez dotazu), null = připojit tlačítkem. */
 export async function scalePort(): Promise<ReadablePort | null> {
+  const ports = (await serialApi()?.getPorts()) ?? [];
   const want = remembered();
-  if (!want) return null;
-  return (await serialApi()?.getPorts())?.find((p) => infoKey(p) === want) ?? null;
+  const hit = want ? ports.find((p) => infoKey(p) === want) : undefined;
+  if (hit) return hit;
+  // jediný povolený port v prohlížeči = váha (port se pak neřeší); víc portů = vybrat tlačítkem Připojit
+  if (ports.length === 1) {
+    try {
+      localStorage.setItem(KEY, infoKey(ports[0]));
+    } catch {
+      /* bez úložiště jen pro tuto relaci */
+    }
+    return ports[0];
+  }
+  return null;
 }
 
 /** Výběr portu váhy (dialog prohlížeče) a zapamatování. */
