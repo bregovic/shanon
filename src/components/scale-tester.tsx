@@ -15,6 +15,9 @@ const PROBES: { id: string; bytes: number[] }[] = [
   { id: "listen", bytes: [] },
   { id: "W", bytes: [0x57] },
   { id: "ENQ DC1", bytes: [0x05, 0x11] },
+  { id: "ENQ", bytes: [0x05] },
+  // Dialog 02 / 04 / 06 (TEM, Bizerba): dotaz na hmotnost
+  { id: "EOT ENQ", bytes: [0x04, 0x05] },
   { id: "DC1", bytes: [0x11] },
   { id: "S CR LF", bytes: [0x53, 0x0d, 0x0a] },
   { id: "SI CR LF", bytes: [0x53, 0x49, 0x0d, 0x0a] },
@@ -121,7 +124,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           const hit: Hit = { settings, probe: p.id, bytes: got, parsed: recognize(p.id, got) };
           found.push(hit);
           setHits([...found]);
-          add(`← [${settingsText(settings)}] ${p.id}: ${ascii(got)}`);
+          add(`← [${settingsText(settings)}] ${p.id}: ${ascii(got)}   HEX ${hex(got)}`);
         }
         // rozpoznaná hmotnost = máme nastavení, dál nehledat
         if (found.some((h) => h.parsed && h.settings === settings)) break;
