@@ -10,6 +10,7 @@ import { PlugConnected24Regular, Search24Regular, Send24Regular } from "@fluentu
 import { saveRecordAction } from "@/app/actions";
 import { connectScalePort, parseScale, serialExchange, type ReadablePort, type ScaleProtocol, type SerialSettings } from "@/lib/scale";
 import { toast } from "./toast";
+import { DIALOG06_LINE, encodeStatusRequest, encodeUnitPrice, parseDialog06 } from "@/lib/dialog06";
 
 const PROBES: { id: string; bytes: number[] }[] = [
   { id: "listen", bytes: [] },
@@ -43,7 +44,24 @@ interface Hit {
   probe: string;
   bytes: number[];
   /** rozpoznaný protokol a hmotnost (null = odpověď neznámého tvaru) */
-  parsed: { protocol: ScaleProtocol; kg: number | null; stable: boolean } | null;
+  parsed: { protocol: ScaleProtocol | "dialog06"; kg: number | null; stable: boolean; note?: string } | null;
+}
+
+/** Dialog 06 (ověřená váha TEM): cena za kg → ACK, pak EOT ENQ → hmotnost a cena z váhy, nebo stav */
+function recognizeDialog06(bytes: number[]): Hit["parsed"] {
+  let rest = bytes;
+  let best: Hit["parsed"] = null;
+  for (let guard = 0; rest.length && guard < 10; guard++) {
+    const r = parseDialog06(rest);
+    if (!r) break;
+    rest = rest.slice(r.used);
+    const m = r.msg;
+    if (m.kind === "data") return { protocol: "dialog06", kg: Number(m.weight.replace(",", ".")), stable: true, note: `${m.unitPrice} Kč/kg → ${m.total} Kč` };
+    if (m.kind === "status") best = { protocol: "dialog06", kg: null, stable: false, note: m.status };
+    if (m.kind === "ack" && !best) best = { protocol: "dialog06", kg: null, stable: false, note: "ACK" };
+    if (m.kind === "nak" && !best) best = { protocol: "dialog06", kg: null, stable: false, note: "NAK" };
+  }
+  return best;
 }
 
 function recognize(probe: string, bytes: number[]): Hit["parsed"] {
@@ -101,6 +119,22 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       setProgress(null);
     }
   };
+
+  /** Dialog 06: cena 100,00 Kč/kg, potvrzení, dotaz na hmotnost (9600 7O1 nebo nastavená rychlost) */
+  const dialog06 = (settings: SerialSettings) =>
+    run(async () => {
+      if (!port) return;
+      const price = Array.from(encodeUnitPrice(10000));
+      add(`→ [${settingsText(settings)}] Dialog 06 cena 100,00 Kč/kg  ${hex(price)}`);
+      const a = await serialExchange(port, settings, Uint8Array.from(price), 700);
+      add(a.length ? `← ${hex(a)}   ${ascii(a)}` : `← ${L.NoAnswer}`);
+      const req = Array.from(encodeStatusRequest());
+      add(`→ [${settingsText(settings)}] Dialog 06 EOT ENQ  ${hex(req)}`);
+      const b = await serialExchange(port, settings, Uint8Array.from(req), 1200);
+      add(b.length ? `← ${hex(b)}   ${ascii(b)}` : `← ${L.NoAnswer}`);
+      const parsed = recognizeDialog06([...a, ...b]);
+      if (a.length || b.length) setHits((h) => [...h, { settings, probe: "Dialog 06", bytes: [...a, ...b], parsed }]);
+    });
 
   const scan = () =>
     run(async () => {
@@ -207,7 +241,10 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       </div>
 
       <div className={st.row}>
-        <Button appearance="primary" icon={<Search24Regular />} disabled={!port || busy} onClick={scan}>
+        <Button appearance="primary" disabled={!port || busy} onClick={() => dialog06({ baudRate: s.baudRate, ...DIALOG06_LINE })}>
+          {L.Dialog06}
+        </Button>
+        <Button icon={<Search24Regular />} disabled={!port || busy} onClick={scan}>
           {L.Scan}
         </Button>
         <Text size={200}>{L.ScanHint}</Text>
@@ -237,7 +274,11 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
                       {hex(h.bytes).slice(0, 120)}
                     </div>
                   </TableCell>
-                  <TableCell>{h.parsed ? `${h.parsed.kg?.toFixed(3)} kg · ${L[`P_${h.parsed.protocol}`] ?? h.parsed.protocol}${h.parsed.stable ? "" : ` · ${L.Unstable}`}` : "—"}</TableCell>
+                  <TableCell>
+                    {h.parsed
+                      ? [h.parsed.kg !== null ? `${h.parsed.kg.toFixed(3)} kg` : null, L[`P_${h.parsed.protocol}`] ?? h.parsed.protocol, h.parsed.note, h.parsed.kg !== null && !h.parsed.stable ? L.Unstable : null].filter(Boolean).join(" · ")
+                      : "—"}
+                  </TableCell>
                   <TableCell>
                     {h.parsed && connections.length > 0 && (
                       <Button size="small" appearance="primary" onClick={() => void save(h)}>

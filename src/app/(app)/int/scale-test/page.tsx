@@ -12,7 +12,7 @@ export const metadata = { title: "Zkouška váhy" };
 const KEYS = [
   "Intro", "Connect", "Reconnect", "Connected", "Baud", "Frame", "Manual", "Listen", "CustomHint", "Send", "Scan", "ScanHint", "ScanDone", "ScanNothing",
   "Settings", "Probe", "Answer", "Weight", "Use", "SaveTo", "NoConnection", "Log", "NoAnswer", "Unsupported", "Saved", "Unstable",
-  "P_toledo8217", "P_casEcr", "P_continuous",
+  "P_toledo8217", "P_casEcr", "P_continuous", "P_dialog06", "Dialog06",
 ];
 
 export default async function ScaleTestPage() {
