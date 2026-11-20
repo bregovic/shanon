@@ -1,6 +1,6 @@
 /**
  * QR platba v pokladně: účtenka čeká na platbu (VS z čísla účtenky, QR kód SPAYD na tisku), uzávěrka účtuje
- * na účet QR plateb (výchozí = účet karet 261), bankovní výpis podle VS a částky spáruje a účtenku označí jako zaplacenou.
+ * na analytiku bankovního účtu pro QR (221), bankovní výpis podle VS a částky spáruje a účtenku označí jako zaplacenou.
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
@@ -53,12 +53,13 @@ describe("QR platba v pokladně", () => {
     expect(text).toContain(`X-VS:${rec.vs}`);
     expect(text).toContain(`VS ${rec.vs}`);
 
-    // uzávěrka: QR tržba na účet karet (peníze na cestě), ne do hotovosti
+    // uzávěrka: QR tržba na analytiku bankovního účtu (221), ne do hotovosti ani na 261
     const [shift] = (await listRecords(P, "pos.shift", { filter: { status: "open" } }, client)).rows;
     await runAction(P, "pos.shift", String(shift.id), "close", client);
     const closed = (await getRecord(P, "pos.shift", String(shift.id), client))!;
     expect([closed.qrTotal, closed.cashTotal, closed.cardTotal]).toEqual(["242.00", "0.00", "0.00"]);
-    expect(await bal("261000")).toBe("242.00");
+    expect(await bal("221000")).toBe("242.00");
+    expect(await bal("261000")).toBe("0.00");
 
     // výpis: jiná částka se nespáruje, přesná částka a VS ano
     const st = await saveRecord(P, "bank.statement", null, { bankAccountId: bank.id, statementNum: "1", date: "2026-11-20", openingBalance: "0" }, undefined, client);
@@ -76,7 +77,8 @@ describe("QR platba v pokladně", () => {
     await runAction(P, "bank.statement", String(st.id), "post", client);
     const paid = (await getRecord(P, "pos.receipt", String(r.id), client))!;
     expect([paid.payStatus, String(paid.paidDate).slice(0, 10)]).toEqual(["paid", "2026-11-20"]);
-    // 261: +242 z uzávěrky, −242 −200 z výpisu
+    // 221: +242 z uzávěrky, výpis +442 a úhrada účtenky −242; 261 jen ruční řádek −200
+    expect(await bal("221000")).toBe("442.00");
     expect(await bal("261000")).toBe("-200.00");
     // zaplacená účtenka už QR netiskne
     expect((await api((a) => receiptPrint(a, P.companyId, String(r.id)))).qr).toBeNull();

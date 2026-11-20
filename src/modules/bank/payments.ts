@@ -11,6 +11,7 @@
  * (banka proti odběrateli / dodavateli / účtu podle spárování; nespárované
  * řádky doplní účetní v deníku).
  */
+import { qrGlAccount } from "./qr-account";
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type DownloadFile, type ObjectHandlers, type RecordData } from "@/core/module";
 import { transformByCode } from "@/core/transform";
@@ -226,7 +227,7 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
       // QR platba účtenky: protiúčet = účet QR plateb pokladny (stav účtenky mění jen zaúčtování výpisu)
       const r = await data.get("pos.receipt", String(l.posReceiptId));
       const reg = r?.registerId ? await data.get("pos.register", String(r.registerId)) : null;
-      Object.assign(base, { offsetType: "ledger", offsetAccountId: reg?.qrAccountId ?? reg?.cardAccountId ?? null });
+      Object.assign(base, { offsetType: "ledger", offsetAccountId: reg ? await qrGlAccount(data, reg) : null });
     } else if ((l.matchKind === "ledger" || l.matchKind === "rule") && l.offsetAccountId) {
       Object.assign(base, { offsetType: "ledger", offsetAccountId: l.offsetAccountId });
     } else {

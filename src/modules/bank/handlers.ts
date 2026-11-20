@@ -13,6 +13,7 @@ import { csvMatchesAccount, decodeText, parseCsvStatement, toCsvFormat } from ".
 import { czIban } from "@/core/print";
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
+import { qrGlAccount } from "./qr-account";
 import { accountingCurrencyId, convertLines, postVoucher, type PostingLine } from "@/modules/gl/posting";
 import { checkStatement, decodeGpc, parseGpc } from "./gpc";
 import type { GpcStatement } from "./gpc";
@@ -55,13 +56,12 @@ const remaining = (t: RecordData) => toCents(t.amountCur ?? t.amount) - toCents(
 /** Výchozí pořadí, když firma kroky nemá (starší firmy před nasazením nastavení). */
 const DEFAULT_STEPS = [{ method: "vsInvoice", requireAmount: false }, { method: "vsAdvance", requireAmount: false }, { method: "vsPosReceipt", requireAmount: true }, { method: "counterPartner", requireAmount: false }, { method: "rules", requireAmount: false }];
 
-/** Účet QR plateb pokladny účtenky (prázdné = účet plateb kartou) — proti němu jde úhrada z výpisu. */
+/** Účet QR plateb pokladny účtenky (analytika bankovního účtu pro QR) — proti němu jde úhrada z výpisu. */
 async function posReceiptAccount(data: DataApi, receiptId: string): Promise<string> {
   const r = await data.get("pos.receipt", receiptId);
   const reg = r?.registerId ? await data.get("pos.register", String(r.registerId)) : null;
-  const acc = reg?.qrAccountId || reg?.cardAccountId;
-  if (!acc) throw new UserError("@SYS:InvalidValue");
-  return String(acc);
+  if (!reg) throw new UserError("@SYS:InvalidValue");
+  return qrGlAccount(data, reg);
 }
 
 /** Číslo účtu pro porovnání: bez kódu banky, mezer a vodicích nul (předčíslí-číslo jako GPC). */

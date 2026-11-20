@@ -1224,7 +1224,6 @@ model GlAccount {
   cashVoucher_offsetAccount           CashVoucher[]          @relation("CashVoucher_offsetAccount")
   posRegister_cashAccount             PosRegister[]          @relation("PosRegister_cashAccount")
   posRegister_cardAccount             PosRegister[]          @relation("PosRegister_cardAccount")
-  posRegister_qrAccount               PosRegister[]          @relation("PosRegister_qrAccount")
   posReceiptLine_revenueAccount       PosReceiptLine[]       @relation("PosReceiptLine_revenueAccount")
   whsParameters_stockAccount          WhsParameters[]        @relation("WhsParameters_stockAccount")
   whsParameters_inTransitAccount      WhsParameters[]        @relation("WhsParameters_inTransitAccount")
@@ -3549,7 +3548,6 @@ model PosRegister {
   warehouseId     String?  @map("warehouse_id") @db.Uuid
   cashAccountId   String   @map("cash_account_id") @db.Uuid
   cardAccountId   String   @map("card_account_id") @db.Uuid
-  qrAccountId     String?  @map("qr_account_id") @db.Uuid
   qrBankAccountId String?  @map("qr_bank_account_id") @db.Uuid
   receiptFooter   String?  @map("receipt_footer") @db.VarChar(255)
   pin             String?  @db.VarChar(200)
@@ -3567,7 +3565,6 @@ model PosRegister {
   warehouse              WhsWarehouse?   @relation("PosRegister_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
   cashAccount            GlAccount       @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
   cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
-  qrAccount              GlAccount?      @relation("PosRegister_qrAccount", fields: [qrAccountId], references: [id], onDelete: Restrict)
   qrBankAccount          BankAccount?    @relation("PosRegister_qrBankAccount", fields: [qrBankAccountId], references: [id], onDelete: Restrict)
   scaleConn              IntConnection?  @relation("PosRegister_scaleConn", fields: [scaleConnId], references: [id], onDelete: Restrict)
   printerConn            IntConnection?  @relation("PosRegister_printerConn", fields: [printerConnId], references: [id], onDelete: Restrict)
@@ -3581,7 +3578,6 @@ model PosRegister {
   @@index([warehouseId])
   @@index([cashAccountId])
   @@index([cardAccountId])
-  @@index([qrAccountId])
   @@index([qrBankAccountId])
   @@index([scaleConnId])
   @@index([printerConnId])

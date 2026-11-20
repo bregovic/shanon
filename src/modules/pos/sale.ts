@@ -12,13 +12,14 @@
  * - Známý odběratel: placeno hned → účtenka s odběratelem (tiskne se jako faktura – daňový doklad),
  *   „na fakturu“ → zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele (bez účtenky).
  * - QR platba: účtenka s QR kódem (SPAYD, VS = číslice čísla účtenky) čeká na platbu; uzávěrka ji
- *   účtuje na účet QR plateb pokladny (jinak účet karet, peníze na cestě), bankovní výpis ji podle VS
+ *   účtuje na analytiku bankovního účtu pro QR (bank/qr-account.ts), bankovní výpis ji podle VS
  *   a částky spáruje proti stejnému účtu a označí jako zaplacenou.
  */
 import type { ScaleLine } from "./scale-line";
 import { convertPrice } from "@/modules/gl/posting";
 import { fromCents, mulCents, roundCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
+import { qrBankRecord, qrGlAccount } from "@/modules/bank/qr-account";
 import { accountingCurrencyId, currencyRounding, postVoucher, systemAccount, type PostingLine } from "@/modules/gl/posting";
 import { bestDiscount, netFromGross } from "@/modules/inv/handlers";
 import { addressLine, orgOf } from "@/modules/org";
@@ -173,30 +174,16 @@ async function customerOf(data: DataApi, customerId: string | null | undefined):
   return c;
 }
 
-/** Účet QR plateb pokladny do doby úhrady (prázdné = účet plateb kartou). */
-export const qrAccountOf = (reg: RecordData) => String(reg.qrAccountId || reg.cardAccountId);
-
 /**
- * Bankovní účet pro QR platbu: zadaný u pokladny, jinak výchozí účet firmy v účetní měně (Banka → Bankovní účty),
- * jinak první účet v účetní měně, jinak účet z Organizace. Vrací IBAN a kód měny, nebo null.
+ * Bankovní účet pro QR platbu (`qrBankRecord`: vybraný u pokladny, jinak výchozí účet firmy v účetní měně),
+ * jinak účet z Organizace. Vrací IBAN a kód měny, nebo null.
  */
 export async function qrBankAccount(data: DataApi, reg: RecordData): Promise<{ iban: string; currency: string } | null> {
   const base = await accountingCurrencyId(data, data.companyId ?? null);
   const cur = base ? await data.get("sys.currency", base) : null;
   const currency = String(cur?.code ?? "CZK");
   const ibanOf = (a: RecordData | null | undefined) => (a ? String(a.iban || czIban(String(a.accountNum ?? "")) || "").replace(/\s/g, "") : "");
-  let accs: RecordData[] = [];
-  try {
-    if (reg.qrBankAccountId) {
-      const own = await data.get("bank.account", String(reg.qrBankAccountId));
-      if (ibanOf(own)) return { iban: ibanOf(own), currency };
-    }
-    accs = await data.find("bank.account", { blocked: false }, { take: 20, orderBy: { code: "asc" } });
-  } catch {
-    accs = []; // Banka není zapnutá
-  }
-  const inBase = accs.filter((a) => ibanOf(a) && (!a.currencyId || a.currencyId === base));
-  const pick = inBase.find((a) => a.isDefault) ?? inBase[0];
+  const pick = await qrBankRecord(data, reg, (a) => !!ibanOf(a));
   if (pick) return { iban: ibanOf(pick), currency };
   const org = await orgOf(data);
   const iban = String(org?.iban || czIban(String(org?.bankAccount ?? "")) || "").replace(/\s/g, "");
@@ -337,7 +324,8 @@ export async function closeShift(data: DataApi, shift: RecordData) {
     const lines: PostingLine[] = [];
     if (t.cash) lines.push({ accountId: String(reg.cashAccountId), amount: fromCents(t.cash), text: String(reg.name) });
     if (t.card) lines.push({ accountId: String(reg.cardAccountId), amount: fromCents(t.card), text: String(reg.name) });
-    if (t.qr) lines.push({ accountId: qrAccountOf(reg), amount: fromCents(t.qr), text: String(reg.name) });
+    // QR tržba na analytiku bankovního účtu pro QR (výpis ji pak jen spáruje)
+    if (t.qr) lines.push({ accountId: await qrGlAccount(data, reg), amount: fromCents(t.qr), text: String(reg.name) });
     for (const [acc, net] of t.revenue) {
       if (!acc) throw new UserError("@SYS:FixErrors", {}, { revenueAccountId: "@SYS:Required" });
       if (net) lines.push({ accountId: acc, amount: fromCents(-net) });

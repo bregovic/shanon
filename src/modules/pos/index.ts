@@ -74,8 +74,6 @@ export const register = defineObject({
     warehouseId: { edt: refEdt("whs.warehouse", "@POS:Warehouse"), optionalRef: true },
     cashAccountId: { edt: AccountRef("@POS:CashAccount"), mandatory: true },
     cardAccountId: { edt: AccountRef("@POS:CardAccount"), mandatory: true },
-    /** QR platby do doby úhrady (prázdné = účet plateb kartou, peníze na cestě) */
-    qrAccountId: { edt: AccountRef("@POS:QrAccount") },
     /** účet, na který zákazník posílá QR platbu (prázdné = výchozí bankovní účet firmy) */
     qrBankAccountId: { edt: refEdt("bank.account", "@POS:QrBankAccount"), optionalRef: true },
     /** hotovost se zaokrouhluje na celé koruny (mince pod 1 Kč nejsou) */
@@ -91,7 +89,7 @@ export const register = defineObject({
   list: ["code", "name", "template", "cashAccountId", "cardAccountId", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["code", "name", "template", "warehouseId", "receiptFooter", "pin", "blocked"] },
-    { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId", "qrAccountId", "qrBankAccountId"] },
+    { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId", "qrBankAccountId"] },
     { label: "@POS:Devices", fields: ["scaleConnId", "printerConnId"] },
   ],
   unique: [["code"]],
@@ -397,7 +395,6 @@ export default defineModule({
       TemplateCounter: "Pult s váhou",
       CashAccount: "Účet hotovosti",
       CardAccount: "Účet plateb kartou",
-      QrAccount: "Účet QR plateb",
       QrBankAccount: "Bankovní účet pro QR platby",
       QrPayment: "QR platba",
       PayQr: "QR platba",
@@ -631,7 +628,6 @@ export default defineModule({
       TemplateCounter: "Counter with scale",
       CashAccount: "Cash account",
       CardAccount: "Card payments account",
-      QrAccount: "QR payments account",
       QrBankAccount: "Bank account for QR payments",
       QrPayment: "QR payment",
       PayQr: "QR payment",
