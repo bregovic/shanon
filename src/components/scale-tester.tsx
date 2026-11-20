@@ -25,13 +25,29 @@ const PROBES: { id: string; bytes: number[] }[] = [
   { id: "P", bytes: [0x50] },
   { id: "ESC P", bytes: [0x1b, 0x50] },
 ];
-const BAUDS = [9600, 4800, 2400, 19200, 1200];
+// pořadí podle četnosti u pokladních vah (rychlé nalezení obvyklého nastavení)
+const BAUDS = [9600, 19200, 4800, 38400, 2400, 57600, 115200, 1200];
 const FRAMES: Pick<SerialSettings, "dataBits" | "parity">[] = [
   { dataBits: 8, parity: "none" },
-  { dataBits: 7, parity: "even" },
   { dataBits: 7, parity: "odd" },
+  { dataBits: 7, parity: "even" },
   { dataBits: 8, parity: "even" },
+  { dataBits: 8, parity: "odd" },
 ];
+
+/** Rozbor odpovědi bez znalosti protokolu: co váha poslala a co to znamená pro diagnózu. */
+type Kind = "weight" | "ack" | "nak" | "text" | "noise";
+function classify(bytes: number[], parsed: Hit["parsed"]): { kind: Kind; score: number } {
+  if (parsed && parsed.kg !== null) return { kind: "weight", score: 100 };
+  if (bytes.length === 1 && bytes[0] === 0x06) return { kind: "ack", score: 60 };
+  if (bytes.length === 1 && bytes[0] === 0x15) return { kind: "nak", score: 50 };
+  if (parsed?.note === "ACK") return { kind: "ack", score: 60 };
+  if (parsed?.note === "NAK") return { kind: "nak", score: 50 };
+  if (parsed) return { kind: "ack", score: 70 }; // stav Dialog 06 (váha rozumí, např. bez zátěže)
+  const printable = bytes.filter((b) => (b >= 0x20 && b < 0x7f) || b === 0x0d || b === 0x0a).length;
+  if (bytes.length >= 3 && printable / bytes.length > 0.8 && /\d/.test(String.fromCharCode(...bytes))) return { kind: "text", score: 40 };
+  return { kind: "noise", score: 1 };
+}
 const PROTOCOLS: ScaleProtocol[] = ["toledo8217", "casEcr", "continuous"];
 const PROBE_FOR: Record<ScaleProtocol, string> = { toledo8217: "W", casEcr: "ENQ DC1", continuous: "listen" };
 
@@ -90,6 +106,7 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
   const [progress, setProgress] = useState<number | null>(null);
   const [hits, setHits] = useState<Hit[]>([]);
   const [custom, setCustom] = useState("");
+  const [verdict, setVerdict] = useState<{ ok: boolean; lines: string[] } | null>(null);
   const [connId, setConnId] = useState(connections[0]?.id ?? "");
   // podpora sériového portu jen v prohlížeči (na serveru null → nic, bez nesouladu při hydrataci)
   const supported = useSyncExternalStore(
@@ -155,33 +172,71 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       }
     });
 
+  /**
+   * Diagnostika: rychlosti z běžných vah × rámce linky × dotazy všech podporovaných protokolů (vč. Dialog 06).
+   * Každou odpověď zařadí (hmotnost / potvrzení ACK / odmítnutí NAK / text s čísly / šum) a na konci napíše,
+   * které nastavení linky váha nejspíš používá a co dál. Skončí u první rozpoznané hmotnosti.
+   */
   const scan = () =>
     run(async () => {
       if (!port) return;
       setHits([]);
+      setVerdict(null);
       const combos = BAUDS.flatMap((baudRate) => FRAMES.map((f) => ({ ...f, baudRate, stopBits: 1 as const })));
-      const total = combos.length * PROBES.length;
+      const probes = [...PROBES.map((p) => p.id), "Dialog 06"];
+      const total = combos.length * probes.length;
       let n = 0;
-      const found: Hit[] = [];
-      for (const settings of combos) {
-        for (const p of PROBES) {
+      const found: (Hit & { kind: Kind; score: number })[] = [];
+      const errors = new Map<string, number>();
+      outer: for (const settings of combos) {
+        for (const id of probes) {
           setProgress(++n / total);
           let got: number[] = [];
           try {
-            got = await serialExchange(port, settings, Uint8Array.from(p.bytes), p.id === "listen" ? 1200 : 600);
+            if (id === "Dialog 06") {
+              const a = await serialExchange(port, settings, encodeUnitPrice(10000), 600);
+              const b = await serialExchange(port, settings, encodeStatusRequest(), 900);
+              got = [...a, ...b];
+            } else {
+              const p = PROBES.find((x) => x.id === id)!;
+              got = await serialExchange(port, settings, Uint8Array.from(p.bytes), id === "listen" ? 1200 : 500);
+            }
           } catch (e) {
-            add(`! ${settingsText(settings)} ${p.id}: ${String((e as Error).message ?? e)}`);
+            // chyba rámce / parity = data na lince jsou, ale s jiným nastavením
+            const key = settingsText(settings);
+            errors.set(key, (errors.get(key) ?? 0) + 1);
+            add(`! ${key} ${id}: ${String((e as Error).message ?? e)}`);
             continue;
           }
           if (!got.length) continue;
-          const hit: Hit = { settings, probe: p.id, bytes: got, parsed: recognize(p.id, got) };
-          found.push(hit);
+          const parsed = id === "Dialog 06" ? recognizeDialog06(got) : recognize(id, got);
+          const c = classify(got, parsed);
+          found.push({ settings, probe: id, bytes: got, parsed, ...c });
           setHits([...found]);
-          add(`← [${settingsText(settings)}] ${p.id}: ${ascii(got)}   HEX ${hex(got)}`);
+          add(`← [${settingsText(settings)}] ${id}: ${ascii(got)}   HEX ${hex(got)}   (${L[`K_${c.kind}`]})`);
+          if (c.kind === "weight") break outer;
         }
-        // rozpoznaná hmotnost = máme nastavení, dál nehledat
-        if (found.some((h) => h.parsed && h.settings === settings)) break;
       }
+      // diagnóza: nejlepší nastavení linky podle součtu „smysluplných“ odpovědí
+      const by = new Map<string, { settings: SerialSettings; score: number; kinds: Set<Kind>; probes: string[] }>();
+      for (const h of found) {
+        const k = settingsText(h.settings);
+        const x = by.get(k) ?? { settings: h.settings, score: 0, kinds: new Set<Kind>(), probes: [] };
+        x.score += h.score;
+        x.kinds.add(h.kind);
+        if (h.kind !== "noise") x.probes.push(h.probe);
+        by.set(k, x);
+      }
+      const best = [...by.values()].sort((a, b) => b.score - a.score)[0];
+      const weight = found.find((h) => h.kind === "weight");
+      const lines: string[] = [];
+      if (weight) lines.push(L.DiagWeight.replace("{settings}", settingsText(weight.settings)).replace("{protocol}", L[`P_${weight.parsed!.protocol}`] ?? weight.parsed!.protocol));
+      else if (best && (best.kinds.has("ack") || best.kinds.has("nak"))) lines.push(L.DiagLine.replace("{settings}", settingsText(best.settings)).replace("{probes}", [...new Set(best.probes)].join(", ")));
+      else if (best && best.kinds.has("text")) lines.push(L.DiagText.replace("{settings}", settingsText(best.settings)));
+      else if (found.length || errors.size) lines.push(L.DiagNoise);
+      else lines.push(L.DiagSilent);
+      if (!weight) lines.push(L.DiagNext);
+      setVerdict({ ok: !!weight, lines });
       add(found.length ? L.ScanDone.replace("{n}", String(found.length)) : L.ScanNothing);
     });
 
@@ -272,6 +327,15 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
         <Text size={200}>{L.ScanHint}</Text>
       </div>
       {progress !== null && <ProgressBar value={progress} />}
+      {verdict && (
+        <MessageBar intent={verdict.ok ? "success" : "warning"} layout="multiline">
+          <MessageBarBody>
+            {verdict.lines.map((l, i) => (
+              <div key={i}>{l}</div>
+            ))}
+          </MessageBarBody>
+        </MessageBar>
+      )}
 
       {hits.length > 0 && (
         <div className={st.scroll}>

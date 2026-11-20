@@ -52,7 +52,7 @@ Váha se připojuje k počítači pokladny kabelem RS-232 nebo USB (převodník 
 3. U zboží na váhu se po klepnutí hmotnost načte sama — vezme se jen **ustálená** kladná hmotnost. **Zvážit** čtení zopakuje; hmotnost jde vždy zadat i ručně. Tárování a nulování se dělá na váze.
 
 **Nová váha a neznámý protokol:** [Integrace → Zkouška váhy](/int/scale-test) (Chrome nebo Edge na počítači s váhou) →
-**Připojit váhu** → položte zboží → **Najít nastavení**. Stránka zkusí obvyklé rychlosti, parity a dotazy běžných protokolů
+**Připojit váhu** → položte zboží → **Diagnostika**. Stránka zkusí obvyklé rychlosti, parity a dotazy běžných protokolů
 a ukáže, co váha odpoví; rozpoznané nastavení uložíte do napojení váhy tlačítkem **Použít**. Ručně jde poslat i vlastní
 dotaz (text nebo HEX) a sledovat komunikaci. Když váha neodpoví vůbec, zkontrolujte v nastavení váhy zapnutý výstup
 RS-232 a zkuste **Jen poslouchat** a na váze tlačítko tisku.
