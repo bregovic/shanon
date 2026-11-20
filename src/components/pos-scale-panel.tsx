@@ -157,7 +157,10 @@ export function ScalePanel({
           : phase === "waiting"
             ? L.ScaleWaitGoods
             : phase === "needZero"
-              ? L.ScaleRemoveGoods
+              ? // zboží leželo na váze dřív než cena (ověřená váha ho nepřijme): zvednout a vrátit, pokladna pokračuje sama
+                product
+                ? L.ScaleLiftReplace
+                : L.ScaleRemoveGoods
               : phase === "weighing"
                 ? L.ScaleWeighing
                 : phase === "stable"
