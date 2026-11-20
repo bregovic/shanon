@@ -14,10 +14,18 @@ import type { PrismaClient } from "@/generated/prisma/client";
 
 const SYSTEM = new Set(["id", "tenantId", "companyId", "version", "createdAt", "updatedAt", "createdBy", "updatedBy", "_titles"]);
 
+/** Textová pole klíče (kód): kopie je převezme a uložit půjde až po změně (např. přípony). */
+export function keyFieldsToChange(def: ObjectDef): string[] {
+  const out = new Set<string>();
+  for (const key of def.unique ?? []) for (const f of key) if (def.fields[f]?.edt.kind === "string" && f !== def.numberSeq?.field) out.add(f);
+  return [...out];
+}
+
 /** Pole, která se do kopie nepřenášejí. */
 function skipped(def: ObjectDef): Set<string> {
   const out = new Set<string>();
-  for (const key of def.unique ?? []) for (const f of key) if (def.fields[f]?.edt.kind !== "ref") out.add(f);
+  const keep = new Set(keyFieldsToChange(def));
+  for (const key of def.unique ?? []) for (const f of key) if (def.fields[f]?.edt.kind !== "ref" && !keep.has(f)) out.add(f);
   if (def.numberSeq) out.add(def.numberSeq.field);
   for (const [n, f] of Object.entries(def.fields)) if (f.readOnly || f.image || f.secret) out.add(n);
   return out;
@@ -48,7 +56,7 @@ async function loadCopy(s: Session, def: ObjectDef, id: string) {
   return rec;
 }
 
-export type DuplicateResult = { id: string } | { values: RecordData; titles: Record<string, string> };
+export type DuplicateResult = { id: string } | { values: RecordData; titles: Record<string, string>; mustChange: string[] };
 
 export function duplicateRecord(ctx: Ctx, objectId: string, id: string, client?: PrismaClient): Promise<DuplicateResult | null> {
   const def = getObject(objectId);
@@ -58,7 +66,7 @@ export function duplicateRecord(ctx: Ctx, objectId: string, id: string, client?:
       const rec = await loadCopy(s, def, id);
       if (!rec) return null;
       const values = copyValues(def, rec);
-      if (!copiesDirectly(def)) return { values, titles: (rec._titles as Record<string, string>) ?? {} };
+      if (!copiesDirectly(def)) return { values, titles: (rec._titles as Record<string, string>) ?? {}, mustChange: keyFieldsToChange(def).filter((f) => values[f] !== undefined) };
       const created = await s.save(objectId, null, values);
       for (const l of copiedLines(def)) {
         const ldef = getObject(l.object);

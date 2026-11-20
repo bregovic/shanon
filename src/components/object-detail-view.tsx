@@ -97,6 +97,8 @@ export interface ObjectDetailProps {
   canDelete: boolean;
   /** Duplikovat (i zamčený doklad — kopie je nový koncept) */
   canDuplicate?: boolean;
+  /** kopie záznamu: pole klíče s původní hodnotou — uložit až po změně (pole → původní hodnota) */
+  mustChange?: { fields: Record<string, string>; text: string };
   /** tisk podle šablony (Tiskové sestavy) */
   printHref?: string;
   /** texty tiskového dialogu */
@@ -317,7 +319,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   const router = useRouter();
   const [values, setValues] = useState<Values>(p.values);
   const [titles, setTitles] = useState(p.titles);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>(() => Object.fromEntries(Object.keys(p.mustChange?.fields ?? {}).map((f) => [f, p.mustChange!.text])));
   const [message, setMessage] = useState<{ intent: "error" | "success"; text: string }>();
   const [busy, start] = useTransition();
   const [confirm, setConfirm] = useState(false);
@@ -336,6 +338,17 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   // nový záznam: kurzor do prvního prázdného povinného pole (deník: Popis), ať jde rovnou psát
   useEffect(() => {
     if (p.id || p.readOnly) return;
+    // kopie: kurzor na konec kódu (doplnit příponu)
+    const key = Object.keys(p.mustChange?.fields ?? {})[0];
+    if (key) {
+      const t = setTimeout(() => {
+        const el = document.querySelector<HTMLInputElement>(`[data-field="${key}"] input`);
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }, 150);
+      return () => clearTimeout(t);
+    }
     const f = allFields.find((x) => x.mandatory && !x.readOnly && (p.values[x.name] === null || p.values[x.name] === undefined || p.values[x.name] === ""));
     if (!f) return;
     const t = setTimeout(() => document.querySelector<HTMLElement>(`[data-field="${f.name}"] input, [data-field="${f.name}"] textarea`)?.focus(), 150);
@@ -352,6 +365,13 @@ export function ObjectDetailView(p: ObjectDetailProps) {
   // neuložené změny (změna pole uživatelem) — při odchodu dotaz Uložit / Neukládat / Zpět
   const dirtyRef = useRef(false);
   const doSave = async (current: Values = values, stay = true): Promise<boolean> => {
+    // kopie: klíč (kód) se musí změnit, jinak by šlo o tentýž záznam
+    const same = Object.entries(p.mustChange?.fields ?? {}).filter(([f, orig]) => String(current[f] ?? "").trim() === orig.trim());
+    if (!p.id && same.length) {
+      setErrors((e) => ({ ...e, ...Object.fromEntries(same.map(([f]) => [f, p.mustChange!.text])) }));
+      setMessage({ intent: "error", text: p.mustChange!.text });
+      return false;
+    }
     const editable = p.groups.flatMap((g) => g.fields).filter((f) => !f.readOnly);
     const v: Values = {};
     for (const f of editable) v[f.name] = current[f.name] ?? null;

@@ -607,7 +607,9 @@ describe("Duplikovat", () => {
     const Q = (await provisionTenant(client, { code: `t-dup-${run}`, name: "Dup", adminEmail: `dup-${run}@test.local`, adminPassword: "heslo-12345", modules: ["qa", "gl"], company: { code: "D", name: "D" } })).ctx;
     const [acc] = (await listRecords(Q, "gl.account", { filter: { accountNum: "211000" } }, client)).rows;
     const a = await duplicateRecord(Q, "gl.account", String(acc.id), client);
-    expect(a && "values" in a && a.values.accountNum).toBeUndefined();
+    // kód kopie zůstane (uložit až po změně, např. přípony)
+    expect(a && "values" in a && a.values.accountNum).toBe(acc.accountNum);
+    expect(a && "values" in a && a.mustChange).toContain("accountNum");
     expect(a && "values" in a && a.values.name).toBe(acc.name);
     const iss = await saveRecord(Q, "qa.issue", null, { title: "Šablona", priority: "high" }, undefined, client);
     await saveRecord(Q, "qa.comment", null, { issueId: iss.id, text: "x" }, undefined, client);

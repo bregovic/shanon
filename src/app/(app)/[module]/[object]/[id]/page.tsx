@@ -38,10 +38,11 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
   };
 
   let record: RecordData;
+  let dup: Awaited<ReturnType<typeof duplicateRecord>> = null;
   if (isNew) {
     record = { ext: {}, ...defaults(def) };
     // Duplikovat: hodnoty zdrojového záznamu bez klíče
-    const dup = copy ? await duplicateRecord(s.ctx, def.id, copy) : null;
+    dup = copy ? await duplicateRecord(s.ctx, def.id, copy) : null;
     if (dup && "values" in dup) record = { ...record, ...dup.values, _titles: dup.titles };
     // hodnoty z filtru seznamu (?set.pole=hodnota) — jen jednoduchá upravitelná pole (poslední hodnoty až po nich)
     for (const [k, v] of Object.entries(sp)) {
@@ -166,6 +167,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
       showDelete={!isNew && !def.systemOnly && can(s.ctx.perms, def.id, "delete")}
       canDuplicate={!isNew && !def.systemOnly && mayWrite}
+      mustChange={dup && "values" in dup && dup.mustChange.length ? { fields: Object.fromEntries(dup.mustChange.map((f) => [f, String(dup.values[f] ?? "")])), text: t("@SYS:ChangeKeyOnCopy") } : undefined}
       compactHeader={!!def.compactHeader}
       collapseHeader={!!def.collapseHeader}
       autoCreate={isNew && !!def.numberSeq && (def.lines ?? []).some((l) => l.owned !== false)}
