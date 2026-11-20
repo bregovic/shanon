@@ -18,6 +18,17 @@ export const PosTemplate = defineEnum({
   values: [{ value: "counter", label: "@POS:TemplateCounter" }],
 });
 
+/** Jak pokladna vybírá box pro odložený nákup: kódem / QR, ze seznamu aktivních boxů, nebo obojí. */
+export const PosBoxPick = defineEnum({
+  id: "PosBoxPick",
+  label: "@POS:BoxPick",
+  values: [
+    { value: "both", label: "@POS:BoxPickBoth" },
+    { value: "qr", label: "@POS:BoxPickQr" },
+    { value: "list", label: "@POS:BoxPickList" },
+  ],
+});
+
 export const PaymentMethod = defineEnum({
   id: "PosPaymentMethod",
   label: "@POS:PaymentMethod",
@@ -70,6 +81,7 @@ export const register = defineObject({
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
     template: { edt: enumEdt(PosTemplate), mandatory: true, default: "counter" },
+    boxPick: { edt: enumEdt(PosBoxPick), mandatory: true, default: "both" },
     // výdej prodaného zboží (prázdné = výchozí sklad)
     warehouseId: { edt: refEdt("whs.warehouse", "@POS:Warehouse"), optionalRef: true },
     cashAccountId: { edt: AccountRef("@POS:CashAccount"), mandatory: true },
@@ -88,7 +100,7 @@ export const register = defineObject({
   titleField: "code",
   list: ["code", "name", "template", "cashAccountId", "cardAccountId", "blocked"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "template", "warehouseId", "receiptFooter", "pin", "blocked"] },
+    { label: "@SYS:General", fields: ["code", "name", "template", "boxPick", "warehouseId", "receiptFooter", "pin", "blocked"] },
     { label: "@GL:Posting", fields: ["cashAccountId", "cardAccountId", "qrBankAccountId"] },
     { label: "@POS:Devices", fields: ["scaleConnId", "printerConnId"] },
   ],
@@ -336,7 +348,7 @@ export default defineModule({
   description: "@POS:ModuleDesc",
   icon: "Cart",
   dependsOn: ["inv", "gl", "tax", "prt"],
-  enums: [PosTemplate, PaymentMethod, ReceiptPayStatus, ShiftStatus, EetStatus, BasketStatus],
+  enums: [PosTemplate, PosBoxPick, PaymentMethod, ReceiptPayStatus, ShiftStatus, EetStatus, BasketStatus],
   objects: [register, shift, receipt, receiptLine, box, basket, basketLine],
   menu: [
     { label: "@POS:Module", items: [{ href: "/kasa", label: "@POS:Terminal" }, { object: "pos.receipt" }, { object: "pos.shift" }, { object: "pos.basket" }] },
@@ -387,6 +399,13 @@ export default defineModule({
       Terminal: "Prodej",
       Register: "Pokladna",
       Devices: "Zařízení",
+      BoxPick: "Výběr boxu",
+      BoxPickBoth: "Kód / QR i ze seznamu",
+      BoxPickQr: "Kód / QR",
+      BoxPickList: "Ze seznamu boxů",
+      BoxPickFree: "Volné boxy",
+      BoxTaken: "obsazený",
+      NoBoxes: "Žádné aktivní boxy (Pokladna → Nastavení → Boxy).",
       ScaleConn: "Váha",
       ScaleConnHelp: "Napojení pokladní váhy z Integrací (Zkouška váhy je na napojení).",
       PrinterConn: "Tiskárna účtenek",
@@ -626,6 +645,13 @@ export default defineModule({
       Terminal: "Sell",
       Register: "Register",
       Devices: "Devices",
+      BoxPick: "Box selection",
+      BoxPickBoth: "Code / QR and list",
+      BoxPickQr: "Code / QR",
+      BoxPickList: "From the box list",
+      BoxPickFree: "Free boxes",
+      BoxTaken: "taken",
+      NoBoxes: "No active boxes (Point of sale → Setup → Boxes).",
       ScaleConn: "Scale",
       ScaleConnHelp: "Till scale connection from Integrations (the scale test is on the connection).",
       PrinterConn: "Receipt printer",

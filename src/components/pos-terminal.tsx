@@ -331,6 +331,9 @@ export function PosTerminal(p: {
   top: string[];
   /** odložené nákupy (boxy) sdílené pokladnami firmy */
   baskets: BasketView[];
+  /** výběr boxu při odložení: kód / QR, seznam aktivních boxů, nebo obojí */
+  boxPick?: "both" | "qr" | "list";
+  boxes?: { code: string; name: string }[];
   /** tisková šablona účtenky (Tiskové sestavy); bez ní vestavěná účtenka */
   receiptLayout?: PrintLayout | null;
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
@@ -1256,23 +1259,51 @@ export function PosTerminal(p: {
           <DialogBody>
             <DialogTitle>{L.ParkTitle}</DialogTitle>
             <DialogContent>
-              <Text block style={{ marginBottom: 8 }}>
-                {L.ParkHint}
-              </Text>
-              <Input
-                size="large"
-                autoFocus
-                value={parkDlg ?? ""}
-                onChange={(_, d) => setParkDlg(d.value)}
-                onKeyDown={(e) => e.key === "Enter" && void park(parkDlg ?? "")}
-                aria-label={L.BasketLabel}
-              />
+              {p.boxPick !== "list" && (
+                <>
+                  <Text block style={{ marginBottom: 8 }}>
+                    {L.ParkHint}
+                  </Text>
+                  <Input
+                    size="large"
+                    autoFocus
+                    value={parkDlg ?? ""}
+                    onChange={(_, d) => setParkDlg(d.value)}
+                    onKeyDown={(e) => e.key === "Enter" && void park(parkDlg ?? "")}
+                    aria-label={L.BasketLabel}
+                  />
+                </>
+              )}
+              {p.boxPick !== "qr" && (
+                <>
+                  <Text block weight="semibold" style={{ margin: "12px 0 8px" }}>
+                    {L.BoxPickFree}
+                  </Text>
+                  {!p.boxes?.length && <Text block>{L.NoBoxes}</Text>}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 8, maxHeight: "40vh", overflowY: "auto" }}>
+                    {(p.boxes ?? []).map((b) => {
+                      // obsazený = box už má odložený nákup
+                      const taken = baskets.some((x) => x.boxCode && x.boxCode.toUpperCase() === b.code.toUpperCase());
+                      return (
+                        <Button key={b.code} size="large" disabled={busy || taken} onClick={() => void park(b.code)} title={b.name || undefined}>
+                          <span style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <span>{b.code}</span>
+                            {(taken || b.name) && <Text size={200}>{taken ? L.BoxTaken : b.name}</Text>}
+                          </span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setParkDlg(null)}>{L.Cancel}</Button>
-              <Button appearance="primary" disabled={busy || !(parkDlg ?? "").trim()} onClick={() => void park(parkDlg ?? "")}>
-                {L.Park}
-              </Button>
+              {p.boxPick !== "list" && (
+                <Button appearance="primary" disabled={busy || !(parkDlg ?? "").trim()} onClick={() => void park(parkDlg ?? "")}>
+                  {L.Park}
+                </Button>
+              )}
             </DialogActions>
           </DialogBody>
         </DialogSurface>

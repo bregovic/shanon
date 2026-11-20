@@ -3545,6 +3545,7 @@ model PosRegister {
   code            String   @db.VarChar(20)
   name            String   @db.VarChar(120)
   template        String   @default("counter") @db.VarChar(40)
+  boxPick         String   @default("both") @map("box_pick") @db.VarChar(40)
   warehouseId     String?  @map("warehouse_id") @db.Uuid
   cashAccountId   String   @map("cash_account_id") @db.Uuid
   cardAccountId   String   @map("card_account_id") @db.Uuid

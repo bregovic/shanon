@@ -67,6 +67,9 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     // zaokrouhlení hotovosti podle účetní měny (terminál jen ukazuje, počítá server)
     const rounding = await currencyRounding(api, await accountingCurrencyId(api, s.ctx.companyId));
     const baskets = await openBaskets(api);
+    // výběr boxu ze seznamu (volba pokladny): aktivní boxy firmy
+    const boxPick = String(reg.boxPick ?? "both");
+    const boxes = boxPick === "qr" ? [] : (await api.find("pos.box", { active: true }, { take: 500, orderBy: { code: "asc" } })).map((b) => ({ code: String(b.code), name: b.name ? String(b.name) : "" }));
     // výchozí tisková šablona účtenky (Tiskové sestavy), jinak vestavěná účtenka
     const [rt] = await api.find("prt.template", { docType: "pos.receipt", isDefault: true }, { take: 1 }).catch(() => []);
     let receiptLayout: PrintLayout | null = null;
@@ -75,7 +78,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     } catch {
       receiptLayout = null;
     }
-    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding, baskets, receiptLayout };
+    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -83,6 +86,8 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
 
   return (
     <PosTerminal
+      boxPick={data.boxPick as "both" | "qr" | "list"}
+      boxes={data.boxes}
       register={{ id, code: String(reg.code), name: String(reg.name), cashRounding: { unit: Number(data.rounding.cashUnit), method: data.rounding.cashMethod } }}
       shift={data.shift ? { id: String(data.shift.id), num: String(data.shift.shiftNum) } : null}
       items={data.items

@@ -17,7 +17,7 @@ summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a 
 - **Platba hotově** – zadejte přijatou částku, kasa spočítá vrácení (hotovost se zaokrouhluje na koruny). **Kartou** – přes platební terminál.
 - **QR platba** – zákazník zaplatí převodem: účtenka se vytiskne s **QR kódem** pro bankovní aplikaci a variabilním symbolem (číslice čísla účtenky) a je ve stavu **Čeká na platbu**. Jakmile platba přijde, bankovní výpis ji podle VS a částky spáruje a účtenka je **Zaplaceno** (seznam [Účtenky](/pos/receipt?filter.payStatus=awaiting) ukáže, co ještě čeká). Peníze jdou na bankovní účet zadaný u pokladny, jinak na výchozí účet firmy v Bance; bez bankovního účtu QR platba nejde. Do EET se QR platba neposílá (je to převod).
 - Účtenka se vytiskne podle šablony; s EET dostane kód tržby.
-- **Odložený nákup** (box s QR nebo jméno) – rozpracovaný nákup odložíte a dokončíte později nebo na jiné pokladně; kód boxu stačí naskenovat do hledání.
+- **Odložený nákup** (box s QR nebo jméno) – rozpracovaný nákup odložíte a dokončíte později nebo na jiné pokladně; kód boxu stačí naskenovat do hledání. Jak se box při odložení vybírá, určuje pokladna (**Výběr boxu**: kód / QR, ze seznamu aktivních boxů, nebo obojí); obsazené boxy seznam nenabídne.
 
 ## Přestávka
 
