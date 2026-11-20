@@ -362,7 +362,7 @@ export function PosTerminal(p: {
   const [group, setGroup] = useState(p.top.length ? "top" : "all");
   const [sub, setSub] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  // celá obrazovka: prohlížeč ji dovolí až po akci uživatele → při prvním dotyku / kliknutí po otevření pokladny
+  // celá obrazovka jen tlačítkem v liště (automatické zapnutí rušilo klepání na tabletu)
   const [fullscreen, setFullscreen] = useState(false);
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
@@ -370,18 +370,8 @@ export function PosTerminal(p: {
   };
   useEffect(() => {
     const sync = () => setFullscreen(!!document.fullscreenElement);
-    const first = (e: Event) => {
-      document.removeEventListener("click", first, { capture: true });
-      // první klepnutí na přepínač celé obrazovky řeší přepínač sám
-      if ((e.target as HTMLElement | null)?.closest?.("[data-fullscreen-toggle]")) return;
-      if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.({ navigationUI: "hide" }).catch(() => undefined);
-    };
     document.addEventListener("fullscreenchange", sync);
-    document.addEventListener("click", first, { capture: true });
-    return () => {
-      document.removeEventListener("fullscreenchange", sync);
-      document.removeEventListener("click", first, { capture: true });
-    };
+    return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
   const [lines, setLines] = useState<Line[]>([]);
   // ověřená váha (Dialog 06): klepnutí na vážené zboží pošle cenu za kg do váhy, panel Váha převezme výsledek
@@ -980,7 +970,6 @@ export function PosTerminal(p: {
           title={fullscreen ? L.FullscreenExit : L.Fullscreen}
           aria-label={fullscreen ? L.FullscreenExit : L.Fullscreen}
           onClick={toggleFullscreen}
-          data-fullscreen-toggle
         />
         {p.canLock && (
           <Button
