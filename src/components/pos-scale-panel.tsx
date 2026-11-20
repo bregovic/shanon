@@ -180,7 +180,9 @@ export function ScalePanel({
             ? `${L.ScaleConnectFailed} ${state.detail}`
             : null
       : phase === "ready"
-        ? L.ScalePick
+        ? state.lastAdded
+          ? L.ScaleAdded.replace("{what}", `${state.lastAdded.name} · ${state.lastAdded.weight.replace(".", ",")} kg · ${fmtMoney(state.lastAdded.total)}`)
+          : L.ScalePick
         : phase === "sending"
           ? L.ScaleSending
           : phase === "waiting"

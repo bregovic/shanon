@@ -49,6 +49,8 @@ export interface ScaleState {
   reading: ScaleWeighing | null;
   /** stav z váhy (pod minimem, přetíženo…) nebo chyba driveru */
   problem: Dialog06Status | "noResponse" | "priceMismatch" | "disconnected" | null;
+  /** naposledy přidané vážené zboží (po přidání do nákupu, do výběru dalšího) */
+  lastAdded?: { name: string; weight: string; total: string } | null;
   /** proč se nepřipojilo: noPort = port v tomto prohlížeči nepovolen, busy = port drží jiná záložka / program, jinak text chyby */
   detail?: "noPort" | "busy" | string | null;
 }
@@ -166,7 +168,7 @@ export class ScaleDriver {
   async setUnitPrice(product: { id: string; name: string; unitPrice: string }): Promise<void> {
     const loop = ++this.polling;
     this.armed = false;
-    this.set({ product, reading: null, phase: "sending", problem: null });
+    this.set({ product, reading: null, phase: "sending", problem: null, lastAdded: null });
     if (!this.connected) return this.set({ phase: "disconnected", problem: "disconnected" });
     // cena s názvem; když ji váha odmítne, jen cena (a příště rovnou bez názvu)
     let ok = this.withText ? await this.ask(encodeUnitPrice(cents(product.unitPrice), product.name), true) : null;
@@ -274,7 +276,9 @@ export class ScaleDriver {
     this.polling++;
     this.armed = false;
     if (added) this.sawZero = false;
-    this.set({ product: null, reading: null, phase: this.connected ? "ready" : "disconnected", problem: this.connected ? null : "disconnected" });
+    const r = this.state.reading;
+    const lastAdded = added && r && this.state.product ? { name: this.state.product.name, weight: r.weight, total: r.total } : null;
+    this.set({ lastAdded, product: null, reading: null, phase: this.connected ? "ready" : "disconnected", problem: this.connected ? null : "disconnected" });
     if (this.connected) await this.ask(encodeClear(), true);
   }
 
