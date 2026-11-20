@@ -35,7 +35,8 @@ export type Dialog06Status = "unstable" | "belowMin" | "overload" | "negative" |
 
 /**
  * Kódy stavů ve zprávě 09 → význam. Podle popisu protokolu Dialog (Mettler Toledo / Bizerba), který TEM přebírá;
- * TEM EGE-M 20. 11. 2026 vrátil 12 na cenu bez táry (záznam 01) → posíláme cenu s tárou (03 / 05).
+ * TEM EGE-M (20. 11. 2026): cenu bere záznamem 01 (ACK), záznamy s tárou 03 / 05 odmítá (NAK); stav 12 hlásí při
+ * tárování na váze, 31 bez zátěže (podtížení).
  * 00 bez chyby, 01 obecná chyba, 02 parita / délka, 10 špatné číslo záznamu, 11 neplatná cena, 12 neplatná tára,
  * 13 neplatný text, 20 neustálená, 21 od posledního vážení se nevrátila na nulu, 22 cena ještě není spočítaná,
  * 30 pod minimem, 31 záporná / podtížení, 32 přetížení.
@@ -69,10 +70,10 @@ export function scaleText(s: string): string {
 }
 
 /**
- * Cena za kg do váhy (v haléřích) s tárou v gramech: záznam 03 (cena + tára), s textem 05 (cena + tára + text).
- * Ověřená váha bez táry odmítne vážit (stav 12). `tareGrams` null = starší záznamy 01 / 04 bez táry.
+ * Cena za kg do váhy (v haléřích): záznam 01, s textem 04. S tárou v gramech (`tareGrams`) záznam 03 / 05 —
+ * TEM EGE-M je odmítá (NAK), proto výchozí bez táry.
  */
-export function encodeUnitPrice(priceCents: number, text?: string, tareGrams: number | null = 0): Uint8Array {
+export function encodeUnitPrice(priceCents: number, text?: string, tareGrams: number | null = null): Uint8Array {
   const price = digits(priceCents, 6);
   const t = text ? scaleText(text) : "";
   const body = tareGrams === null ? (t ? ["04", price, t] : ["01", price]) : t ? ["05", price, digits(tareGrams, 4), t] : ["03", price, digits(tareGrams, 4)];

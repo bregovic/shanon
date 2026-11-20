@@ -159,8 +159,8 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
           let got: number[] = [];
           try {
             if (id === "Dialog 06") {
-              // záznam ceny: 03 (cena + tára 0 g), 05 (+ text), 01 (bez táry) — první, se kterým váha dá hmotnost
-              const variants: [string, Uint8Array][] = [["03", encodeUnitPrice(10000)], ["05", encodeUnitPrice(10000, "ZKOUSKA")], ["01", encodeUnitPrice(10000, undefined, null)]];
+              // záznam ceny: 01 (cena), 04 (+ text), 03 / 05 (s tárou 0 g) — první, se kterým váha dá hmotnost
+              const variants: [string, Uint8Array][] = [["01", encodeUnitPrice(10000)], ["04", encodeUnitPrice(10000, "ZKOUSKA")], ["03", encodeUnitPrice(10000, undefined, 0)], ["05", encodeUnitPrice(10000, "ZKOUSKA", 0)]];
               for (const [rec, frame] of variants) {
                 const ack = await serialExchange(port, settings, frame, 600);
                 add(`→ [${settingsText(settings)}] Dialog 06 záznam ${rec} (100,00 Kč/kg)  ${hex([...frame])}  ← ${hex(ack) || L.NoAnswer}`);
