@@ -120,20 +120,39 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
     }
   };
 
-  /** Dialog 06: cena 100,00 Kč/kg, potvrzení, dotaz na hmotnost (9600 7O1 nebo nastavená rychlost) */
-  const dialog06 = (settings: SerialSettings) =>
+  /** Dialog 06 na jednom nastavení linky: cena 100,00 Kč/kg → potvrzení → EOT ENQ; true = váha odpověděla */
+  const d06Once = async (settings: SerialSettings): Promise<boolean> => {
+    if (!port) return false;
+    const price = Array.from(encodeUnitPrice(10000));
+    add(`→ [${settingsText(settings)}] Dialog 06 cena 100,00 Kč/kg  ${hex(price)}`);
+    const a = await serialExchange(port, settings, Uint8Array.from(price), 700);
+    add(a.length ? `← ${hex(a)}   ${ascii(a)}` : `← ${L.NoAnswer}`);
+    const req = Array.from(encodeStatusRequest());
+    add(`→ [${settingsText(settings)}] Dialog 06 EOT ENQ  ${hex(req)}`);
+    const b = await serialExchange(port, settings, Uint8Array.from(req), 1200);
+    add(b.length ? `← ${hex(b)}   ${ascii(b)}` : `← ${L.NoAnswer}`);
+    if (!a.length && !b.length) return false;
+    setHits((h) => [...h, { settings, probe: "Dialog 06", bytes: [...a, ...b], parsed: recognizeDialog06([...a, ...b]) }]);
+    return true;
+  };
+
+  /** Dialog 06 na nastavené rychlosti / rámci, nebo na všech obvyklých (9600, 19200 × 7O1 7E1 8N1 8E1 8O1) */
+  const dialog06 = (all: boolean) =>
     run(async () => {
-      if (!port) return;
-      const price = Array.from(encodeUnitPrice(10000));
-      add(`→ [${settingsText(settings)}] Dialog 06 cena 100,00 Kč/kg  ${hex(price)}`);
-      const a = await serialExchange(port, settings, Uint8Array.from(price), 700);
-      add(a.length ? `← ${hex(a)}   ${ascii(a)}` : `← ${L.NoAnswer}`);
-      const req = Array.from(encodeStatusRequest());
-      add(`→ [${settingsText(settings)}] Dialog 06 EOT ENQ  ${hex(req)}`);
-      const b = await serialExchange(port, settings, Uint8Array.from(req), 1200);
-      add(b.length ? `← ${hex(b)}   ${ascii(b)}` : `← ${L.NoAnswer}`);
-      const parsed = recognizeDialog06([...a, ...b]);
-      if (a.length || b.length) setHits((h) => [...h, { settings, probe: "Dialog 06", bytes: [...a, ...b], parsed }]);
+      const list: SerialSettings[] = all
+        ? [9600, 19200].flatMap((baudRate) =>
+            ([[7, "odd"], [7, "even"], [8, "none"], [8, "even"], [8, "odd"]] as const).map(([dataBits, parity]) => ({ baudRate, dataBits, parity, stopBits: 1 as const })),
+          )
+        : [{ baudRate: s.baudRate, ...DIALOG06_LINE }];
+      let n = 0;
+      for (const set of list) {
+        if (all) setProgress(++n / list.length);
+        try {
+          await d06Once(set);
+        } catch (e) {
+          add(`! ${settingsText(set)}: ${String((e as Error).message ?? e)}`);
+        }
+      }
     });
 
   const scan = () =>
@@ -241,8 +260,11 @@ export function ScaleTester({ connections, L }: { connections: { id: string; cod
       </div>
 
       <div className={st.row}>
-        <Button appearance="primary" disabled={!port || busy} onClick={() => dialog06({ baudRate: s.baudRate, ...DIALOG06_LINE })}>
+        <Button appearance="primary" disabled={!port || busy} onClick={() => dialog06(false)}>
           {L.Dialog06}
+        </Button>
+        <Button disabled={!port || busy} onClick={() => dialog06(true)}>
+          {L.Dialog06All}
         </Button>
         <Button icon={<Search24Regular />} disabled={!port || busy} onClick={scan}>
           {L.Scan}
