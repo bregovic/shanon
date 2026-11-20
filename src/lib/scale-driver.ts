@@ -49,6 +49,8 @@ export interface ScaleState {
   reading: ScaleWeighing | null;
   /** stav z váhy (pod minimem, přetíženo…) nebo chyba driveru */
   problem: Dialog06Status | "noResponse" | "priceMismatch" | "disconnected" | null;
+  /** proč se nepřipojilo: noPort = port v tomto prohlížeči nepovolen, busy = port drží jiná záložka / program, jinak text chyby */
+  detail?: "noPort" | "busy" | string | null;
 }
 
 const POLL_MS = 250;
@@ -104,20 +106,23 @@ export class ScaleDriver {
     try {
       await this.transport.open();
       this.connected = true;
-      this.set({ phase: this.state.product ? "sending" : "ready", problem: null });
+      this.set({ phase: this.state.product ? "sending" : "ready", problem: null, detail: null });
       if (this.state.product) await this.setUnitPrice(this.state.product);
       return true;
-    } catch {
-      this.lost();
+    } catch (e) {
+      const err = e as { name?: string; message?: string };
+      const detail = err?.message === "no port" ? "noPort" : err?.name === "NetworkError" || err?.name === "InvalidStateError" ? "busy" : (err?.message ?? String(e));
+      console.warn("[váha] nepřipojeno:", err?.name, err?.message);
+      this.lost(detail);
       return false;
     }
   }
 
   /** odpojeno (kabel, vypnutá váha): stav Odpojeno a nový pokus za 5 s; kusové zboží jde prodávat dál */
-  private lost() {
+  private lost(detail: string | null = null) {
     this.connected = false;
     this.polling++;
-    this.set({ phase: "disconnected", problem: "disconnected", reading: null });
+    this.set({ phase: "disconnected", problem: "disconnected", reading: null, detail });
     void this.transport.close().catch(() => undefined);
     if (!this.disposed) this.reconnectTimer = setTimeout(() => void this.connect(), RECONNECT_MS);
   }

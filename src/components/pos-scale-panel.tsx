@@ -158,7 +158,13 @@ export function ScalePanel({
 
   const message =
     phase === "disconnected"
-      ? null
+      ? state.detail === "noPort"
+        ? L.ScaleNoPort
+        : state.detail === "busy"
+          ? L.ScalePortBusy
+          : state.detail
+            ? `${L.ScaleConnectFailed} ${state.detail}`
+            : null
       : phase === "ready"
         ? L.ScalePick
         : phase === "sending"
@@ -214,7 +220,10 @@ export function ScalePanel({
       <div className={st.msg}>
         {phase === "sending" && <Spinner size="tiny" style={{ display: "inline-flex", marginRight: 6 }} />}
         {problemText && phase !== "weighing" ? (
-          <span className={st.problem}>{problemText}</span>
+          <span className={st.problem}>
+            {problemText}
+            {phase === "disconnected" && message ? ` — ${message}` : ""}
+          </span>
         ) : stable ? (
           <span className={st.stable}>
             <span className={st.dot} />
