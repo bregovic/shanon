@@ -1,0 +1,16 @@
+{
+  "name": "Shanon",
+  "short_name": "Shanon",
+  "description": "Shanon — účetnictví, doklady, pokladna",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1f4e79",
+  "lang": "cs",
+  "icons": [
+    { "src": "/icons/shanon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/shanon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

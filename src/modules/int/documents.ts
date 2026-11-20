@@ -101,7 +101,7 @@ export async function applyExtraction(data: DataApi, doc: RecordData, r: OcrResu
  * jinak odpovědná osoba napojení vytěžování; jinak nikdo.
  */
 export async function docOriginator(data: DataApi, doc: RecordData): Promise<string | null> {
-  if (doc.source === "portal" && doc.portalId) {
+  if ((doc.source === "portal" || doc.source === "app") && doc.portalId) {
     const p = await data.get("int.portal", String(doc.portalId));
     return (p?.responsible as string) || null;
   }
@@ -135,7 +135,14 @@ export async function checkDocument(data: DataApi, doc: RecordData, t: T): Promi
   let partnerId: string | null = null;
   let subjectId: string | null = null;
   if (!tg) issues.push(t("@INT:DocNoTarget"));
-  else {
+  else if (doc.employeeId) {
+    // účtenka zaplacená zaměstnancem: partnerem je zaměstnanec (dodavatel s profilem ZAM), ne obchod z účtenky
+    const emp = await data.get("hr.employee", String(doc.employeeId)).catch(() => null);
+    if (!emp) issues.push(t("@INT:DocNoEmployee"));
+    else if (tg.partner !== "ap.vendor") issues.push(t("@INT:DocEmployeeTarget"));
+    else if (emp.vendorId) partnerId = String(emp.vendorId);
+    else notes.push(t("@INT:DocEmployeeVendor", { name: String(emp.name ?? "") }));
+  } else {
     try {
       const subj = await findSubject(data, doc);
       subjectId = subj ? String(subj.id) : null;
@@ -222,10 +229,29 @@ export async function listDocumentFull(data: DataApi, doc: RecordData, t: T): Pr
   if (doc.status !== "ready" && doc.status !== "attention") throw new UserError("@SYS:Locked");
   let d = await checkDocument(data, doc, t);
   const tg = TARGETS[String(d.target)];
-  if (tg && !d[tg.field] && (d.regNo || d.vatId)) d = await createDocPartner(data, d, t);
+  if (tg && !d[tg.field] && d.employeeId) {
+    await employeeVendor(data, String(d.employeeId));
+    d = await checkDocument(data, d, t);
+  } else if (tg && !d[tg.field] && (d.regNo || d.vatId)) d = await createDocPartner(data, d, t);
   const out = await listDocument(data, d, t);
   await data.copyAttachments?.("int.document", String(doc.id), out.object, out.id);
   return out;
+}
+
+/**
+ * Dodavatel zaměstnance pro proplácení výdajů: subjekt (osoba) + dodavatel s účtovacím profilem ZAM (333),
+ * odkaz na kartě zaměstnance. Už existuje → jeho id.
+ */
+export async function employeeVendor(data: DataApi, employeeId: string): Promise<string> {
+  const emp = await data.get("hr.employee", employeeId);
+  if (!emp) throw new UserError("@INT:DocNoEmployee");
+  if (emp.vendorId && (await data.get("ap.vendor", String(emp.vendorId)))) return String(emp.vendorId);
+  const subj = await data.create("gab.subject", { name: String(emp.name || emp.personalNum).slice(0, 120), type: "person" });
+  const vendor = await createPartner(data, String(subj.id), "ap.vendor");
+  const [zam] = await data.find("ap.postingProfile", { code: "ZAM" }, { take: 1 });
+  if (zam) await data.update("ap.vendor", String(vendor.id), { postingProfileId: zam.id });
+  await data.update("hr.employee", employeeId, { vendorId: vendor.id });
+  return String(vendor.id);
 }
 
 /** Zalistovat: koncept dokladu v agendě (faktura, záloha, objednávka) s řádky. */

@@ -15,6 +15,9 @@ const ACTIONS: Record<string, () => Promise<OutsideAction>> = {
   "ar.invoice:email": async () => (await import("./mail")).invoiceMailDraft,
   "ar.advance:email": async () => (await import("./mail")).advanceMailDraft,
   "int.mail:send": async () => (await import("./mail")).sendMail,
+  // pozvánka do aplikace Portál (systémová pošta)
+  "hr.employee:invite": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./portal-app")).inviteToPortal(ctx, "hr.employee", id, client),
+  "int.portalContact:invite": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./portal-app")).inviteToPortal(ctx, "int.portalContact", id, client),
   // smazání firmy i s daty (superuživatel — sys.company je adminOnly, ověří runAction)
   "sys.company:deleteWithData": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./company-delete")).deleteCompanyWithData(ctx, id, client),
 };

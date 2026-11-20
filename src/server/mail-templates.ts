@@ -155,3 +155,44 @@ export function loginHelpMail(t: T, p: { email: string; message: string; account
     footer: t("@SYS:MailHelpReqFooter"),
   });
 }
+
+/**
+ * Pozvánka do aplikace Portál. Zaměstnanec: nastavení hesla (přihlašuje se osobním číslem);
+ * dodavatel: odkaz rovnou přihlásí, příště stačí zadat e-mail a přijde nový odkaz.
+ */
+export function portalInviteMail(t: T, p: { kind: "employee" | "vendor"; name: string; login: string; link: string; days: number; companies: string[]; inviter: string; appUrl: string }) {
+  const emp = p.kind === "employee";
+  return render({
+    subject: t("@INT:MailPortalInviteSubject", { company: p.companies[0] ?? "" }),
+    title: t(emp ? "@INT:MailPortalInviteTitleEmp" : "@INT:MailPortalInviteTitleVendor"),
+    intro: [
+      p.name ? t("@SYS:MailHello", { name: p.name }) : t("@INT:MailPortalHelloAnon"),
+      t(emp ? "@INT:MailPortalInviteTextEmp" : "@INT:MailPortalInviteTextVendor", { companies: p.companies.join(", ") }),
+    ],
+    button: { label: t(emp ? "@INT:MailPortalSetPassword" : "@INT:MailPortalOpen"), href: p.link, note: t("@SYS:MailLinkValid", { days: String(p.days) }) },
+    blocks: [
+      {
+        heading: t("@INT:MailPortalHowHeading"),
+        rows: [
+          { label: t("@INT:MailPortalAddress"), value: p.appUrl.replace(/^https?:\/\//, ""), href: p.appUrl },
+          { label: t(emp ? "@INT:MailPortalLoginEmp" : "@INT:MailPortalLoginVendor"), value: p.login },
+        ],
+        text: t(emp ? "@INT:MailPortalHowEmp" : "@INT:MailPortalHowVendor"),
+      },
+      { heading: t("@INT:MailPortalInstallHeading"), text: t("@INT:MailPortalInstallText") },
+    ],
+    footer: p.inviter ? t("@SYS:MailFooter", { inviter: p.inviter }) : t("@INT:MailPortalFooter"),
+  });
+}
+
+/** Přihlašovací odkaz dodavatele (platí krátce, jednou). */
+export function portalLinkMail(t: T, p: { link: string; minutes: number; companies: string[] }) {
+  return render({
+    subject: t("@INT:MailPortalLinkSubject"),
+    title: t("@INT:MailPortalLinkTitle"),
+    intro: [t("@INT:MailPortalLinkText", { companies: p.companies.join(", ") })],
+    button: { label: t("@INT:MailPortalOpen"), href: p.link, note: t("@INT:MailPortalLinkValid", { minutes: String(p.minutes) }) },
+    blocks: [],
+    footer: t("@INT:MailPortalLinkFooter"),
+  });
+}

@@ -1,0 +1,16 @@
+{
+  "name": "Shanon Portál",
+  "short_name": "Portál",
+  "description": "Účtenky a doklady pro firmu — zaměstnanci a dodavatelé",
+  "id": "/p/start",
+  "start_url": "/p/start",
+  "scope": "/p/",
+  "display": "standalone",
+  "background_color": "#1f4e79",
+  "theme_color": "#1f4e79",
+  "lang": "cs",
+  "icons": [
+    { "src": "/icons/portal-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/portal-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -28,5 +28,6 @@ export const config = {
   // api/v1: REST API s vlastní autorizací klíčem (bez přihlášení)
   // portal, api/portal: dodavatelský portál (veřejný odkaz s tajným klíčem, limity v src/server/supplier-portal.ts)
   // eshop, api/eshop: veřejný e-shop (src/server/eshop.ts); api/pay: oznámení platební brány
-  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1|api/portal|portal/|api/eshop|eshop/|api/pay/|pay-sim/|api/pay-sim/).*)"],
+  // p/, api/p/: aplikace Portál (vlastní přihlášení, src/server/portal-auth.ts); manifesty a ikony aplikací
+  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1|api/portal|portal/|api/eshop|eshop/|api/pay/|pay-sim/|api/pay-sim/|p/|api/p/|manifest.webmanifest|portal-app.webmanifest|icons/).*)"],
 };

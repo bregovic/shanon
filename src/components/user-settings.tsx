@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button, Checkbox, Dropdown, Field, Input, MessageBar, MessageBarBody, Option, Text, makeStyles, tokens } from "@fluentui/react-components";
 import { changePasswordAction, saveProfileAction, setPosPinAction } from "@/app/actions";
 import { ActionBar, Crumbs, PageContent } from "./page";
+import { InstallAppButton } from "./install-app";
 
 const useStyles = makeStyles({
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px", maxWidth: "1100px" },
@@ -77,6 +78,13 @@ export function UserSettings(p: {
                 <Option value="en">English</Option>
               </Dropdown>
             </Field>
+            <div className={st.title}>{L.InstallApp}</div>
+            <Text size={200} className={st.muted}>
+              {L.InstallAppHelp}
+            </Text>
+            <div>
+              <InstallAppButton label={L.InstallApp} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
+            </div>
             <div className={st.title}>{L.Notifications}</div>
             {(
               [

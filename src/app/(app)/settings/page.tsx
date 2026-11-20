@@ -9,7 +9,7 @@ export const metadata = { title: "Moje nastavení" };
 const KEYS = [
   "UserSettings", "Profile", "Language", "ChangePassword", "CurrentPassword", "NewPassword", "RepeatPassword", "PasswordRules",
   "PasswordChanged", "PosPin", "PosPinHelp", "PosPinSet", "PosPinNone", "Notifications", "NotifyDailySummary", "NotifyOverdue",
-  "NotifyIntegration", "NotifyInfo", "Saved", "Save", "Name", "Email", "FirstName", "LastName"];
+  "NotifyIntegration", "NotifyInfo", "Saved", "Save", "Name", "Email", "FirstName", "LastName", "InstallApp", "InstallAppHelp", "InstallAppIos", "InstallAppDone"];
 
 export default async function SettingsPage() {
   const s = await requireSession();

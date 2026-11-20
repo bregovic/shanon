@@ -161,6 +161,13 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   `DataApi.claimGlobalKey` (tabulka `sys_global_key` bez RLS, grant v `scripts/rls.ts`); `src/proxy.ts` přepíše dvoudílnou adresu,
   jejíž první část není v `RESERVED_PATHS` (`src/lib/reserved-paths.ts` — nový modul / stránku přidat, test to hlídá).
   Pole s `share` (odkaz) má ve formuláři Kopírovat / E-mailem / Otevřít.
+- Aplikace Portál (CR-108, `/p/<kód tenanta>`, manifest `public/portal-app.webmanifest`, Shanon `public/manifest.webmanifest`,
+  tlačítko `InstallAppButton`): účty mimo uživatele v `sys_portal_account` / `sys_portal_session` (base.prisma, aplikační role
+  k nim práva nemá, čte jen `src/server/portal-auth.ts`, cookie `shanon_portal`). Zaměstnanec = `hr.employee` (osobní číslo napříč
+  firmami = jedna identita, heslo z pozvánky), dodavatel = `int.portalContact` (e-mail, přihlášení odkazem; neznámý e-mail nic,
+  odpověď stejná). Firmy a agendy se odvozují při každém požadavku (`identityCompanies` + `int.portal.appEmployees/appVendors`).
+  Podání `src/server/portal-app.ts` → `int.document` se zdrojem `app` (WF-DOKLADY ho smí zalistovat sám), účtenka nese
+  `employeeId` → `employeeVendor` (dodavatel zaměstnance s profilem ZAM). Úprava fotky v prohlížeči `components/photo-editor.tsx`.
 - Veřejné datové služby (ARES, ČNB, ECB) volat přes `withService(data, "ares"|"cnb"|"ecb", …)`
   (`src/modules/int/services.ts`): napojení druhu „service“ (zakládá výchozí nastavení)
   je jde vypnout, otestovat a volání jdou do `int.log`; bez Integrace běží služba bez logu.

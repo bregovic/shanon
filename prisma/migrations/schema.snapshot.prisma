@@ -80,6 +80,49 @@ model SysSession {
   @@map("sys_session")
 }
 
+/// Účet aplikace Portál (zaměstnanec / dodavatel) — mimo uživatele Shanonu, bez licence.
+/// Zaměstnanec: přihlašovací jméno = osobní číslo, heslo; dodavatel: e-mail, přihlášení odkazem z e-mailu.
+/// Firmy a oprávnění se odvozují z karet (hr.employee / int.portalContact) při každém přihlášení.
+/// Aplikační role k tabulce práva nemá — čte ji jen přihlášení portálu (src/server/portal-auth.ts).
+model SysPortalAccount {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  /// employee | vendor
+  kind         String    @db.VarChar(10)
+  /// osobní číslo (velkými) / e-mail (malými)
+  login        String    @db.VarChar(254)
+  passwordHash String?   @map("password_hash")
+  /// jednorázový odkaz (pozvánka, přihlášení, nové heslo) — jen SHA-256
+  tokenHash    String?   @map("token_hash") @db.VarChar(64)
+  tokenExpires DateTime? @map("token_expires")
+  failedLogins Int       @default(0) @map("failed_logins")
+  lockedUntil  DateTime? @map("locked_until")
+  /// poslední firma a agenda (nabídnou se při dalším otevření)
+  prefs        Json      @default("{}")
+  invitedAt    DateTime? @map("invited_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  sessions SysPortalSession[]
+
+  @@unique([tenantId, kind, login])
+  @@index([tokenHash])
+  @@map("sys_portal_account")
+}
+
+model SysPortalSession {
+  /// SHA-256 tokenu z cookie
+  id        String   @id @db.VarChar(64)
+  accountId String   @map("account_id") @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account SysPortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@map("sys_portal_session")
+}
+
 /// Zapnuté moduly tenanta (obdoba konfiguračních klíčů v AX).
 /// Moduly zapnuté ve firmě (agenda firmy); sys_tenant_module = souhrn přes firmy (src/server/modules.ts).
 model SysCompanyModule {
@@ -350,6 +393,7 @@ model SysCompany {
   intLog_company                   IntLog[]                   @relation("IntLog_company")
   intPortal_company                IntPortal[]                @relation("IntPortal_company")
   intPortalUpload_company          IntPortalUpload[]          @relation("IntPortalUpload_company")
+  intPortalContact_company         IntPortalContact[]         @relation("IntPortalContact_company")
   intDocument_company              IntDocument[]              @relation("IntDocument_company")
   intDocumentLine_company          IntDocumentLine[]          @relation("IntDocumentLine_company")
   intMail_company                  IntMail[]                  @relation("IntMail_company")
@@ -364,6 +408,7 @@ model SysCompany {
   wfDefinition_company             WfDefinition[]             @relation("WfDefinition_company")
   wfDefinitionStep_company         WfDefinitionStep[]         @relation("WfDefinitionStep_company")
   wfInstance_company               WfInstance[]               @relation("WfInstance_company")
+  hrEmployee_company               HrEmployee[]               @relation("HrEmployee_company")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2669,7 +2714,9 @@ model ApVendor {
   apTrans_vendor                ApTrans[]              @relation("ApTrans_vendor")
   bankStatementLine_vendor      BankStatementLine[]    @relation("BankStatementLine_vendor")
   bankPaymentOrderLine_vendor   BankPaymentOrderLine[] @relation("BankPaymentOrderLine_vendor")
+  intPortalContact_vendor       IntPortalContact[]     @relation("IntPortalContact_vendor")
   intDocument_vendor            IntDocument[]          @relation("IntDocument_vendor")
+  hrEmployee_vendor             HrEmployee[]           @relation("HrEmployee_vendor")
 
   @@unique([tenantId, companyId, accountNum])
   @@unique([tenantId, companyId, subjectId])
@@ -4193,6 +4240,8 @@ model IntPortal {
   requireRegNo Boolean  @default(true) @map("require_reg_no")
   autoExtract  Boolean  @default(true) @map("auto_extract")
   responsible  String?  @db.VarChar(36)
+  appVendors   Boolean  @default(true) @map("app_vendors")
+  appEmployees Boolean  @default(false) @map("app_employees")
   maxFileMb    Int?     @default(10) @map("max_file_mb")
   maxFiles     Int?     @default(5) @map("max_files")
   ipHourLimit  Int?     @default(10) @map("ip_hour_limit")
@@ -4244,6 +4293,34 @@ model IntPortalUpload {
   @@map("int_portal_upload")
 }
 
+/// int.portalContact — generováno z definice objektu
+model IntPortalContact {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  email       String    @db.VarChar(254)
+  name        String?   @db.VarChar(120)
+  vendorId    String?   @map("vendor_id") @db.Uuid
+  active      Boolean   @default(true)
+  invitedAt   DateTime? @map("invited_at")
+  lastLoginAt DateTime? @map("last_login_at")
+  note        String?   @db.VarChar(255)
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("IntPortalContact_company", fields: [companyId], references: [id], onDelete: Restrict)
+  vendor  ApVendor?  @relation("IntPortalContact_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, email])
+  @@index([tenantId, companyId])
+  @@index([vendorId])
+  @@map("int_portal_contact")
+}
+
 /// int.document — generováno z definice objektu
 model IntDocument {
   id           String    @id @default(uuid(7)) @db.Uuid
@@ -4285,6 +4362,7 @@ model IntDocument {
   senderRegNo  String?   @map("sender_reg_no") @db.VarChar(20)
   senderEmail  String?   @map("sender_email") @db.VarChar(254)
   senderNote   String?   @map("sender_note") @db.VarChar(255)
+  employeeId   String?   @map("employee_id") @db.Uuid
   ext          Json      @default("{}")
   version      Int       @default(1)
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -4298,6 +4376,7 @@ model IntDocument {
   customer                 ArCustomer?       @relation("IntDocument_customer", fields: [customerId], references: [id], onDelete: Restrict)
   connection               IntConnection?    @relation("IntDocument_connection", fields: [connectionId], references: [id], onDelete: Restrict)
   portal                   IntPortal?        @relation("IntDocument_portal", fields: [portalId], references: [id], onDelete: Restrict)
+  employee                 HrEmployee?       @relation("IntDocument_employee", fields: [employeeId], references: [id], onDelete: Restrict)
   intPortalUpload_document IntPortalUpload[] @relation("IntPortalUpload_document")
   intDocumentLine_document IntDocumentLine[] @relation("IntDocumentLine_document")
 
@@ -4307,6 +4386,7 @@ model IntDocument {
   @@index([customerId])
   @@index([connectionId])
   @@index([portalId])
+  @@index([employeeId])
   @@map("int_document")
 }
 
@@ -4753,6 +4833,43 @@ model WfInstance {
   @@index([definitionId])
   @@index([tenantId, companyId, refObject, refId, status])
   @@map("wf_instance")
+}
+
+/// hr.employee — generováno z definice objektu
+model HrEmployee {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  personalNum     String    @map("personal_num") @db.VarChar(20)
+  firstName       String    @map("first_name") @db.VarChar(120)
+  lastName        String    @map("last_name") @db.VarChar(120)
+  name            String?   @db.VarChar(120)
+  email           String?   @db.VarChar(254)
+  phone           String?   @db.VarChar(30)
+  position        String?   @db.VarChar(255)
+  validFrom       DateTime? @map("valid_from") @db.Date
+  validTo         DateTime? @map("valid_to") @db.Date
+  active          Boolean   @default(true)
+  portalAccess    Boolean   @default(true) @map("portal_access")
+  vendorId        String?   @map("vendor_id") @db.Uuid
+  portalInvitedAt DateTime? @map("portal_invited_at")
+  portalLastLogin DateTime? @map("portal_last_login")
+  note            String?
+  ext             Json      @default("{}")
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  createdBy       String?   @map("created_by") @db.Uuid
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?   @map("updated_by") @db.Uuid
+
+  company              SysCompany    @relation("HrEmployee_company", fields: [companyId], references: [id], onDelete: Restrict)
+  vendor               ApVendor?     @relation("HrEmployee_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  intDocument_employee IntDocument[] @relation("IntDocument_employee")
+
+  @@unique([tenantId, companyId, personalNum])
+  @@index([tenantId, companyId])
+  @@index([vendorId])
+  @@map("hr_employee")
 }
 
 /// qa.feature — generováno z definice objektu
