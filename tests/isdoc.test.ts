@@ -2,7 +2,7 @@
  * ISDOC: vydaná faktura → ISDOC XML → PDF s vloženým ISDOC → import toho PDF
  * (i .isdoc a .isdocx) jako dokladu ke zpracování bez OCR → zalistování.
  */
-import { deflateRawSync } from "node:zlib";
+import { deflateRawSync, deflateSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 import { createPrisma } from "@/server/db";
 import { getRecord, inTenant, listRecords, runAction, saveRecord } from "@/server/data";
@@ -29,6 +29,17 @@ function zip(name: string, data: Buffer): Buffer {
 }
 
 describe("ISDOC", () => {
+  it("PDF s ISDOC za jiným proudem (Pohoda): konec proudu „endstream“ není začátek dalšího", () => {
+    const xml = '<?xml version="1.0" encoding="utf-8"?><Invoice xmlns="http://isdoc.cz/namespace/2013" version="6.0.2"><ID>260100928</ID></Invoice>';
+    const pdf = Buffer.concat([
+      Buffer.from("%PDF-1.5\n1 0 obj<</Length 3>>stream\nAAA\nendstream\nendobj\n2 0 obj<</Type/EmbeddedFile/Filter/FlateDecode/Subtype/application#2Fxml>>stream\n"),
+      deflateSync(Buffer.from(xml)),
+      Buffer.from("\nendstream\nendobj\n%%EOF"),
+    ]);
+    expect(isdocFromFile("Faktura_260100928.pdf", pdf)).toContain("<ID>260100928</ID>");
+  });
+
+
   it("export faktury, ISDOC v PDF, import PDF / .isdoc / .isdocx bez OCR", async () => {
     vi.stubGlobal("fetch", async () => new Response("{}", { status: 404 })); // registry mimo test
     const T = (await provisionTenant(client, { code: `t-isd-${run}`, name: "ISD", adminEmail: `isd-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "ap", "int", "org"], company: { code: "S", name: "Uzeniny Vzor" } })).ctx;

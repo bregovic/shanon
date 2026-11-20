@@ -249,7 +249,8 @@ function unzipIsdoc(buf: Buffer): string | null {
 /** PDF s vloženým ISDOC: projde proudy (i komprimované) a najde ISDOC XML. */
 function isdocFromPdf(buf: Buffer): string | null {
   const s = buf.toString("latin1");
-  const re = /stream\r?\n/g;
+  // klíčové slovo „stream“, ne konec předchozího proudu „endstream“ (jinak se přeskočí každý druhý proud — PDF z Pohody)
+  const re = /(?<!end)stream\r?\n/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(s))) {
     const start = m.index + m[0].length;
@@ -264,7 +265,7 @@ function isdocFromPdf(buf: Buffer): string | null {
         /* není deflate */
       }
     }
-    re.lastIndex = end;
+    re.lastIndex = end + "endstream".length;
   }
   return null;
 }
