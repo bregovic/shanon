@@ -4,7 +4,7 @@
  * Texty jsou labely (`@SYS:Mail…`) v jazyce příjemce.
  */
 import type { LabelRef } from "@/core/labels";
-import { envUrls } from "./system-mail";
+import { envUrls, publicUrl } from "./system-mail";
 
 type T = (l: LabelRef, p?: Record<string, string>) => string;
 
@@ -31,7 +31,7 @@ const C = { brand: "#1f4e79", text: "#1f2328", muted: "#5f6b76", line: "#e3e8ee"
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function render(l: Layout): { subject: string; html: string; text: string } {
-  const { prod } = envUrls();
+  const self = publicUrl();
   const a = (href: string, label: string) => `<a href="${esc(href)}" style="color:${C.brand};text-decoration:underline">${esc(label)}</a>`;
   const blocks = l.blocks
     .map(
@@ -56,7 +56,7 @@ function render(l: Layout): { subject: string; html: string; text: string } {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};padding:24px 12px"><tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid ${C.line};border-radius:10px;overflow:hidden">
     <tr><td style="background:${C.brand};height:6px;font-size:0;line-height:0">&nbsp;</td></tr>
-    <tr><td style="padding:24px 32px 0"><img src="${esc(prod)}/logo.png" alt="Shanon" height="36" style="display:block;height:36px;border:0"></td></tr>
+    <tr><td style="padding:24px 32px 0"><img src="${esc(self)}/logo.png" alt="Shanon" height="36" style="display:block;height:36px;border:0"></td></tr>
     <tr><td style="padding:16px 32px 0;font-size:22px;font-weight:700;color:${C.text}">${esc(l.title)}</td></tr>
     <tr><td style="padding:10px 32px 0;font-size:15px;line-height:1.6;color:${C.text}">${l.intro.map((p) => `<p style="margin:0 0 10px">${esc(p)}</p>`).join("")}</td></tr>
     ${
@@ -84,13 +84,14 @@ function render(l: Layout): { subject: string; html: string; text: string } {
 
 /** společné bloky: prostředí, nápověda, zpětná vazba */
 function commonBlocks(t: T, email: string): Block[] {
-  const { prod, test, self } = envUrls();
+  const { prod, test } = envUrls();
+  const self = publicUrl();
   return [
     {
       heading: t("@SYS:MailLoginHeading"),
       rows: [
         { label: t("@SYS:MailLoginName"), value: email },
-        { label: t("@SYS:MailEnvProd"), value: prod.replace(/^https?:\/\//, ""), href: prod, note: t("@SYS:MailEnvProdNote") },
+        ...(prod || !test ? [{ label: t("@SYS:MailEnvProd"), value: (prod || self).replace(/^https?:\/\//, ""), href: prod || self, note: t("@SYS:MailEnvProdNote") }] : []),
         ...(test ? [{ label: t("@SYS:MailEnvTest"), value: test.replace(/^https?:\/\//, ""), href: test, note: t("@SYS:MailEnvTestNote") }] : []),
       ],
     },
@@ -134,7 +135,7 @@ export function resetMail(t: T, p: { name: string; email: string; inviter: strin
 
 /** Žádost „Nemůžu se přihlásit“ správci: kdo, odkud a v jakém stavu je účet. */
 export function loginHelpMail(t: T, p: { email: string; message: string; account: string; when: string }) {
-  const { self } = envUrls();
+  const self = publicUrl();
   return render({
     subject: t("@SYS:MailHelpReqSubject", { email: p.email }),
     title: t("@SYS:MailHelpReqTitle"),

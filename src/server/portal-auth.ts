@@ -20,7 +20,7 @@ import { prisma, withTenant, type Tx } from "./db";
 import { companyModules } from "./modules";
 import { getT } from "./i18n";
 import { portalInviteMail, portalLinkMail } from "./mail-templates";
-import { envUrls, sendSystemMail } from "./system-mail";
+import { publicUrl, sendSystemMail } from "./system-mail";
 
 export type PortalKind = "employee" | "vendor";
 export const PORTAL_COOKIE = "shanon_portal";
@@ -174,7 +174,7 @@ async function sendLink(tenantId: string, tenantCode: string, kind: PortalKind, 
     where: { id: acc.id },
     data: { tokenHash: sha(token), tokenExpires: new Date(Date.now() + minutes * 60_000), ...(purpose === "invite" ? { invitedAt: new Date() } : {}) },
   });
-  const base = `${envUrls().self}/p/${tenantCode}`;
+  const base = `${publicUrl()}/p/${tenantCode}`;
   const link = kind === "employee" ? `${base}/heslo?t=${token}` : `${base}/vstup?t=${token}`;
   const t = await getT("cs", tenantId);
   const to = kind === "vendor" ? login : companies.find((c) => c.email)?.email;

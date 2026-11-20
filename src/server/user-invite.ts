@@ -14,7 +14,7 @@ import { clearLoginLock, loginLockMinutes } from "./auth";
 import { prisma, withTenant } from "./db";
 import { getT } from "./i18n";
 import { inviteMail, loginHelpMail, resetMail } from "./mail-templates";
-import { envUrls, sendSystemMail, supportEmail, systemMailConfigured } from "./system-mail";
+import { publicUrl, sendSystemMail, supportEmail, systemMailConfigured } from "./system-mail";
 
 const INVITE_DAYS = 7;
 const RESET_DAYS = 2;
@@ -46,7 +46,7 @@ export async function sendPasswordLink(
     data: { inviteTokenHash: sha(token), inviteExpiresAt: new Date(Date.now() + days * 86_400_000), ...(kind === "invite" ? { invitedAt: new Date() } : {}) },
   });
   const t = await getT((user.lang as Lang) || "cs", tenantId);
-  const link = `${envUrls().self}/login/heslo?t=${token}`;
+  const link = `${publicUrl()}/login/heslo?t=${token}`;
   const name = user.firstName || user.name;
   // názvy firem jsou jen do textu — chyba při jejich čtení pozvánku nezastaví (pak název organizace)
   const companies = await userCompanyNames(tenantId, user.id).catch((e) => {
@@ -138,7 +138,9 @@ export async function requestLoginHelp(email: string, message: string, ip: strin
         .join(" · ");
   const when = new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
   const mail = loginHelpMail(t, { email: key, message: message.trim().slice(0, 2000), account, when });
-  await sendSystemMail({ to: supportEmail(), replyTo: key, ...mail });
+  const support = supportEmail();
+  if (!support) throw new UserError("@SYS:MailNotConfigured");
+  await sendSystemMail({ to: support, replyTo: key, ...mail });
 }
 
 export { systemMailConfigured };

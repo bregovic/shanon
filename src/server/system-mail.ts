@@ -3,13 +3,16 @@
  * napojení pošty v Integraci. Nastavení jen z prostředí, nikdy z databáze ani z repa:
  *
  *   RESEND_API_KEY — odesílání přes Resend (HTTPS). Na Railway jediná cesta: odchozí SMTP Railway blokuje.
- *   SHANON_MAIL_FROM — odesílatel, např. „Shanon <shanon@hollyhop.cz>“ (doména musí být ověřená v Resendu)
+ *   SHANON_MAIL_FROM — odesílatel, např. „Shanon <posta@vase-domena.cz>“ (doména musí být ověřená v Resendu)
  *   SHANON_SMTP_HOST, _PORT (587 STARTTLS / 465 TLS), _USER, _PASS — místo Resendu, jen na vlastním hostingu
  *   SHANON_SUPPORT_EMAIL — kam chodí „Nemůžu se přihlásit“ (výchozí = odesílatel)
- *   SHANON_PROD_URL, SHANON_TEST_URL — adresy prostředí do pozvánky
+ *   SHANON_PUBLIC_URL — adresa tohoto prostředí (odkazy v e-mailech: pozvánky, portál)
+ *   SHANON_PROD_URL, SHANON_TEST_URL — adresy produkce a testu do pozvánky (nepovinné)
  *
- * Bez Resendu i SMTP se nic neodesílá: zpráva se jen vypíše do logu serveru (vývoj, testy).
+ * Žádné výchozí adresy v kódu: chybí odesílatel nebo Resend / SMTP = pošta není nastavená (vývoj a testy:
+ * zpráva jen do logu; produkce: chyba s hláškou). Chybí SHANON_PUBLIC_URL = odkaz nejde sestavit (produkce: chyba).
  */
+import { UserError } from "@/core/module";
 import nodemailer from "nodemailer";
 
 export interface SystemMail {
@@ -20,16 +23,19 @@ export interface SystemMail {
   replyTo?: string;
 }
 
-export const systemMailConfigured = () => !!process.env.RESEND_API_KEY || !!process.env.SHANON_SMTP_HOST;
-
-/** „Jméno <adresa>“ odesílatele */
-function from(): string {
+/** „Jméno <adresa>“ odesílatele z prostředí; bez nastavení null */
+function from(): string | null {
   if (process.env.SHANON_MAIL_FROM) return process.env.SHANON_MAIL_FROM;
-  const address = process.env.SHANON_SMTP_FROM || process.env.SHANON_SMTP_USER || "shanon@hollyhop.cz";
-  return `${process.env.SHANON_SMTP_FROM_NAME || "Shanon"} <${address}>`;
+  const address = process.env.SHANON_SMTP_FROM || process.env.SHANON_SMTP_USER;
+  return address ? `${process.env.SHANON_SMTP_FROM_NAME || "Shanon"} <${address}>` : null;
 }
 
-const fromAddress = () => from().replace(/^.*<([^>]+)>.*$/, "$1");
+const fromAddress = () => from()?.replace(/^.*<([^>]+)>.*$/, "$1") ?? null;
+
+/** pošta je nastavená: odesílatel + Resend nebo SMTP */
+export const systemMailConfigured = () => !!from() && (!!process.env.RESEND_API_KEY || !!process.env.SHANON_SMTP_HOST);
+
+const isProduction = () => process.env.NODE_ENV === "production";
 
 export const supportEmail = () => process.env.SHANON_SUPPORT_EMAIL || fromAddress();
 
@@ -38,29 +44,41 @@ export const supportEmail = () => process.env.SHANON_SUPPORT_EMAIL || fromAddres
  * RAILWAY_PUBLIC_DOMAIN se nebere: je to vygenerovaná doména služby (shanon-app-test…), ne adresa, kterou používáme.
  */
 export function envUrls() {
-  const prod = (process.env.SHANON_PROD_URL || "https://shanon.up.railway.app").replace(/\/$/, "");
-  const test = (process.env.SHANON_TEST_URL || "https://shanon-test.up.railway.app").replace(/\/$/, "");
+  const clean = (v: string | undefined) => (v ?? "").trim().replace(/\/$/, "");
+  const prod = clean(process.env.SHANON_PROD_URL);
+  const test = clean(process.env.SHANON_TEST_URL);
   const envName = process.env.RAILWAY_ENVIRONMENT_NAME;
-  const self = (process.env.SHANON_PUBLIC_URL || (envName === "test" ? test : prod)).replace(/\/$/, "");
+  const self = clean(process.env.SHANON_PUBLIC_URL) || (envName === "test" ? test : prod);
   return { prod, test, self, isTest: !!test && self === test };
+}
+
+/** Adresa tohoto prostředí pro odkazy v e-mailech; v produkci bez nastavení chyba (vývoj: místní server). */
+export function publicUrl(): string {
+  const { self } = envUrls();
+  if (self) return self;
+  if (isProduction()) throw new UserError("@SYS:PublicUrlMissing");
+  return `http://localhost:${process.env.PORT || 3000}`;
 }
 
 /** Odeslat; vrací false, když systémová pošta není nastavená (zpráva jen do logu). Chyba odeslání = výjimka. */
 export async function sendSystemMail(m: SystemMail): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
+  const sender = from();
+  if (!m.to) throw new UserError("@SYS:MailNotConfigured");
+  if (!sender || (!key && !process.env.SHANON_SMTP_HOST)) {
+    if (isProduction()) throw new UserError("@SYS:MailNotConfigured");
+    console.log(`[system-mail] (neodesláno, pošta není nastavená) → ${m.to}: ${m.subject}\n${m.text}`);
+    return false;
+  }
   if (key) {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: from(), to: [m.to], subject: m.subject, html: m.html, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}) }),
+      body: JSON.stringify({ from: sender, to: [m.to], subject: m.subject, html: m.html, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}) }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
     return true;
-  }
-  if (!process.env.SHANON_SMTP_HOST) {
-    console.log(`[system-mail] (neodesláno, chybí RESEND_API_KEY i SHANON_SMTP_HOST) → ${m.to}: ${m.subject}\n${m.text}`);
-    return false;
   }
   const port = Number(process.env.SHANON_SMTP_PORT || 587);
   const t = nodemailer.createTransport({
@@ -73,7 +91,7 @@ export async function sendSystemMail(m: SystemMail): Promise<boolean> {
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
   });
-  await t.sendMail({ from: from(), to: m.to, replyTo: m.replyTo, subject: m.subject, text: m.text, html: m.html });
+  await t.sendMail({ from: sender, to: m.to, replyTo: m.replyTo, subject: m.subject, text: m.text, html: m.html });
   return true;
 }
 
@@ -96,8 +114,13 @@ export interface PlatformMail {
  */
 export async function sendPlatformMail(m: PlatformMail): Promise<string> {
   const address = fromAddress();
-  const sender = m.fromName ? `${m.fromName.replace(/[<>"]/g, "").slice(0, 80)} <${address}>` : from();
   const key = process.env.RESEND_API_KEY;
+  if (!address || (!key && !process.env.SHANON_SMTP_HOST)) {
+    if (isProduction()) throw new UserError("@INT:MailSystemOff");
+    console.log(`[platform-mail] (neodesláno, pošta není nastavená) → ${m.to.join(", ")}: ${m.subject}`);
+    return `local-${Date.now()}@shanon.local`;
+  }
+  const sender = m.fromName ? `${m.fromName.replace(/[<>"]/g, "").slice(0, 80)} <${address}>` : from()!;
   if (key) {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -117,10 +140,6 @@ export async function sendPlatformMail(m: PlatformMail): Promise<string> {
     if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const j = (await res.json().catch(() => ({}))) as { id?: string };
     return String(j.id ?? `resend-${Date.now()}`);
-  }
-  if (!process.env.SHANON_SMTP_HOST) {
-    console.log(`[platform-mail] (neodesláno, chybí RESEND_API_KEY i SHANON_SMTP_HOST) → ${m.to.join(", ")}: ${m.subject}`);
-    return `local-${Date.now()}@shanon.local`;
   }
   const port = Number(process.env.SHANON_SMTP_PORT || 587);
   const t = nodemailer.createTransport({

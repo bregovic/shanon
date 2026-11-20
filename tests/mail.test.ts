@@ -101,7 +101,9 @@ describe("pošta", () => {
       return new Response("{}", { status: 404 });
     });
     const key = process.env.RESEND_API_KEY;
+    const fromEnv = process.env.SHANON_MAIL_FROM;
     process.env.RESEND_API_KEY = "re_test";
+    process.env.SHANON_MAIL_FROM = "Shanon <doklady@shanon.test>";
     try {
       const T = (await provisionTenant(client, { code: `t-mail2-${run}`, name: "MAIL2", adminEmail: `mail2-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "int", "org", "pos"], company: { code: "M", name: "Uzeniny Vzor" } })).ctx;
       // výchozí nastavení: napojení POSTA (Systémová pošta Shanonu) a šablona e-mailu v organizaci
@@ -125,7 +127,8 @@ describe("pošta", () => {
       const res = await sendDocumentNow(T, "pos.receipt", String(r.id), "zakaznik@test.local", client);
       expect([res.test, res.to]).toEqual([false, ["zakaznik@test.local"]]);
       const b = calls.at(-1)!.body as { from: string; to: string[]; subject: string; reply_to: string; html: string; text: string; attachments: { filename: string; content: string }[] };
-      expect(b.from).toBe("Uzeniny Vzor s.r.o. <shanon@hollyhop.cz>");
+      // adresa odesílatele z proměnné serveru, jméno = firma
+      expect(b.from).toBe("Uzeniny Vzor s.r.o. <doklady@shanon.test>");
       expect([b.to, b.reply_to, b.subject]).toEqual([["zakaznik@test.local"], "obchod@vzor.test", `Vaše účtenka ${r.receiptNum} od Uzeniny Vzor s.r.o.`]);
       expect(b.html).toContain("Uzeniny Vzor s.r.o.");
       expect(b.html).toContain("777 111 222");
@@ -146,6 +149,8 @@ describe("pošta", () => {
     } finally {
       if (key === undefined) delete process.env.RESEND_API_KEY;
       else process.env.RESEND_API_KEY = key;
+      if (fromEnv === undefined) delete process.env.SHANON_MAIL_FROM;
+      else process.env.SHANON_MAIL_FROM = fromEnv;
       vi.unstubAllGlobals();
     }
   }, 120_000);
