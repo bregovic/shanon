@@ -1049,7 +1049,7 @@ export function PosTerminal(p: {
             </div>
           </section>
 
-          {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
+          {verified && vDriver && vState && <ScalePanel driver={vDriver} state={vState} autoAddSec={p.verifiedScale?.autoAddSec ?? 0} beepOn={p.verifiedScale?.beep !== false} L={L} fmtMoney={(v) => fmt(v)} onAdd={addWeighed} />}
 
           <aside className={st.cart} aria-label={L.Cart}>
             <div className={st.baskets}>

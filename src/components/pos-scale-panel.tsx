@@ -5,6 +5,7 @@
  * nákupu jen po ustálení. Panel o protokolu nic neví — pracuje se stavem `ScaleDriver` (src/lib/scale-driver.ts).
  * Cenu vážené položky tu nic nepočítá; zobrazuje se text, který vrátila váha.
  */
+import { beep } from "@/lib/beep";
 import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Spinner, makeStyles, tokens } from "@fluentui/react-components";
 import { Scales24Regular } from "@fluentui/react-icons";
@@ -46,6 +47,8 @@ export interface VerifiedScaleConfig {
   stopBits?: 1 | 2;
   /** přidat samo po N s ustálení (0 = vypnuto) */
   autoAddSec: number;
+  /** pípnout při přidání váženého zboží do nákupu (výchozí ano) */
+  beep?: boolean;
 }
 
 /** Driver ověřené váhy pro pokladnu: simulátor nebo Web Serial; po připojení stránky se sám připojí. */
@@ -78,6 +81,7 @@ export function ScalePanel({
   driver,
   state,
   autoAddSec,
+  beepOn = true,
   L,
   fmtMoney,
   onAdd,
@@ -85,6 +89,8 @@ export function ScalePanel({
   driver: ScaleDriver;
   state: ScaleState;
   autoAddSec: number;
+  /** pípnutí při přidání (napojení váhy) */
+  beepOn?: boolean;
   L: Record<string, string>;
   /** formát Kč pro text z váhy (jen zobrazení) */
   fmtMoney: (v: string) => string;
@@ -107,6 +113,7 @@ export function ScalePanel({
         clearInterval(t);
         added.current = reading!.raw;
         setLeft(null);
+        if (beepOn) beep();
         onAdd(reading!);
       }
     }, 1000);
@@ -115,7 +122,7 @@ export function ScalePanel({
       clearInterval(t);
       setLeft(null);
     };
-  }, [stable, reading, autoAddSec, onAdd]);
+  }, [stable, reading, autoAddSec, onAdd, beepOn]);
 
   const conn =
     phase === "disconnected" ? (
@@ -225,7 +232,7 @@ export function ScalePanel({
             {L.ScaleRetry}
           </Button>
         ) : (
-          <Button appearance="primary" className={st.addBtn} disabled={!stable} onClick={() => reading && onAdd(reading)}>
+          <Button appearance="primary" className={st.addBtn} disabled={!stable} onClick={() => reading && (beepOn && beep(), onAdd(reading))}>
             {L.ScaleAdd}
           </Button>
         )}

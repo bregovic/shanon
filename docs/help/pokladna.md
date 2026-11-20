@@ -59,6 +59,30 @@ RS-232 a zkuste **Jen poslouchat** a na váze tlačítko tisku.
 
 Testovací prostředí simulátor váhy nezakládá — vždy se používá skutečná váha z napojení.
 
+**Na pokladně:** port se povolí na každém počítači jen **jednou** (Připojit váhu nebo Zkouška váhy) — prohlížeč z bezpečnosti
+nedovolí stránce sáhnout na COM port bez souhlasu; potom se pokladna připojuje sama (i po odpojení, každých 5 s). V napojení
+váhy: **Přidat samo po ustálení** (výchozí 2 s, 0 = jen tlačítkem) a **Pípnout při přidání do nákupu**.
+
+**Pořadí u ověřené váhy (Dialog 06):** nejdřív klepnout na zboží (cena za kg jde do váhy), pak ho položit. Leží-li zboží na
+váze dřív, panel řekne *Zvedněte zboží z váhy a položte ho zpět* — váha přijme jen vážení, které začne po zadání ceny.
+
+### Zásady vážení v prodeji potravin (přehled)
+
+Orientační shrnutí, nenahrazuje předpisy ani poradenství ČMI / dodavatele váhy:
+
+- **Ověřená váha.** Váha pro prodej podle hmotnosti je stanovené měřidlo (zákon č. 505/1990 Sb. o metrologii, vyhláška
+  č. 345/2002 Sb.): musí mít označení shody (CE + M + rok) a úřední značky, **následné ověření každé 2 roky** (ČMI nebo
+  autorizované středisko). Porušená plomba nebo značka = váha se nesmí používat.
+- **Zákazník vidí údaje.** Displej hmotnosti, ceny za kg a ceny musí být čitelný ze strany zákazníka.
+- **Váha v rovině a na nule.** Libela uprostřed, před vážením nula a ustálení; vážit jen ustálenou hmotnost.
+- **Minimum (Min).** Pod minimální vážitelnou hmotností (štítek váhy) se podle hmotnosti prodávat nesmí — váha to hlásí sama.
+- **Obal se neplatí.** Zákazník platí jen hmotnost potraviny: obal / sáček / misku **vytárujte** na váze (tlačítko Tare) — u
+  balených potravin platí čistá hmotnost (nařízení EU č. 1169/2011, zákon č. 110/1997 Sb. o potravinách).
+- **Cenu počítá váha.** U sestavy pokladna + ověřená váha s výpočtem ceny (Dialog 06) pokladna cenu jen přebírá, nepřepočítává
+  a nedovolí ruční změnu váženého řádku (požadavky WELMEC 2.2 na sestavy pokladna – váha; posouzení sestavy s dodavatelem).
+- **Doklad.** Na účtence je u váženého zboží hmotnost, cena za kg a cena (zákon č. 634/1992 Sb. o ochraně spotřebitele —
+  správnost měření a ceny).
+
 **Ověřená váha (stanovené měřidlo):** při prodeji podle hmotnosti musí být váha ověřená a její displej viditelný pro zákazníka. Když pokladna přebírá hmotnost z váhy, posuzuje ČMI celou sestavu váha + pokladna (prohlášení výrobce o shodě sestavy, případně informativní štítek, že ověření platí jen pro váhu) — postup konzultujte s dodavatelem váhy. Pro ověřenou váhu s výpočtem ceny je protokol **Dialog 06** (viz níže).
 
 **Panel Váha (Dialog 06):** v napojení váhy zvolte protokol **Dialog 06**, vyplňte výrobní číslo váhy a případně

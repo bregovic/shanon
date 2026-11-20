@@ -128,6 +128,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
               parity: (["even", "odd"].includes(String(data.conns.scale.parity)) ? data.conns.scale.parity : "none") as "none",
               stopBits: Number(data.conns.scale.stopBits) === 2 ? 2 : 1,
               autoAddSec: Math.max(0, Number(data.conns.scale.scaleAutoAddSec ?? 0)),
+              beep: data.conns.scale.scaleBeep !== false,
             }
           : null
       }
