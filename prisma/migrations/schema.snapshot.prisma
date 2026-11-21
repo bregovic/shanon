@@ -33,33 +33,36 @@ model SysTenant {
 }
 
 model SysUser {
-  id              String    @id @default(uuid(7)) @db.Uuid
-  tenantId        String    @map("tenant_id") @db.Uuid
-  email           String    @unique @db.VarChar(254)
+  id               String    @id @default(uuid(7)) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  email            String    @unique @db.VarChar(254)
   /// celé jméno (Jméno Příjmení) — skládá se z firstName a lastName
-  name            String    @db.VarChar(120)
-  firstName       String    @default("") @map("first_name") @db.VarChar(60)
-  lastName        String    @default("") @map("last_name") @db.VarChar(60)
-  passwordHash    String    @map("password_hash")
+  name             String    @db.VarChar(120)
+  firstName        String    @default("") @map("first_name") @db.VarChar(60)
+  lastName         String    @default("") @map("last_name") @db.VarChar(60)
+  passwordHash     String    @map("password_hash")
   /// admin = superuživatel tenanta (všechny firmy, moduly, role); user = podle přiřazení k firmám
-  role            String    @default("user") @db.VarChar(20)
-  lang            String    @default("cs") @db.VarChar(5)
-  active          Boolean   @default(true)
+  role             String    @default("user") @db.VarChar(20)
+  lang             String    @default("cs") @db.VarChar(5)
+  active           Boolean   @default(true)
   /// PIN do pokladny (bcrypt) — rychlé přihlášení pokladní u terminálu
-  posPinHash      String?   @map("pos_pin_hash")
+  posPinHash       String?   @map("pos_pin_hash")
   /// e-mailová upozornění, která si uživatel zapnul: { dailySummary, overdueInvoices, integrationErrors }
-  notify          Json      @default("{}")
+  notify           Json      @default("{}")
+  /// firma, do které se uživatel přihlásí (prázdné / bez přístupu = první dostupná)
+  defaultCompanyId String?   @map("default_company_id") @db.Uuid
   /// pozvánka / reset hesla: SHA-256 jednorázového tokenu z odkazu (token samotný se neukládá) a jeho platnost
-  inviteTokenHash String?   @map("invite_token_hash") @db.VarChar(64)
-  inviteExpiresAt DateTime? @map("invite_expires_at")
+  inviteTokenHash  String?   @map("invite_token_hash") @db.VarChar(64)
+  inviteExpiresAt  DateTime? @map("invite_expires_at")
   /// kdy odešla poslední pozvánka; heslo si uživatel nastavil = passwordSetAt
-  invitedAt       DateTime? @map("invited_at")
-  passwordSetAt   DateTime? @map("password_set_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  invitedAt        DateTime? @map("invited_at")
+  passwordSetAt    DateTime? @map("password_set_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   tenant    SysTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions  SysSession[]
   favorites SysFavorite[]
+  recents   SysRecent[]
   companies SysUserCompany[]
 
   @@index([tenantId])
@@ -234,6 +237,21 @@ model SysFavorite {
 
   @@id([userId, href])
   @@map("sys_favorite")
+}
+
+/// Nedávné: posledně otevřené funkce z menu uživatele (drží se 10 nejnovějších, starší se mažou)
+model SysRecent {
+  userId   String   @map("user_id") @db.Uuid
+  href     String   @db.VarChar(1000)
+  label    String   @db.VarChar(120)
+  module   String   @default("") @db.VarChar(120)
+  openedAt DateTime @default(now()) @map("opened_at")
+
+  user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, href])
+  @@index([userId, openedAt])
+  @@map("sys_recent")
 }
 
 /// Přiřazení uživatele k firmě (účetní jednotce) — obdoba přiřazení rolí

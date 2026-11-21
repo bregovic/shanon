@@ -28,7 +28,9 @@ type Msg = { intent: "success" | "error"; text: string } | null;
 
 export function UserSettings(p: {
   crumbs: { label: string; href?: string }[];
-  user: { firstName: string; lastName: string; email: string; lang: string; hasPin: boolean; notify: Record<string, boolean> };
+  user: { firstName: string; lastName: string; email: string; lang: string; hasPin: boolean; notify: Record<string, boolean>; defaultCompanyId: string };
+  /** firmy, kam uživatel smí (výběr výchozí firmy) */
+  companies: { id: string; label: string }[];
   L: Record<string, string>;
 }) {
   const st = useStyles();
@@ -37,6 +39,7 @@ export function UserSettings(p: {
   const [firstName, setFirstName] = useState(p.user.firstName);
   const [lastName, setLastName] = useState(p.user.lastName);
   const [lang, setLang] = useState(p.user.lang);
+  const [defaultCompanyId, setDefaultCompanyId] = useState(p.user.defaultCompanyId);
   const [notify, setNotify] = useState(p.user.notify);
   const [pw, setPw] = useState({ current: "", next: "", repeat: "" });
   const [pin, setPin] = useState("");
@@ -78,6 +81,22 @@ export function UserSettings(p: {
                 <Option value="en">English</Option>
               </Dropdown>
             </Field>
+            {p.companies.length > 1 && (
+              <Field label={L.DefaultCompany} hint={L.DefaultCompanyHelp}>
+                <Dropdown
+                  value={p.companies.find((c) => c.id === defaultCompanyId)?.label ?? L.DefaultCompanyFirst}
+                  selectedOptions={[defaultCompanyId]}
+                  onOptionSelect={(_, d) => setDefaultCompanyId(String(d.optionValue ?? ""))}
+                >
+                  <Option value="">{L.DefaultCompanyFirst}</Option>
+                  {p.companies.map((c) => (
+                    <Option key={c.id} value={c.id}>
+                      {c.label}
+                    </Option>
+                  ))}
+                </Dropdown>
+              </Field>
+            )}
             <div className={st.title}>{L.InstallApp}</div>
             <Text size={200} className={st.muted}>
               {L.InstallAppHelp}
@@ -100,7 +119,7 @@ export function UserSettings(p: {
             </Text>
             <Note m={msg.profile} />
             <div className={st.actions}>
-              <Button appearance="primary" disabled={busy} onClick={() => run("profile", () => saveProfileAction({ firstName, lastName, lang, notify }), L.Saved, () => router.refresh())}>
+              <Button appearance="primary" disabled={busy} onClick={() => run("profile", () => saveProfileAction({ firstName, lastName, lang, notify, defaultCompanyId: defaultCompanyId || null }), L.Saved, () => router.refresh())}>
                 {L.Save}
               </Button>
             </div>

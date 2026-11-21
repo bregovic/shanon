@@ -1,48 +1,31 @@
 "use client";
 
 /**
- * Nedávné: posledních 5 otevřených funkcí z menu (seznamy, reporty, funkce).
- * Pamatuje si je prohlížeč (pohodlí uživatele, ne data aplikace).
+ * Nedávné: posledních 10 otevřených funkcí z menu (seznamy, reporty, funkce) — v databázi u uživatele
+ * (stejné ve všech oknech a zařízeních), starší se mažou (`touchRecentAction`).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Tooltip } from "@fluentui/react-components";
 import { History24Regular } from "@fluentui/react-icons";
 import type { MenuHit } from "@/lib/menu-search";
-
-const KEY = "shanon:recent";
-const MAX = 5;
+import { recentAction, touchRecentAction } from "@/app/actions";
 
 type Recent = { href: string; label: string; module: string };
-
-function load(): Recent[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    return Array.isArray(v) ? v.slice(0, MAX) : [];
-  } catch {
-    return [];
-  }
-}
 
 export function RecentMenu({ menu, labels }: { menu: MenuHit[]; labels: { title: string; empty: string } }) {
   const path = usePathname();
   const router = useRouter();
   const [items, setItems] = useState<Recent[]>([]);
+  const last = useRef<string | null>(null);
 
-  // otevřená funkce z menu → na začátek seznamu
+  // otevřená funkce z menu → na začátek seznamu (zápis jen při změně stránky)
   useEffect(() => {
     const hit = menu.find((m) => m.href.split("?")[0] === path);
-    const list = load();
-    if (hit) {
-      const next = [{ href: hit.href, label: hit.label, module: hit.moduleLabel }, ...list.filter((r) => r.href !== hit.href)].slice(0, MAX);
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next));
-      } catch {
-        /* bez úložiště jen pro tuto stránku */
-      }
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setItems(next);
-    } else setItems(list);
+    const key = hit?.href ?? "";
+    if (last.current === key) return;
+    last.current = key;
+    (hit ? touchRecentAction(hit.href, hit.label, hit.moduleLabel) : recentAction()).then(setItems).catch(() => undefined);
   }, [path, menu]);
 
   return (

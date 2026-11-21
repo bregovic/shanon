@@ -47,6 +47,8 @@ model SysUser {
   posPinHash   String?  @map("pos_pin_hash")
   /// e-mailová upozornění, která si uživatel zapnul: { dailySummary, overdueInvoices, integrationErrors }
   notify       Json     @default("{}")
+  /// firma, do které se uživatel přihlásí (prázdné / bez přístupu = první dostupná)
+  defaultCompanyId String? @map("default_company_id") @db.Uuid
   /// pozvánka / reset hesla: SHA-256 jednorázového tokenu z odkazu (token samotný se neukládá) a jeho platnost
   inviteTokenHash String?   @map("invite_token_hash") @db.VarChar(64)
   inviteExpiresAt DateTime? @map("invite_expires_at")
@@ -58,6 +60,7 @@ model SysUser {
   tenant    SysTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions  SysSession[]
   favorites SysFavorite[]
+  recents   SysRecent[]
   companies SysUserCompany[]
 
   @@index([tenantId])
@@ -232,6 +235,21 @@ model SysFavorite {
 
   @@id([userId, href])
   @@map("sys_favorite")
+}
+
+/// Nedávné: posledně otevřené funkce z menu uživatele (drží se 10 nejnovějších, starší se mažou)
+model SysRecent {
+  userId   String   @map("user_id") @db.Uuid
+  href     String   @db.VarChar(1000)
+  label    String   @db.VarChar(120)
+  module   String   @default("") @db.VarChar(120)
+  openedAt DateTime @default(now()) @map("opened_at")
+
+  user SysUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, href])
+  @@index([userId, openedAt])
+  @@map("sys_recent")
 }
 
 /// Přiřazení uživatele k firmě (účetní jednotce) — obdoba přiřazení rolí

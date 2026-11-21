@@ -49,7 +49,8 @@ export async function login(email: string, password: string): Promise<boolean | 
 
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + TTL_DAYS * 86_400_000);
-  await prisma.sysSession.create({ data: { id: hash(token), userId: user.id, expiresAt } });
+  // výchozí firma z Mého nastavení (bez přístupu k ní vybere session první dostupnou)
+  await prisma.sysSession.create({ data: { id: hash(token), userId: user.id, expiresAt, companyId: user.defaultCompanyId ?? null } });
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

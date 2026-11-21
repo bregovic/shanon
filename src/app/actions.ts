@@ -719,7 +719,7 @@ export async function runReportAction(module: string, id: string, params: Record
 
 const NOTIFY_KEYS = ["dailySummary", "overdueInvoices", "integrationErrors"] as const;
 
-export async function saveProfileAction(input: { firstName: string; lastName: string; lang: string; notify: Record<string, boolean> }): Promise<ActionResult> {
+export async function saveProfileAction(input: { firstName: string; lastName: string; lang: string; notify: Record<string, boolean>; defaultCompanyId?: string | null }): Promise<ActionResult> {
   const s = await requireSession();
   const t = await getT(s.lang, s.ctx.tenantId);
   const firstName = String(input.firstName ?? "").trim().slice(0, 60);
@@ -730,7 +730,9 @@ export async function saveProfileAction(input: { firstName: string; lastName: st
   if (!lastName) errs.lastName = t("@SYS:Required");
   if (Object.keys(errs).length) return { ok: false, message: t("@SYS:FixErrors"), errors: errs };
   const notify = Object.fromEntries(NOTIFY_KEYS.map((k) => [k, !!input.notify?.[k]]));
-  await prisma.sysUser.update({ where: { id: s.user.id }, data: { name, firstName, lastName, lang: input.lang === "en" ? "en" : "cs", notify } });
+  // výchozí firma jen z firem, kam uživatel smí
+  const defaultCompanyId = input.defaultCompanyId && s.companies.some((c) => c.id === input.defaultCompanyId) ? input.defaultCompanyId : null;
+  await prisma.sysUser.update({ where: { id: s.user.id }, data: { name, firstName, lastName, lang: input.lang === "en" ? "en" : "cs", notify, defaultCompanyId } });
   revalidatePath("/", "layout");
   return { ok: true, data: undefined };
 }
@@ -1013,6 +1015,29 @@ export async function historyAction(objectId: string, recordId: string): Promise
 }
 
 /** Přidá / odebere stránku z oblíbených; vrací nový stav. */
+const RECENT_MAX = 10;
+
+/** Nedávné uživatele (nejnovější první). */
+export async function recentAction(): Promise<{ href: string; label: string; module: string }[]> {
+  const s = await requireSession();
+  return prisma.sysRecent.findMany({ where: { userId: s.user.id }, orderBy: { openedAt: "desc" }, take: RECENT_MAX, select: { href: true, label: true, module: true } });
+}
+
+/** Otevřená funkce z menu → do Nedávných; drží se jen RECENT_MAX nejnovějších (starší se smažou). */
+export async function touchRecentAction(href: string, label: string, module: string): Promise<{ href: string; label: string; module: string }[]> {
+  const s = await requireSession();
+  if (!href.startsWith("/") || href.startsWith("//")) return recentAction();
+  const h = href.slice(0, 1000);
+  await prisma.sysRecent.upsert({
+    where: { userId_href: { userId: s.user.id, href: h } },
+    create: { userId: s.user.id, href: h, label: label.slice(0, 120), module: module.slice(0, 120) },
+    update: { label: label.slice(0, 120), module: module.slice(0, 120), openedAt: new Date() },
+  });
+  const keep = await prisma.sysRecent.findMany({ where: { userId: s.user.id }, orderBy: { openedAt: "desc" }, take: RECENT_MAX, select: { href: true, label: true, module: true } });
+  await prisma.sysRecent.deleteMany({ where: { userId: s.user.id, href: { notIn: keep.map((k) => k.href) } } });
+  return keep;
+}
+
 export async function toggleFavoriteAction(href: string, label: string): Promise<boolean> {
   const s = await requireSession();
   if (!href.startsWith("/") || href.startsWith("//")) return false;

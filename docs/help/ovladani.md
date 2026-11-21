@@ -80,6 +80,6 @@ Nabídka ukazuje jen hodnoty, které se do pole hodí (např. jen názvy deník�
 - **Ruce na klávesnici:** v mřížce stačí `Enter` dopředu, `Shift+Enter` zpět a `↓` pro nový řádek – myš nepotřebujete.
 - **Pište zkratky:** datum `d`, účet jen prvními číslicemi (`518` → vyberte šipkou), odběratele jménem.
 - **Nejdřív náhled:** před zaúčtováním faktury nebo deníku použijte **Zobrazit ▾ → Náhled dokladu** (zápisy i DPH, nic se neuloží), deník lze **Ověřit**.
-- **Hledejte přes `Ctrl+K`** místo proklikávání menu; časté agendy si dejte do **oblíbených** (hvězdička).
+- **Hledejte přes `Ctrl+K`** místo proklikávání menu; časté agendy si dejte do **oblíbených** (hvězdička). **Nedávné** (ikona hodin v hlavičce) ukazují 10 naposledy otevřených agend — stejné na všech zařízeních. **Výchozí firmu** po přihlášení si nastavíte v Mém nastavení.
 - **Tisk, PDF, ISDOC a e-mail** jsou pohromadě v nabídce **Tisk ▾**, související doklady v **Zobrazit ▾**.
 - **Nápověda k agendě** je pod ikonou **?** v liště formuláře.
