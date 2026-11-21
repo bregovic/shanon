@@ -215,7 +215,12 @@ export async function rateFor(
   const range = { lte: date, gte: addDays(date, -(cfg.maxAgeDays ?? 7)) };
   const pick = async (src: string, forCompanyId: string | null = null) => (await data.find("sys.exchangeRate", { currencyId, base, source: src, date: range, forCompanyId }, { take: 1, orderBy: { date: "desc" } }))[0];
   // vlastní kurz firmy má přednost před společným (ručním i staženým)
-  const own = async () => (data.companyId ? ((await pick("manual", data.companyId)) ?? (await pick(source, data.companyId))) : undefined);
+  // jeden dotaz: vlastní ruční i stažený kurz firmy, nejnovější (ruční má přednost ve stejný den)
+  const own = async () => {
+    if (!data.companyId) return undefined;
+    const rows = await data.find("sys.exchangeRate", { currencyId, base, source: { in: ["manual", source] }, date: range, forCompanyId: data.companyId }, { take: 2, orderBy: { date: "desc" } });
+    return rows.find((r) => r.source === "manual" && String(r.date) === String(rows[0]?.date)) ?? rows[0];
+  };
   const find = async () => (await own()) ?? (await pick("manual")) ?? (await pick(source));
   let r: RecordData | undefined = await find();
   if (!r) {
