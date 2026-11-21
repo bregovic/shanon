@@ -223,7 +223,19 @@ const useStyles = makeStyles({
   tileWeighed: { border: `1px dashed ${tokens.colorBrandStroke2}` },
   tileWeighing: { border: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   regular: { color: tokens.colorNeutralForeground3, fontWeight: tokens.fontWeightRegular },
-  tileImg: { "@media (max-width: 600px)": { height: "64px" }, width: "100%", height: "96px", objectFit: "contain", borderRadius: tokens.borderRadiusMedium, flexShrink: 0 },
+  tileImg: {
+    "@media (max-width: 600px)": { height: "64px" },
+    width: "100%",
+    height: "96px",
+    objectFit: "contain",
+    borderRadius: tokens.borderRadiusMedium,
+    flexShrink: 0,
+    // podklad místo prázdného místa, obrázek se plynule objeví po načtení
+    backgroundColor: tokens.colorNeutralBackground3,
+    opacity: 0,
+    transitionProperty: "opacity",
+    transitionDuration: "150ms",
+  },
   tileName: { fontWeight: tokens.fontWeightSemibold, lineHeight: tokens.lineHeightBase400 },
   tilePrice: { display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
   cart: {
@@ -1126,7 +1138,7 @@ export function PosTerminal(p: {
             {q.trim() && <Text className={st.searchInfo}>{L.SearchResults.replace("{n}", String(visible.length))}</Text>}
             {!p.items.length && <p className={st.empty}>{L.NoItems}</p>}
             <div className={st.tiles}>
-              {visible.map((i) => (
+              {visible.map((i, idx) => (
                 <button
                   key={i.id}
                   type="button"
@@ -1137,7 +1149,18 @@ export function PosTerminal(p: {
                 >
                   {i.image && (
                     // eslint-disable-next-line @next/next/no-img-element -- soubor za přihlášením, prohlížeč ho cachuje
-                    <img src={`/api/files/${i.image}`} alt="" loading="lazy" className={st.tileImg} />
+                    <img
+                      src={`/api/files/${i.image}?w=320`}
+                      alt=""
+                      // první obrazovka hned, zbytek při posunu; objeví se až načtený (bez postupného vykreslování)
+                      loading={idx < 24 ? "eager" : "lazy"}
+                      decoding="async"
+                      className={st.tileImg}
+                      ref={(el) => {
+                        if (el?.complete) el.style.opacity = "1";
+                      }}
+                      onLoad={(e) => (e.currentTarget.style.opacity = "1")}
+                    />
                   )}
                   <span className={st.tileName}>{i.name}</span>
                   <span className={st.tilePrice}>
