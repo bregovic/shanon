@@ -1283,7 +1283,7 @@ export async function bankBulkImportAction(form: FormData): Promise<ActionResult
 }
 
 /** Hromadná akce nad vybranými záznamy seznamu (výpisy → deník HK…); každý záznam zvlášť. */
-export async function bulkRecordAction(objectId: string, ids: string[], actionId: string): Promise<ActionResult<{ ok: number; errors: string[] }>> {
+export async function bulkRecordAction(objectId: string, ids: string[], actionId: string, input?: Record<string, string>): Promise<ActionResult<{ ok: number; errors: string[] }>> {
   const s = await requireSession();
   const t = await getT(s.lang, s.ctx.tenantId);
   let ok = 0;
@@ -1291,7 +1291,7 @@ export async function bulkRecordAction(objectId: string, ids: string[], actionId
   for (const id of ids.slice(0, 500)) {
     try {
       const wctx = { ...s.ctx, warnings: [] as string[] };
-      await runAction(wctx, objectId, id, actionId);
+      await runAction(wctx, objectId, id, actionId, undefined, undefined, input ? Object.fromEntries(Object.entries(input).map(([k, v]) => [String(k), String(v)])) : undefined);
       errors.push(...wctx.warnings);
       ok++;
     } catch (e) {

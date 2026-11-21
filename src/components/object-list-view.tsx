@@ -25,6 +25,7 @@ import { actionIcon } from "./action-icon";
 import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
 import type { ActionIcon as ActionIconName } from "@/core/object";
 import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
+import { DateInput } from "./date-input";
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
@@ -66,7 +67,7 @@ export interface ObjectListProps {
   /** Sloučit vybrané záznamy (ObjectDef.mergeable) */
   mergeable?: boolean;
   /** akce nad víc vybranými záznamy (výpisy → deník HK) */
-  bulkActions?: { id: string; label: string; icon?: ActionIconName }[];
+  bulkActions?: { id: string; label: string; icon?: ActionIconName; input?: { name: string; label: string; kind: "date" } }[];
   /** hromadný tisk vybraných dokladů (tisknutelný objekt): adresa `/print/<objekt>/batch` */
   printHref?: string;
   /** texty tiskového dialogu */
@@ -178,7 +179,9 @@ export function ObjectListView(p: ObjectListProps) {
   const [bulkBusy, setBulkBusy] = useState(false);
   // tiskový dialog: vybrané záznamy (null = zavřený)
   const [printing, setPrinting] = useState<string[] | null>(null);
-  const bulk = async (actionId: string) => {
+  // akce se zadáním hodnoty: nejdřív dialog
+  const [ask, setAsk] = useState<{ id: string; label: string; input: { name: string; label: string; kind: "date" }; value: string | null } | null>(null);
+  const bulk = async (actionId: string, input?: Record<string, string>) => {
     setBulkBusy(true);
     // po jednom záznamu (vytěžení dokladu trvá desítky sekund) — průběh „3/10“
     const ids = selected.map((r) => String(r.id));
@@ -186,7 +189,7 @@ export function ObjectListView(p: ObjectListProps) {
     let ok = 0;
     const errors: string[] = [];
     for (const id of ids) {
-      const res = await bulkRecordAction(p.objectId, [id], actionId);
+      const res = await bulkRecordAction(p.objectId, [id], actionId, input);
       if (!res.ok) errors.push(res.message ?? "");
       else {
         ok += res.data.ok;
@@ -240,7 +243,7 @@ export function ObjectListView(p: ObjectListProps) {
           </Button>
         )}
         {(p.bulkActions ?? []).map((a) => (
-          <Button key={a.id} icon={actionIcon(a)} disabled={!selected.length || bulkBusy} onClick={() => void bulk(a.id)}>
+          <Button key={a.id} icon={actionIcon(a)} disabled={!selected.length || bulkBusy} onClick={() => (a.input ? setAsk({ id: a.id, label: a.label, input: a.input, value: null }) : void bulk(a.id))}>
             {a.label}
           </Button>
         ))}
@@ -416,6 +419,32 @@ export function ObjectListView(p: ObjectListProps) {
         />
       )}
 
+      <Dialog open={!!ask} onOpenChange={(_, d) => !d.open && setAsk(null)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{ask?.label}</DialogTitle>
+            <DialogContent>
+              <Field label={ask?.input.label} required>
+                <DateInput value={ask?.value} onChange={(v) => setAsk((x) => (x ? { ...x, value: v } : x))} autoFocus />
+              </Field>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setAsk(null)}>{p.labels.views.cancel}</Button>
+              <Button
+                appearance="primary"
+                disabled={!ask?.value}
+                onClick={() => {
+                  const a = ask!;
+                  setAsk(null);
+                  void bulk(a.id, { [a.input.name]: a.value! });
+                }}
+              >
+                {ask?.label}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
       <DeleteDialog open={confirm} objectId={p.objectId} ids={selected.map((r) => String(r.id))} labels={p.labels.actions} onClose={() => setConfirm(false)} onConfirm={(ids) => void remove(ids)} />
     </>
   );

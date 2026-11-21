@@ -190,7 +190,7 @@ export interface ObjectHandlers {
   /** Sloučit: úpravy ponechaného záznamu (vrací změněná pole) nebo UserError = sloučení odmítnout */
   merge?: (ctx: EventContext, target: RecordData, others: RecordData[]) => RecordData | void | Promise<RecordData | void>;
   /** akce nad záznamem (tlačítka ve formuláři), klíč = id akce z ObjectDef.actions */
-  actions?: Record<string, (ctx: EventContext, record: RecordData, file?: ActionFile) => Promise<void | ActionOutcome>>;
+  actions?: Record<string, (ctx: EventContext, record: RecordData, file?: ActionFile, input?: RecordData) => Promise<void | ActionOutcome>>;
   /** akce, které vrací soubor ke stažení (XML pro úřad, PDF…); klíč = id akce */
   downloads?: Record<string, (ctx: EventContext, record: RecordData) => Promise<DownloadFile>>;
   /** původce záznamu pro workflow (komu jde úkol), když to není ten, kdo ho založil — null = nevím */

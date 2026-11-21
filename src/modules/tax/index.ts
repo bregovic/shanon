@@ -45,12 +45,14 @@ export const taxCode = defineObject({
     outputAccountId: { edt: refEdt("gl.account", "@TAX:OutputAccount"), visibleWhen: { field: "reverseCharge", in: ["true"] } },
     /** kód předmětu plnění pro KH (A.1 / B.1 — přenesená povinnost v tuzemsku) */
     khItemCode: { edt: defineEdt({ id: "KhItemCode", kind: "string", label: "@TAX:KhItemCode", maxLength: 4 }) },
+    /** nárok na odpočet lze uplatnit v pozdějším období (Změnit datum vykázání na daňové transakci) */
+    deferrable: { edt: Edts.NoYes, label: "@TAX:Deferrable", help: "@TAX:DeferrableHelp", visibleWhen: { field: "direction", in: ["input"] } },
   },
   titleField: "code",
   list: ["code", "name", "rate", "direction", "reverseCharge", "accountId", "reportLine", "deductLine", "khSection"],
   form: [
     { label: "@SYS:General", fields: ["code", "name", "rate", "direction", "reverseCharge"] },
-    { label: "@TAX:Posting", fields: ["accountId", "reportLine", "khSection", "khItemCode", "deductLine", "outputAccountId"] },
+    { label: "@TAX:Posting", fields: ["accountId", "reportLine", "khSection", "khItemCode", "deductLine", "outputAccountId", "deferrable"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -211,7 +213,7 @@ export async function taxSetup(data: DataApi) {
   const codes = new Map<string, string>();
   for (const [code, name, rate, direction, reverseCharge, reportLine, deductLine, khSection, khItemCode] of payer ? CZ_CODES : NP_CODES) {
     const have = await byCode("tax.taxCode", code);
-    const rec = have ?? (await data.create("tax.taxCode", { code, name, rate: String(rate), direction, reverseCharge, accountId: vatId, reportLine, deductLine: deductLine || null, khSection: khSection || null, khItemCode: khItemCode || null }));
+    const rec = have ?? (await data.create("tax.taxCode", { code, name, rate: String(rate), direction, reverseCharge, accountId: vatId, reportLine, deductLine: deductLine || null, khSection: khSection || null, khItemCode: khItemCode || null, deferrable: direction === "input" && !reverseCharge }));
     codes.set(code, String(rec.id));
   }
   const groups = new Map<string, string>();
@@ -260,11 +262,14 @@ export const taxTrans = defineObject({
     reportLine: { edt: ReportLine, readOnly: true },
     khSection: { edt: KhSection, readOnly: true },
     khItemCode: { edt: defineEdt({ id: "TaxTransKhItem", kind: "string", label: "@TAX:KhItemCode", maxLength: 4 }), readOnly: true },
+    /** nárok uplatněný v jiném období: do přiznání a KH podle tohoto data (prázdné = podle DUZP) */
+    reportDate: { edt: Edts.TransDate, label: "@TAX:ReportDate", readOnly: true },
   },
   titleField: "documentNum",
-  list: ["taxDate", "taxCodeId", "direction", "reportLine", "khSection", "base", "tax", "currencyId", "subjectId", "vatId", "documentNum", "voucherId"],
+  actions: [{ id: "changeReportDate", label: "@TAX:ChangeReportDate", bulk: true, input: { name: "date", label: "@TAX:ReportDate", kind: "date" } }],
+  list: ["taxDate", "reportDate", "taxCodeId", "direction", "reportLine", "khSection", "base", "tax", "currencyId", "subjectId", "vatId", "documentNum", "voucherId"],
   form: [
-    { label: "@SYS:General", fields: ["taxDate", "taxCodeId", "direction", "base", "tax"] },
+    { label: "@SYS:General", fields: ["taxDate", "reportDate", "taxCodeId", "direction", "base", "tax"] },
     { label: "@TAX:Partner", fields: ["subjectId", "vatId", "documentNum", "voucherId"] },
     { label: "@SYS:Currency", fields: ["currencyId", "baseCur", "taxCur"] },
   ],
@@ -498,6 +503,14 @@ export default defineModule({
       Trans: "Daňová transakce",
       TransPlural: "Daňové transakce",
       TaxDate: "DUZP",
+      ReportDate: "Datum vykázání",
+      ChangeReportDate: "Změnit datum vykázání",
+      Deferrable: "Nárok lze uplatnit později",
+      DeferrableHelp: "Daňovou transakci jde vykázat v pozdějším období (Změnit datum vykázání), nejvýš 3 roky od DUZP.",
+      DeferOutput: "Daň na výstupu nelze vykázat v jiném období než podle DUZP.",
+      DeferNotAllowed: "Kód DPH {code} nedovoluje uplatnit nárok později.",
+      DeferBefore: "Datum vykázání nesmí být před DUZP ({date}).",
+      DeferTooLate: "Nárok lze uplatnit nejvýš 3 roky od DUZP (do {date}).",
       Base: "Základ",
       Tax: "Daň",
       BaseCur: "Základ v měně",
@@ -715,6 +728,14 @@ export default defineModule({
       Trans: "Tax transaction",
       TransPlural: "Tax transactions",
       TaxDate: "Tax point date",
+      ReportDate: "Reporting date",
+      ChangeReportDate: "Change reporting date",
+      Deferrable: "Deduction can be claimed later",
+      DeferrableHelp: "The tax transaction can be reported in a later period (Change reporting date), at most 3 years after the tax point date.",
+      DeferOutput: "Output tax cannot be reported in a period other than by the tax point date.",
+      DeferNotAllowed: "Tax code {code} does not allow claiming the deduction later.",
+      DeferBefore: "The reporting date cannot be before the tax point date ({date}).",
+      DeferTooLate: "The deduction can be claimed at most 3 years after the tax point date (until {date}).",
       Base: "Base",
       Tax: "Tax",
       BaseCur: "Base in currency",

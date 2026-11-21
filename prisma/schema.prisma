@@ -1580,6 +1580,7 @@ model TaxCode {
   deductLine      String?  @map("deduct_line") @db.VarChar(10)
   outputAccountId String?  @map("output_account_id") @db.Uuid
   khItemCode      String?  @map("kh_item_code") @db.VarChar(4)
+  deferrable      Boolean  @default(false)
   ext             Json     @default("{}")
   version         Int      @default(1)
   createdAt       DateTime @default(now()) @map("created_at")
@@ -1741,33 +1742,34 @@ model TaxPaymentTerm {
 
 /// tax.trans — generováno z definice objektu
 model TaxTrans {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  tenantId     String   @map("tenant_id") @db.Uuid
-  companyId    String   @map("company_id") @db.Uuid
-  taxDate      DateTime @map("tax_date") @db.Date
-  taxCodeId    String   @map("tax_code_id") @db.Uuid
-  direction    String   @db.VarChar(40)
-  base         Decimal  @db.Decimal(18, 2)
-  tax          Decimal  @db.Decimal(18, 2)
-  currencyId   String?  @map("currency_id") @db.Uuid
-  baseCur      Decimal? @map("base_cur") @db.Decimal(18, 2)
-  taxCur       Decimal? @map("tax_cur") @db.Decimal(18, 2)
-  subjectId    String?  @map("subject_id") @db.Uuid
-  vatId        String?  @map("vat_id") @db.VarChar(16)
-  documentNum  String?  @map("document_num") @db.VarChar(255)
-  voucherId    String?  @map("voucher_id") @db.Uuid
-  sourceObject String?  @map("source_object") @db.VarChar(255)
-  sourceId     String?  @map("source_id") @db.VarChar(255)
-  simplified   Boolean  @default(false)
-  reportLine   String?  @map("report_line") @db.VarChar(10)
-  khSection    String?  @map("kh_section") @db.VarChar(4)
-  khItemCode   String?  @map("kh_item_code") @db.VarChar(4)
-  ext          Json     @default("{}")
-  version      Int      @default(1)
-  createdAt    DateTime @default(now()) @map("created_at")
-  createdBy    String?  @map("created_by") @db.Uuid
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy    String?  @map("updated_by") @db.Uuid
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  taxDate      DateTime  @map("tax_date") @db.Date
+  taxCodeId    String    @map("tax_code_id") @db.Uuid
+  direction    String    @db.VarChar(40)
+  base         Decimal   @db.Decimal(18, 2)
+  tax          Decimal   @db.Decimal(18, 2)
+  currencyId   String?   @map("currency_id") @db.Uuid
+  baseCur      Decimal?  @map("base_cur") @db.Decimal(18, 2)
+  taxCur       Decimal?  @map("tax_cur") @db.Decimal(18, 2)
+  subjectId    String?   @map("subject_id") @db.Uuid
+  vatId        String?   @map("vat_id") @db.VarChar(16)
+  documentNum  String?   @map("document_num") @db.VarChar(255)
+  voucherId    String?   @map("voucher_id") @db.Uuid
+  sourceObject String?   @map("source_object") @db.VarChar(255)
+  sourceId     String?   @map("source_id") @db.VarChar(255)
+  simplified   Boolean   @default(false)
+  reportLine   String?   @map("report_line") @db.VarChar(10)
+  khSection    String?   @map("kh_section") @db.VarChar(4)
+  khItemCode   String?   @map("kh_item_code") @db.VarChar(4)
+  reportDate   DateTime? @map("report_date") @db.Date
+  ext          Json      @default("{}")
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by") @db.Uuid
 
   company  SysCompany   @relation("TaxTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
   taxCode  TaxCode      @relation("TaxTrans_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)

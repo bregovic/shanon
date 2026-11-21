@@ -92,6 +92,19 @@ export const DEDUCT_LINES = ["40", "41", "42", "43", "44", "45", "47"];
 const KNOWN = new Set([...OUTPUT_LINES, ...SUPPLY_LINES, ...DEDUCT_LINES, "50"]);
 
 /** Výpočet z daňových transakcí období (podle DUZP). `t` přeloží varování. */
+/** Rozhodné datum transakce pro přiznání a KH: datum vykázání (nárok v jiném období), jinak DUZP. */
+export const reportDateOf = (t: RecordData) => (t.reportDate ?? t.taxDate) as unknown;
+
+/** Daňové transakce, které patří do období (podle data vykázání, jinak DUZP). */
+export async function taxTransInPeriod(data: DataApi, from: string, to: string): Promise<RecordData[]> {
+  const range = { gte: from, lte: to };
+  const [byTaxDate, byReport] = await Promise.all([
+    data.find("tax.trans", { taxDate: range, reportDate: null }, { take: 100000, orderBy: { taxDate: "asc" } }),
+    data.find("tax.trans", { reportDate: range }, { take: 100000, orderBy: { taxDate: "asc" } }),
+  ]);
+  return [...byTaxDate, ...byReport];
+}
+
 export async function computeVat(
   data: DataApi,
   ret: RecordData,
@@ -99,7 +112,7 @@ export async function computeVat(
 ): Promise<VatComputation> {
   const warn = t;
   const period = periodRange(ret);
-  const trans = await data.find("tax.trans", { taxDate: { gte: period.from, lte: period.to } }, { take: 100000, orderBy: { taxDate: "asc" } });
+  const trans = await taxTransInPeriod(data, period.from, period.to);
   const codes = new Map<string, RecordData>();
   for (const t of trans) {
     const id = String(t.taxCodeId);
@@ -404,9 +417,33 @@ export async function filedPeriodOf(data: DataApi, date: unknown): Promise<strin
   return hit ? `${String(month).padStart(2, "0")}/${year}` : null;
 }
 
+const ymd = (v: unknown) => (v instanceof Date ? v.toISOString() : String(v ?? "")).slice(0, 10);
+
 export const vatReturnHandlers: Record<string, ObjectHandlers> = {
   // oprava daňové transakce (DUZP, DIČ, číslo dokladu) jen mimo podané období — původní i nové DUZP
   "tax.trans": {
+    actions: {
+      /**
+       * Nárok v jiném období: jen přijatá plnění s kódem, který to dovoluje, dopředu nejvýš 3 roky od DUZP;
+       * původní ani nové období nesmí mít podané přiznání / KH.
+       */
+      async changeReportDate(ctx, t, _file, input) {
+        const date = String(input?.date ?? "");
+        if (t.direction !== "input") throw new UserError("@TAX:DeferOutput");
+        const code = await ctx.data.get("tax.taxCode", String(t.taxCodeId));
+        if (!code?.deferrable) throw new UserError("@TAX:DeferNotAllowed", { code: String(code?.code ?? "") });
+        const duzp = ymd(t.taxDate);
+        if (date < duzp) throw new UserError("@TAX:DeferBefore", { date: duzp });
+        const limit = `${Number(duzp.slice(0, 4)) + 3}${duzp.slice(4)}`;
+        if (date > limit) throw new UserError("@TAX:DeferTooLate", { date: limit });
+        for (const d of [reportDateOf(t), date]) {
+          const period = await filedPeriodOf(ctx.data, d);
+          if (period) throw new UserError("@TAX:TransFiled", { period });
+        }
+        // stejné jako DUZP = zpět na vykázání podle DUZP
+        await ctx.data.update("tax.trans", String(t.id), { reportDate: date === duzp ? null : date });
+      },
+    },
     async beforeSave(ctx, d, isNew) {
       if (isNew || !d.id) return;
       const before = await ctx.data.get("tax.trans", String(d.id));
@@ -414,7 +451,7 @@ export const vatReturnHandlers: Record<string, ObjectHandlers> = {
       const day = (v: unknown) => (v instanceof Date ? v.toISOString() : String(v ?? "")).slice(0, 10);
       const changed = day(before.taxDate) !== day(d.taxDate) || (before.vatId ?? null) !== (d.vatId ?? null) || (before.documentNum ?? null) !== (d.documentNum ?? null);
       if (!changed) return;
-      for (const date of [before.taxDate, d.taxDate]) {
+      for (const date of [reportDateOf(before), reportDateOf(d)]) {
         const period = await filedPeriodOf(ctx.data, date);
         if (period) throw new UserError("@TAX:TransFiled", { period });
       }

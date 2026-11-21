@@ -73,6 +73,17 @@ Závazek je uhrazený, jakmile platbu z bankovního výpisu spáruje banka (VS =
 
 Druh **Daň z příjmů** je připravený; výpočet a podání doplníme.
 
+## Nárok na odpočet v jiném období
+
+Přijatou fakturu jde vykázat v pozdějším období (nárok uplatněný později): v **Daňových transakcích** vyberte transakce
+a **Změnit datum vykázání**. DUZP zůstává (v KH se vykáže původní DUZP), přiznání, kontrolní hlášení i platba DPH je zařadí
+podle data vykázání.
+
+- jen **přijatá plnění** s kódem DPH, který má zapnuté **Nárok lze uplatnit později** (výchozí: přijatá plnění bez samovyměření);
+- datum vykázání nejdřív DUZP, nejvýš 3 roky od DUZP;
+- původní ani nové období nesmí mít podané přiznání nebo KH;
+- datum vykázání shodné s DUZP = zpět na vykázání podle DUZP.
+
 ## Oprava daňové transakce
 
 V **Daňových transakcích** jde u transakce opravit **DUZP**, **DIČ partnera** a **číslo dokladu** (ostatní údaje vznikají zaúčtováním dokladu). Transakci, která patří do podaného přiznání nebo kontrolního hlášení (původní i nové DUZP), opravit nejde — tu opravte dodatečným podáním.

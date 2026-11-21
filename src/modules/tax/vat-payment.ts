@@ -8,7 +8,7 @@
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { accountingCurrencyId, postVoucher, systemAccount, type PostingLine } from "@/modules/gl/posting";
-import { DEDUCT_LINES, OUTPUT_LINES, computeVat, periodRange } from "./vat-return";
+import { DEDUCT_LINES, OUTPUT_LINES, computeVat, periodRange, taxTransInPeriod } from "./vat-return";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -55,7 +55,7 @@ export async function postVatPayment(data: DataApi, companyId: string | null, re
   // zúčtování účtů DPH: výstup MD (vyrovná dal), vstup D (vyrovná má dáti)
   const byAccount = new Map<string, bigint>();
   const codes = new Map<string, RecordData | null>();
-  for (const tr of await data.find("tax.trans", { taxDate: { gte: period.from, lte: period.to } }, { take: 100000 })) {
+  for (const tr of await taxTransInPeriod(data, period.from, period.to)) {
     const id = String(tr.taxCodeId);
     if (!codes.has(id)) codes.set(id, await data.get("tax.taxCode", id));
     const code = codes.get(id);

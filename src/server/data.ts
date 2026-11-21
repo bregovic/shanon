@@ -828,7 +828,7 @@ export class Session {
   }
 
   /** `checkOnly` = jen oprávnění a podmínky (akce mimo transakci, `src/server/outside.ts`) */
-  async action(objectId: string, id: string, actionId: string, file?: ActionFile, checkOnly = false, opts: { workflow?: boolean } = {}): Promise<void | ActionOutcome> {
+  async action(objectId: string, id: string, actionId: string, file?: ActionFile, checkOnly = false, opts: { workflow?: boolean; input?: RecordData } = {}): Promise<void | ActionOutcome> {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "write", this.system);
     const a = def.actions?.find((x) => x.id === actionId);
@@ -847,7 +847,14 @@ export class Session {
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];
     if (!fn) throw new UserError("@SYS:InvalidValue");
     if (a.upload && !file) throw new UserError("@SYS:Required");
-    const out = await fn(this.eventCtx(objectId), record, file);
+    // akce se zadáním hodnoty: povinná, datum ve tvaru RRRR-MM-DD
+    let input: RecordData | undefined;
+    if (a.input) {
+      const v = String(opts.input?.[a.input.name] ?? "").slice(0, 10);
+      if (a.input.kind === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new UserError("@SYS:FixErrors", {}, { [a.input.name]: "@SYS:Required" });
+      input = { [a.input.name]: v };
+    }
+    const out = await fn(this.eventCtx(objectId), record, file, input);
     // provedená akce: spouštěč „akce“, pokračování čekajícího kroku, dokončení úkolu workflow
     queueWorkflow(this, { kind: "action", objectId, id, name: actionId, byWorkflow: !!opts.workflow });
     return out;
@@ -994,14 +1001,14 @@ export const deleteRecord = (ctx: Ctx, objectId: string, id: string, client?: Pr
 export const downloadFile = (ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient) =>
   inTenant(ctx, (s) => s.download(objectId, id, actionId), client);
 
-export async function runAction(ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile): Promise<void | ActionOutcome> {
+export async function runAction(ctx: Ctx, objectId: string, id: string, actionId: string, client?: PrismaClient, file?: ActionFile, input?: RecordData): Promise<void | ActionOutcome> {
   if (getObject(objectId).actions?.find((x) => x.id === actionId)?.outside) {
     // síť mimo transakci: oprávnění a podmínky ověří transakce, práci obsluha po krocích
     await inTenant(ctx, (s) => s.action(objectId, id, actionId, file, true), client);
     const { runOutsideAction } = await import("./outside");
     return runOutsideAction(ctx, objectId, id, actionId, client);
   }
-  return inTenant(ctx, (s) => s.action(objectId, id, actionId, file), client);
+  return inTenant(ctx, (s) => s.action(objectId, id, actionId, file, false, { input }), client);
 }
 
 /** Možnosti pro výběr odkazu (combobox ve formuláři). */
