@@ -4,6 +4,7 @@
  * Výpočet daně z dokladů a podklady pro přiznání/KH přijdou s modulem
  * odběratelů a dodavatelů (viz docs/ARCHITEKTURA.md).
  */
+import { DAT_FIELDS } from "@/core/dat-fields";
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -104,6 +105,7 @@ export const itemTaxGroup = defineObject({
 /** Platební podmínka (Terms of payment v AX): splatnost v dnech od data vystavení; patří partnerovi a skupině partnerů. */
 export const paymentTerm = defineObject({
   id: "tax.paymentTerm",
+  datLayer: true,
   table: "tax_payment_term",
   label: "@TAX:PaymentTerm",
   labelPlural: "@TAX:PaymentTerms",
@@ -113,6 +115,7 @@ export const paymentTerm = defineObject({
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
     days: { edt: Edts.Int, label: "@TAX:PaymentDays", mandatory: true, default: 0 },
+    ...DAT_FIELDS,
   },
   titleField: "code",
   list: ["code", "name", "days"],

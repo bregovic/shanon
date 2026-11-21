@@ -10,6 +10,7 @@
  *  - spustí události core a zapnutých rozšíření
  *  - hlídá souběžné úpravy (version) a zapisuje audit
  */
+import { copyDatTemplates, datCompanyId, markDatLocal, propagateDat } from "./dat";
 import { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { FieldDef, ObjectDef } from "@/core/object";
@@ -158,6 +159,13 @@ function assertAccess(ctx: Ctx, def: ObjectDef, need: Exclude<Level, "none">, sy
 }
 
 /** Firma, ve které leží data objektu: vlastní, nebo virtuální společnost (sdílený číselník). */
+/** Číselník Společných dat (`datLayer`) nebo jeho vlastní řádek (pole formátu výpisu). */
+let datObjects: Set<string> | null = null;
+const datRelated = (def: ObjectDef) =>
+  (datObjects ??= new Set(
+    [...registry.objects.values()].filter((p) => p.datLayer).flatMap((p) => [p.id, ...(p.lines ?? []).filter((l) => l.owned !== false).map((l) => l.object)]),
+  )).has(def.id);
+
 export const dataCompany = (ctx: Ctx, def: ObjectDef): string | null => (def.scope === "company" ? (ctx.shared?.[def.id] ?? ctx.companyId) : null);
 
 const scopeWhere = (ctx: Ctx, def: ObjectDef): RecordData =>
@@ -381,6 +389,22 @@ export class Session {
     await this.tx.sysGlobalKey.deleteMany({ where: { namespace, tenantId: this.ctx.tenantId, ownerId, ...(key ? { NOT: { key } } : {}) } });
     if (key) await this.tx.sysGlobalKey.upsert({ where: { namespace_key: { namespace, key } }, create: { namespace, key, tenantId: this.ctx.tenantId, companyId: this.ctx.companyId, ownerId }, update: {} });
     return true;
+  }
+
+  /** zápis kopií ze Společných dat (DAT) — neoznačuje kopie jako upravené ve firmě a nepropisuje dál */
+  datSync = false;
+
+  /** Systémová session jiné firmy téže transakce (Společná data, propsání kopií). */
+  forCompany(companyId: string): Session {
+    const s = new Session(this.tx, { ...this.ctx, companyId, shared: {} }, true);
+    s.datSync = true;
+    return s;
+  }
+
+  /** Je číselník ve firmě sdílený přes virtuální společnost? */
+  async isSharedVirtually(objectId: string): Promise<boolean> {
+    if (!this.ctx.companyId) return false;
+    return !!(await sharedMap(this.tx, this.ctx.tenantId, this.ctx.companyId))[objectId];
   }
 
   /** Klíč paměti čtení: firma a sdílené číselníky určují, co `scopeWhere` vrátí. */
@@ -776,6 +800,11 @@ export class Session {
     forgetReads(this.tx, [objectId]);
     await this.audit(objectId, String(result.id), isNew ? "create" : "update", existing && maskSecrets(def, existing), maskSecrets(def, result));
     for (const h of handlersFor(this.ctx, objectId)) await h.afterSave?.(ectx, result, isNew);
+    // Společná data: uložení v DAT se propíše do firem, úprava kopie ve firmě z ní udělá vlastní záznam
+    if (!this.datSync && datRelated(def)) {
+      if (this.ctx.companyId && this.ctx.companyId === (await datCompanyId(this))) await propagateDat(this, def, result);
+      else if (!isNew || !def.datLayer) await markDatLocal(this, def, result);
+    }
     // workflow se spouštěčem „založení záznamu“ — po dokončení operace (doklad už má řádky), viz inTenant
     if (isNew) queueWorkflow(this, { kind: "created", objectId, id: String(result.id) });
     // nová firma dostane výchozí nastavení zapnutých modulů (číselné řady, účty…)
@@ -786,7 +815,9 @@ export class Session {
         ? [...moduleSet([...registry.modules.values()].filter((m) => m.core || m.starter).map((m) => m.id))]
         : [...this.ctx.modules].filter((m) => registry.modules.has(m));
       await this.tx.sysCompanyModule.createMany({ data: ids.map((moduleId) => ({ tenantId: this.ctx.tenantId, companyId: String(result.id), moduleId })), skipDuplicates: true });
-      await setupCompany(new Session(this.tx, { ...this.ctx, companyId: String(result.id), modules: new Set(ids) }, true).api(), new Set(ids));
+      const fresh = new Session(this.tx, { ...this.ctx, companyId: String(result.id), modules: new Set(ids), shared: {} }, true);
+      await copyDatTemplates(fresh, ids);
+      await setupCompany(fresh.api(), new Set(ids));
     }
     return result;
   }
@@ -825,6 +856,8 @@ export class Session {
     await this.audit(objectId, id, "delete", maskSecrets(def, existing), null);
     await this.releaseNumber(def, existing);
     for (const h of handlersFor(this.ctx, objectId)) await h.afterDelete?.(ectx, existing);
+    // odebraný řádek kopie číselníku ve firmě = kopie upravená ve firmě
+    if (!this.datSync && !def.datLayer && datRelated(def)) await markDatLocal(this, def, existing);
   }
 
   /** `checkOnly` = jen oprávnění a podmínky (akce mimo transakci, `src/server/outside.ts`) */

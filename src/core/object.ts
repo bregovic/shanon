@@ -114,6 +114,11 @@ export interface ObjectDef {
   userCorrect?: boolean;
   /** parametry modulu: nová firma je při zapnutí modulu převezme ze Společných dat (DAT), `src/server/dat.ts` */
   datTemplate?: boolean;
+  /**
+   * běžný číselník Společných dat (DAT): firmy mají kopie, nový záznam v DAT se doplní, změna se propíše do
+   * neupravených kopií (`src/server/dat.ts`); objekt musí mít pole `DAT_FIELDS` (src/core/dat-fields.ts)
+   */
+  datLayer?: boolean;
   /** podřízené řádky zobrazené ve formuláři (např. řádky dokladu) */
   /**
    * podřízené záznamy zobrazené ve formuláři. `owned: false` = jen přehled

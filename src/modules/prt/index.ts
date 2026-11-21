@@ -3,6 +3,7 @@
  * na plátně (/print/designer), tisk a PDF z dokladu (/print/<druh>/<id>).
  * Zapíná se sám s moduly, které tisknou (Pohledávky, Pokladna).
  */
+import { DAT_FIELDS } from "@/core/dat-fields";
 import { Edts, defineEnum, enumEdt } from "@/core/edt";
 import { defineModule, type DataApi, type ObjectHandlers } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -25,6 +26,7 @@ export const Paper = defineEnum({
 
 export const template = defineObject({
   id: "prt.template",
+  datLayer: true,
   table: "prt_template",
   label: "@PRT:Template",
   labelPlural: "@PRT:Templates",
@@ -38,6 +40,7 @@ export const template = defineObject({
     isDefault: { edt: Edts.NoYes, label: "@PRT:IsDefault" },
     // rozvržení (JSON) upravuje návrhář, ve formuláři se neukazuje
     layout: { edt: Edts.Notes, label: "@PRT:Layout" },
+    ...DAT_FIELDS,
   },
   titleField: "code",
   list: ["code", "name", "docType", "paper", "isDefault"],

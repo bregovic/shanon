@@ -3,6 +3,7 @@
  * s importem GPC, párování plateb s otevřenými položkami odběratelů
  * a dodavatelů a zaúčtování úhrad.
  */
+import { DAT_FIELDS } from "@/core/dat-fields";
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -136,6 +137,7 @@ const FmtText = (id: string, label: string, max: number) => defineEdt({ id, kind
  */
 export const statementFormat = defineObject({
   id: "bank.statementFormat",
+  datLayer: true,
   table: "bank_statement_format",
   label: "@BANK:StatementFormat",
   labelPlural: "@BANK:StatementFormats",
@@ -153,6 +155,7 @@ export const statementFormat = defineObject({
     dateFormat: { edt: FmtText("BankFmtDate", "@BANK:DateFormat", 20), mandatory: true, default: "dd.MM.yyyy" },
     linesStart: { edt: FmtText("BankFmtLinesStart", "@BANK:LinesStart", 120) },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+    ...DAT_FIELDS,
   },
   titleField: "code",
   list: ["code", "name", "transformationId", "detect", "fileNamePattern", "encoding", "blocked"],
@@ -387,6 +390,7 @@ export const matchStep = defineObject({
 /** Platební metoda: druh, účet, ze kterého se platí, a formát platebního příkazu (Transformace). */
 export const paymentMethod = defineObject({
   id: "bank.paymentMethod",
+  datLayer: true,
   table: "bank_payment_method",
   label: "@BANK:PaymentMethod",
   labelPlural: "@BANK:PaymentMethods",
@@ -401,6 +405,7 @@ export const paymentMethod = defineObject({
     /** nabídnout v e-shopu (modul shop) */
     eshop: { edt: Edts.NoYes, label: "@BANK:ForEshop", module: "shop" },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
+    ...DAT_FIELDS,
   },
   titleField: "code",
   list: ["code", "name", "kind", "transformationId", "eshop", "blocked"],

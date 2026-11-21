@@ -51,6 +51,11 @@ Skrytá firma organizace s výchozí konfigurací pro firmy. Superuživatel se d
 
 - firma, která modul zapíná a jeho parametry ještě nemá, je převezme z DAT (kopie — další úpravy jen ve firmě);
 - odkazy na data jednotlivých firem (např. dodavatel Finanční úřad) se nepřebírají;
+- **běžné číselníky** (měrné jednotky, platební podmínky, platební metody, formáty bankovních výpisů, tiskové sestavy):
+  firmy mají kopie. Nový záznam v DAT se doplní všem firmám s modulem, které ten kód ještě nemají; změna v DAT se
+  propíše do kopií, které firma neupravila. Upravená kopie (příznak *Upraveno ve firmě*) a vlastní záznam firmy se
+  stejným kódem mají přednost — DAT je nepřepíše. Smazání v DAT kopie ve firmách nemaže;
+- účty hlavní knihy, DPH a dimenze se přes DAT nesdílí (jen celou sadou přes virtuální společnost);
 - DAT nedostává výchozí nastavení (účty, řady) a nevystavují se v ní doklady.
 
 **Kurzy** jsou společné pro celou organizaci (stahují se jednou). Vlastní kurz firmy zadáte v kurzech měny s vyplněným

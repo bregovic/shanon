@@ -3,6 +3,7 @@
  * měrné jednotky, skupiny položek (DPH a účty) a položky s cenami.
  * Z položek čerpají řádky faktur a později pokladna a e-shop.
  */
+import { DAT_FIELDS } from "@/core/dat-fields";
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -34,6 +35,7 @@ const TaxRef = (label = "@TAX:TaxCode") => refEdt("tax.taxCode", label);
 
 export const unit = defineObject({
   id: "inv.unit",
+  datLayer: true,
   table: "inv_unit",
   label: "@INV:Unit",
   labelPlural: "@INV:Units",
@@ -43,6 +45,7 @@ export const unit = defineObject({
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
     decimals: { edt: Edts.Int, label: "@INV:Decimals", default: 0 },
+    ...DAT_FIELDS,
   },
   titleField: "code",
   list: ["code", "name", "decimals"],

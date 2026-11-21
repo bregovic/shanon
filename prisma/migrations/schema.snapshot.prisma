@@ -823,21 +823,23 @@ model SysLastValue {
 
 /// prt.template — generováno z definice objektu
 model PrtTemplate {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  code      String   @db.VarChar(20)
-  name      String   @db.VarChar(120)
-  docType   String   @map("doc_type") @db.VarChar(40)
-  paper     String   @default("a4") @db.VarChar(40)
-  isDefault Boolean  @default(false) @map("is_default")
-  layout    String?
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  docType     String   @map("doc_type") @db.VarChar(40)
+  paper       String   @default("a4") @db.VarChar(40)
+  isDefault   Boolean  @default(false) @map("is_default")
+  layout      String?
+  datSourceId String?  @map("dat_source_id") @db.VarChar(36)
+  datLocal    Boolean  @default(false) @map("dat_local")
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
 
   company SysCompany @relation("PrtTemplate_company", fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -1721,18 +1723,20 @@ model TaxGroupCode {
 
 /// tax.paymentTerm — generováno z definice objektu
 model TaxPaymentTerm {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  code      String   @db.VarChar(20)
-  name      String   @db.VarChar(120)
-  days      Int      @default(0)
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  days        Int      @default(0)
+  datSourceId String?  @map("dat_source_id") @db.VarChar(36)
+  datLocal    Boolean  @default(false) @map("dat_local")
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
 
   company                SysCompany   @relation("TaxPaymentTerm_company", fields: [companyId], references: [id], onDelete: Restrict)
   arGroup_paymentTerm    ArGroup[]    @relation("ArGroup_paymentTerm")
@@ -1876,18 +1880,20 @@ model TaxReturn {
 
 /// inv.unit — generováno z definice objektu
 model InvUnit {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  code      String   @db.VarChar(20)
-  name      String   @db.VarChar(120)
-  decimals  Int?     @default(0)
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  decimals    Int?     @default(0)
+  datSourceId String?  @map("dat_source_id") @db.VarChar(36)
+  datLocal    Boolean  @default(false) @map("dat_local")
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
 
   company             SysCompany       @relation("InvUnit_company", fields: [companyId], references: [id], onDelete: Restrict)
   invItem_unit        InvItem[]        @relation("InvItem_unit")
@@ -3082,6 +3088,8 @@ model BankStatementFormat {
   dateFormat       String   @default("dd.MM.yyyy") @map("date_format") @db.VarChar(20)
   linesStart       String?  @map("lines_start") @db.VarChar(120)
   blocked          Boolean  @default(false)
+  datSourceId      String?  @map("dat_source_id") @db.VarChar(36)
+  datLocal         Boolean  @default(false) @map("dat_local")
   ext              Json     @default("{}")
   version          Int      @default(1)
   createdAt        DateTime @default(now()) @map("created_at")
@@ -3357,6 +3365,8 @@ model BankPaymentMethod {
   transformationId String?  @map("transformation_id") @db.Uuid
   eshop            Boolean  @default(false)
   blocked          Boolean  @default(false)
+  datSourceId      String?  @map("dat_source_id") @db.VarChar(36)
+  datLocal         Boolean  @default(false) @map("dat_local")
   ext              Json     @default("{}")
   version          Int      @default(1)
   createdAt        DateTime @default(now()) @map("created_at")
