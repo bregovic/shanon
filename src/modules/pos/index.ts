@@ -15,7 +15,11 @@ import { postingAccount } from "@/modules/gl/setup";
 export const PosTemplate = defineEnum({
   id: "PosTemplate",
   label: "@POS:Template",
-  values: [{ value: "counter", label: "@POS:TemplateCounter" }],
+  values: [
+    { value: "counter", label: "@POS:TemplateCounter" },
+    { value: "till", label: "@POS:TemplateTill" },
+    { value: "boxes", label: "@POS:TemplateBoxes" },
+  ],
 });
 
 /** Jak pokladna vybírá box pro odložený nákup: kódem / QR, ze seznamu aktivních boxů, nebo obojí. */
@@ -413,6 +417,10 @@ export default defineModule({
       Registers: "Pokladny",
       Template: "Šablona",
       TemplateCounter: "Pult s váhou",
+      TemplateTill: "Kasa bez váhy",
+      TemplateBoxes: "Vážení do boxů (bez plateb)",
+      BoxDone: "Hotovo — další box",
+      BoxTarget: "Box",
       CashAccount: "Účet hotovosti",
       CardAccount: "Účet plateb kartou",
       QrBankAccount: "Bankovní účet pro QR platby",
@@ -659,6 +667,10 @@ export default defineModule({
       Registers: "Registers",
       Template: "Template",
       TemplateCounter: "Counter with scale",
+      TemplateTill: "Till without scale",
+      TemplateBoxes: "Weighing into boxes (no payments)",
+      BoxDone: "Done — next box",
+      BoxTarget: "Box",
       CashAccount: "Cash account",
       CardAccount: "Card payments account",
       QrBankAccount: "Bank account for QR payments",

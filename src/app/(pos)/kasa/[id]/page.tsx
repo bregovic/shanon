@@ -69,7 +69,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     const baskets = await openBaskets(api);
     // výběr boxu ze seznamu (volba pokladny): aktivní boxy firmy
     const boxPick = String(reg.boxPick ?? "both");
-    const boxes = boxPick === "qr" ? [] : (await api.find("pos.box", { active: true }, { take: 500, orderBy: { code: "asc" } })).map((b) => ({ code: String(b.code), name: b.name ? String(b.name) : "" }));
+    const boxes = boxPick === "qr" && reg.template !== "boxes" ? [] : (await api.find("pos.box", { active: true }, { take: 500, orderBy: { code: "asc" } })).map((b) => ({ code: String(b.code), name: b.name ? String(b.name) : "" }));
     // výchozí tisková šablona účtenky (Tiskové sestavy), jinak vestavěná účtenka
     const [rt] = await api.find("prt.template", { docType: "pos.receipt", isDefault: true }, { take: 1 }).catch(() => []);
     let receiptLayout: PrintLayout | null = null;
@@ -87,6 +87,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
   return (
     <PosTerminal
       boxPick={data.boxPick as "both" | "qr" | "list"}
+      template={(["till", "boxes"].includes(String(reg.template)) ? reg.template : "counter") as "counter"}
       boxes={data.boxes}
       register={{ id, code: String(reg.code), name: String(reg.name), cashRounding: { unit: Number(data.rounding.cashUnit), method: data.rounding.cashMethod } }}
       shift={data.shift ? { id: String(data.shift.id), num: String(data.shift.shiftNum) } : null}
@@ -125,7 +126,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       payment={data.conns.payment ? { driver: String(data.conns.payment.driver) } : null}
       // ověřená váha (Dialog 06): panel Váha místo dialogu hmotnosti; cenu počítá váha
       verifiedScale={
-        data.conns.scale && data.conns.scale.scaleProtocol === "dialog06"
+        reg.template !== "till" && data.conns.scale && data.conns.scale.scaleProtocol === "dialog06"
           ? {
               driver: String(data.conns.scale.driver),
               baudRate: Number(data.conns.scale.baudRate ?? 9600),
@@ -139,7 +140,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           : null
       }
       scale={
-        data.conns.scale && data.conns.scale.scaleProtocol !== "dialog06"
+        reg.template !== "till" && data.conns.scale && data.conns.scale.scaleProtocol !== "dialog06"
           ? {
               driver: String(data.conns.scale.driver),
               protocol: (["toledo8217", "casEcr", "continuous"].includes(String(data.conns.scale.scaleProtocol)) ? data.conns.scale.scaleProtocol : "toledo8217") as "toledo8217",

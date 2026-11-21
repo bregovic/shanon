@@ -175,6 +175,7 @@ const useStyles = makeStyles({
   // s panelem Váha: zboží | váha (~320 px) | nákup
   catalog: { display: "flex", flexDirection: "column", minHeight: 0, padding: "12px 16px", gap: "8px" },
   tabs: { overflowX: "auto", flexShrink: 0 },
+  boxPickRow: { display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px", maxHeight: "120px", overflowY: "auto" },
   subTabs: { marginTop: "-6px", paddingLeft: "12px", borderLeft: `2px solid ${tokens.colorNeutralStroke2}` },
   // jedna posuvná řada (i při mnoha boxech zůstane místo pro zboží a košík)
   baskets: { display: "flex", gap: "6px", flexWrap: "nowrap", overflowX: "auto", flexShrink: 0, padding: "8px 12px 4px", "& > *": { flexShrink: 0 } },
@@ -341,6 +342,8 @@ export function PosTerminal(p: {
   top: string[];
   /** odložené nákupy (boxy) sdílené pokladnami firmy */
   baskets: BasketView[];
+  /** druh pokladny: pult s váhou, kasa bez váhy, vážení do boxů (bez plateb a směny) */
+  template?: "counter" | "till" | "boxes";
   /** výběr boxu při odložení: kód / QR, seznam aktivních boxů, nebo obojí */
   boxPick?: "both" | "qr" | "list";
   boxes?: { code: string; name: string }[];
@@ -546,6 +549,45 @@ export function PosTerminal(p: {
     setActive({ id: b.id, label: b.label, version: b.version });
     setBaskets((bs) => (bs.some((x) => x.id === b.id) ? bs.map((x) => (x.id === b.id ? b : x)) : [...bs, b]));
   };
+  // vážení do boxů: vybraný box = otevřený nákup boxu (ukládá se sám), Hotovo = další box
+  const boxesMode = p.template === "boxes";
+  const activeBox = active ? (baskets.find((b) => b.id === active.id)?.boxCode ?? "").toUpperCase() : "";
+  const boxTaken = (code: string) => baskets.some((x) => x.boxCode && x.boxCode.toUpperCase() === code.toUpperCase() && x.lines.length > 0);
+  const selectBox = async (code: string) => {
+    setBusy(true);
+    const r = await posBasketOpenAction(p.register.id, code);
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    if (r.data) await openBasket(r.data);
+  };
+  const boxDone = async () => {
+    if (!active) return;
+    // prázdný box se uvolní (nic se do něj nezvážilo)
+    if (!lines.length) {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      const id = active.id;
+      if ((await posBasketCancelAction(id)).ok) setBaskets((bs) => bs.filter((b) => b.id !== id));
+    } else await flush();
+    const list = p.boxes ?? [];
+    const cur = list.findIndex((b) => b.code.toUpperCase() === activeBox);
+    setActive(null);
+    loadLines([]);
+    freeStash.current = [];
+    // další box v pořadí: přednostně prázdný, jinak prostě další
+    const order = list.map((_, i) => list[(cur + 1 + i) % list.length]).filter((b) => b.code.toUpperCase() !== activeBox);
+    const next = order.find((b) => !boxTaken(b.code)) ?? order[0];
+    if (next) await selectBox(next.code);
+  };
+  const boxStarted = useRef(false);
+  useEffect(() => {
+    if (!boxesMode || boxStarted.current || active) return;
+    boxStarted.current = true;
+    const first = (p.boxes ?? []).find((b) => !boxTaken(b.code)) ?? p.boxes?.[0];
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- otevření boxu na serveru (vnější zdroj)
+    if (first) void selectBox(first.code);
+    // jen jednou po otevření pokladny
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const openFree = async () => {
     if (!active) return;
     await flush();
@@ -1009,7 +1051,7 @@ export function PosTerminal(p: {
             {L.Lock}
           </Button>
         )}
-        {shift && (
+        {shift && !boxesMode && (
           <Button icon={<LockClosed24Regular />} onClick={showSummary} disabled={busy || lines.length > 0}>
             {L.CloseShift}
           </Button>
@@ -1022,7 +1064,7 @@ export function PosTerminal(p: {
         </MessageBar>
       )}
 
-      {!shift ? (
+      {!shift && p.template !== "boxes" ? (
         <div className={st.openBox}>
           <p>{L.ShiftClosedInfo}</p>
           <Input value={opening} onChange={(_, d) => setOpening(d.value)} inputMode="decimal" contentAfter="Kč" aria-label={L.OpeningCash} placeholder={L.OpeningCash} size="large" />
@@ -1189,6 +1231,21 @@ export function PosTerminal(p: {
                 <span>{L.Total}</span>
                 <span>{fmt(total)}</span>
               </div>
+              {boxesMode ? (
+                <>
+                  <div className={st.boxPickRow}>
+                    {(p.boxes ?? []).map((b) => (
+                      <Button key={b.code} shape="circular" appearance={activeBox === b.code.toUpperCase() ? "primary" : boxTaken(b.code) ? "outline" : "secondary"} disabled={busy} onClick={() => void selectBox(b.code)} title={b.name || undefined}>
+                        {b.code}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button appearance="primary" className={st.payBtn} style={{ width: "100%" }} icon={<Box20Regular />} disabled={busy || !active} onClick={() => void boxDone()}>
+                    {L.BoxDone}
+                  </Button>
+                </>
+              ) : (
+                <>
               <div className={st.pay}>
                 <Button appearance="primary" className={st.payBtn} icon={<Money24Regular />} disabled={!lines.length} onClick={() => startPay("cash")}>
                   {L.PayCash}
@@ -1207,6 +1264,8 @@ export function PosTerminal(p: {
                 </Button>
               )}
               {error && customer && !payDlg && <div style={{ color: "var(--colorPaletteRedForeground1)", marginTop: 6 }}>{error}</div>}
+                </>
+              )}
             </div>
           </aside>
           <div className={st.mobileBar}>
@@ -1293,7 +1352,7 @@ export function PosTerminal(p: {
                   </Text>
                   <Input
                     size="large"
-                    autoFocus
+                    autoFocus={p.boxPick === "qr"}
                     value={parkDlg ?? ""}
                     onChange={(_, d) => setParkDlg(d.value)}
                     onKeyDown={(e) => e.key === "Enter" && void park(parkDlg ?? "")}
@@ -1312,7 +1371,15 @@ export function PosTerminal(p: {
                       // obsazený = box už má odložený nákup
                       const taken = baskets.some((x) => x.boxCode && x.boxCode.toUpperCase() === b.code.toUpperCase());
                       return (
-                        <Button key={b.code} size="large" disabled={busy || taken} onClick={() => void park(b.code)} title={b.name || undefined}>
+                        <Button
+                          key={b.code}
+                          size="large"
+                          disabled={busy || taken}
+                          onClick={() => void park(b.code)}
+                          title={b.name || undefined}
+                          // výchozí fokus na první volný box (ne do pole — bez klávesnice na tabletu)
+                          autoFocus={b.code === (p.boxes ?? []).find((x) => !baskets.some((y) => y.boxCode && y.boxCode.toUpperCase() === x.code.toUpperCase()))?.code}
+                        >
                           <span style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                             <span>{b.code}</span>
                             {(taken || b.name) && <Text size={200}>{taken ? L.BoxTaken : b.name}</Text>}
