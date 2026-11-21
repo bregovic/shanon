@@ -100,7 +100,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   const assigned = new Map(user.companies.filter((a) => a.tenantId === tenant.id).map((a) => [a.companyId, a]));
   const allCompanies = await withTenant(tenant.id, (tx) =>
     // nosné firmy virtuálních společností nejsou pro práci (jen pro sdílená data)
-    tx.sysCompany.findMany({ where: { tenantId: tenant.id, virtual: false }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
+    tx.sysCompany.findMany({ where: { tenantId: tenant.id, OR: [{ virtual: false }, ...(user.role === "admin" ? [{ dat: true }] : [])] }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
   );
   const companies = superUser ? allCompanies : allCompanies.filter((c) => assigned.has(c.id));
   const companyId = companies.find((c) => c.id === session.companyId)?.id ?? companies[0]?.id ?? null;

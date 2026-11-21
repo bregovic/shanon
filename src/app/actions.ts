@@ -1086,6 +1086,9 @@ export async function runSetupAction(allCompanies: boolean): Promise<ActionResul
   const ids = (allCompanies ? s.companies.map((c) => c.id) : s.ctx.companyId ? [s.ctx.companyId] : []).filter((id) =>
     s.adminCompanyIds.includes(id),
   );
+  // Společná data (DAT) nedostávají výchozí nastavení (jen parametry, které správce zadá)
+  const dat = await prisma.sysCompany.findFirst({ where: { tenantId: s.ctx.tenantId, dat: true }, select: { id: true } });
+  if (dat && ids.includes(dat.id)) ids.splice(ids.indexOf(dat.id), 1);
   if (!ids.length) return { ok: false, message: t("@SYS:NoAccess") };
   const total: Record<string, number> = {};
   try {

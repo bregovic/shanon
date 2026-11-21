@@ -305,6 +305,7 @@ model SysCompany {
   currency  String   @default("CZK") @db.VarChar(3)
   country   String   @default("CZ") @db.VarChar(2)
   virtual   Boolean  @default(false)
+  dat       Boolean  @default(false)
   ext       Json     @default("{}")
   version   Int      @default(1)
   createdAt DateTime @default(now()) @map("created_at")
@@ -313,6 +314,7 @@ model SysCompany {
   updatedBy String?  @map("updated_by") @db.Uuid
 
   sysNumberSeq_company             SysNumberSeq[]             @relation("SysNumberSeq_company")
+  sysExchangeRate_forCompany       SysExchangeRate[]          @relation("SysExchangeRate_forCompany")
   sysBatchJob_company              SysBatchJob[]              @relation("SysBatchJob_company")
   sysBatchRun_company              SysBatchRun[]              @relation("SysBatchRun_company")
   sysVirtualCompany_holderCompany  SysVirtualCompany[]        @relation("SysVirtualCompany_holderCompany")
@@ -508,26 +510,29 @@ model SysCurrency {
 
 /// sys.exchangeRate — generováno z definice objektu
 model SysExchangeRate {
-  id         String   @id @default(uuid(7)) @db.Uuid
-  tenantId   String   @map("tenant_id") @db.Uuid
-  currencyId String   @map("currency_id") @db.Uuid
-  date       DateTime @db.Date
-  amount     Int      @default(1)
-  rate       Decimal  @db.Decimal(18, 6)
-  base       String   @default("CZK") @db.VarChar(3)
-  source     String   @default("manual") @db.VarChar(40)
-  ext        Json     @default("{}")
-  version    Int      @default(1)
-  createdAt  DateTime @default(now()) @map("created_at")
-  createdBy  String?  @map("created_by") @db.Uuid
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy  String?  @map("updated_by") @db.Uuid
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  currencyId   String   @map("currency_id") @db.Uuid
+  date         DateTime @db.Date
+  amount       Int      @default(1)
+  rate         Decimal  @db.Decimal(18, 6)
+  base         String   @default("CZK") @db.VarChar(3)
+  source       String   @default("manual") @db.VarChar(40)
+  forCompanyId String?  @map("for_company_id") @db.Uuid
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
 
-  currency SysCurrency @relation("SysExchangeRate_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  currency   SysCurrency @relation("SysExchangeRate_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  forCompany SysCompany? @relation("SysExchangeRate_forCompany", fields: [forCompanyId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, currencyId, date, base, source])
+  @@unique([tenantId, currencyId, date, base, source, forCompanyId])
   @@index([tenantId])
   @@index([currencyId])
+  @@index([forCompanyId])
   @@map("sys_exchange_rate")
 }
 

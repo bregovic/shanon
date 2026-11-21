@@ -321,6 +321,7 @@ const Str = (id: string, label: string, maxLength: number, pattern?: RegExp, pat
  */
 export const parameters = defineObject({
   id: "tax.parameters",
+  datTemplate: true,
   table: "tax_parameters",
   label: "@TAX:Parameters",
   labelPlural: "@TAX:Parameters",

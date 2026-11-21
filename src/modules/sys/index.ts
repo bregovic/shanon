@@ -143,6 +143,8 @@ export const company = defineObject({
     country: { edt: Edts.CountryCode, mandatory: true, default: "CZ" },
     // nosič sdílených číselníků virtuální společnosti — ne pro doklady, v přepínači firem se neukazuje
     virtual: { edt: Edts.NoYes, label: "@SYS:VirtualHolder", readOnly: true },
+    // Společná data (DAT): výchozí konfigurace pro firmy organizace, spravuje superuživatel
+    dat: { edt: Edts.NoYes, label: "@SYS:Dat", readOnly: true },
   },
   titleField: "name",
   list: ["code", "name", "regNo", "vatId", "currency"],
@@ -293,11 +295,13 @@ export const exchangeRate = defineObject({
     /** měna, ve které je kurz vyjádřen (CZK u ČNB, EUR nebo přepočet u ECB) */
     base: { edt: Edts.CurrencyCode, label: "@SYS:RateBase", mandatory: true, default: "CZK" },
     source: { edt: enumEdt(RateSource), mandatory: true, default: "manual" },
+    /** vlastní kurz firmy (přednost před společným); prázdné = pro všechny firmy */
+    forCompanyId: { edt: refEdt("sys.company", "@SYS:ForCompany"), help: "@SYS:ForCompanyHelp" },
   },
   titleField: "date",
-  list: ["currencyId", "date", "amount", "rate", "base", "source"],
-  form: [{ label: "@SYS:General", fields: ["currencyId", "date", "amount", "rate", "base", "source"] }],
-  unique: [["currencyId", "date", "base", "source"]],
+  list: ["currencyId", "date", "amount", "rate", "base", "source", "forCompanyId"],
+  form: [{ label: "@SYS:General", fields: ["currencyId", "date", "amount", "rate", "base", "source", "forCompanyId"] }],
+  unique: [["currencyId", "date", "base", "source", "forCompanyId"]],
   defaultSort: { field: "date", dir: "desc" },
 });
 
@@ -528,7 +532,7 @@ export default defineModule({
       label: "@SYS:Setup",
       items: [{ object: "sys.company" }, { object: "sys.virtualCompany" }, { object: "sys.numberSeq" }, { object: "sys.transformation" }],
     },
-    { label: "@SYS:ModulesAndSetup", kind: "setup", items: [{ href: "/system/modules", label: "@SYS:Modules" }] },
+    { label: "@SYS:ModulesAndSetup", kind: "setup", items: [{ href: "/system/modules", label: "@SYS:Modules" }, { href: "/system/dat", label: "@SYS:Dat" }] },
     { label: "@SYS:Maintenance", kind: "functions", items: [{ href: "/system/setup", label: "@SYS:DefaultSetup" }, { object: "sys.batchJob" }, { object: "sys.batchRun" }] },
     {
       label: "@SYS:Security",
@@ -688,6 +692,9 @@ export default defineModule({
       ModuleDesc: "Organizace, uživatelé a role, číselné řady, moduly a výchozí nastavení.",
       ModulesAndSetup: "Moduly a výchozí nastavení",
       UserSettings: "Moje nastavení",
+      Dat: "Společná data (DAT)",
+      ForCompany: "Jen pro firmu",
+      ForCompanyHelp: "Kurz platí jen pro tuto firmu a má přednost před společným kurzem. Prázdné = pro všechny firmy.",
       DefaultCompany: "Výchozí firma",
       DefaultCompanyHelp: "Firma, do které se po přihlášení dostanete.",
       DefaultCompanyFirst: "První dostupná",
@@ -1184,6 +1191,9 @@ export default defineModule({
       Module: "System administration",
       ModulesAndSetup: "Modules and default setup",
       UserSettings: "My settings",
+      Dat: "Shared data (DAT)",
+      ForCompany: "Only for company",
+      ForCompanyHelp: "The rate applies only to this company and takes precedence over the shared rate. Empty = all companies.",
       DefaultCompany: "Default company",
       DefaultCompanyHelp: "The company you land in after signing in.",
       DefaultCompanyFirst: "First available",

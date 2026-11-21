@@ -142,6 +142,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   // parametry odběratelů / dodavatelů (jeden záznam za firmu)
   const params = defineObject({
     id: id("parameters"),
+    datTemplate: true,
     table: `${m}_parameters`,
     label: L("Parameters"),
     labelPlural: L("Parameters"),

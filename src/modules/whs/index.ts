@@ -256,6 +256,7 @@ const AccountRef = (label: string) => refEdt("gl.account", label);
 /** Parametry skladu: ocenění zásob průměrnou cenou a účty (způsob A). */
 export const parameters = defineObject({
   id: "whs.parameters",
+  datTemplate: true,
   table: "whs_parameters",
   label: "@WHS:Parameters",
   labelPlural: "@WHS:Parameters",

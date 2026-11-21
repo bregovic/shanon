@@ -290,6 +290,7 @@ export const DupCheck = defineEnum({
 
 export const parameters = defineObject({
   id: "gl.parameters",
+  datTemplate: true,
   table: "gl_parameters",
   label: "@GL:Parameters",
   labelPlural: "@GL:Parameters",

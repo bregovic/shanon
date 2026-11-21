@@ -47,7 +47,7 @@ export async function loadCnbRates(data: DataApi, date: string): Promise<number>
   for (const cur of await data.find("sys.currency", {})) {
     const r = sheet.rates.find((x) => x.code === cur.code);
     if (!r) continue;
-    if ((await data.find("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, base: "CZK", source: "cnb" }, { take: 1 })).length) continue;
+    if ((await data.find("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, base: "CZK", source: "cnb", forCompanyId: null }, { take: 1 })).length) continue;
     await data.create("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, amount: r.amount, rate: r.rate, base: "CZK", source: "cnb" });
     n++;
   }
@@ -162,7 +162,7 @@ export async function loadEcbRates(data: DataApi, date: string, base: string): P
   for (const cur of await data.find("sys.currency", {})) {
     const r = sheet.rates.find((x) => x.code === cur.code);
     if (!r) continue;
-    if ((await data.find("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, base, source: "ecb" }, { take: 1 })).length) continue;
+    if ((await data.find("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, base, source: "ecb", forCompanyId: null }, { take: 1 })).length) continue;
     await data.create("sys.exchangeRate", { currencyId: cur.id, date: sheet.date, amount: r.amount, rate: r.rate, base, source: "ecb" });
     n++;
   }
@@ -213,8 +213,10 @@ export async function rateFor(
   const base = cfg.base ?? "CZK";
   const source = cfg.source ?? (base === "CZK" ? "cnb" : "ecb");
   const range = { lte: date, gte: addDays(date, -(cfg.maxAgeDays ?? 7)) };
-  const pick = async (src: string) => (await data.find("sys.exchangeRate", { currencyId, base, source: src, date: range }, { take: 1, orderBy: { date: "desc" } }))[0];
-  const find = async () => (await pick("manual")) ?? (await pick(source));
+  const pick = async (src: string, forCompanyId: string | null = null) => (await data.find("sys.exchangeRate", { currencyId, base, source: src, date: range, forCompanyId }, { take: 1, orderBy: { date: "desc" } }))[0];
+  // vlastní kurz firmy má přednost před společným (ručním i staženým)
+  const own = async () => (data.companyId ? ((await pick("manual", data.companyId)) ?? (await pick(source, data.companyId))) : undefined);
+  const find = async () => (await own()) ?? (await pick("manual")) ?? (await pick(source));
   let r: RecordData | undefined = await find();
   if (!r) {
     await (source === "cnb" && base === "CZK" ? loadCnbRates(data, date) : loadEcbRates(data, date, base)).catch(() => 0);

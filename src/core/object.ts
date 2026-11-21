@@ -112,6 +112,8 @@ export interface ObjectDef {
   systemOnly?: boolean;
   /** systémový záznam smí uživatel opravit (pole, která nejsou readOnly) — nezaloží ani nesmaže (daňové transakce) */
   userCorrect?: boolean;
+  /** parametry modulu: nová firma je při zapnutí modulu převezme ze Společných dat (DAT), `src/server/dat.ts` */
+  datTemplate?: boolean;
   /** podřízené řádky zobrazené ve formuláři (např. řádky dokladu) */
   /**
    * podřízené záznamy zobrazené ve formuláři. `owned: false` = jen přehled

@@ -44,6 +44,18 @@ Když jeden provozovatel vede víc firem a chce sdílet číselníky (adresář,
 3. Doklady a transakce se nesdílí nikdy – každá firma účtuje zvlášť.
 4. **Osamostatnit firmu** (na firmě ve virtuální společnosti) zkopíruje sdílená data do firmy a přepojí na ně její doklady.
 
+## Společná data (DAT)
+
+Skrytá firma organizace s výchozí konfigurací pro firmy. Superuživatel se do ní přepne přes **Správa systému → Společná data (DAT)**
+(nebo v přepínači firem) a nastaví v ní parametry modulů (účetnictví, DPH, sklad, odběratelé, dodavatelé).
+
+- firma, která modul zapíná a jeho parametry ještě nemá, je převezme z DAT (kopie — další úpravy jen ve firmě);
+- odkazy na data jednotlivých firem (např. dodavatel Finanční úřad) se nepřebírají;
+- DAT nedostává výchozí nastavení (účty, řady) a nevystavují se v ní doklady.
+
+**Kurzy** jsou společné pro celou organizaci (stahují se jednou). Vlastní kurz firmy zadáte v kurzech měny s vyplněným
+**Jen pro firmu** — pro tu firmu má přednost před společným kurzem, ostatní firmy ho nevidí v přepočtu.
+
 ## Na co si dát pozor
 
 - Nezávislé firmy (různí majitelé) do jedné virtuální společnosti nedávejte – viděly by si navzájem adresář.

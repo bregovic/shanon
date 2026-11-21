@@ -11,6 +11,7 @@ import { inTenant, type Ctx } from "./data";
 import { companyModules, enableCompanyModules } from "./modules";
 import { prisma } from "./db";
 import { setupCompany } from "./setup";
+import { copyDatTemplates } from "./dat";
 
 /** Vrací nově zapnuté moduly. `ctx.modules` = moduly, které firma má teď. */
 export async function enableModulesWithSetup(ctx: Ctx, companyId: string, ids: string[], lang: Lang = "cs", client: PrismaClient = prisma): Promise<string[]> {
@@ -19,6 +20,15 @@ export async function enableModulesWithSetup(ctx: Ctx, companyId: string, ids: s
   const added = [...dependencyClosure(registry, ids)].filter((m) => registry.modules.has(m) && !current.has(m));
   await enableCompanyModules(ctx.tenantId, companyId, [...current, ...added], client);
   const enabled = new Set([...current, ...added]);
-  if (added.length) await inTenant({ ...ctx, companyId, modules: enabled }, (s) => setupCompany(s.sys().api(), new Set(added), lang), client);
+  if (added.length)
+    await inTenant(
+      { ...ctx, companyId, modules: enabled },
+      async (s) => {
+        // parametry modulů ze Společných dat (DAT), výchozí nastavení je pak nepřepisuje
+        await copyDatTemplates(s, added);
+        return setupCompany(s.sys().api(), new Set(added), lang);
+      },
+      client,
+    );
   return added;
 }
