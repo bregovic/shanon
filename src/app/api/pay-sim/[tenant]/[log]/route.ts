@@ -7,7 +7,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ tenant:
   const { tenant, log } = await params;
   const form = await req.formData().catch(() => null);
   const paid = String(form?.get("result") ?? "") === "paid";
-  const res = await simDecide(tenant, log, paid);
+  // neplatná adresa / protokol = zpět na testovací stránku, ne 500
+  const res = await simDecide(tenant, log, paid).catch(() => ({ returnUrl: null as string | null }));
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? new URL(req.url).host;
   const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
   const self = `${proto}://${host}/pay-sim/${tenant}/${log}`;

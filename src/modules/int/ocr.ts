@@ -11,7 +11,6 @@
 import { UserError, type RecordData } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
 
-export const OCR_DRIVERS = ["openai", "openaiTest"];
 export const DEFAULT_OCR_MODEL = "gpt-5-mini";
 const API = "https://api.openai.com/v1";
 

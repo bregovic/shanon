@@ -64,6 +64,7 @@ import {
   posMailAction,
   posShiftSummaryAction,
   posLockAction,
+  type ActionResult,
 } from "@/app/actions";
 import type { BasketView } from "@/modules/pos/basket";
 import type { PrintLayout } from "@/core/print";
@@ -378,6 +379,9 @@ export function PosTerminal(p: {
   const [group, setGroup] = useState(p.top.length ? "top" : "all");
   const [sub, setSub] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  // výpadek spojení se serverem: hláška místo neošetřené výjimky (tlačítka se neodblokovala)
+  const netError = L.NetworkError;
+  const safe = useCallback(<T,>(pr: Promise<ActionResult<T>>): Promise<ActionResult<T>> => pr.catch(() => ({ ok: false as const, message: netError })), [netError]);
   // mobil (do 900 px): jen jeden sloupec — zboží, nebo nákup (spodní lišta)
   const [mobileCart, setMobileCart] = useState(false);
   // celá obrazovka jen tlačítkem v liště (automatické zapnutí rušilo klepání na tabletu)
@@ -476,7 +480,7 @@ export function PosTerminal(p: {
   /** načíst seznam; změnil-li aktivní nákup jiný terminál, převzít jeho stav */
   const refreshBaskets = useCallback(
     async (force = false) => {
-      const r = await posBasketsAction();
+      const r = await safe(posBasketsAction());
       if (!r.ok) return;
       setBaskets(r.data);
       setActive((a) => {
@@ -495,15 +499,15 @@ export function PosTerminal(p: {
         return a;
       });
     },
-    [toLines],
+    [toLines, safe],
   );
   const saveActive = async (ls: Line[], a: { id: string; version: number }) => {
-    const r = await posBasketSaveAction({
+    const r = await safe(posBasketSaveAction({
       id: a.id,
       registerId: p.register.id,
       version: a.version,
       lines: ls.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null })),
-    });
+    }));
     dirty.current = false;
     if (r.ok) {
       setActive((x) => (x && x.id === r.data.id ? { ...x, version: r.data.version } : x));
@@ -555,7 +559,7 @@ export function PosTerminal(p: {
   const boxTaken = (code: string) => baskets.some((x) => x.boxCode && x.boxCode.toUpperCase() === code.toUpperCase() && x.lines.length > 0);
   const selectBox = async (code: string) => {
     setBusy(true);
-    const r = await posBasketOpenAction(p.register.id, code);
+    const r = await safe(posBasketOpenAction(p.register.id, code));
     setBusy(false);
     if (!r.ok) return setError(r.message);
     if (r.data) await openBasket(r.data);
@@ -566,7 +570,7 @@ export function PosTerminal(p: {
     if (!lines.length) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const id = active.id;
-      if ((await posBasketCancelAction(id)).ok) setBaskets((bs) => bs.filter((b) => b.id !== id));
+      if ((await safe(posBasketCancelAction(id))).ok) setBaskets((bs) => bs.filter((b) => b.id !== id));
     } else await flush();
     const list = p.boxes ?? [];
     const cur = list.findIndex((b) => b.code.toUpperCase() === activeBox);
@@ -600,7 +604,7 @@ export function PosTerminal(p: {
     const v = value.trim();
     if (!v) return;
     setBusy(true);
-    const r = await posBasketSaveAction({ label: v, boxCode: v, registerId: p.register.id, lines: lines.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null })) });
+    const r = await safe(posBasketSaveAction({ label: v, boxCode: v, registerId: p.register.id, lines: lines.map((l) => ({ itemId: l.item.id, qty: l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3))), scale: l.scale ?? null })) }));
     setBusy(false);
     if (!r.ok) return setError(r.message);
     setParkDlg(null);
@@ -612,7 +616,7 @@ export function PosTerminal(p: {
   const release = async () => {
     if (!active || lines.length) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    const r = await posBasketCancelAction(active.id);
+    const r = await safe(posBasketCancelAction(active.id));
     if (!r.ok) return setError(r.message);
     setBaskets((bs) => bs.filter((b) => b.id !== active.id));
     loadLines(freeStash.current);
@@ -835,7 +839,7 @@ export function PosTerminal(p: {
     // není to zboží: kód boxu (QR nebo ručně) otevře jeho nákup
     const code = q.trim();
     if (!code) return;
-    void posBasketOpenAction(p.register.id, code).then((r) => {
+    void safe(posBasketOpenAction(p.register.id, code)).then((r) => {
       if (r.ok && r.data) {
         setQ("");
         void openBasket(r.data);
@@ -856,7 +860,7 @@ export function PosTerminal(p: {
   const finishSale = async (payment: "cash" | "card" | "qr", paymentRef: string | null) => {
     setBusy(true);
     setError(undefined);
-    const res = await posSellAction({
+    const res = await safe(posSellAction({
       registerId: p.register.id,
       payment,
       cashGiven: payment === "cash" && given ? given.replace(",", ".") : null,
@@ -865,7 +869,7 @@ export function PosTerminal(p: {
       customerId: customer?.id ?? null,
       buyer: customer ? null : hasBuyer(buyer) ? buyer : null,
       lines: saleLines(),
-    });
+    }));
     setBusy(false);
     if (!res.ok) {
       setError(res.message);
@@ -900,7 +904,7 @@ export function PosTerminal(p: {
   const payByTerminal = async () => {
     setBusy(true);
     setError(undefined);
-    const start = await posCardStartAction({ registerId: p.register.id, payment: "card", lines: saleLines() });
+    const start = await safe(posCardStartAction({ registerId: p.register.id, payment: "card", lines: saleLines() }));
     setBusy(false);
     if (!start.ok) return setError(start.message);
     const ref = start.data.ref;
@@ -910,7 +914,7 @@ export function PosTerminal(p: {
     for (let i = 0; i < 150; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       if (cardLoop.current !== loop) return; // zrušeno
-      const st = await posCardStatusAction(p.register.id, ref);
+      const st = await safe(posCardStatusAction(p.register.id, ref));
       if (cardLoop.current !== loop) return;
       if (!st.ok) return setCard({ ref, state: "declined", message: st.message, qr });
       if (st.data?.state === "successful") return finishSale("card", ref);
@@ -930,7 +934,7 @@ export function PosTerminal(p: {
     if (!customer) return;
     setBusy(true);
     setError(undefined);
-    const res = await posInvoiceAction({ registerId: p.register.id, payment: "invoice", customerId: customer.id, basketId: active?.id ?? null, lines: saleLines() });
+    const res = await safe(posInvoiceAction({ registerId: p.register.id, payment: "invoice", customerId: customer.id, basketId: active?.id ?? null, lines: saleLines() }));
     setBusy(false);
     if (!res.ok) return setError(res.message);
     setMailTo(res.data.email || customer.email || "");
@@ -948,13 +952,13 @@ export function PosTerminal(p: {
   };
   const findCustomers = async (q: string) => {
     setCustQ(q);
-    const r = await posCustomersAction(q);
+    const r = await safe(posCustomersAction(q));
     if (r.ok) setCustRows(r.data);
   };
   const sendMail = async (kind: "receipt" | "invoice", id: string) => {
     setBusy(true);
     setMailState(null);
-    const r = await posMailAction(kind, id, mailTo);
+    const r = await safe(posMailAction(kind, id, mailTo));
     setBusy(false);
     // testovací prostředí: zákazníkovi nic neodešlo, zpráva šla přihlášenému
     setMailState(r.ok ? { ok: true, text: r.data?.test ? (L.EmailSentTest ?? "").replace("{to}", r.data.testTo ?? "—") : `${L.EmailSent} ${mailTo}` } : { ok: false, text: r.message });
@@ -964,7 +968,7 @@ export function PosTerminal(p: {
     const ref = card?.ref;
     cardLoop.current++;
     setCard(null);
-    if (ref) await posCardStatusAction(p.register.id, ref, true);
+    if (ref) await safe(posCardStatusAction(p.register.id, ref, true));
   };
 
   const pay = async () => {
@@ -975,7 +979,7 @@ export function PosTerminal(p: {
 
   const resendEet = async () => {
     setBusy(true);
-    const res = await posEetResendAction(p.register.id);
+    const res = await safe(posEetResendAction(p.register.id));
     setBusy(false);
     if (!res.ok) return setError(res.message);
     setEetPending(res.data.pending);
@@ -983,7 +987,7 @@ export function PosTerminal(p: {
 
   const openShift = async () => {
     setBusy(true);
-    const res = await posOpenShiftAction(p.register.id, opening.replace(",", ".") || "0");
+    const res = await safe(posOpenShiftAction(p.register.id, opening.replace(",", ".") || "0"));
     setBusy(false);
     if (!res.ok) return setError(res.message);
     window.location.reload();
@@ -991,7 +995,7 @@ export function PosTerminal(p: {
 
   const showSummary = async () => {
     setBusy(true);
-    const res = await posShiftSummaryAction(p.register.id);
+    const res = await safe(posShiftSummaryAction(p.register.id));
     setBusy(false);
     if (!res.ok) return setError(res.message);
     setSummary(res.data);
@@ -999,7 +1003,7 @@ export function PosTerminal(p: {
 
   const closeShift = async () => {
     setBusy(true);
-    const res = await posCloseShiftAction(p.register.id);
+    const res = await safe(posCloseShiftAction(p.register.id));
     setBusy(false);
     if (!res.ok) return setError(res.message);
     setSummary(null);
@@ -1044,7 +1048,7 @@ export function PosTerminal(p: {
             icon={<LockClosed24Regular />}
             disabled={busy}
             onClick={async () => {
-              await posLockAction(p.register.id);
+              await safe(posLockAction(p.register.id));
               window.location.reload();
             }}
           >

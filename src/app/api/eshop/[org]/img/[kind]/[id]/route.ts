@@ -5,7 +5,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ org: string; kind: string; id: string }> }) {
   const { org, kind, id } = await params;
-  const img = await shopImage(org, kind, id);
+  // neplatné id / chyba čtení = 404, ne 500
+  const img = await shopImage(org, kind, id).catch(() => null);
   if (!img) return new Response("Nenalezeno", { status: 404 });
   return new Response(new Uint8Array(img.data), {
     headers: { "Content-Type": img.mime, "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" },

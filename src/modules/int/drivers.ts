@@ -29,7 +29,6 @@ import { fetchCnb, fetchEcb } from "@/modules/sys/currency";
 import { registry } from "@/registry";
 import { cancelWorkflows, closeWorkItems } from "@/modules/wf/work";
 import {
-  EET_RESEND_HOURS,
   buildEetMessage,
   openP12,
   sendEet,
@@ -293,9 +292,6 @@ export async function eetResendPending(
   ).length;
   return { sent, pending: still };
 }
-
-export const eetDeadline = (createdAt: string) =>
-  new Date(new Date(createdAt).getTime() + EET_RESEND_HOURS * 3600_000);
 
 // ---------------------------------------------------------------------------
 // Platební terminál

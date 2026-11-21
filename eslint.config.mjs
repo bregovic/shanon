@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // lokální jednorázové skripty (mimo repo, .git/info/exclude)
+    "scripts/.tmp-*",
   ]),
 ]);
 

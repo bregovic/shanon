@@ -16,7 +16,7 @@ import { redirect } from "next/navigation";
 import { dependents, UserError, type RecordData } from "@/core/module";
 import { registry } from "@/registry";
 import { clearLoginLock, isAnyAdmin, login, logout, requireSession, setCompany } from "@/server/auth";
-import { countAllRecords, deleteRecord, getObject, getRecord, inTenant, listRecords, previewRecord, refOptions, runAction, saveRecord } from "@/server/data";
+import { countAllRecords, getObject, getRecord, inTenant, listRecords, previewRecord, refOptions, runAction, saveRecord } from "@/server/data";
 import { prisma, withTenant } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
@@ -84,57 +84,6 @@ async function userError(e: unknown, lang: Parameters<typeof getT>[0], tenantId:
   // parametr může být label (název druhu, pole) — přeložit
   const params = Object.fromEntries(Object.entries(e.params ?? {}).map(([k, v]) => [k, v.startsWith("@") ? t(v) : v]));
   return { message: t(e.label, params), errors };
-}
-
-export async function saveAction(_: FormState, form: FormData): Promise<FormState> {
-  const s = await requireSession();
-  const objectId = String(form.get("_object"));
-  const id = String(form.get("_id") || "") || null;
-  const version = form.get("_version") ? Number(form.get("_version")) : undefined;
-  const back = String(form.get("_back") || "");
-  const fields = JSON.parse(String(form.get("_fields") ?? "[]")) as { name: string; kind: string }[];
-
-  const input: RecordData = {};
-  const titles: Record<string, string> = {};
-  for (const f of fields) {
-    input[f.name] = f.kind === "bool" ? form.has(`f:${f.name}`) : form.get(`f:${f.name}`);
-    if (f.kind === "ref") titles[f.name] = String(form.get(`t:${f.name}`) ?? "");
-  }
-  let saved: RecordData;
-  try {
-    saved = await saveRecord(s.ctx, objectId, id, input, version);
-  } catch (e) {
-    return { ...(await userError(e, s.lang, s.ctx.tenantId)), values: input, titles };
-  }
-  revalidatePath(objectHref(objectId));
-  if (back) redirect(back);
-  redirect(objectHref(objectId, String(saved.id)) + (id ? "?saved=1" : ""));
-}
-
-export async function deleteAction(_: FormState, form: FormData): Promise<FormState> {
-  const s = await requireSession();
-  const objectId = String(form.get("_object"));
-  const back = String(form.get("_back") || "") || objectHref(objectId);
-  try {
-    await deleteRecord(s.ctx, objectId, String(form.get("_id")));
-  } catch (e) {
-    return userError(e, s.lang, s.ctx.tenantId);
-  }
-  revalidatePath(objectHref(objectId));
-  redirect(back);
-}
-
-export async function recordAction(_: FormState, form: FormData): Promise<FormState> {
-  const s = await requireSession();
-  const objectId = String(form.get("_object"));
-  const id = String(form.get("_id"));
-  try {
-    await runAction(s.ctx, objectId, id, String(form.get("_action")));
-  } catch (e) {
-    return userError(e, s.lang, s.ctx.tenantId);
-  }
-  revalidatePath(objectHref(objectId, id));
-  return { ok: true };
 }
 
 export async function searchRefs(objectId: string, q: string, where?: Record<string, string>) {
@@ -998,11 +947,15 @@ export async function deleteUserAction(id: string): Promise<ActionResult> {
     const supers = await prisma.sysUser.count({ where: { tenantId: s.ctx.tenantId, role: "admin", active: true } });
     if (supers <= 1) return { ok: false, message: t("@SYS:LastSuper") };
   }
-  await prisma.sysUser.delete({ where: { id: user.id } });
-  await withTenant(s.ctx.tenantId, async (tx) => {
-    await tx.wfWorkItem.updateMany({ where: { tenantId: s.ctx.tenantId, assignedTo: user.id, status: "open" }, data: { assignedTo: null } });
-    await tx.sysAudit.create({ data: { tenantId: s.ctx.tenantId, objectId: "sys.user", recordId: user.id, action: "delete", userId: s.user.id, changes: { name: [user.name, null], email: [user.email, null] } } });
-  });
+  try {
+    await prisma.sysUser.delete({ where: { id: user.id } });
+    await withTenant(s.ctx.tenantId, async (tx) => {
+      await tx.wfWorkItem.updateMany({ where: { tenantId: s.ctx.tenantId, assignedTo: user.id, status: "open" }, data: { assignedTo: null } });
+      await tx.sysAudit.create({ data: { tenantId: s.ctx.tenantId, objectId: "sys.user", recordId: user.id, action: "delete", userId: s.user.id, changes: { name: [user.name, null], email: [user.email, null] } } });
+    });
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
   revalidatePath("/system/users");
   return { ok: true, data: undefined };
 }
@@ -1110,9 +1063,13 @@ export async function runSetupAction(allCompanies: boolean): Promise<ActionResul
   );
   if (!ids.length) return { ok: false, message: t("@SYS:NoAccess") };
   const total: Record<string, number> = {};
-  for (const companyId of ids) {
-    const created = await inTenant({ ...s.ctx, companyId }, (sess) => setupCompany(sess.sys().api(), s.ctx.modules, s.lang));
-    for (const [k, n] of Object.entries(created)) total[k] = (total[k] ?? 0) + n;
+  try {
+    for (const companyId of ids) {
+      const created = await inTenant({ ...s.ctx, companyId }, (sess) => setupCompany(sess.sys().api(), s.ctx.modules, s.lang));
+      for (const [k, n] of Object.entries(created)) total[k] = (total[k] ?? 0) + n;
+    }
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
   }
   revalidatePath("/", "layout");
   const list = Object.entries(total).map(([o, n]) => `${t(registry.objects.get(o)?.labelPlural)} ${n}`);
