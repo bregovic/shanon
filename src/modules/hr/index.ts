@@ -49,6 +49,8 @@ export const employee = defineObject({
   defaultSort: { field: "personalNum", dir: "asc" },
   actions: [
     { id: "invite", label: "@HR:Invite", icon: "mail", outside: true, bulk: true },
+    // dodavatel pro proplácení jedním klepnutím (osoba + dodavatel s profilem ZAM), jen když ho zaměstnanec nemá
+    { id: "createVendor", label: "@HR:CreateVendor", module: "ap", when: { field: "vendorId", equals: null }, bulk: true },
   ],
 });
 
@@ -77,6 +79,7 @@ export default defineModule({
       Portal: "Portál",
       PortalAccess: "Přístup do Portálu",
       Vendor: "Dodavatel pro proplácení",
+      CreateVendor: "Vytvořit dodavatele pro proplácení",
       VendorHelp: "Na něj se zalistují doklady k proplacení (účtenky z portálu, doklady s vyplněným zaměstnancem). Prázdné = založí se sám s účtovacím profilem ZAM.",
       PortalInvitedAt: "Pozvánka odeslána",
       PortalLastLogin: "Poslední přihlášení",
@@ -101,6 +104,7 @@ export default defineModule({
       Portal: "Portal",
       PortalAccess: "Portal access",
       Vendor: "Vendor for reimbursement",
+      CreateVendor: "Create reimbursement vendor",
       VendorHelp: "Documents to reimburse are listed to this vendor (portal receipts, documents with the employee filled in). Empty = created automatically with the ZAM posting profile.",
       PortalInvitedAt: "Invitation sent",
       PortalLastLogin: "Last sign-in",

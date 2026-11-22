@@ -37,5 +37,13 @@ describe("doklad k proplacení zaměstnanci", () => {
     // na dokladu jde profil změnit na standardní dodavatelský
     const changed = await saveRecord(T, "ap.invoice", String(inv.id), { ...inv, postingProfileId: std.id }, inv.version as number, client);
     expect(changed.postingProfileId).toBe(String(std.id));
+
+    // zaměstnanec bez dodavatele: Vytvořit dodavatele pro proplácení (profil ZAM), podruhé už nejde
+    const e2 = await saveRecord(T, "hr.employee", null, { personalNum: "002", firstName: "Jana", lastName: "Nová" }, undefined, client);
+    await runAction(T, "hr.employee", String(e2.id), "createVendor", client);
+    const e2b = (await getRecord(T, "hr.employee", String(e2.id), client))!;
+    const v2 = (await getRecord(T, "ap.vendor", String(e2b.vendorId), client))!;
+    expect(v2.postingProfileId).toBe(String(zam.id));
+    await expect(runAction(T, "hr.employee", String(e2.id), "createVendor", client)).rejects.toMatchObject({ label: "@SYS:Locked" });
   }, 180_000);
 });
