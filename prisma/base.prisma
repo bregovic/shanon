@@ -49,6 +49,8 @@ model SysUser {
   notify       Json     @default("{}")
   /// firma, do které se uživatel přihlásí (prázdné / bez přístupu = první dostupná)
   defaultCompanyId String? @map("default_company_id") @db.Uuid
+  /// naposledy zvolená firma (přepínač firem) — použije se po přihlášení, když výchozí firma není nastavená
+  lastCompanyId    String? @map("last_company_id") @db.Uuid
   /// pozvánka / reset hesla: SHA-256 jednorázového tokenu z odkazu (token samotný se neukládá) a jeho platnost
   inviteTokenHash String?   @map("invite_token_hash") @db.VarChar(64)
   inviteExpiresAt DateTime? @map("invite_expires_at")

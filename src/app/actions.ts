@@ -68,7 +68,11 @@ export async function logoutAction() {
 export async function switchCompanyAction(form: FormData) {
   const s = await requireSession();
   const id = String(form.get("companyId"));
-  if (s.companies.some((c) => c.id === id)) await setCompany(id);
+  if (s.companies.some((c) => c.id === id)) {
+    await setCompany(id);
+    // poslední použitá firma pro příští přihlášení (Výchozí firma = Poslední použitá)
+    await prisma.sysUser.update({ where: { id: s.user.id }, data: { lastCompanyId: id } });
+  }
   revalidatePath("/", "layout");
 }
 
