@@ -32,7 +32,8 @@ export const employee = defineObject({
     /** přístup do aplikace Portál (účtenky, později žádosti) */
     portalAccess: { edt: Edts.NoYes, label: "@HR:PortalAccess", default: true },
     /** dodavatel pro proplácení výdajů (profil ZAM) — založí se s první účtenkou */
-    vendorId: { edt: refEdt("ap.vendor", "@HR:Vendor"), optionalRef: true, readOnly: true },
+    // dodavatel pro proplácení výdajů (prázdné = při prvním dokladu k proplacení se založí s profilem ZAM)
+    vendorId: { edt: refEdt("ap.vendor", "@HR:Vendor"), optionalRef: true, help: "@HR:VendorHelp" },
     portalInvitedAt: { edt: Edts.DateTime, label: "@HR:PortalInvitedAt", readOnly: true },
     portalLastLogin: { edt: Edts.DateTime, label: "@HR:PortalLastLogin", readOnly: true },
     note: { edt: Edts.Notes },
@@ -76,6 +77,7 @@ export default defineModule({
       Portal: "Portál",
       PortalAccess: "Přístup do Portálu",
       Vendor: "Dodavatel pro proplácení",
+      VendorHelp: "Na něj se zalistují doklady k proplacení (účtenky z portálu, doklady s vyplněným zaměstnancem). Prázdné = založí se sám s účtovacím profilem ZAM.",
       PortalInvitedAt: "Pozvánka odeslána",
       PortalLastLogin: "Poslední přihlášení",
       Invite: "Poslat pozvánku do Portálu",
@@ -99,6 +101,7 @@ export default defineModule({
       Portal: "Portal",
       PortalAccess: "Portal access",
       Vendor: "Vendor for reimbursement",
+      VendorHelp: "Documents to reimburse are listed to this vendor (portal receipts, documents with the employee filled in). Empty = created automatically with the ZAM posting profile.",
       PortalInvitedAt: "Invitation sent",
       PortalLastLogin: "Last sign-in",
       Invite: "Send Portal invitation",
