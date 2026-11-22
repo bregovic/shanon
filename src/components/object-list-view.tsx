@@ -23,6 +23,7 @@ import {
 } from "@fluentui/react-components";
 import { actionIcon } from "./action-icon";
 import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
+import { printInFrame } from "@/lib/print-frame";
 import type { ActionIcon as ActionIconName } from "@/core/object";
 import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
 import { DateInput } from "./date-input";
@@ -70,6 +71,8 @@ export interface ObjectListProps {
   bulkActions?: { id: string; label: string; icon?: ActionIconName; input?: { name: string; label: string; kind: "date" } }[];
   /** hromadný tisk vybraných dokladů (tisknutelný objekt): adresa `/print/<objekt>/batch` */
   printHref?: string;
+  /** Tisk rovnou do tiskárny, bez náhledu (účtenka — `PrintableDef.directPrint`) */
+  printDirect?: boolean;
   /** texty tiskového dialogu */
   printDialog?: PrintDialogLabels;
   /** objekt má akci Odeslat e-mailem (nabídne ji tiskový dialog u jednoho dokladu) */
@@ -251,7 +254,11 @@ export function ObjectListView(p: ObjectListProps) {
           <Button
             icon={<Print24Regular />}
             disabled={!selected.length || selected.length > 100}
-            onClick={() => setPrinting(selected.map((x) => String(x.id)))}
+            onClick={() => {
+              const ids = selected.map((x) => String(x.id));
+              if (p.printDirect) void printInFrame(`${p.printHref}?ids=${ids.join(",")}`);
+              else setPrinting(ids);
+            }}
           >
             {p.printLabel}
           </Button>

@@ -79,8 +79,56 @@ export interface PrintableDef {
   defaultLayout: () => PrintLayout;
   /** dřívější výchozí rozvržení — neupravené šablony v této podobě se převedou na nové */
   legacyLayouts?: PrintLayout[];
+  /** role, na kterou se doklad tiskne (tiskárna pokladny) — šablona navržená na jinou roli se přeskládá */
+  rollPaper?: (data: DataApi, companyId: string | null, id: string) => Promise<PaperKind | null>;
+  /** Tisk v seznamu / detailu tiskne rovnou (bez náhledu) — účtenka do účtenkové tiskárny */
+  directPrint?: boolean;
   /** soubory vložené do PDF (ISDOC u faktury) */
   attachments?: (data: DataApi, companyId: string | null, id: string) => Promise<{ name: string; mime: string; data: string | Buffer }[]>;
+}
+
+/**
+ * Šablona účtenky navržená na jinou roli (výchozí je 80 mm) přeskládaná na roli tiskárny.
+ * Rozměry se přepočtou poměrem šířek, písmo méně (na 58 mm by poměrem bylo nečitelné) — účtenka
+ * se skládá pod sebe podle obsahu, takže delší řádek se zalomí a nic se nepřekryje.
+ * Bez toho prohlížeč 72 mm širokou účtenku na 48 mm roli zmenší, posune a kraj ořízne (XP-58).
+ */
+export function fitRoll(layout: PrintLayout, target: PaperKind | null | undefined): PrintLayout {
+  const src = PAPERS[layout.paper], dst = target ? PAPERS[target] : undefined;
+  if (!src || !dst || src.h || dst.h || src.w === dst.w) return layout;
+  const k = dst.w / src.w;
+  const f = k < 1 ? Math.min(1, k + (1 - k) * 0.55) : 1;
+  const mm = (v: number) => Math.round(v * k * 100) / 100;
+  // nejmenší písmo 6 bodů — menší termotisk na 203 dpi slévá
+  const pt = (v: number | undefined) => (v === undefined ? v : Math.max(Math.min(v, 6), Math.round(v * f * 10) / 10));
+  return {
+    ...layout,
+    paper: target!,
+    fontSize: pt(layout.fontSize) ?? layout.fontSize,
+    elements: layout.elements.map((e) => ({
+      ...e,
+      x: mm(e.x),
+      y: mm(e.y),
+      w: mm(e.w),
+      h: mm(e.h),
+      ...(e.columns ? { columns: fitColumns(e.columns, mm(e.w), k) } : {}),
+      ...(e.style ? { style: { ...e.style, size: pt(e.style.size) } } : {}),
+    })),
+  };
+}
+
+/**
+ * Sloupce tabulky na užší roli: čísla a krátké údaje (MJ, sazba) se zúží méně než poměrem — jinak se „kg“
+ * nebo „12“ zlomí na dva řádky; zbytek dostane první textový sloupec (název položky se klidně zalomí).
+ * Tabulka, která textem nezačíná (rekapitulace DPH), se zúží poměrem.
+ */
+function fitColumns(cols: PrintColumn[], width: number, k: number): PrintColumn[] {
+  const scaled = cols.map((c) => ({ ...c, width: Math.round(c.width * k * 100) / 100 }));
+  const first = cols[0];
+  if (k >= 1 || !first || first.align === "right" || first.format === "money" || first.format === "qty") return scaled;
+  const rest = scaled.slice(1).map((c, i) => ({ ...c, width: Math.round(Math.max(c.width, cols[i + 1].width * 0.8) * 100) / 100 }));
+  const left = Math.round((width - rest.reduce((a, c) => a + c.width, 0)) * 100) / 100;
+  return left >= first.width * k * 0.6 ? [{ ...scaled[0], width: left }, ...rest] : scaled;
 }
 
 /** Hodnota podle cesty "doc.number" / "company.name". */

@@ -5,7 +5,7 @@
 import { storageFor } from "./storage";
 import { UserError, type RecordData } from "@/core/module";
 import { can } from "@/core/security";
-import type { PrintLayout, PrintableDef } from "@/core/print";
+import { fitRoll, type PrintLayout, type PrintableDef } from "@/core/print";
 import { labelTable, registry, modules } from "@/registry";
 import { resolveLabel } from "@/core/labels";
 import { inTenant, type Ctx } from "./data";
@@ -63,10 +63,12 @@ export async function printJob(ctx: Ctx, docType: string, recordId: string, temp
       }
       // přílohy PDF (ISDOC); chyba přílohy tisk nezastaví
       const attachments = p.attachments ? await p.attachments(api, ctx.companyId, recordId).catch(() => []) : [];
+      const base = tpl ? parseLayout(tpl.layout, p) : p.defaultLayout();
+      const roll = p.rollPaper ? await p.rollPaper(api, ctx.companyId, recordId).catch(() => null) : null;
       return {
         attachments,
         title: String(record[p.numberField] ?? ""),
-        layout: tpl ? parseLayout(tpl.layout, p) : p.defaultLayout(),
+        layout: fitRoll(base, roll),
         templateId: tpl ? String(tpl.id) : null,
         templates: templates.map((t) => ({ id: String(t.id), name: String(t.name) })),
         data,
@@ -94,6 +96,11 @@ export function batchIds(raw: string | null | undefined): string[] {
   if (!ids.length) throw new UserError("@SYS:Required");
   if (ids.length > PRINT_BATCH_MAX) throw new UserError("@PRT:BatchTooMany", { max: String(PRINT_BATCH_MAX) });
   return ids;
+}
+
+/** Doklady, které se v seznamu a detailu tisknou rovnou (bez náhledu) — účtenka. */
+export function directPrintObjectIds(): Set<string> {
+  return new Set(modules.flatMap((m) => (m.printables ?? []).filter((p) => p.directPrint).map((p) => p.id)));
 }
 
 export function printableObjectIds(): Set<string> {

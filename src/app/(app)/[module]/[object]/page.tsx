@@ -8,7 +8,7 @@ import { getRecord, listRecords } from "@/server/data";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, hiddenFields, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
-import { printableObjectIds } from "@/server/print";
+import { directPrintObjectIds, printableObjectIds } from "@/server/print";
 
 type Params = { module: string; object: string };
 
@@ -83,6 +83,7 @@ export default async function ObjectListPage({ params, searchParams }: { params:
           ? (def.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon, input: a.input ? { name: a.input.name, label: t(a.input.label), kind: a.input.kind } : undefined }))
           : []
       }
+      printDirect={directPrintObjectIds().has(def.id)}
       printHref={s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/batch` : undefined}
       printLabel={t("@PRT:Print")}
       printDialog={{ title: t("@PRT:Print"), print: t("@PRT:Print"), pdf: t("@PRT:Pdf"), email: t("@INT:SendByEmail"), newWindow: t("@PRT:OpenNewWindow"), close: t("@PRT:Close") }}

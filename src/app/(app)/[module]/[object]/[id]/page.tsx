@@ -7,7 +7,7 @@ import { registry } from "@/registry";
 import { requireSession } from "@/server/auth";
 import { inTenant, getRecord, listRecords } from "@/server/data";
 import { duplicateRecord } from "@/server/duplicate";
-import { printableObjectIds } from "@/server/print";
+import { directPrintObjectIds, printableObjectIds } from "@/server/print";
 import { getT } from "@/server/i18n";
 import { fieldsMeta, formGroups, hiddenFields, objectHref, uiLabels } from "@/server/ui";
 import { can } from "@/core/security";
@@ -172,6 +172,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       collapseHeader={!!def.collapseHeader}
       autoCreate={isNew && !!def.numberSeq && (def.lines ?? []).some((l) => l.owned !== false)}
       newLinesHint={t("@SYS:LinesAfterHeader")}
+      printDirect={directPrintObjectIds().has(def.id)}
       printHref={!isNew && s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/${id}` : undefined}
       printDialog={{ title: t("@PRT:Print"), print: t("@PRT:Print"), pdf: t("@PRT:Pdf"), email: t("@INT:SendByEmail"), newWindow: t("@PRT:OpenNewWindow"), close: t("@PRT:Close") }}
       actions={

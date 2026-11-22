@@ -32,6 +32,7 @@ import {
 } from "@fluentui/react-components";
 import { actionIcon } from "./action-icon";
 import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
+import { printInFrame } from "@/lib/print-frame";
 import { WorkflowBar, type WorkflowBarLabels } from "./workflow-bar";
 import type { WorkflowBarData } from "@/server/workflow-bar";
 import type { ActionIcon as ActionIconName } from "@/core/object";
@@ -101,6 +102,8 @@ export interface ObjectDetailProps {
   mustChange?: { fields: Record<string, string>; text: string };
   /** tisk podle šablony (Tiskové sestavy) */
   printHref?: string;
+  /** Tisk rovnou do tiskárny, bez náhledu (účtenka — `PrintableDef.directPrint`) */
+  printDirect?: boolean;
   /** texty tiskového dialogu */
   printDialog?: PrintDialogLabels;
   /** hlavička jako kompaktní pruh (deník), řádky přes celou stránku */
@@ -521,7 +524,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           const printItems = [
             ...(p.printHref
               ? [
-                  <MenuItem key="print" icon={<Print24Regular />} onClick={() => setPrinting(true)}>
+                  <MenuItem key="print" icon={<Print24Regular />} onClick={() => (p.printDirect ? void printInFrame(p.printHref!) : setPrinting(true))}>
                     {p.labels.actions.print}
                   </MenuItem>,
                   <MenuItem key="pdf" icon={<DocumentPdf24Regular />} onClick={() => window.open(p.printHref!.replace(/^\/print\//, "/api/pdf/"), "_blank")}>

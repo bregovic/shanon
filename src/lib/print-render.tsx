@@ -7,7 +7,7 @@
  * se posunou o skutečnou výšku tabulky.
  */
 import QRCode from "qrcode";
-import { PAPERS, valueAt, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
+import { PAPERS, valueAt, type PrintColumn, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
 
 export function formatValue(v: unknown, f: ValueFormat | undefined, locale: string): string {
   if (v === null || v === undefined || v === "") return "";
@@ -63,7 +63,7 @@ function Table({ el, rows, locale, fontSize }: { el: PrintElement; rows: Record<
       <thead style={{ display: "table-header-group" }}>
         <tr>
           {cols.map((c, i) => (
-            <th key={i} style={{ textAlign: c.align ?? "left", borderBottom: "0.3mm solid #000", padding: `${(el.style?.rowPad ?? 0.6) + 0.2}mm 1mm`, fontWeight: 700, background: el.style?.fill, color: el.style?.color }}>
+            <th key={i} style={{ textAlign: c.align ?? "left", borderBottom: "0.3mm solid #000", padding: `${(el.style?.rowPad ?? 0.6) + 0.2}mm ${cellPad(c.width)}mm`, whiteSpace: "nowrap", overflow: "hidden", fontWeight: 700, background: el.style?.fill, color: el.style?.color }}>
               {c.label}
             </th>
           ))}
@@ -73,7 +73,7 @@ function Table({ el, rows, locale, fontSize }: { el: PrintElement; rows: Record<
         {rows.map((r, ri) => (
           <tr key={ri} style={{ breakInside: "avoid" }}>
             {cols.map((c, i) => (
-              <td key={i} style={{ textAlign: c.align ?? "left", padding: `${el.style?.rowPad ?? 0.6}mm 1mm`, borderBottom: "0.1mm solid #ccc", verticalAlign: "top", overflowWrap: "anywhere" }}>
+              <td key={i} style={{ textAlign: c.align ?? "left", padding: `${el.style?.rowPad ?? 0.6}mm ${cellPad(c.width)}mm`, borderBottom: "0.1mm solid #ccc", verticalAlign: "top", ...(numericCol(c) ? { whiteSpace: "nowrap" } : { overflowWrap: "anywhere" }) }}>
                 {formatValue(r[c.field], c.format, locale)}
               </td>
             ))}
@@ -152,6 +152,11 @@ export function ElementView({
   }
 }
 
+/** Vodorovný okraj buňky: 1 mm, v úzkém sloupci (role 58 mm) méně. */
+const cellPad = (w: number) => Math.round(Math.min(1, Math.max(0.3, w * 0.08)) * 100) / 100;
+/** Čísla a krátké údaje se nelámou uprostřed („1 2“, „k g“). */
+const numericCol = (c: PrintColumn) => c.align === "right" || c.format === "money" || c.format === "qty" || c.format === "percent";
+
 /** Celý doklad: hlavička (absolutně), tabulka řádků (teče), zbytek pod ní. */
 export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: PrintLayout; data: PrintData; locale?: string }) {
   const paper = PAPERS[layout.paper] ?? PAPERS.a4;
@@ -169,7 +174,8 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
     const top = Math.min(...visible.map((e) => e.y));
     const sorted = visible.map((e) => ({ ...e, y: e.y - (Number.isFinite(top) ? top : 0) })).sort((a, b) => a.y - b.y || a.x - b.x);
     // mezera nad prvkem = odstup od spodku předchozích prvků v návrhu
-    const gaps = sorted.map((el, i) => Math.max(0, el.y - Math.max(0, ...sorted.slice(0, i).map((x) => x.y + x.h))));
+    // (nejvýš 4 mm — větší mezera v návrhu je místo po skrytém prvku, např. QR platbě u hotovosti)
+    const gaps = sorted.map((el, i) => Math.min(4, Math.max(0, el.y - Math.max(0, ...sorted.slice(0, i).map((x) => x.y + x.h)))));
     return (
       <div className="print-page" style={{ width: `${paper.w}mm`, fontFamily: "Arial, Helvetica, sans-serif", color: "#000", background: "#fff" }}>
         {sorted.map((el, i) => {

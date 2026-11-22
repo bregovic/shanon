@@ -1410,6 +1410,20 @@ export const receiptPrintable: PrintableDef = {
   id: "pos.receipt",
   label: "@PRT:DocReceipt",
   defaultPaper: "receipt80",
+  directPrint: true,
+  /** šířka role z napojení tiskárny pokladny (vybraná na pokladně → napojení pokladny → společné) */
+  async rollPaper(data, _companyId, id) {
+    const rec = await data.get("pos.receipt", id).catch(() => null);
+    const registerId = rec?.registerId ? String(rec.registerId) : null;
+    const reg = registerId ? await data.get("pos.register", registerId).catch(() => null) : null;
+    const printers = (await data.find("int.connection", { kind: "printer", active: true }, { take: 50 }).catch(() => [])) as RecordData[];
+    const pick =
+      (reg?.printerConnId ? printers.find((c) => c.id === reg.printerConnId) : undefined) ??
+      printers.find((c) => registerId && c.registerId === registerId) ??
+      printers.find((c) => !c.registerId);
+    if (!pick) return null;
+    return String(pick.paperWidth) === "58" ? "receipt58" : "receipt80";
+  },
   numberField: "receiptNum",
   fields: [
     ...COMPANY_FIELDS.slice(0, 5),
