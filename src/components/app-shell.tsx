@@ -43,7 +43,7 @@ interface Props {
   companies: { id: string; code: string; name: string }[];
   companyId: string | null;
   user: { name: string; email: string; initials: string; admin: boolean };
-  labels: { home: string; settings: string; signOut: string; search: string; noResults: string; recent: string; noRecent: string; help: string; lang: string; notices: { title: string; empty: string; allRead: string; showRead: string } };
+  labels: { home: string; settings: string; system: string; signOut: string; search: string; noResults: string; recent: string; noRecent: string; help: string; lang: string; notices: { title: string; empty: string; allRead: string; showRead: string } };
   menu: MenuHit[];
   children: React.ReactNode;
   /** logo organizace aktuální firmy (/api/files/<id>), jinak logo Shanon */
@@ -180,11 +180,13 @@ export function AppShell({ modules, companies, companyId, logoSrc, user, labels,
           <Tooltip content={labels.help} relationship="label">
             <Button appearance="subtle" icon={<QuestionCircle24Regular />} aria-label={labels.help} onClick={() => router.push("/help")} />
           </Tooltip>
-          <Tooltip content={labels.settings} relationship="label">
-            <Button appearance="subtle" icon={<Settings24Regular />} aria-label={labels.settings} onClick={() => router.push("/settings")} />
-          </Tooltip>
+          {user.admin && (
+            <Tooltip content={labels.system} relationship="label">
+              <Button appearance="subtle" icon={<Settings24Regular />} aria-label={labels.system} onClick={() => router.push("/sys")} />
+            </Tooltip>
+          )}
 
-          <Tooltip content={`${user.name} · ${user.email}`} relationship="label">
+          <Tooltip content={`${labels.settings} · ${user.name} · ${user.email}`} relationship="label">
             <Avatar color="brand" initials={user.initials} size={32} style={{ margin: "0 8px", cursor: "pointer" }} onClick={() => router.push("/settings")} />
           </Tooltip>
 

@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { registry } from "@/registry";
-import { requireSession } from "@/server/auth";
+import { isAnyAdmin, requireSession } from "@/server/auth";
 import { getT } from "@/server/i18n";
 import { canSeeModule } from "@/core/security";
 import { FavoritesProvider } from "@/components/favorites";
@@ -55,8 +55,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       companies={s.companies}
       companyId={s.ctx.companyId}
       logoSrc={orgLogo ? `/api/files/${orgLogo}` : null}
-      user={{ name: s.user.name, email: s.user.email, initials, admin: s.superUser }}
-      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults"), recent: t("@SYS:Recent"), noRecent: t("@SYS:NoRecent"), help: t("@SYS:Help"), lang: s.lang, notices: { title: t("@SYS:Notices"), empty: t("@SYS:NoticesEmpty"), allRead: t("@SYS:NoticesAllRead"), showRead: t("@SYS:NoticesShowRead") } }}
+      user={{ name: s.user.name, email: s.user.email, initials, admin: isAnyAdmin(s) }}
+      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), system: t("@SYS:SystemSettings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults"), recent: t("@SYS:Recent"), noRecent: t("@SYS:NoRecent"), help: t("@SYS:Help"), lang: s.lang, notices: { title: t("@SYS:Notices"), empty: t("@SYS:NoticesEmpty"), allRead: t("@SYS:NoticesAllRead"), showRead: t("@SYS:NoticesShowRead") } }}
       menu={menuIndex(s, t)}
     >
       {children}

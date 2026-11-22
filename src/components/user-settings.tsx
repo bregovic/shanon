@@ -3,7 +3,7 @@
 /** Moje nastavení: údaje, jazyk, heslo, PIN do pokladny, upozornění e-mailem. */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Checkbox, Dropdown, Field, Input, MessageBar, MessageBarBody, Option, Text, makeStyles, tokens } from "@fluentui/react-components";
+import { Button, Dropdown, Switch, Field, Input, MessageBar, MessageBarBody, Option, Text, makeStyles, tokens } from "@fluentui/react-components";
 import { changePasswordAction, saveProfileAction, setPosPinAction } from "@/app/actions";
 import { ActionBar, Crumbs, PageContent } from "./page";
 import { InstallAppButton } from "./install-app";
@@ -105,15 +105,12 @@ export function UserSettings(p: {
               <InstallAppButton label={L.InstallApp} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
             </div>
             <div className={st.title}>{L.Notifications}</div>
-            {(
-              [
-                ["dailySummary", L.NotifyDailySummary],
-                ["overdueInvoices", L.NotifyOverdue],
-                ["integrationErrors", L.NotifyIntegration],
-              ] as const
-            ).map(([k, label]) => (
-              <Checkbox key={k} label={label} checked={!!notify[k]} onChange={(_, d) => setNotify((n) => ({ ...n, [k]: !!d.checked }))} />
-            ))}
+            {/* jeden přepínač: oznámení e-mailem zapnutá / vypnutá (souhrn úkolů, faktury po splatnosti, chyby napojení) */}
+            <Switch
+              label={L.NotifyEmail}
+              checked={Object.values(notify).some(Boolean)}
+              onChange={(_, d) => setNotify({ dailySummary: d.checked, overdueInvoices: d.checked, integrationErrors: d.checked })}
+            />
             <Text size={200} className={st.muted}>
               {L.NotifyInfo}
             </Text>
