@@ -27,6 +27,8 @@ const useStyles = makeStyles({
 type Msg = { intent: "success" | "error"; text: string } | null;
 
 export function UserSettings(p: {
+  /** profile = Můj profil (iniciály: jméno, heslo); settings = Nastavení (ozubené kolo: jazyk, firma, oznámení, PIN, aplikace) */
+  section: "profile" | "settings";
   crumbs: { label: string; href?: string }[];
   user: { firstName: string; lastName: string; email: string; lang: string; hasPin: boolean; notify: Record<string, boolean>; defaultCompanyId: string };
   /** firmy, kam uživatel smí (výběr výchozí firmy) */
@@ -64,96 +66,158 @@ export function UserSettings(p: {
       </ActionBar>
       <PageContent>
         <div className={st.grid}>
-          <section className={st.card}>
-            <div className={st.title}>{L.Profile}</div>
-            <Field label={L.FirstName} required validationMessage={errs.firstName}>
-              <Input value={firstName} onChange={(_, d) => setFirstName(d.value)} maxLength={60} />
-            </Field>
-            <Field label={L.LastName} required validationMessage={errs.lastName}>
-              <Input value={lastName} onChange={(_, d) => setLastName(d.value)} maxLength={60} />
-            </Field>
-            <Field label={L.Email}>
-              <Input value={p.user.email} disabled />
-            </Field>
-            <Field label={L.Language}>
-              <Dropdown value={lang === "en" ? "English" : "Čeština"} selectedOptions={[lang]} onOptionSelect={(_, d) => setLang(String(d.optionValue))}>
-                <Option value="cs">Čeština</Option>
-                <Option value="en">English</Option>
-              </Dropdown>
-            </Field>
-            {p.companies.length > 1 && (
-              <Field label={L.DefaultCompany} hint={L.DefaultCompanyHelp}>
-                <Dropdown
-                  value={p.companies.find((c) => c.id === defaultCompanyId)?.label ?? L.DefaultCompanyFirst}
-                  selectedOptions={[defaultCompanyId]}
-                  onOptionSelect={(_, d) => setDefaultCompanyId(String(d.optionValue ?? ""))}
+          {p.section === "profile" && (
+            <section className={st.card}>
+              <div className={st.title}>{L.Profile}</div>
+              <Field label={L.FirstName} required validationMessage={errs.firstName}>
+                <Input value={firstName} onChange={(_, d) => setFirstName(d.value)} maxLength={60} />
+              </Field>
+              <Field label={L.LastName} required validationMessage={errs.lastName}>
+                <Input value={lastName} onChange={(_, d) => setLastName(d.value)} maxLength={60} />
+              </Field>
+              <Field label={L.Email}>
+                <Input value={p.user.email} disabled />
+              </Field>
+              <Note m={msg.profile} />
+              <div className={st.actions}>
+                <Button
+                  appearance="primary"
+                  disabled={busy}
+                  onClick={() =>
+                    run(
+                      "profile",
+                      () => saveProfileAction({ firstName, lastName, lang, notify, defaultCompanyId: defaultCompanyId || null }),
+                      L.Saved,
+                      () => router.refresh(),
+                    )
+                  }
                 >
-                  <Option value="">{L.DefaultCompanyFirst}</Option>
-                  {p.companies.map((c) => (
-                    <Option key={c.id} value={c.id}>
-                      {c.label}
-                    </Option>
-                  ))}
+                  {L.Save}
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {p.section === "settings" && (
+            <section className={st.card}>
+              <div className={st.title}>{L.Preferences}</div>
+              <Field label={L.Language}>
+                <Dropdown value={lang === "en" ? "English" : "Čeština"} selectedOptions={[lang]} onOptionSelect={(_, d) => setLang(String(d.optionValue))}>
+                  <Option value="cs">Čeština</Option>
+                  <Option value="en">English</Option>
                 </Dropdown>
               </Field>
-            )}
-            <div className={st.title}>{L.InstallApp}</div>
-            <Text size={200} className={st.muted}>
-              {L.InstallAppHelp}
-            </Text>
-            <div>
-              <InstallAppButton label={L.InstallApp} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
-            </div>
-            <div className={st.title}>{L.Notifications}</div>
-            {/* jeden přepínač: oznámení e-mailem zapnutá / vypnutá (souhrn úkolů, faktury po splatnosti, chyby napojení) */}
-            <Switch
-              label={L.NotifyEmail}
-              checked={Object.values(notify).some(Boolean)}
-              onChange={(_, d) => setNotify({ dailySummary: d.checked, overdueInvoices: d.checked, integrationErrors: d.checked })}
-            />
-            <Text size={200} className={st.muted}>
-              {L.NotifyInfo}
-            </Text>
-            <Note m={msg.profile} />
-            <div className={st.actions}>
-              <Button appearance="primary" disabled={busy} onClick={() => run("profile", () => saveProfileAction({ firstName, lastName, lang, notify, defaultCompanyId: defaultCompanyId || null }), L.Saved, () => router.refresh())}>
-                {L.Save}
-              </Button>
-            </div>
-          </section>
+              {p.companies.length > 1 && (
+                <Field label={L.DefaultCompany} hint={L.DefaultCompanyHelp}>
+                  <Dropdown
+                    value={p.companies.find((c) => c.id === defaultCompanyId)?.label ?? L.DefaultCompanyFirst}
+                    selectedOptions={[defaultCompanyId]}
+                    onOptionSelect={(_, d) => setDefaultCompanyId(String(d.optionValue ?? ""))}
+                  >
+                    <Option value="">{L.DefaultCompanyFirst}</Option>
+                    {p.companies.map((c) => (
+                      <Option key={c.id} value={c.id}>
+                        {c.label}
+                      </Option>
+                    ))}
+                  </Dropdown>
+                </Field>
+              )}
+              <div className={st.title}>{L.InstallApp}</div>
+              <Text size={200} className={st.muted}>
+                {L.InstallAppHelp}
+              </Text>
+              <div>
+                <InstallAppButton label={L.InstallApp} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
+              </div>
+              <div className={st.title}>{L.Notifications}</div>
+              {/* jeden přepínač: oznámení e-mailem zapnutá / vypnutá (souhrn úkolů, faktury po splatnosti, chyby napojení) */}
+              <Switch
+                label={L.NotifyEmail}
+                checked={Object.values(notify).some(Boolean)}
+                onChange={(_, d) => setNotify({ dailySummary: d.checked, overdueInvoices: d.checked, integrationErrors: d.checked })}
+              />
+              <Text size={200} className={st.muted}>
+                {L.NotifyInfo}
+              </Text>
+              <Note m={msg.settings} />
+              <div className={st.actions}>
+                <Button
+                  appearance="primary"
+                  disabled={busy}
+                  onClick={() =>
+                    run(
+                      "settings",
+                      () => saveProfileAction({ firstName, lastName, lang, notify, defaultCompanyId: defaultCompanyId || null }),
+                      L.Saved,
+                      () => router.refresh(),
+                    )
+                  }
+                >
+                  {L.Save}
+                </Button>
+              </div>
+            </section>
+          )}
 
-          <section className={st.card}>
-            <div className={st.title}>{L.ChangePassword}</div>
-            <Field label={L.CurrentPassword} validationMessage={errs.current}>
-              <Input type="password" autoComplete="current-password" value={pw.current} onChange={(_, d) => setPw((x) => ({ ...x, current: d.value }))} />
-            </Field>
-            <Field label={L.NewPassword} hint={L.PasswordRules} validationMessage={errs.next}>
-              <Input type="password" autoComplete="new-password" value={pw.next} onChange={(_, d) => setPw((x) => ({ ...x, next: d.value }))} />
-            </Field>
-            <Field label={L.RepeatPassword} validationMessage={errs.repeat}>
-              <Input type="password" autoComplete="new-password" value={pw.repeat} onChange={(_, d) => setPw((x) => ({ ...x, repeat: d.value }))} />
-            </Field>
-            <Note m={msg.pw} />
-            <div className={st.actions}>
-              <Button appearance="primary" disabled={busy || !pw.current || !pw.next} onClick={() => run("pw", () => changePasswordAction(pw), L.PasswordChanged, () => setPw({ current: "", next: "", repeat: "" }))}>
-                {L.ChangePassword}
-              </Button>
-            </div>
-          </section>
+          {p.section === "profile" && (
+            <section className={st.card}>
+              <div className={st.title}>{L.ChangePassword}</div>
+              <Field label={L.CurrentPassword} validationMessage={errs.current}>
+                <Input type="password" autoComplete="current-password" value={pw.current} onChange={(_, d) => setPw((x) => ({ ...x, current: d.value }))} />
+              </Field>
+              <Field label={L.NewPassword} hint={L.PasswordRules} validationMessage={errs.next}>
+                <Input type="password" autoComplete="new-password" value={pw.next} onChange={(_, d) => setPw((x) => ({ ...x, next: d.value }))} />
+              </Field>
+              <Field label={L.RepeatPassword} validationMessage={errs.repeat}>
+                <Input type="password" autoComplete="new-password" value={pw.repeat} onChange={(_, d) => setPw((x) => ({ ...x, repeat: d.value }))} />
+              </Field>
+              <Note m={msg.pw} />
+              <div className={st.actions}>
+                <Button
+                  appearance="primary"
+                  disabled={busy || !pw.current || !pw.next}
+                  onClick={() =>
+                    run(
+                      "pw",
+                      () => changePasswordAction(pw),
+                      L.PasswordChanged,
+                      () => setPw({ current: "", next: "", repeat: "" }),
+                    )
+                  }
+                >
+                  {L.ChangePassword}
+                </Button>
+              </div>
+            </section>
+          )}
 
-          <section className={st.card}>
-            <div className={st.title}>{L.PosPin}</div>
-            <Text className={st.muted}>{hasPin ? L.PosPinSet : L.PosPinNone}</Text>
-            <Field label={L.PosPin} hint={L.PosPinHelp} validationMessage={errs.pin}>
-              <Input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(_, d) => setPin(d.value.replace(/\D/g, ""))} />
-            </Field>
-            <Note m={msg.pin} />
-            <div className={st.actions}>
-              <Button appearance="primary" disabled={busy || !pin} onClick={() => run("pin", () => setPosPinAction(pin), L.Saved, () => (setHasPin(true), setPin("")))}>
-                {L.Save}
-              </Button>
-            </div>
-          </section>
+          {p.section === "settings" && (
+            <section className={st.card}>
+              <div className={st.title}>{L.PosPin}</div>
+              <Text className={st.muted}>{hasPin ? L.PosPinSet : L.PosPinNone}</Text>
+              <Field label={L.PosPin} hint={L.PosPinHelp} validationMessage={errs.pin}>
+                <Input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(_, d) => setPin(d.value.replace(/\D/g, ""))} />
+              </Field>
+              <Note m={msg.pin} />
+              <div className={st.actions}>
+                <Button
+                  appearance="primary"
+                  disabled={busy || !pin}
+                  onClick={() =>
+                    run(
+                      "pin",
+                      () => setPosPinAction(pin),
+                      L.Saved,
+                      () => (setHasPin(true), setPin("")),
+                    )
+                  }
+                >
+                  {L.Save}
+                </Button>
+              </div>
+            </section>
+          )}
         </div>
       </PageContent>
     </>

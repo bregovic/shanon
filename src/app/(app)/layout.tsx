@@ -56,7 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       companyId={s.ctx.companyId}
       logoSrc={orgLogo ? `/api/files/${orgLogo}` : null}
       user={{ name: s.user.name, email: s.user.email, initials, admin: isAnyAdmin(s) }}
-      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), system: t("@SYS:SystemSettings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults"), recent: t("@SYS:Recent"), noRecent: t("@SYS:NoRecent"), help: t("@SYS:Help"), lang: s.lang, notices: { title: t("@SYS:Notices"), empty: t("@SYS:NoticesEmpty"), allRead: t("@SYS:NoticesAllRead"), showRead: t("@SYS:NoticesShowRead") } }}
+      labels={{ home: t("@SYS:Home"), settings: t("@SYS:UserSettings"), system: t("@SYS:Settings"), signOut: t("@SYS:SignOut"), search: t("@SYS:MenuSearchShort"), noResults: t("@SYS:MenuNoResults"), recent: t("@SYS:Recent"), noRecent: t("@SYS:NoRecent"), help: t("@SYS:Help"), lang: s.lang, notices: { title: t("@SYS:Notices"), empty: t("@SYS:NoticesEmpty"), allRead: t("@SYS:NoticesAllRead"), showRead: t("@SYS:NoticesShowRead") } }}
       menu={menuIndex(s, t)}
     >
       {children}

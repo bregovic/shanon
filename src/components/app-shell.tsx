@@ -180,14 +180,12 @@ export function AppShell({ modules, companies, companyId, logoSrc, user, labels,
           <Tooltip content={labels.help} relationship="label">
             <Button appearance="subtle" icon={<QuestionCircle24Regular />} aria-label={labels.help} onClick={() => router.push("/help")} />
           </Tooltip>
-          {user.admin && (
-            <Tooltip content={labels.system} relationship="label">
-              <Button appearance="subtle" icon={<Settings24Regular />} aria-label={labels.system} onClick={() => router.push("/sys")} />
-            </Tooltip>
-          )}
+          <Tooltip content={labels.system} relationship="label">
+            <Button appearance="subtle" icon={<Settings24Regular />} aria-label={labels.system} onClick={() => router.push("/settings")} />
+          </Tooltip>
 
           <Tooltip content={`${labels.settings} · ${user.name} · ${user.email}`} relationship="label">
-            <Avatar color="brand" initials={user.initials} size={32} style={{ margin: "0 8px", cursor: "pointer" }} onClick={() => router.push("/settings")} />
+            <Avatar color="brand" initials={user.initials} size={32} style={{ margin: "0 8px", cursor: "pointer" }} onClick={() => router.push("/profile")} />
           </Tooltip>
 
           <Tooltip content={labels.signOut} relationship="label">
