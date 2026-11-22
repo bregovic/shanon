@@ -155,7 +155,11 @@ export const company = defineObject({
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
   // zkušební a předváděcí firmy: smazat i se všemi daty (jen superuživatel, potvrzení opsáním kódu)
-  actions: [{ id: "deleteWithData", label: "@SYS:DeleteCompanyData", outside: true, group: "more", confirm: { field: "code", text: "@SYS:DeleteCompanyConfirm" } }],
+  actions: [
+    // výchozí konfigurace organizace z této firmy (jen to, co Společná data ještě nemají)
+    { id: "fillDat", label: "@SYS:FillDat", adminOnly: true, group: "more" },
+    { id: "deleteWithData", label: "@SYS:DeleteCompanyData", outside: true, group: "more", confirm: { field: "code", text: "@SYS:DeleteCompanyConfirm" } },
+  ],
 });
 
 export const numberSeq = defineObject({
@@ -693,6 +697,8 @@ export default defineModule({
       ModulesAndSetup: "Moduly a výchozí nastavení",
       UserSettings: "Moje nastavení",
       Dat: "Společná data (DAT)",
+      FillDat: "Naplnit Společná data z této firmy",
+      FillDatDone: "Do Společných dat převzato záznamů: {n}.",
       DatSource: "Ze Společných dat",
       DatLocal: "Upraveno ve firmě",
       ForCompany: "Jen pro firmu",
@@ -1194,6 +1200,8 @@ export default defineModule({
       ModulesAndSetup: "Modules and default setup",
       UserSettings: "My settings",
       Dat: "Shared data (DAT)",
+      FillDat: "Fill shared data from this company",
+      FillDatDone: "Records taken into shared data: {n}.",
       DatSource: "From shared data",
       DatLocal: "Changed in company",
       ForCompany: "Only for company",

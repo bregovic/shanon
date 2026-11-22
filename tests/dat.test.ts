@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
-import { inTenant, listRecords, saveRecord } from "@/server/data";
+import { inTenant, listRecords, runAction, saveRecord } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { ensureDat } from "@/server/dat";
 import { enableModulesWithSetup } from "@/server/company-modules";
@@ -71,6 +71,24 @@ describe("Společná data (DAT)", () => {
     await enableModulesWithSetup(B, String(b.id), ["inv"], "cs", client);
     expect((await unit(B, "KRT")).name).toBe("Balík");
     expect((await unit(B, "KS")).name).toBe("Kus DAT");
+  }, 180_000);
+
+  it("Naplnit DAT z firmy: parametry a číselníky do DAT, firma napojená na kopie", async () => {
+    const P = (await provisionTenant(client, { code: `t-datn-${run}`, name: "DATN", adminEmail: `datn-${run}@test.local`, adminPassword: "heslo-12345", modules: ["inv", "gl"], company: { code: "A", name: "A s.r.o." } })).ctx;
+    await runAction(P, "sys.company", String(P.companyId), "fillDat", client);
+    const D = { ...P, companyId: await ensureDat(P.tenantId, client) };
+    const datUnits = (await listRecords(D, "inv.unit", { pageSize: 200 }, client)).rows;
+    const ownUnits = (await listRecords(P, "inv.unit", { pageSize: 200 }, client)).rows;
+    expect(datUnits.length).toBe(ownUnits.length);
+    expect(ownUnits.every((u) => u.datSourceId && !u.datLocal)).toBe(true);
+    expect((await listRecords(D, "gl.parameters", {}, client)).rows.length).toBe(1);
+    // změna v DAT se teď propíše i do zdrojové firmy
+    const ks = datUnits.find((u) => u.code === "KS")!;
+    await saveRecord(D, "inv.unit", String(ks.id), { ...ks, name: "Kus (DAT)" }, ks.version as number, client);
+    expect((await listRecords(P, "inv.unit", { filter: { code: "KS" } }, client)).rows[0].name).toBe("Kus (DAT)");
+    // podruhé nic nového
+    await runAction(P, "sys.company", String(P.companyId), "fillDat", client);
+    expect((await listRecords(D, "inv.unit", { pageSize: 200 }, client)).rows.length).toBe(datUnits.length);
   }, 180_000);
 
   it("formát výpisu z DAT se zkopíruje i s poli", async () => {

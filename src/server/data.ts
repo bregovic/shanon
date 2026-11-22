@@ -10,7 +10,7 @@
  *  - spustí události core a zapnutých rozšíření
  *  - hlídá souběžné úpravy (version) a zapisuje audit
  */
-import { copyDatTemplates, datCompanyId, markDatLocal, propagateDat } from "./dat";
+import { copyDatTemplates, datCompanyId, fillDatFrom, markDatLocal, propagateDat } from "./dat";
 import { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { FieldDef, ObjectDef } from "@/core/object";
@@ -877,6 +877,12 @@ export class Session {
     if (a.outside) throw new UserError("@SYS:InvalidValue");
     // osamostatnění firmy z virtuální společnosti (jádro: přímý přístup k datům všech firem)
     if (objectId === "sys.virtualMember" && actionId === "detach") return detachMember(this, record);
+    // Společná data naplnit z firmy (jádro: zápis do jiné firmy)
+    if (objectId === "sys.company" && actionId === "fillDat") {
+      const r = await fillDatFrom(this, record);
+      this.api().warn?.("@SYS:FillDatDone", { n: String(r.count) });
+      return;
+    }
     const fn = handlersFor(this.ctx, objectId).find((h) => h.actions?.[actionId])?.actions?.[actionId];
     if (!fn) throw new UserError("@SYS:InvalidValue");
     if (a.upload && !file) throw new UserError("@SYS:Required");

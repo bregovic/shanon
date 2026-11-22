@@ -48,6 +48,8 @@ Když jeden provozovatel vede víc firem a chce sdílet číselníky (adresář,
 
 Skrytá firma organizace s výchozí konfigurací pro firmy. Superuživatel se do ní přepne přes **Správa systému → Společná data (DAT)**
 (nebo v přepínači firem) a nastaví v ní parametry modulů (účetnictví, DPH, sklad, odběratelé, dodavatelé).
+Rychlejší start: na firmě v [Organizacích](/sys/company) **Další → Naplnit Společná data z této firmy** — zkopíruje do DAT
+parametry a běžné číselníky, které DAT ještě nemá, a záznamy firmy na ně napojí (ostatní firmy se nemění).
 
 - firma, která modul zapíná a jeho parametry ještě nemá, je převezme z DAT (kopie — další úpravy jen ve firmě);
 - odkazy na data jednotlivých firem (např. dodavatel Finanční úřad) se nepřebírají;

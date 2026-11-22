@@ -13,7 +13,7 @@
  */
 import "server-only";
 import type { PrismaClient } from "@/generated/prisma/client";
-import type { RecordData } from "@/core/module";
+import { UserError, type RecordData } from "@/core/module";
 import type { ObjectDef } from "@/core/object";
 import { registry } from "@/registry";
 import { prisma } from "./db";
@@ -159,4 +159,50 @@ export async function markDatLocal(s: Session, def: ObjectDef, rec: RecordData):
   if (!parent) return;
   const row = await s.api().get(parent.def.id, parent.id);
   if (row?.datSourceId && !row.datLocal) await s.forCompany(String(s.ctx.companyId)).api().update(parent.def.id, parent.id, { datLocal: true });
+}
+
+/**
+ * Naplnit Společná data z firmy (Organizace → firma → Naplnit DAT): parametry a běžné číselníky, které DAT ještě nemá,
+ * se zkopírují do DAT a záznamy firmy se na ně napojí (další změny v DAT se do nich propíšou). Ostatní firmy se nemění.
+ */
+export async function fillDatFrom(s: Session, company: RecordData): Promise<{ count: number }> {
+  if (company.virtual || company.dat) throw new UserError("@SYS:InvalidValue");
+  const tenantId = s.ctx.tenantId;
+  let datId = await datCompanyId(s);
+  if (!datId) {
+    const code = (await s.tx.sysCompany.findFirst({ where: { tenantId, code: "DAT" }, select: { id: true } })) ? "DAT-SPOL" : "DAT";
+    datId = (await s.tx.sysCompany.create({ data: { tenantId, code, name: "Společná data", currency: "CZK", country: "CZ", vatPayer: true, virtual: true, dat: true } })).id;
+  }
+  const srcCompany = String(company.id);
+  const mods = (await s.tx.sysCompanyModule.findMany({ where: { tenantId, companyId: srcCompany }, select: { moduleId: true } })).map((m) => m.moduleId);
+  // DAT má aspoň moduly zdrojové firmy (formuláře parametrů a číselníků)
+  await s.tx.sysCompanyModule.createMany({ data: mods.map((moduleId) => ({ tenantId, companyId: datId!, moduleId })), skipDuplicates: true });
+  const src = s.forCompany(srcCompany);
+  const dat = s.forCompany(datId);
+  let count = 0;
+  for (const def of objectsOf(mods)) {
+    if (await src.isSharedVirtually(def.id)) continue;
+    if (def.datTemplate) {
+      const [p] = await src.api().find(def.id, {}, { take: 1 });
+      if (p && !(await dat.api().find(def.id, {}, { take: 1 })).length) {
+        await dat.api().create(def.id, templateValues(def, p));
+        count++;
+      }
+    }
+    if (def.datLayer) {
+      const key = keyField(def);
+      const have = new Set((await dat.api().find(def.id, {}, { take: 10000 })).map((r) => String(r[key])));
+      for (const row of await src.api().find(def.id, {}, { take: 10000 })) {
+        if (have.has(String(row[key]))) continue;
+        const created = await dat.api().create(def.id, templateValues(def, row));
+        for (const l of ownedLines(def))
+          for (const line of await src.api().find(l.def.id, { [l.field]: String(row.id) }, { take: 5000 }))
+            await dat.api().create(l.def.id, { ...templateValues(l.def, line, [l.field]), [l.field]: String(created.id) });
+        // záznam firmy = neupravená kopie nového záznamu DAT
+        await src.api().update(def.id, String(row.id), { datSourceId: String(created.id), datLocal: false });
+        count++;
+      }
+    }
+  }
+  return { count };
 }
