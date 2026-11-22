@@ -11,7 +11,6 @@
  *
  * Bez importu `./data` za běhu (data.ts tento soubor volá) — jiné firmy přes `Session.forCompany`.
  */
-import "server-only";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { UserError, type RecordData } from "@/core/module";
 import type { ObjectDef } from "@/core/object";
