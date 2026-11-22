@@ -585,8 +585,12 @@ function scaleLineOf(v: unknown): ScaleLine | null {
   return { weight: str("weight"), unitPrice: str("unitPrice"), total: str("total"), raw: str("raw", 2000), weighedAt: str("weighedAt") };
 }
 
-/** Pokladna s ověřenou vahou (Dialog 06): údaj bere server z napojení, terminál ho poslat nemůže. */
+/** Pokladna s ověřenou vahou (Dialog 06): údaj bere server z napojení, terminál ho poslat nemůže.
+ *  Kasa bez váhy (`template = till`) váhu nemá ani v terminálu (kasa/[id]/page.tsx) — vážené zboží se v ní
+ *  zadává ručně; dřív ho tady server přesto vyžadoval z váhy a platba skončila „… se váží na váze“. */
 async function verifiedScaleOf(api: Parameters<typeof connectionsFor>[0], registerId: string): Promise<SaleInput["verifiedScale"]> {
+  const reg = await api.get("pos.register", registerId).catch(() => null);
+  if (reg?.template === "till") return null;
   const conn = (await connectionsFor(api, registerId)).scale;
   if (!conn || conn.scaleProtocol !== "dialog06") return null;
   return { name: String(conn.name ?? conn.code ?? ""), serial: (conn.scaleSerial as string) || null, protocol: "dialog06" };
