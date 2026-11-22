@@ -73,6 +73,19 @@ Závazek je uhrazený, jakmile platbu z bankovního výpisu spáruje banka (VS =
 
 Druh **Daň z příjmů** je připravený; výpočet a podání doplníme.
 
+## Podání datovou schránkou
+
+Přiznání i kontrolní hlášení jde podat přímo z Shanonu: XML (stejné jako **Stáhnout XML** pro EPO) odejde datovou zprávou
+do schránky finančního úřadu — nic se nepodepisuje, podáním je samotná datová zpráva.
+
+1. **Integrace → Napojení → Nový**: druh *Datová schránka*, ovladač *Datová schránka (ostrá)* nebo *veřejný test (czebox)*,
+   přihlašovací jméno a heslo schránky firmy (heslo se ukládá šifrovaně). **Test spojení** ověří přihlášení (nic neodešle).
+2. **Daňové parametry → Datová schránka finančního úřadu**: ID schránky příslušného finančního úřadu (7 znaků).
+3. Na spočítaném podání **Odeslat datovou schránkou** a pro potvrzení opište období. Po přijetí je podání *Podané*
+   s číslem datové zprávy, záznam je i v protokolu napojení.
+
+Odeslání je nevratné a nikdy neproběhne samo. Na testovacím serveru jde jen veřejný test (czebox), ostré podání jen z produkce.
+
 ## Nárok na odpočet v jiném období
 
 Přijatou fakturu jde vykázat v pozdějším období (nárok uplatněný později): v **Daňových transakcích** vyberte transakce

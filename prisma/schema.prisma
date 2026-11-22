@@ -1814,6 +1814,7 @@ model TaxParameters {
   phone             String?  @db.VarChar(30)
   email             String?  @db.VarChar(254)
   dataBoxId         String?  @map("data_box_id") @db.VarChar(7)
+  taxOfficeDataBox  String?  @map("tax_office_data_box") @db.VarChar(7)
   preparerFirstName String?  @map("preparer_first_name") @db.VarChar(40)
   preparerLastName  String?  @map("preparer_last_name") @db.VarChar(40)
   ext               Json     @default("{}")
@@ -1842,6 +1843,8 @@ model TaxReturn {
   month         Int?
   quarter       Int?
   status        String    @default("draft") @db.VarChar(40)
+  isdsMessageId String?   @map("isds_message_id") @db.VarChar(20)
+  sentAt        DateTime? @map("sent_at") @db.Date
   computedAt    DateTime? @map("computed_at") @db.Date
   paymentAmount Decimal?  @map("payment_amount") @db.Decimal(18, 2)
   dueDate       DateTime? @map("due_date") @db.Date
@@ -4184,6 +4187,8 @@ model IntConnection {
   certData        String?   @map("cert_data")
   certSubject     String?   @map("cert_subject") @db.VarChar(255)
   certValidTo     DateTime? @map("cert_valid_to") @db.Date
+  isdsLogin       String?   @map("isds_login") @db.VarChar(60)
+  isdsPassword    String?   @map("isds_password") @db.VarChar(4000)
   paperWidth      String?   @default("80") @map("paper_width") @db.VarChar(40)
   codePage        String?   @default("cp852") @map("code_page") @db.VarChar(40)
   baudRate        Int?      @default(9600) @map("baud_rate")

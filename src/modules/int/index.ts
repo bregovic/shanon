@@ -23,6 +23,7 @@ export const ConnKind = defineEnum({
     { value: "ocr", label: "@INT:KindOcr" },
     { value: "mail", label: "@INT:KindMail" },
     { value: "scale", label: "@INT:KindScale" },
+    { value: "isds", label: "@INT:KindIsds" },
   ],
 });
 
@@ -75,6 +76,8 @@ export const Driver = defineEnum({
     { value: "system", label: "@INT:DrvSystemMail" },
     { value: "smtp", label: "@INT:DrvSmtp" },
     { value: "mailTest", label: "@INT:DrvMailTest" },
+    { value: "isds", label: "@INT:DrvIsds" },
+    { value: "isdsTest", label: "@INT:DrvIsdsTest" },
   ],
 });
 
@@ -198,6 +201,7 @@ const COMGATE = { field: "driver", in: ["comgate"] };
 const SERIAL = { field: "driver", in: ["escposSerial"] };
 const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
+const ISDS = { field: "kind", in: ["isds"] };
 const MAIL = { field: "kind", in: ["mail"] };
 const SMTP = { field: "driver", in: ["smtp"] };
 const Email = Str("MailAddress", "@INT:FromEmail", 254, EMAIL_PATTERN, "@SYS:InvalidEmail");
@@ -226,6 +230,9 @@ export const connection = defineObject({
     certData: { edt: Secret("CertData", "@INT:Certificate", "text"), secret: true, readOnly: true },
     certSubject: { edt: Edts.Description, label: "@INT:CertSubject", readOnly: true, visibleWhen: EET },
     certValidTo: { edt: Edts.TransDate, label: "@INT:CertValidTo", readOnly: true, visibleWhen: EET },
+    // datová schránka firmy (podání na finanční úřad): přihlašovací jméno a heslo (šifrovaně)
+    isdsLogin: { edt: Str("IsdsLogin", "@INT:IsdsLogin", 60), visibleWhen: ISDS },
+    isdsPassword: { edt: Secret("IsdsPassword", "@INT:IsdsPassword"), secret: true, visibleWhen: ISDS },
     // tiskárna
     paperWidth: { edt: enumEdt(PaperWidth), default: "80", visibleWhen: PRINTER },
     codePage: { edt: enumEdt(CodePage), default: "cp852", visibleWhen: SERIAL },
@@ -292,6 +299,7 @@ export const connection = defineObject({
     { label: "@INT:ScaleSettings", fields: ["scaleProtocol", "scaleSerial", "scaleConfirm", "scaleAutoAddSec", "scaleBeep", "baudRate", "dataBits", "parity", "stopBits"], visibleWhen: { field: "driver", in: ["scaleSerial", "scaleSim"] } },
     { label: "@INT:ApiSettings", fields: ["scopes", "tokenPrefix"], visibleWhen: API },
     { label: "@INT:OcrSettings", fields: ["apiKey", "model", "dailyLimit", "responsible"], visibleWhen: OCR },
+    { label: "@INT:IsdsSettings", fields: ["isdsLogin", "isdsPassword"], visibleWhen: ISDS },
     { label: "@INT:MailSettings", fields: ["smtpHost", "smtpPort", "smtpSecurity", "smtpUser", "smtpPassword", "fromEmail", "fromName", "replyTo", "bccSelf", "signature"], visibleWhen: MAIL },
     { label: "@INT:State", fields: ["lastCheckAt", "lastResult"] },
   ],
@@ -632,6 +640,22 @@ export default defineModule({
       NotifyDocs: "Doklady ke zpracování: {attention} ke kontrole, {failed} s chybou",
       KindMail: "Pošta (e-mail)",
       KindScale: "Pokladní váha",
+      KindIsds: "Datová schránka",
+      DrvIsds: "Datová schránka (ostrá)",
+      DrvIsdsTest: "Datová schránka – veřejný test (czebox)",
+      IsdsSettings: "Datová schránka",
+      IsdsLogin: "Přihlašovací jméno",
+      IsdsPassword: "Heslo",
+      IsdsNoLogin: "Doplňte přihlašovací jméno a heslo datové schránky v napojení.",
+      IsdsBadLogin: "Datová schránka odmítla přihlášení — zkontrolujte jméno a heslo v napojení.",
+      IsdsUnreachable: "Datovou schránku se nepodařilo kontaktovat: {error}",
+      IsdsHttp: "Datová schránka vrátila chybu {status}.",
+      IsdsError: "Datová schránka: {message} ({code})",
+      IsdsNoId: "Zpráva se neodeslala — datová schránka nevrátila číslo zprávy.",
+      IsdsBadRecipient: "ID datové schránky finančního úřadu musí mít 7 znaků (Daňové parametry).",
+      IsdsOwnBox: "Přihlášení v pořádku, schránka {box}.",
+      IsdsNoConnection: "Chybí aktivní napojení druhu Datová schránka (Integrace → Napojení).",
+      IsdsLiveOnTest: "Na testovacím serveru jde jen veřejný test datové schránky (czebox) — ostré podání jen z produkce.",
       DrvScaleSerial: "Váha na sériovém portu (RS-232 / USB)",
       ScaleTest: "Zkouška váhy",
       ScaleBeep: "Pípnout při přidání do nákupu",
@@ -1167,6 +1191,22 @@ export default defineModule({
       NotifyDocs: "Documents to process: {attention} to review, {failed} failed",
       KindMail: "Mail (e-mail)",
       KindScale: "Checkout scale",
+      KindIsds: "Data box",
+      DrvIsds: "Data box (live)",
+      DrvIsdsTest: "Data box – public test (czebox)",
+      IsdsSettings: "Data box",
+      IsdsLogin: "Login",
+      IsdsPassword: "Password",
+      IsdsNoLogin: "Fill in the data box login and password in the connection.",
+      IsdsBadLogin: "The data box rejected the login — check the name and password in the connection.",
+      IsdsUnreachable: "Could not reach the data box: {error}",
+      IsdsHttp: "The data box returned error {status}.",
+      IsdsError: "Data box: {message} ({code})",
+      IsdsNoId: "The message was not sent — the data box returned no message id.",
+      IsdsBadRecipient: "The tax office data box id must have 7 characters (Tax parameters).",
+      IsdsOwnBox: "Login OK, data box {box}.",
+      IsdsNoConnection: "No active Data box connection (Integrations → Connections).",
+      IsdsLiveOnTest: "The test server allows only the public data box test (czebox) — live filing only from production.",
       DrvScaleSerial: "Scale on a serial port (RS-232 / USB)",
       ScaleTest: "Scale test",
       ScaleBeep: "Beep when added to the sale",

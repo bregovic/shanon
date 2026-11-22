@@ -20,6 +20,8 @@ const ACTIONS: Record<string, () => Promise<OutsideAction>> = {
   "hr.employee:invite": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./portal-app")).inviteToPortal(ctx, "hr.employee", id, client),
   "int.portalContact:invite": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./portal-app")).inviteToPortal(ctx, "int.portalContact", id, client),
   // smazání firmy i s daty (superuživatel — sys.company je adminOnly, ověří runAction)
+  // podání přiznání / kontrolního hlášení datovou schránkou (potvrzení opsáním období ověřilo UI a runAction)
+  "tax.return:sendIsds": async () => (await import("./tax-isds")).sendReturnIsds,
   "sys.company:deleteWithData": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./company-delete")).deleteCompanyWithData(ctx, id, client),
 };
 

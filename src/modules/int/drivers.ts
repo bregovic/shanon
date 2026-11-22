@@ -5,6 +5,7 @@
  *
  * Každá komunikace s vnější službou se zapíše do protokolu int.log.
  */
+import { isdsOwnBox } from "./isds";
 import { checkDocument, docOriginator, listDocumentFull, TARGETS } from "./documents";
 import { testOpenAi } from "./ocr";
 import { randomUUID } from "node:crypto";
@@ -41,6 +42,7 @@ import {
 export const DRIVERS: Record<string, string[]> = {
   ocr: ["openai", "openaiTest"],
   mail: ["system", "smtp", "mailTest"],
+  isds: ["isds", "isdsTest"],
   eet: ["eet2", "eetSimulator"],
   printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator", "comgate", "gatewaySim"],
@@ -709,6 +711,19 @@ export const intHandlers: Record<string, ObjectHandlers> = {
           return setCheck(ctx.data, conn, ctx.t("@INT:TestOk"));
         // váha visí na sériovém portu počítače pokladny — zkouší se v prohlížeči (Zkouška váhy s tímto napojením)
         if (conn.kind === "scale") return { href: `/int/scale-test?conn=${conn.id}` };
+        // datová schránka: ověření přihlášení (bez odeslání zprávy)
+        if (conn.kind === "isds") {
+          try {
+            const box = await isdsOwnBox(conn);
+            await writeLog(ctx.data, conn, "isds.test", "ok", { message: box });
+            return setCheck(ctx.data, conn, ctx.t("@INT:IsdsOwnBox", { box }));
+          } catch (e) {
+            const msg = e instanceof UserError ? ctx.t(e.label, e.params) : String(e);
+            await writeLog(ctx.data, conn, "isds.test", "error", { message: msg });
+            await setCheck(ctx.data, conn, msg);
+            throw e;
+          }
+        }
         if (conn.kind === "mail") {
           try {
             await verifyMail(conn);

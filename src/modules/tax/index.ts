@@ -346,6 +346,8 @@ export const parameters = defineObject({
     phone: { edt: Edts.Phone },
     email: { edt: Edts.Email },
     dataBoxId: { edt: Str("DataBoxId", "@TAX:DataBoxId", 7, /^[a-z0-9]{7}$/i) },
+    /** ID datové schránky finančního úřadu (příjemce podání) */
+    taxOfficeDataBox: { edt: Str("TaxOfficeDataBox", "@TAX:TaxOfficeDataBox", 7, /^[a-z0-9]{7}$/i), help: "@TAX:TaxOfficeDataBoxHelp" },
     preparerFirstName: { edt: Str("PrepFirst", "@TAX:PreparerFirstName", 40) },
     preparerLastName: { edt: Str("PrepLast", "@TAX:PreparerLastName", 40) },
   },
@@ -355,7 +357,7 @@ export const parameters = defineObject({
     { label: "@TAX:Office", fields: ["taxOfficeCode", "taxOfficeBranch", "subjectType", "filingPeriod", "taxOfficeVendorId"] },
     { label: "@TAX:NaturalPersonName", fields: ["firstName", "lastName"] },
     { label: "@TAX:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode"] },
-    { label: "@TAX:Contact", fields: ["phone", "email", "dataBoxId", "preparerFirstName", "preparerLastName"] },
+    { label: "@TAX:Contact", fields: ["phone", "email", "dataBoxId", "taxOfficeDataBox", "preparerFirstName", "preparerLastName"] },
   ],
 });
 
@@ -375,6 +377,9 @@ export const vatReturn = defineObject({
     month: { edt: Edts.Int, label: "@TAX:Month" },
     quarter: { edt: Edts.Int, label: "@TAX:Quarter" },
     status: { edt: enumEdt(ReturnStatus), mandatory: true, default: "draft", readOnly: true },
+    /** podání datovou schránkou: ID datové zprávy a kdy odešla */
+    isdsMessageId: { edt: Str("IsdsMessageId", "@TAX:IsdsMessage", 20), readOnly: true },
+    sentAt: { edt: Edts.TransDate, label: "@INT:SentAt", readOnly: true },
     computedAt: { edt: Edts.TransDate, label: "@TAX:ComputedAt", readOnly: true },
     // Platba DPH: závazek vůči FÚ (zaúčtování, VS = DIČ, splatnost 25. den po období)
     paymentAmount: Amt("@TAX:PaymentAmount"),
@@ -401,7 +406,7 @@ export const vatReturn = defineObject({
   titleField: "period",
   list: ["kind", "period", "status", "taxOut", "deduction", "result", "computedAt"],
   form: [
-    { label: "@TAX:Period", fields: ["kind", "year", "month", "quarter", "period", "status", "computedAt"] },
+    { label: "@TAX:Period", fields: ["kind", "year", "month", "quarter", "period", "status", "computedAt", "isdsMessageId", "sentAt"] },
     { label: "@TAX:OutputSection", fields: ["out21Base", "out21Tax", "out12Base", "out12Tax", "taxOut"] },
     { label: "@TAX:InputSection", fields: ["in21Base", "in21Tax", "in12Base", "in12Tax", "deduction"] },
     { label: "@TAX:Result", fields: ["result", "a4Count", "b2Count", "warnings"] },
@@ -416,6 +421,8 @@ export const vatReturn = defineObject({
     { id: "postPayment", label: "@TAX:PostPayment", when: { field: "voucherId", equals: null }, module: "ap" },
     { id: "xml", label: "@TAX:DownloadXml", download: true },
     { id: "file", label: "@TAX:MarkFiled", when: { field: "status", equals: "draft" } },
+    // podání datovou schránkou: nevratné, uživatel opíše období
+    { id: "sendIsds", label: "@TAX:SendIsds", outside: true, when: { field: "status", equals: "draft" }, confirm: { field: "period", text: "@TAX:SendIsdsConfirm" } },
   ],
   lockedWhen: { field: "status", equals: "filed" },
 });
@@ -580,6 +587,12 @@ export default defineModule({
       HouseNo: "Číslo popisné",
       OrientNo: "Číslo orientační",
       DataBoxId: "Datová schránka",
+      TaxOfficeDataBox: "Datová schránka finančního úřadu",
+      TaxOfficeDataBoxHelp: "ID schránky příslušného finančního úřadu (7 znaků) — sem odejde podání datovou schránkou.",
+      SendIsds: "Odeslat datovou schránkou",
+      SendIsdsConfirm: "Podání odejde na finanční úřad a nejde vzít zpět. Pro potvrzení opište období:",
+      IsdsMessage: "Datová zpráva",
+      IsdsSent: "Odesláno datovou schránkou, zpráva {id}.",
       PreparerFirstName: "Sestavil – jméno",
       PreparerLastName: "Sestavil – příjmení",
       Office: "Úřad a období",
@@ -805,6 +818,12 @@ export default defineModule({
       HouseNo: "House number",
       OrientNo: "Street number",
       DataBoxId: "Data box",
+      TaxOfficeDataBox: "Tax office data box",
+      TaxOfficeDataBoxHelp: "Data box id of the competent tax office (7 characters) — the filing is sent there.",
+      SendIsds: "Send via data box",
+      SendIsdsConfirm: "The filing goes to the tax office and cannot be withdrawn. To confirm, type the period:",
+      IsdsMessage: "Data message",
+      IsdsSent: "Sent via data box, message {id}.",
       PreparerFirstName: "Prepared by – first name",
       PreparerLastName: "Prepared by – last name",
       Office: "Office and period",
