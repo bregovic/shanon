@@ -39,6 +39,34 @@ async function partnerOf(data: DataApi, docs: OrderDocs, id: unknown) {
   return p;
 }
 
+/** Faktura (koncept) z objednávky: řádky se zkopírují, uhrazená záloha objednávky se předvyplní k odečtu. */
+export async function invoiceFromOrder(data: DataApi, docs: OrderDocs, o: RecordData): Promise<RecordData> {
+  const { cfg } = docs;
+  const pf = cfg.partnerField;
+  if (o.status === "invoiced" || o.status === "cancelled") throw new UserError("@GL:Locked");
+  const lines = await data.find(docs.orderLine, { orderId: o.id });
+  if (!lines.length) throw new UserError("@GL:NoLines");
+  // uhrazená, dosud nevyúčtovaná záloha objednávky
+  const [adv] = (await data.find(docs.advance, { orderId: o.id, status: "paid" }, { take: 1 })) as RecordData[];
+  const inv = await data.create(cfg.header, {
+    [pf]: o[pf],
+    currencyId: o.currencyId ?? null,
+    taxGroupId: o.taxGroupId ?? null,
+    ...("pricesInclTax" in o ? { pricesInclTax: !!o.pricesInclTax } : {}),
+    description: o.description ?? null,
+    orderId: o.id,
+    advanceId: adv?.id ?? null,
+    ...(o.agreementId ? { agreementId: o.agreementId } : {}),
+  });
+  for (const l of lines) {
+    const row: RecordData = { [cfg.lineHeaderField]: inv.id, [cfg.lineAccountField]: l[cfg.lineAccountField] ?? null };
+    for (const f of LINE_FIELDS) row[f] = l[f] ?? null;
+    await data.create(docs.invoiceLine, row);
+  }
+  await data.update(docs.order, String(o.id), { status: "invoiced", invoiceId: inv.id });
+  return inv;
+}
+
 /** Smazání konceptu faktury z objednávky vrátí objednávku k fakturaci. */
 export async function releaseOrder(data: DataApi, docs: OrderDocs, invoice: RecordData) {
   if (!invoice.orderId) return;
@@ -80,26 +108,7 @@ export function orderHandlers(docs: OrderDocs): Record<string, ObjectHandlers> {
           });
         },
         async createInvoice(ctx, o) {
-          if (o.status === "invoiced" || o.status === "cancelled") throw new UserError("@GL:Locked");
-          const lines = await ctx.data.find(docs.orderLine, { orderId: o.id });
-          if (!lines.length) throw new UserError("@GL:NoLines");
-          // uhrazená, dosud nevyúčtovaná záloha objednávky
-          const [adv] = (await ctx.data.find(docs.advance, { orderId: o.id, status: "paid" }, { take: 1 })) as RecordData[];
-          const inv = await ctx.data.create(cfg.header, {
-            [pf]: o[pf],
-            currencyId: o.currencyId ?? null,
-            taxGroupId: o.taxGroupId ?? null,
-            ...("pricesInclTax" in o ? { pricesInclTax: !!o.pricesInclTax } : {}),
-            description: o.description ?? null,
-            orderId: o.id,
-            advanceId: adv?.id ?? null,
-          });
-          for (const l of lines) {
-            const row: RecordData = { [cfg.lineHeaderField]: inv.id, [cfg.lineAccountField]: l[cfg.lineAccountField] ?? null };
-            for (const f of LINE_FIELDS) row[f] = l[f] ?? null;
-            await ctx.data.create(docs.invoiceLine, row);
-          }
-          await ctx.data.update(docs.order, String(o.id), { status: "invoiced", invoiceId: inv.id });
+          await invoiceFromOrder(ctx.data, docs, o);
         },
       },
     },

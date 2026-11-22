@@ -10,6 +10,7 @@ import { defineObject, type ObjectDef } from "@/core/object";
 import { DIM_NAMES, DupCheck, JournalStatus, dimFields } from "@/modules/gl";
 import { documentLineHandlers, invoiceHandlers, type InvoiceConfig } from "./document";
 import { orderHandlers, releaseOrder, vatPayer } from "./orders";
+import { AgreementStatus, agreementHandlers, agreementObject, agreementParamFields, runAgreements, type AgreementDocs } from "./agreements";
 import { postingAccount } from "@/modules/gl/setup";
 import { fillFromAres } from "@/modules/gab/ares";
 import { createFromRegistry } from "@/modules/gab/registry-lookup";
@@ -98,6 +99,8 @@ export interface PartnerLedgerSpec {
   invoiceSeq: string;
   orderSeq: string;
   advanceSeq: string;
+  /** smlouvy (předplatné na období) */
+  agreementSeq: string;
   /** účet záloh (přijaté 324 / poskytnuté 314) — výchozí syntetika */
   advanceAccount: string;
   /** u přijatých faktur číslo dokladu dodavatele */
@@ -164,12 +167,14 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       /** výchozí účtovací profil faktur (prázdné = účet ze skupiny partnera) */
       postingProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfileDefault") },
       ...(sp.side === -1 ? { donationProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfileDonation") } } : {}),
+      ...agreementParamFields,
     },
     titleField: "invoiceNumCheck",
     list: ["invoiceNumCheck", "postingProfileId"],
     form: [
       { label: "@GL:Checks", fields: ["invoiceNumCheck"] },
       { label: "@GL:Posting", fields: ["postingProfileId", ...(sp.side === -1 ? ["donationProfileId"] : [])] },
+      { label: L("Agreements"), fields: Object.keys(agreementParamFields) },
     ],
   });
 
@@ -302,13 +307,14 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     status: { edt: enumEdt(JournalStatus), mandatory: true, default: "draft", readOnly: true },
     voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher"), readOnly: true },
     orderId: { edt: refEdt(id("order"), L("Order")), readOnly: true },
+    agreementId: { edt: refEdt(id("agreement"), L("Agreement")), readOnly: true },
     /** uhrazená záloha partnera — odečte se při zaúčtování */
     advanceId: { edt: refEdt(id("advance"), L("Advance")) },
     advanceAmount: { edt: Edts.Amount, label: "@TAX:AdvanceDeducted", readOnly: true },
     emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
     emailedTo: { edt: Edts.Description, label: "@TAX:EmailedTo", readOnly: true },
   };
-  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType", "paymentState"] : []), partnerId, "taxGroupId", "postingProfileId", ...(sp.side === 1 ? ["pricesInclTax"] : []), "description", "orderId", "advanceId"];
+  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType", "paymentState"] : []), partnerId, "taxGroupId", "postingProfileId", ...(sp.side === 1 ? ["pricesInclTax"] : []), "description", "orderId", "advanceId", "agreementId"];
   const invoice = defineObject({
     id: id("invoice"),
     table: `${m}_invoice`,
@@ -398,12 +404,13 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       amountGross: { edt: Edts.Amount, label: "@TAX:AmountGross", readOnly: true },
       status: { edt: enumEdt(OrderStatus), mandatory: true, default: "open", readOnly: true },
       invoiceId: { edt: refEdt(id("invoice"), L("Invoice")), readOnly: true },
+      agreementId: { edt: refEdt(id("agreement"), L("Agreement")), readOnly: true },
     },
     titleField: "orderNum",
     titleRef: partnerId,
     list: ["orderNum", "externalRef", partnerId, "orderDate", "deliveryDate", "currencyId", "amountNet", "taxAmount", "amountGross", "status", "invoiceId"],
     form: [
-      { label: "@TAX:Header", fields: ["orderNum", "externalRef", partnerId, "description"] },
+      { label: "@TAX:Header", fields: ["orderNum", "externalRef", partnerId, "description", "agreementId"] },
       { label: "@TAX:Dates", fields: ["orderDate", "deliveryDate", "warehouseId", "currencyId", "taxGroupId", ...(sp.side === 1 ? ["pricesInclTax"] : [])] },
       { label: "@TAX:Amounts", fields: ["amountNet", "taxAmount", "amountGross", "status", "invoiceId"] },
     ],
@@ -486,12 +493,13 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       paidAmount: { edt: Edts.Amount, label: "@TAX:PaidAmount", readOnly: true },
       settledAmount: { edt: Edts.Amount, label: "@TAX:SettledAmount", readOnly: true },
       status: { edt: enumEdt(AdvanceStatus), mandatory: true, default: "open", readOnly: true },
+      agreementId: { edt: refEdt(id("agreement"), L("Agreement")), readOnly: true },
     },
     titleField: "advanceNum",
     titleRef: partnerId,
     list: ["advanceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "issueDate", "dueDate", "vs", "currencyId", "amount", "paidAmount", "settledAmount", "status"],
     form: [
-      { label: "@TAX:Header", fields: ["advanceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "orderId", "description"] },
+      { label: "@TAX:Header", fields: ["advanceNum", ...(sp.externalNum ? ["externalNum"] : []), partnerId, "orderId", "agreementId", "description"] },
       { label: "@TAX:Dates", fields: ["issueDate", "dueDate", "currencyId", "vs"] },
       { label: "@TAX:Amounts", fields: ["amount", "paidAmount", "settledAmount", "status"] },
       { label: "@TAX:AdvanceVat", fields: ["taxCodeId", "taxDocNum", "taxDate", "taxBase", "taxAmount"] },
@@ -505,6 +513,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     ],
     lockedWhen: { field: "status", equals: "settled" },
   });
+
+  const agreement = agreementObject(m, L, partnerId, id(sp.partner), sp.agreementSeq);
 
   const trans = defineObject({
     id: id("trans"),
@@ -565,14 +575,30 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   const orderCfg: InvoiceConfig = { ...cfg, header: order.id, line: orderLine.id, lineHeaderField: "orderId", lockedStatuses: ["invoiced", "cancelled"] };
   const docs = { cfg, order: order.id, orderLine: orderLine.id, invoiceLine: invoiceLine.id, advance: advance.id, vsSource: sp.externalNum ? "externalNum" : "advanceNum" };
   const inv = invoiceHandlers(cfg);
+  const agrDocs: AgreementDocs = { ...docs, agreement: agreement.id, parameters: params.id, partnerField: partnerId, sales: sp.side === 1 };
 
   return {
     /** konfigurace faktur (zaúčtování faktury z jiného modulu, např. prodej na fakturu z pokladny) */
     cfg,
-    enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ApPaymentState, ProfileAccountCode],
-    objects: [params, group, profile, profileLine, partner, order, orderLine, invoice, invoiceLine, advance, trans],
+    /** smlouvy (dávka, portál) */
+    agreementDocs: agrDocs,
+    enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ApPaymentState, ProfileAccountCode, AgreementStatus],
+    objects: [params, group, profile, profileLine, partner, agreement, order, orderLine, invoice, invoiceLine, advance, trans],
+    /** smlouvy: výzvy k platbě na další období a blokace po lhůtě (denně) */
+    jobs: [
+      {
+        id: `${m}.${m}Agreements`,
+        label: "@TAX:AgrJob",
+        default: { recurrence: "days" as const, every: 1, at: "06:00" },
+        async run(ctx: EventContext) {
+          const r = await runAgreements(ctx.data, agrDocs);
+          return ctx.t("@TAX:AgrJobDone", { issued: String(r.issued), blocked: String(r.blocked) });
+        },
+      },
+    ],
     handlers: {
       ...inv,
+      ...agreementHandlers(agrDocs),
       ...documentLineHandlers(orderCfg),
       ...orderHandlers(docs),
       // faktura z objednávky: smazáním konceptu se objednávka vrátí k fakturaci
@@ -620,7 +646,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       } as ObjectHandlers,
     },
     menu: [
-      { label: L("Module"), items: [{ object: partner.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }, { object: "gl.journal", href: `/gl/journal?filter.journalType=${sp.side === 1 ? "customerPayment" : "vendorPayment"}`, label: "@GL:JournalsPayment", module: "gl" }, ...(sp.side === -1 ? [{ object: "bank.paymentOrder", module: "bank" }] : [])] },
+      { label: L("Module"), items: [{ object: partner.id }, { object: agreement.id }, { object: order.id }, { object: invoice.id }, { object: advance.id }, { object: trans.id }, { object: "gl.journal", href: `/gl/journal?filter.journalType=${sp.side === 1 ? "customerPayment" : "vendorPayment"}`, label: "@GL:JournalsPayment", module: "gl" }, ...(sp.side === -1 ? [{ object: "bank.paymentOrder", module: "bank" }] : [])] },
       // nahrání dokladů k vytěžení (Integrace), cíl předvolený podle agendy
       { label: L("Module"), kind: "functions" as const, items: [{ href: `/int/doc-import?target=${m}Invoice`, label: "@INT:DocImport", module: "int" }] },
       { label: "@SYS:Setup", items: [{ object: params.id }, { object: group.id }, { object: profile.id }, { object: "tax.paymentTerm" }] },

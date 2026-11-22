@@ -484,6 +484,16 @@ export const document = defineObject({
  * Soubor jde do Dokladů ke zpracování (příloha v úložišti), vytěžení podle nastavení,
  * zalistování vždy schvaluje člověk. Odkaz nese tajný klíč; limity chrání před zahlcením.
  */
+/** K čemu portál slouží: nahrání dokladů dodavateli, nebo uzavření smlouvy (členství, předplatné). */
+export const PortalPurpose = defineEnum({
+  id: "IntPortalPurpose",
+  label: "@INT:PortalPurpose",
+  values: [
+    { value: "documents", label: "@INT:PortalPurposeDocs" },
+    { value: "agreement", label: "@INT:PortalPurposeAgreement" },
+  ],
+});
+
 export const portal = defineObject({
   id: "int.portal",
   table: "int_portal",
@@ -493,6 +503,10 @@ export const portal = defineObject({
   fields: {
     name: { edt: Edts.Name, mandatory: true },
     active: { edt: Edts.NoYes, label: "@INT:PortalActive", default: true },
+    purpose: { edt: enumEdt(PortalPurpose), mandatory: true, default: "documents" },
+    /** smlouva: znění, které zájemce potvrzuje (uloží se ke smlouvě), skupina nových odběratelů */
+    agreementTerms: { edt: Edts.Notes, label: "@INT:PortalAgreementTerms", help: "@INT:PortalAgreementTermsHelp" },
+    agreementGroupId: { edt: refEdt("ar.group", "@INT:PortalAgreementGroup"), optionalRef: true },
     /** tajná část odkazu (vygeneruje se; Nový odkaz zneplatní starý) */
     token: { edt: Str("IntPortalToken", "@INT:PortalToken", 64), readOnly: true },
     /** druhá část jednoduché adresy /<zkratka organizace>/<slug> (výchozí „doklady“) */
@@ -519,10 +533,11 @@ export const portal = defineObject({
   titleField: "name",
   list: ["name", "active", "publicUrl", "autoExtract", "dailyLimit"],
   form: [
-    { label: "@SYS:General", fields: ["name", "active", "slug", "publicUrl", "responsible"] },
+    { label: "@SYS:General", fields: ["name", "active", "purpose", "slug", "publicUrl", "responsible"] },
     { label: "@INT:PortalPage", fields: ["title", "intro"] },
-    { label: "@INT:PortalKinds", fields: ["allowInvoice", "allowAdvance", "allowOrder", "allowOther", "requireRegNo", "autoExtract"] },
-    { label: "@INT:PortalApp", fields: ["appVendors", "appEmployees"] },
+    { label: "@INT:PortalAgreement", fields: ["agreementTerms", "agreementGroupId"], visibleWhen: { field: "purpose", in: ["agreement"] } },
+    { label: "@INT:PortalKinds", fields: ["allowInvoice", "allowAdvance", "allowOrder", "allowOther", "requireRegNo", "autoExtract"], visibleWhen: { field: "purpose", in: ["documents"] } },
+    { label: "@INT:PortalApp", fields: ["appVendors", "appEmployees"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalLimits", fields: ["maxFileMb", "maxFiles", "ipHourLimit", "dailyLimit"] },
   ],
   lines: [{ object: "int.portalUpload", field: "portalId", label: "@INT:PortalUploads", owned: false }],
@@ -635,7 +650,7 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity],
+  enums: [PortalPurpose, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity],
   objects: [connection, log, portal, portalUpload, portalContact, document, documentLine, mail],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
@@ -890,6 +905,23 @@ export default defineModule({
       PortalPage: "Stránka pro dodavatele",
       PortalKinds: "Doklady a zpracování",
       PortalLimits: "Limity (ochrana před zahlcením)",
+      PortalPurpose: "Účel portálu",
+      PortalPurposeDocs: "Nahrání dokladů",
+      PortalPurposeAgreement: "Smlouva (členství, předplatné)",
+      PortalAgreement: "Smlouva",
+      PortalAgreementTerms: "Znění smlouvy",
+      PortalAgreementTermsHelp: "Text, který zájemce na portálu čte a potvrzuje. Uloží se ke smlouvě. Tarify = položky s vyplněnou délkou období.",
+      PortalAgreementGroup: "Skupina nových odběratelů",
+      PortalAgrTariff: "Vyberte tarif.",
+      PortalAgrName: "Vyplňte jméno a příjmení.",
+      PortalAgrEmail: "Vyplňte platný e-mail.",
+      PortalAgrPhone: "Vyplňte telefon.",
+      PortalAgrAddress: "Vyplňte adresu (ulice, město, PSČ).",
+      PortalAgrConsent: "Bez souhlasu se smlouvou ji nejde uzavřít.",
+      PortalAgrStart: "Začátek nesmí být v minulosti.",
+      PortalAgrLimit: "Z této adresy přišlo příliš mnoho žádostí. Zkuste to později.",
+      PortalAgrNoTariff: "Portál zatím nenabízí žádný tarif.",
+      NotifyAgreement: "Nová smlouva z portálu: {name} ({tariff})",
       OtherDoc: "Jiný doklad",
       RequireRegNo: "Povinné IČO",
       AutoExtract: "Vytěžit automaticky",
@@ -1452,6 +1484,23 @@ export default defineModule({
       PortalPage: "Supplier page",
       PortalKinds: "Documents and processing",
       PortalLimits: "Limits (flood protection)",
+      PortalPurpose: "Portal purpose",
+      PortalPurposeDocs: "Document upload",
+      PortalPurposeAgreement: "Agreement (membership, subscription)",
+      PortalAgreement: "Agreement",
+      PortalAgreementTerms: "Agreement terms",
+      PortalAgreementTermsHelp: "Text the applicant reads and confirms on the portal. Stored with the agreement. Tariffs = items with a period length.",
+      PortalAgreementGroup: "Group for new customers",
+      PortalAgrTariff: "Choose a tariff.",
+      PortalAgrName: "Fill in first and last name.",
+      PortalAgrEmail: "Fill in a valid e-mail.",
+      PortalAgrPhone: "Fill in a phone number.",
+      PortalAgrAddress: "Fill in the address (street, city, ZIP).",
+      PortalAgrConsent: "The agreement cannot be concluded without consent.",
+      PortalAgrStart: "The start date cannot be in the past.",
+      PortalAgrLimit: "Too many requests from this address. Try again later.",
+      PortalAgrNoTariff: "The portal does not offer any tariff yet.",
+      NotifyAgreement: "New agreement from the portal: {name} ({tariff})",
       OtherDoc: "Other document",
       RequireRegNo: "Company ID required",
       AutoExtract: "Extract automatically",

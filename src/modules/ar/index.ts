@@ -17,6 +17,7 @@ export const ar = partnerLedger({
   invoiceSeq: "ARINV",
   orderSeq: "ARORD",
   advanceSeq: "ARADV",
+  agreementSeq: "ARAGR",
   advanceAccount: "324",
   profiles: [
     { code: "STANDARD", name: "Standardní (účet ze skupiny odběratelů)" },
@@ -35,8 +36,10 @@ export default defineModule({
   dependsOn: ["gab", "gl", "tax", "prt"],
   enums: ar.enums,
   objects: ar.objects,
+  jobs: ar.jobs,
   menu: ar.menu,
   numberSeqs: [
+    { code: "ARAGR", name: "@AR:Agreements", format: "SM{YY}{#####}", usedFor: "ar.agreement" },
     { code: "ARCUST", name: "@AR:Partners", format: "ODB{#####}", usedFor: "ar.customer" },
     { code: "ARINV", name: "@AR:Invoices", format: "FV{YY}{#####}", usedFor: "ar.invoice", continuous: true },
     { code: "ARORD", name: "@AR:Orders", format: "PO{YY}{#####}", usedFor: "ar.order" },
@@ -46,6 +49,8 @@ export default defineModule({
   setup: ar.setup({ code: "TUZ", name: "Tuzemští odběratelé", summary: "311", line: "604", taxCode: "V21" }),
   labels: {
     cs: {
+      Agreement: "Prodejní smlouva",
+      Agreements: "Prodejní smlouvy",
       AdvanceTaxDocs: "Daňové doklady k přijatým platbám",
       Order: "Prodejní objednávka",
       Orders: "Prodejní objednávky",
@@ -71,6 +76,8 @@ export default defineModule({
       TransPlural: "Saldo odběratelů",
     },
     en: {
+      Agreement: "Sales agreement",
+      Agreements: "Sales agreements",
       AdvanceTaxDocs: "Tax documents for received payments",
       Order: "Sales order",
       Orders: "Sales orders",

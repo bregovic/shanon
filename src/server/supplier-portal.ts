@@ -50,7 +50,7 @@ async function resolveSimple(entity: string, path: string, client: PrismaClient)
   return p?.token ? { tenantId: k.tenantId, token: String(p.token) } : null;
 }
 
-async function load(tenantIdOrEntity: string, tokenOrPath: string, client: PrismaClient): Promise<Loaded | null> {
+export async function loadPortal(tenantIdOrEntity: string, tokenOrPath: string, client: PrismaClient): Promise<Loaded | null> {
   // jednoduchá adresa (zkratka organizace + adresa portálu), jinak odkaz s tajným klíčem
   let tenantId = tenantIdOrEntity;
   let token = tokenOrPath;
@@ -95,7 +95,7 @@ const kindsOf = (p: RecordData): PortalKind[] =>
 
 /** Údaje pro veřejnou stránku (null = odkaz neplatí). */
 export async function portalInfo(tenantId: string, token: string, client: PrismaClient = prisma): Promise<PortalInfo | null> {
-  const l = await load(tenantId, token, client);
+  const l = await loadPortal(tenantId, token, client);
   if (!l) return null;
   const t = await getT("cs", l.ctx.tenantId);
   const labels: Record<PortalKind, string> = { invoice: t("@AP:Invoice"), advance: t("@AP:Advance"), order: t("@AP:Order"), other: t("@INT:OtherDoc") };
@@ -126,7 +126,7 @@ export interface PortalResult {
 
 /** Přijetí dokladů z veřejné stránky. `ip` slouží jen k limitu (ukládá se otisk, ne adresa). */
 export async function portalSubmit(tenantId: string, token: string, input: PortalInput, ip: string, client: PrismaClient = prisma): Promise<PortalResult | null> {
-  const l = await load(tenantId, token, client);
+  const l = await loadPortal(tenantId, token, client);
   if (!l) return null;
   const t = await getT("cs", l.ctx.tenantId);
   const p = l.portal;

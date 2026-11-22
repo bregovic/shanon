@@ -195,11 +195,13 @@ describe("číselné řady a výchozí nastavení", () => {
     const seqs = (await listRecords(A, "sys.numberSeq", {}, client)).rows;
     expect(seqs.map((x) => `${x.code}:${x.usedFor}`).sort()).toEqual([
       "APADV:ap.advance",
+      "APAGR:ap.agreement",
       "APINV:ap.invoice",
       "APORD:ap.order",
       "APVEND:ap.vendor",
       "ARADV:ar.advance",
       "ARADVT:null",
+      "ARAGR:ar.agreement",
       "ARCUST:ar.customer",
       "ARINV:ar.invoice",
       "ARORD:ar.order",

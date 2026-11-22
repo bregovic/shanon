@@ -17,6 +17,7 @@ export const ap = partnerLedger({
   invoiceSeq: "APINV",
   orderSeq: "APORD",
   advanceSeq: "APADV",
+  agreementSeq: "APAGR",
   advanceAccount: "314",
   externalNum: true,
   profiles: [
@@ -39,8 +40,10 @@ export default defineModule({
   dependsOn: ["gab", "gl", "tax"],
   enums: ap.enums,
   objects: ap.objects,
+  jobs: ap.jobs,
   menu: ap.menu,
   numberSeqs: [
+    { code: "APAGR", name: "@AP:Agreements", format: "NS{YY}{#####}", usedFor: "ap.agreement" },
     { code: "APVEND", name: "@AP:Partners", format: "DOD{#####}", usedFor: "ap.vendor" },
     { code: "APINV", name: "@AP:Invoices", format: "FP{YY}{#####}", usedFor: "ap.invoice" },
     { code: "APORD", name: "@AP:Orders", format: "NO{YY}{#####}", usedFor: "ap.order" },
@@ -49,6 +52,8 @@ export default defineModule({
   setup: ap.setup({ code: "TUZ", name: "Tuzemští dodavatelé", summary: "321", line: "518", taxCode: "P21" }),
   labels: {
     cs: {
+      Agreement: "Nákupní smlouva",
+      Agreements: "Nákupní smlouvy",
       Order: "Nákupní objednávka",
       Orders: "Nákupní objednávky",
       OrderRef: "Potvrzení dodavatele",
@@ -74,6 +79,8 @@ export default defineModule({
       TransPlural: "Saldo dodavatelů",
     },
     en: {
+      Agreement: "Purchase agreement",
+      Agreements: "Purchase agreements",
       Order: "Purchase order",
       Orders: "Purchase orders",
       OrderRef: "Vendor confirmation",

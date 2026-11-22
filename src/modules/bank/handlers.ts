@@ -18,6 +18,7 @@ import { accountingCurrencyId, convertLines, postVoucher, type PostingLine } fro
 import { checkStatement, decodeGpc, parseGpc } from "./gpc";
 import type { GpcStatement } from "./gpc";
 import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
+import { agreementAdvancePaid } from "@/modules/tax/agreements";
 import { checkStatementChain, journalFromStatement } from "./payments";
 
 const zero = BigInt(0);
@@ -297,6 +298,8 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
         vs: l.vs ?? null,
         currencyId: cur,
       });
+      // výzva smlouvy: aktivace na zaplacené období + faktura (výnos / náklad)
+      await agreementAdvancePaid(data, isCust ? "customer" : "vendor", String(isCust ? l.customerAdvanceId : l.vendorAdvanceId));
       continue;
     }
     // úhrada partnera bez faktury: položka „Úhrada“ v saldu (spáruje se později)
