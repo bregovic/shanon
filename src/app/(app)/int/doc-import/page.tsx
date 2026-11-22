@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { DocImportView } from "@/components/doc-import-view";
 import { can } from "@/core/security";
-import { DocTarget } from "@/modules/int";
+import { DocPaymentState, DocTarget } from "@/modules/int";
+import { inTenant } from "@/server/data";
 import { requireSession } from "@/server/auth";
 import { getT } from "@/server/i18n";
 import { objectHref } from "@/server/ui";
@@ -20,6 +21,11 @@ export default async function DocImportPage({ searchParams }: { searchParams: Pr
     .map((v) => ({ value: v.value, label: t(v.label) }));
   const k = (x: string) => t(`@INT:${x}`);
   const statuses = ["new", "processing", "attention", "ready", "listed", "error", "rejected"];
+  // zaměstnanci pro „placeno zaměstnancem“ (systémově — pracovník nemusí mít právo na Zaměstnance); předvolený = můj e-mail
+  const employees = mods.has("hr")
+    ? await inTenant(s.ctx, async (sess) => (await sess.sys().find("hr.employee", { active: true }, 1000, { lastName: "asc" })).map((e) => ({ id: String(e.id), label: `${e.personalNum} · ${e.name}`, email: String(e.email ?? "").toLowerCase() })))
+    : [];
+  const mine = employees.find((e) => e.email && e.email === s.user.email.toLowerCase())?.id ?? null;
   return (
     <DocImportView
       crumbs={[{ label: k("Module"), href: "/int" }, { label: k("DocImport") }]}
@@ -37,7 +43,14 @@ export default async function DocImportPage({ searchParams }: { searchParams: Pr
         openList: k("DocImportOpenList"),
         uploading: k("DocImportUploading"),
         target: k("DocTarget"),
+        docType: k("DocImportDocType"),
+        payment: k("PaymentState"),
+        employee: k("Employee"),
       }}
+      docTypes={[{ value: "auto", label: k("DocTypeAuto") }, { value: "invoice", label: k("TypeInvoice") }, { value: "receipt", label: k("TypeReceipt") }, { value: "donation", label: k("TypeDonation") }]}
+      payments={DocPaymentState.values.map((v) => ({ value: v.value, label: t(v.label) }))}
+      employees={employees.map(({ id, label }) => ({ id, label }))}
+      defaultEmployeeId={mine}
     />
   );
 }

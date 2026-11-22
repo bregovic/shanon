@@ -319,10 +319,12 @@ export const role = defineObject({
   fields: {
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
+    /** úvodní stránka uživatele s touto rolí po přihlášení (pokladna, nahrání dokladů); prázdné = přehled */
+    homeHref: { edt: defineEdt({ id: "RoleHome", kind: "string", label: "@SYS:RoleHome", maxLength: 200, pattern: /^\/[^/]/, patternMessage: "@SYS:RoleHomeHelp" }), help: "@SYS:RoleHomeHelp" },
   },
   titleField: "code",
-  list: ["code", "name"],
-  form: [{ label: "@SYS:General", fields: ["code", "name"] }],
+  list: ["code", "name", "homeHref"],
+  form: [{ label: "@SYS:General", fields: ["code", "name", "homeHref"] }],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
   lines: [{ object: "sys.rolePermission", field: "roleId", label: "@SYS:Permissions" }],
@@ -504,7 +506,18 @@ export const notificationRead = defineObject({
   unique: [["notificationId", "userId"]],
 });
 
+/** Výchozí role organizace: Pokladník (jen pokladna) a Pracovník (jen nahrání dokladů) — jen chybějící kódy. */
+const DEFAULT_ROLES: { code: string; name: string; homeHref: string; perms: [string, "read" | "write" | "delete"][] }[] = [
+  { code: "POKLADNIK", name: "Pokladník", homeHref: "/kasa", perms: [["pos", "write"]] },
+  { code: "PRACOVNIK", name: "Pracovník", homeHref: "/int/doc-import", perms: [["int.document", "write"]] },
+];
+
 async function sysSetup(data: DataApi) {
+  for (const r of DEFAULT_ROLES) {
+    if ((await data.find("sys.role", { code: r.code }, { take: 1 })).length) continue;
+    const role = await data.create("sys.role", { code: r.code, name: r.name, homeHref: r.homeHref });
+    for (const [target, level] of r.perms) await data.create("sys.rolePermission", { roleId: role.id, target, level });
+  }
   // transformace (formáty) z registru — jen chybějící
   for (const tr of TRANSFORMS) {
     if ((await data.find("sys.transformation", { code: tr.code }, { take: 1 })).length) continue;
@@ -697,6 +710,8 @@ export default defineModule({
       ModulesAndSetup: "Moduly a výchozí nastavení",
       UserSettings: "Moje nastavení",
       Dat: "Společná data (DAT)",
+      RoleHome: "Úvodní stránka",
+      RoleHomeHelp: "Kam se uživatel s touto rolí dostane po přihlášení, např. /kasa (pokladna) nebo /int/doc-import (nahrání dokladů). Prázdné = přehled.",
       FillDat: "Naplnit Společná data z této firmy",
       FillDatDone: "Do Společných dat převzato záznamů: {n}.",
       DatSource: "Ze Společných dat",
@@ -1200,6 +1215,8 @@ export default defineModule({
       ModulesAndSetup: "Modules and default setup",
       UserSettings: "My settings",
       Dat: "Shared data (DAT)",
+      RoleHome: "Home page",
+      RoleHomeHelp: "Where a user with this role lands after signing in, e.g. /kasa (till) or /int/doc-import (document upload). Empty = overview.",
       FillDat: "Fill shared data from this company",
       FillDatDone: "Records taken into shared data: {n}.",
       DatSource: "From shared data",

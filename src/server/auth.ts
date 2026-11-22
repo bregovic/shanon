@@ -78,6 +78,8 @@ export interface AppSession {
   superUser: boolean;
   /** firmy, ve kterých smí spravovat uživatele a nastavení */
   adminCompanyIds: string[];
+  /** úvodní stránka podle role v aktuální firmě (Pokladník → pokladna, Pracovník → nahrání dokladů); správce nemá */
+  homeHref: string | null;
 }
 
 /** Smí spravovat uživatele / nastavení aspoň jedné firmy. */
@@ -129,6 +131,10 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
       : [];
     perms = { admin: false, levels: mergePerms(permRows) };
   }
+  const homeHref =
+    superUser || here?.admin || !here?.roleIds.length
+      ? null
+      : ((await withTenant(tenant.id, (tx) => tx.sysRole.findMany({ where: { tenantId: tenant.id, id: { in: here.roleIds } }, orderBy: { code: "asc" }, select: { homeHref: true } }))).find((r) => r.homeHref)?.homeHref ?? null);
   /** firmy, kde smí spravovat uživatele (superuživatel všechny) */
   const adminCompanyIds = superUser ? allCompanies.map((c) => c.id) : [...assigned.values()].filter((a) => a.admin).map((a) => a.companyId);
 
@@ -165,6 +171,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
     companies,
     superUser,
     adminCompanyIds,
+    homeHref,
   };
 });
 

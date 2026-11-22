@@ -135,6 +135,7 @@ export async function checkDocument(data: DataApi, doc: RecordData, t: T): Promi
   let partnerId: string | null = null;
   let subjectId: string | null = null;
   if (!tg) issues.push(t("@INT:DocNoTarget"));
+  else if (doc.paymentState === "employee" && !doc.employeeId) issues.push(t("@INT:DocNeedEmployee"));
   else if (doc.employeeId) {
     // účtenka zaplacená zaměstnancem: partnerem je zaměstnanec (dodavatel s profilem ZAM), ne obchod z účtenky
     const emp = await data.get("hr.employee", String(doc.employeeId)).catch(() => null);
@@ -271,7 +272,14 @@ export async function listDocument(data: DataApi, doc: RecordData, t: T): Promis
   if (kind === "invoice") {
     header = await data.create(tg.object, {
       ...common,
-      ...(tg.partner === "ap.vendor" ? { externalNum: checked.docNumber ?? null, docType: checked.docType === "receipt" || checked.docType === "donation" ? checked.docType : "invoice" } : {}),
+      ...(tg.partner === "ap.vendor"
+        ? {
+            externalNum: checked.docNumber ?? null,
+            docType: checked.docType === "receipt" || checked.docType === "donation" ? checked.docType : "invoice",
+            // úhrada z nahrání: zaplacený doklad nejde do platebního příkazu
+            paymentState: checked.paymentState === "paid" ? "paid" : checked.paymentState === "employee" || checked.employeeId ? "employee" : "toPay",
+          }
+        : {}),
       invoiceDate: checked.issueDate,
       taxDate: checked.taxDate ?? checked.issueDate,
       dueDate: checked.dueDate ?? null,

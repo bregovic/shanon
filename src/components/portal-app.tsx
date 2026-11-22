@@ -14,6 +14,8 @@ import {
   Input,
   makeStyles,
   MessageBar,
+  Radio,
+  RadioGroup,
   MessageBarBody,
   Option,
   Spinner,
@@ -236,6 +238,8 @@ export function PortalApp(p: {
   const [files, setFiles] = useState<Picked[]>([]);
   const [editing, setEditing] = useState<Picked | null>(null);
   const [note, setNote] = useState("");
+  // účtenka zaměstnance: platil zaměstnanec (proplatit), nebo firma (zaplaceno)
+  const [paidBy, setPaidBy] = useState<"employee" | "paid">("employee");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ intent: "error" | "success"; text: string } | null>(null);
   const [sent, setSent] = useState<string[] | null>(null);
@@ -263,6 +267,7 @@ export function PortalApp(p: {
     fd.set("companyId", companyId);
     fd.set("agenda", agenda);
     fd.set("note", note);
+    if (agenda === "receipt") fd.set("paymentState", paidBy);
     for (const f of files) fd.append("files", f.file, f.file.name);
     try {
       const r = await fetch(`/api/p/${p.tenant}/submit`, { method: "POST", body: fd });
@@ -413,6 +418,14 @@ export function PortalApp(p: {
                     </div>
                   ))}
                 </div>
+              )}
+              {agenda === "receipt" && (
+                <Field label={L.AppPaidBy}>
+                  <RadioGroup layout="horizontal" value={paidBy} onChange={(_, d) => setPaidBy(d.value as "employee" | "paid")}>
+                    <Radio value="employee" label={L.AppPaidByMe} />
+                    <Radio value="paid" label={L.AppPaidByCompany} />
+                  </RadioGroup>
+                </Field>
               )}
               <Field label={L.AppNote}>
                 <Textarea value={note} onChange={(_, d) => setNote(d.value)} maxLength={255} placeholder={L.AppNotePlaceholder} resize="vertical" />

@@ -147,6 +147,17 @@ export const OcrConfidence = defineEnum({
   ],
 });
 
+/** Úhrada dokladu při nahrání: k zaplacení (platební příkaz), už zaplaceno (karta, hotově), placeno zaměstnancem (proplatit). */
+export const DocPaymentState = defineEnum({
+  id: "IntDocPaymentState",
+  label: "@INT:PaymentState",
+  values: [
+    { value: "toPay", label: "@INT:PayToPay" },
+    { value: "paid", label: "@INT:PayPaid", color: "success" },
+    { value: "employee", label: "@INT:PayEmployee", color: "brand" },
+  ],
+});
+
 export const OcrDocType = defineEnum({
   id: "IntOcrDocType",
   label: "@INT:DocType",
@@ -407,7 +418,8 @@ export const document = defineObject({
     fileName: { edt: Edts.Description, label: "@INT:FileName" },
     target: { edt: enumEdt(DocTarget), mandatory: true, default: "auto" },
     status: { edt: enumEdt(DocStatus), mandatory: true, default: "new", readOnly: true },
-    docType: { edt: enumEdt(OcrDocType), readOnly: true },
+    docType: { edt: enumEdt(OcrDocType) },
+    paymentState: { edt: enumEdt(DocPaymentState), mandatory: true, default: "toPay" },
     /** jak jistě vytěžení doklad přečetlo; nejisté údaje vyjmenuje */
     confidence: { edt: enumEdt(OcrConfidence), readOnly: true },
     uncertain: { edt: Edts.Description, label: "@INT:Uncertain", readOnly: true },
@@ -450,7 +462,7 @@ export const document = defineObject({
     { label: "@SYS:General", fields: ["docNum", "fileName", "target", "status", "docType", "confidence", "uncertain", "message", "resultTitle"] },
     { label: "@INT:Partner", fields: ["employeeId", "partnerName", "regNo", "vatId", "bankAccount", "subjectId", "vendorId", "customerId"] },
     { label: "@INT:DocData", fields: ["docNumber", "orderNumber", "issueDate", "taxDate", "dueDate", "vs"] },
-    { label: "@INT:Amounts", fields: ["currencyCode", "amountNet", "taxAmount", "amountGross"] },
+    { label: "@INT:Amounts", fields: ["currencyCode", "amountNet", "taxAmount", "amountGross", "paymentState"] },
     { label: "@INT:Sender", fields: ["source", "portalId", "senderName", "senderRegNo", "senderEmail", "senderNote"] },
     { label: "@INT:Raw", fields: ["connectionId", "raw"] },
   ],
@@ -623,7 +635,7 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity],
+  enums: [DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity],
   objects: [connection, log, portal, portalUpload, portalContact, document, documentLine, mail],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
@@ -757,6 +769,13 @@ export default defineModule({
       ContactInviteSent: "Pozvánka odeslána: {email}",
       SourceApp: "Aplikace Portál",
       Employee: "Zaměstnanec",
+      PaymentState: "Úhrada",
+      PayToPay: "K zaplacení",
+      PayPaid: "Zaplaceno",
+      PayEmployee: "Placeno zaměstnancem (proplatit)",
+      DocNeedEmployee: "Placeno zaměstnancem: vyberte zaměstnance, kterému se doklad proplatí.",
+      DocImportDocType: "Druh dokladu",
+      DocTypeAuto: "Rozpoznat",
       EmployeeHelp: "Doklad zaplatil zaměstnanec a chce ho proplatit: zalistuje se na jeho dodavatele pro proplácení (ne na obchod z dokladu).",
       PortalApp: "Aplikace Portál",
       AppVendors: "Dodavatelé v aplikaci Portál",
@@ -784,6 +803,9 @@ export default defineModule({
       AppChooseFile: "Vybrat soubor",
       AppNote: "Poznámka",
       AppNotePlaceholder: "Nepovinné — např. k čemu výdaj byl",
+      AppPaidBy: "Kdo platil",
+      AppPaidByMe: "Já — proplatit",
+      AppPaidByCompany: "Firma (firemní karta, hotovost firmy)",
       AppSend: "Odeslat",
       AppSending: "Odesílá se…",
       AppSent: "Odesláno, děkujeme.",
@@ -1309,6 +1331,13 @@ export default defineModule({
       ContactInviteSent: "Invitation sent: {email}",
       SourceApp: "Portal app",
       Employee: "Employee",
+      PaymentState: "Payment",
+      PayToPay: "To pay",
+      PayPaid: "Paid",
+      PayEmployee: "Paid by employee (reimburse)",
+      DocNeedEmployee: "Paid by employee: choose the employee to reimburse.",
+      DocImportDocType: "Document type",
+      DocTypeAuto: "Detect",
       EmployeeHelp: "Paid by an employee for reimbursement: listed to the employee’s reimbursement vendor (not the shop on the document).",
       PortalApp: "Portal app",
       AppVendors: "Vendors in the Portal app",
@@ -1336,6 +1365,9 @@ export default defineModule({
       AppChooseFile: "Choose file",
       AppNote: "Note",
       AppNotePlaceholder: "Optional — e.g. what the expense was for",
+      AppPaidBy: "Who paid",
+      AppPaidByMe: "Me — reimburse",
+      AppPaidByCompany: "Company (company card, company cash)",
       AppSend: "Send",
       AppSending: "Sending…",
       AppSent: "Sent, thank you.",

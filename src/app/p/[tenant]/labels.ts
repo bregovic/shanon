@@ -5,7 +5,7 @@ const KEYS = [
   "AppNote", "AppNotePlaceholder", "AppSend", "AppSending", "AppSent", "AppSentDoc", "AppAnother", "AppEditPhoto", "AppRotate",
   "AppEnhance", "AppStraighten", "AppReset", "AppDone", "AppRemove", "AppCornersHint", "AppSetPassword", "AppNewPassword",
   "AppRepeatPassword", "AppPasswordMismatch", "AppPasswordShortHint", "AppSave", "AppLinkExpired", "AppNoAgenda", "AppInstall",
-  "AppInstallIos", "AppInstalled", "AppFiles", "AppProcessing", "AppError", "AppHello",
+  "AppInstallIos", "AppInstalled", "AppFiles", "AppProcessing", "AppError", "AppHello", "AppPaidBy", "AppPaidByMe", "AppPaidByCompany",
 ] as const;
 
 export type PortalLabels = Record<(typeof KEYS)[number], string>;

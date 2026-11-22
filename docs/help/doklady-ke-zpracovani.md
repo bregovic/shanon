@@ -37,3 +37,20 @@ dodavatelského portálu se samy nezalistují. Na vzniklou přijatou fakturu pak
 
 - Vytěžené údaje vždy zkontrolujte – hlavně datum zdanitelného plnění a sazby DPH.
 - Napojení OCR má denní limit dokladů (u testovacího 30).
+
+## Druh dokladu a úhrada při nahrání
+
+V **Načíst doklady** (i v aplikaci Portál) jde rovnou zvolit:
+
+- **Druh dokladu** — faktura, účtenka, dar (nebo *Rozpoznat* podle obsahu; volba má přednost před vytěžením);
+- **Úhrada** — *K zaplacení* (navrhne se do platebního příkazu), *Zaplaceno* (firemní karta, hotovost — do příkazu nepůjde),
+  *Placeno zaměstnancem* (vyberete zaměstnance, doklad se zalistuje na jeho dodavatele pro proplácení). Uživateli se předvolí
+  zaměstnanec se stejným e-mailem.
+
+Stav úhrady se přenese na přijatou fakturu (pole *Úhrada*) a jde tam změnit.
+
+## Role Pokladník a Pracovník
+
+Výchozí role organizace (Správa systému → Role): **Pokladník** smí jen pokladnu a po přihlášení se dostane rovnou do pokladny,
+**Pracovník** smí jen nahrávat doklady a po přihlášení vidí rovnou *Načíst doklady*. Úvodní stránku role nastavíte v poli
+**Úvodní stránka** (např. `/kasa`); správci firmy a superuživatel začínají vždy na přehledu.

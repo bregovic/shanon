@@ -51,6 +51,17 @@ export const AdvanceStatus = defineEnum({
 });
 
 /** Typ přijatého dokladu: faktura, účtenka (zjednodušený daňový doklad), dar (bez DPH, účet darů). */
+/** Úhrada přijatého dokladu: k zaplacení, už zaplaceno (karta, hotově — mimo platební příkaz), placeno zaměstnancem. */
+export const ApPaymentState = defineEnum({
+  id: "ApPaymentState",
+  label: "@TAX:PaymentState",
+  values: [
+    { value: "toPay", label: "@TAX:PayToPay" },
+    { value: "paid", label: "@TAX:PayPaid", color: "success" },
+    { value: "employee", label: "@TAX:PayEmployee", color: "brand" },
+  ],
+});
+
 export const InvoiceDocType = defineEnum({
   id: "InvoiceDocType",
   label: "@TAX:DocType",
@@ -260,7 +271,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     ...(sp.externalNum ? { externalNum: { edt: Edts.Code, label: L("ExternalNum") } } : {}),
     // přijatá: účtenka = zjednodušený daňový doklad (KH souhrnně, číslo dodavatele nepovinné),
     // dar = bez DPH, náklad 543, závazek podle profilu darů (379)
-    ...(sp.side === -1 ? { docType: { edt: enumEdt(InvoiceDocType), mandatory: true, default: "invoice" } } : {}),
+    ...(sp.side === -1 ? { docType: { edt: enumEdt(InvoiceDocType), mandatory: true, default: "invoice" }, paymentState: { edt: enumEdt(ApPaymentState), mandatory: true, default: "toPay" } } : {}),
     /** účet závazků / pohledávek dokladu (prázdné = účet ze skupiny partnera) */
     postingProfileId: { edt: refEdt(id("postingProfile"), "@TAX:PostingProfile") },
     // vydaná: jednotkové ceny řádků včetně DPH (e-shop, maloobchod) — daň se počítá z ceny s DPH jako v pokladně
@@ -297,7 +308,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     emailedAt: { edt: Edts.DateTime, label: "@TAX:EmailedAt", readOnly: true },
     emailedTo: { edt: Edts.Description, label: "@TAX:EmailedTo", readOnly: true },
   };
-  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType"] : []), partnerId, "taxGroupId", "postingProfileId", ...(sp.side === 1 ? ["pricesInclTax"] : []), "description", "orderId", "advanceId"];
+  const headerFields = ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType", "paymentState"] : []), partnerId, "taxGroupId", "postingProfileId", ...(sp.side === 1 ? ["pricesInclTax"] : []), "description", "orderId", "advanceId"];
   const invoice = defineObject({
     id: id("invoice"),
     table: `${m}_invoice`,
@@ -306,7 +317,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     scope: "company",
     fields: invoiceFields,
     titleField: "invoiceNum",
-    list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
+    list: ["invoiceNum", ...(sp.externalNum ? ["externalNum"] : []), ...(sp.side === -1 ? ["docType", "paymentState"] : []), partnerId, "invoiceDate", "dueDate", "vs", "currencyId", "amountNet", "taxAmount", "amountGross", "paidAmount", "status"],
     form: [
       { label: "@TAX:Header", fields: headerFields },
       { label: "@TAX:Dates", fields: ["invoiceDate", "taxDate", "dueDate", "currencyId", "vs", ...(sp.side === 1 ? ["bankAccountId", "paymentMethodId"] : [])] },
@@ -558,7 +569,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   return {
     /** konfigurace faktur (zaúčtování faktury z jiného modulu, např. prodej na fakturu z pokladny) */
     cfg,
-    enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ProfileAccountCode],
+    enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ApPaymentState, ProfileAccountCode],
     objects: [params, group, profile, profileLine, partner, order, orderLine, invoice, invoiceLine, advance, trans],
     handlers: {
       ...inv,

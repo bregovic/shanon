@@ -70,7 +70,7 @@ export interface PortalSubmitResult {
 /** Podání dokladů z aplikace Portál. */
 export async function portalAppSubmit(
   identity: PortalIdentity,
-  input: { companyId: string; agenda: string; note: string; files: { name: string; type: string; data: Buffer }[] },
+  input: { companyId: string; agenda: string; note: string; paymentState?: string; files: { name: string; type: string; data: Buffer }[] },
   client: PrismaClient = prisma,
 ): Promise<PortalSubmitResult> {
   const t = await getT("cs", identity.tenantId);
@@ -114,7 +114,9 @@ export async function portalAppSubmit(
           senderName: (c.name || identity.login).slice(0, 120),
           senderEmail: identity.kind === "vendor" ? identity.login : c.email,
           senderNote: note || null,
-          employeeId: agenda === "receipt" ? c.refId : null,
+          // účtenka zaměstnance: platil on (proplatit, jeho dodavatel) / firma (zaplaceno, dodavatel z dokladu)
+          employeeId: agenda === "receipt" && input.paymentState !== "paid" ? c.refId : null,
+          paymentState: agenda === "receipt" ? (input.paymentState === "paid" ? "paid" : "employee") : "toPay",
         });
         await log("accepted", null, { name: fname, size: f.data.length }, String(doc.id));
         out.push({ name: fname, ok: true, docNum: String(doc.docNum ?? "") });

@@ -45,7 +45,13 @@ export function DocImportView(p: {
   listHref: string;
   docHref: string;
   statusLabels: Record<string, string>;
-  labels: Record<"intro" | "files" | "drop" | "extract" | "start" | "openList" | "uploading" | "target", string>;
+  labels: Record<"intro" | "files" | "drop" | "extract" | "start" | "openList" | "uploading" | "target" | "docType" | "payment" | "employee", string>;
+  /** druh dokladu (auto = rozpoznat) a úhrada */
+  docTypes: { value: string; label: string }[];
+  payments: { value: string; label: string }[];
+  /** zaměstnanci pro „placeno zaměstnancem“ (prázdné = bez modulu Zaměstnanci) a předvolený (podle e-mailu uživatele) */
+  employees: { id: string; label: string }[];
+  defaultEmployeeId: string | null;
 }) {
   const s = useStyles();
   const input = useRef<HTMLInputElement>(null);
@@ -53,6 +59,9 @@ export function DocImportView(p: {
   const [rows, setRows] = useState<Row[]>([]);
   const [target, setTarget] = useState(p.initialTarget);
   const [extract, setExtract] = useState(true);
+  const [docType, setDocType] = useState("auto");
+  const [payment, setPayment] = useState(p.defaultEmployeeId ? "employee" : "toPay");
+  const [employeeId, setEmployeeId] = useState(p.defaultEmployeeId ?? "");
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
 
@@ -73,6 +82,9 @@ export function DocImportView(p: {
       form.set("file", files[i]);
       form.set("target", target);
       form.set("extract", extract ? "1" : "0");
+      form.set("docType", docType);
+      form.set("paymentState", payment);
+      if (payment === "employee") form.set("employeeId", employeeId);
       const r = await docImportAction(form);
       next[i] = r.ok ? { ...next[i], state: "done", ...r.data } : { ...next[i], state: "error", message: r.message };
       setRows([...next]);
@@ -104,6 +116,37 @@ export function DocImportView(p: {
                 ))}
               </Dropdown>
             </Field>
+            <Field label={p.labels.docType}>
+              <Dropdown value={p.docTypes.find((x) => x.value === docType)?.label ?? ""} selectedOptions={[docType]} onOptionSelect={(_, d) => setDocType(String(d.optionValue))} disabled={busy}>
+                {p.docTypes.map((x) => (
+                  <Option key={x.value} value={x.value}>
+                    {x.label}
+                  </Option>
+                ))}
+              </Dropdown>
+            </Field>
+            <Field label={p.labels.payment}>
+              <Dropdown value={p.payments.find((x) => x.value === payment)?.label ?? ""} selectedOptions={[payment]} onOptionSelect={(_, d) => setPayment(String(d.optionValue))} disabled={busy}>
+                {p.payments
+                  .filter((x) => x.value !== "employee" || p.employees.length > 0)
+                  .map((x) => (
+                    <Option key={x.value} value={x.value}>
+                      {x.label}
+                    </Option>
+                  ))}
+              </Dropdown>
+            </Field>
+            {payment === "employee" && (
+              <Field label={p.labels.employee} required>
+                <Dropdown value={p.employees.find((x) => x.id === employeeId)?.label ?? ""} selectedOptions={[employeeId]} onOptionSelect={(_, d) => setEmployeeId(String(d.optionValue))} disabled={busy}>
+                  {p.employees.map((x) => (
+                    <Option key={x.id} value={x.id}>
+                      {x.label}
+                    </Option>
+                  ))}
+                </Dropdown>
+              </Field>
+            )}
             <Checkbox label={p.labels.extract} checked={extract} onChange={(_, d) => setExtract(!!d.checked)} disabled={busy} />
           </div>
           <div

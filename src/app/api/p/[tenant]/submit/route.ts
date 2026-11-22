@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ tenant:
   const files: { name: string; type: string; data: Buffer }[] = [];
   for (const f of form.getAll("files")) if (f instanceof File && f.size) files.push({ name: f.name, type: f.type, data: Buffer.from(await f.arrayBuffer()) });
   try {
-    const res = await portalAppSubmit(id, { companyId: String(form.get("companyId") ?? ""), agenda: String(form.get("agenda") ?? ""), note: String(form.get("note") ?? ""), files });
+    const res = await portalAppSubmit(id, { companyId: String(form.get("companyId") ?? ""), agenda: String(form.get("agenda") ?? ""), note: String(form.get("note") ?? ""), paymentState: String(form.get("paymentState") ?? ""), files });
     return Response.json(res, { status: res.ok ? 200 : 400 });
   } catch (e) {
     // chyba nastavení firmy (číselná řada…) → hláška uživateli, podrobnosti do logu serveru

@@ -189,7 +189,8 @@ export async function deleteDocuRef(ctx: Ctx, id: string, client?: PrismaClient)
 export async function readFile(ctx: Ctx, id: string, client?: PrismaClient) {
   const ref = await inTenant(ctx, (s) => s.tx.sysDocuRef.findFirst({ where: { id, tenantId: ctx.tenantId, kind: "file" } }), client);
   if (!ref || !ref.storageKey) throw new UserError("@SYS:NotFound");
-  await checkRecord(ctx, ref.objectId, ref.recordId, "read", client);
+  // obrázek zboží na dlaždici pokladny: pokladníkovi stačí právo na pokladnu
+  if (!(ref.objectId === "inv.item" && can(ctx.perms, "pos.receipt", "write"))) await checkRecord(ctx, ref.objectId, ref.recordId, "read", client);
   const data = await inTenant(ctx, (s) => storageFor(ref.storage).get(s.tx, ctx.tenantId, ref.storageKey!), client);
   if (!data) throw new UserError("@SYS:NotFound");
   return { name: ref.name, mime: ref.mime ?? "application/octet-stream", data };

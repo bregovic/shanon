@@ -43,14 +43,16 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     );
   }
   const data = await inTenant(s.ctx, async (sess) => {
-    const items = await sess.find("inv.item", { blocked: false }, 5000, { name: "asc" });
-    const groups = await sess.find("inv.itemGroup", {}, 500, { code: "asc" });
-    const categories = (await sess.find("inv.category", { blocked: false }, 1000, { sortOrder: "asc" })).map((c) => ({
+    // nabídka zboží: systémově (stačí právo na pokladnu, ne na Sklad / Položky)
+    const cat = sess.sys();
+    const items = await cat.find("inv.item", { blocked: false }, 5000, { name: "asc" });
+    const groups = await cat.find("inv.itemGroup", {}, 500, { code: "asc" });
+    const categories = (await cat.find("inv.category", { blocked: false }, 1000, { sortOrder: "asc" })).map((c) => ({
       id: String(c.id),
       name: String(c.name),
       parentId: (c.parentId as string) ?? null,
     }));
-    const units = new Map((await sess.find("inv.unit", {}, 500)).map((u) => [String(u.id), String(u.code)]));
+    const units = new Map((await cat.find("inv.unit", {}, 500)).map((u) => [String(u.id), String(u.code)]));
     const api = sess.sys().api();
     const shift = await openShiftOf(api, id);
     const conns = s.ctx.modules.has("int") ? await connectionsFor(api, id) : {};

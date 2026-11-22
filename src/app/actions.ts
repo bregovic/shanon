@@ -1317,13 +1317,28 @@ export async function docImportAction(form: FormData): Promise<ActionResult<{ id
     const name = file.name.slice(0, 200);
     if (!/\.(pdf|jpe?g|png|webp|isdoc|isdocx|xml)$/i.test(name)) throw new UserError("@INT:OcrFileType");
     const target = String(form.get("target") ?? "auto");
-    const doc = await saveRecord(s.ctx, "int.document", null, { fileName: name, target });
+    // volby z nahrání: druh dokladu, úhrada, zaměstnanec (placeno zaměstnancem) — přednost před vytěžením
+    const choice: Record<string, string | null> = {};
+    const dt = String(form.get("docType") ?? "");
+    if (["invoice", "receipt", "donation"].includes(dt)) choice.docType = dt;
+    const pay = String(form.get("paymentState") ?? "");
+    if (["toPay", "paid", "employee"].includes(pay)) choice.paymentState = pay;
+    const emp = String(form.get("employeeId") ?? "");
+    if (pay === "employee" && /^[0-9a-f-]{36}$/i.test(emp)) choice.employeeId = emp;
+    const doc = await saveRecord(s.ctx, "int.document", null, { fileName: name, target, ...choice });
     const { addFile } = await import("@/server/docuref");
     await addFile(s.ctx, "int.document", String(doc.id), { name, type: file.type, data: Buffer.from(await file.arrayBuffer()) });
     let out = doc;
     if (form.get("extract") === "1") {
       const { extractDocument } = await import("@/server/doc-import");
       out = await extractDocument(s.ctx, String(doc.id)).catch(async () => (await getRecord(s.ctx, "int.document", String(doc.id)))!);
+      // vytěžení mohlo druh přepsat — volba uživatele platí (a kontrola znovu)
+      if (choice.docType && out.docType !== choice.docType && out.status !== "listed") {
+        const cur = (await getRecord(s.ctx, "int.document", String(doc.id)))!;
+        await saveRecord(s.ctx, "int.document", String(doc.id), { ...cur, docType: choice.docType }, cur.version as number);
+        await runAction(s.ctx, "int.document", String(doc.id), "check").catch(() => undefined);
+        out = (await getRecord(s.ctx, "int.document", String(doc.id)))!;
+      }
     }
     return { ok: true, data: { id: String(doc.id), docNum: String(out.docNum ?? doc.docNum), status: String(out.status), message: (out.message as string) ?? null } };
   } catch (e) {

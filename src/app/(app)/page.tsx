@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { HomeTiles } from "@/components/home-tiles";
 import { requireSession } from "@/server/auth";
 import { getT } from "@/server/i18n";
@@ -6,6 +7,8 @@ import { myTasks } from "@/server/work-items";
 
 export default async function Home() {
   const s = await requireSession();
+  // role s vlastní úvodní stránkou (Pokladník → pokladna, Pracovník → nahrání dokladů)
+  if (s.homeHref) redirect(s.homeHref);
   const t = await getT(s.lang, s.ctx.tenantId);
   const modules = visibleModules(s)
     .sort((a, b) => (a.id === "sys" ? 1 : b.id === "sys" ? -1 : 0))

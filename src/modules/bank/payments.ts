@@ -78,6 +78,8 @@ async function suggest(data: DataApi, o: RecordData, t: (r: string) => string) {
   for (const tr of await data.find("ap.trans", { kind: "invoice", closed: false }, { take: 5000, orderBy: { dueDate: "asc" } })) {
     if (busy.has(String(tr.id)) || remaining(tr) <= zero) continue;
     if (tr.dueDate && String(tr.dueDate) > due) continue;
+    // doklad zaplacený jinak (karta, hotově) do příkazu nepatří
+    if (tr.invoiceId && (await data.get("ap.invoice", String(tr.invoiceId)))?.paymentState === "paid") continue;
     const vend = await data.get("ap.vendor", String(tr.vendorId));
     if (vend?.blocked) continue;
     // dodavatel s jinou platební metodou do příkazu nepatří
