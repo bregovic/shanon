@@ -337,12 +337,13 @@ const useStyles = makeStyles({
   rBold: { fontWeight: tokens.fontWeightBold, fontSize: tokens.fontSizeBase400 },
 });
 
-// náhradní tisk vestavěné účtenky (bez šablony): jen účtenka, od horního okraje, stránka se může zalomit
-const PRINT_CSS = `@page { margin: 4mm; }
+// náhradní tisk vestavěné účtenky (bez šablony): jen účtenka, od horního okraje, na střed papíru role
+// (bez okrajů prohlížeče — viz printCss v lib/print-render.tsx), stránka se může zalomit
+const PRINT_CSS = `@page { margin: 0; }
 @media print {
   body * { visibility: hidden !important; }
   .pos-receipt, .pos-receipt * { visibility: visible !important; }
-  .pos-receipt { position: absolute; left: 0; top: 0; width: 72mm; border: none !important; box-shadow: none !important; }
+  .pos-receipt { position: absolute; left: 50%; transform: translateX(-50%); top: 0; width: 72mm; border: none !important; box-shadow: none !important; }
 }`;
 
 export function PosTerminal(p: {

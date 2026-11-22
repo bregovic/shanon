@@ -225,12 +225,16 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
 
 /**
  * CSS pro tisk. Pevný papír (A4, A5, štítek): velikost stránky, bez okrajů prohlížeče.
- * Účtenka (role 80 / 58 mm, výška podle obsahu): velikost se nenastavuje — tiskne se na papír tiskárny
- * (role v ovladači účtenkové tiskárny i obyčejná A4), okraj 4 mm = potisknutelná šířka role (72 / 48 mm)
- * a na A4 je účtenka celá vlevo nahoře, nic se neořízne.
+ * Účtenka (role 80 / 58 mm, výška podle obsahu): velikost se nenastavuje — tiskne se na papír tiskárny,
+ * bez okrajů prohlížeče a na střed. Ovladače rolí hlásí papír dvojím způsobem: jen potisknutelnou šířku
+ * (XP-58: papír „58(48)“ = 48 mm, odsazení 0) nebo celou roli s nepotisknutelným okrajem (58 mm, 5 mm
+ * po stranách). Dřívější pevný okraj 4 mm sedí jen na ten druhý — na XP-58 posunul účtenku doprava
+ * a 48 mm široká šablona se do 40 mm nevešla a ořízla. Na střed sedí obojí i A4.
  */
 export function printCss(layout: PrintLayout): string {
   const p = PAPERS[layout.paper] ?? PAPERS.a4;
-  const page = p.h ? `@page { size: ${p.w}mm ${p.h}mm; margin: 0; }` : `@page { margin: 4mm; }`;
-  return `${page} @media print { html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; } .no-print { display: none !important; } .print-page { break-inside: auto; } }`;
+  if (p.h)
+    return `@page { size: ${p.w}mm ${p.h}mm; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; } .no-print { display: none !important; } .print-page { break-inside: auto; } }`;
+  // role: na střed papíru; obal stránky nesmí mít výšku obrazovky (na roli by to byly metry prázdného papíru)
+  return `@page { margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; } body > div { min-height: 0 !important; } .no-print { display: none !important; } .print-page { break-inside: auto; } body .print-sheet { margin: 0 auto !important; } }`;
 }
