@@ -8,13 +8,14 @@ import { UserError, type ActionOutcome } from "@/core/module";
 import type { Ctx } from "./data";
 
 type OutsideAction = (ctx: Ctx, id: string, client?: PrismaClient) => Promise<unknown>;
-const outcome = (r: unknown): ActionOutcome | undefined => (r && typeof r === "object" && "open" in r ? (r as ActionOutcome) : undefined);
+const outcome = (r: unknown): ActionOutcome | undefined => (r && typeof r === "object" && ("open" in r || "message" in r) ? (r as ActionOutcome) : undefined);
 
 const ACTIONS: Record<string, () => Promise<OutsideAction>> = {
   "int.document:extract": async () => (await import("./doc-import")).extractDocument,
-  "ar.invoice:email": async () => (await import("./mail")).invoiceMailDraft,
-  "ar.advance:email": async () => (await import("./mail")).advanceMailDraft,
-  "pos.receipt:email": async () => (await import("./mail")).receiptMailDraft,
+  // Odeslat e-mailem: hned odeslat, když je příjemce; jinak otevřít koncept
+  "ar.invoice:email": async () => (await import("./mail")).invoiceMailSend,
+  "ar.advance:email": async () => (await import("./mail")).advanceMailSend,
+  "pos.receipt:email": async () => (await import("./mail")).receiptMailSend,
   "int.mail:send": async () => (await import("./mail")).sendMail,
   // pozvánka do aplikace Portál (systémová pošta)
   "hr.employee:invite": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./portal-app")).inviteToPortal(ctx, "hr.employee", id, client),

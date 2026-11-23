@@ -18,6 +18,7 @@ import { documentMailHtml } from "./mail-templates";
 import { fillMail, MAIL_DEFAULTS, MAIL_FIELDS, type MailDocKind } from "@/modules/org/mail-template";
 import { registry } from "@/registry";
 import { renderPdf } from "./print-pdf";
+import { getT } from "./i18n";
 
 const sysCtx = (ctx: Ctx): Ctx => ({ ...ctx, perms: ADMIN });
 
@@ -104,6 +105,28 @@ async function draftFor(ctx: Ctx, id: string, spec: DraftSpec, client?: PrismaCl
   await addFile(sysCtx(ctx), "int.mail", mailId, { name: `${(job.title || prep.num || "doklad").replace(/[^\w.-]+/g, "_")}.pdf`, type: "application/pdf", data: pdf }, client);
   return { open: { object: "int.mail", id: mailId } };
 }
+
+/**
+ * Odeslat e-mailem (tlačítko u dokladu / v tisku): koncept s PDF a hned odeslat, když má příjemce
+ * (e-mail odběratele). Bez příjemce nebo když odeslání selže → otevře se koncept k doplnění.
+ */
+async function draftThenSend(ctx: Ctx, draft: ActionOutcome, client?: PrismaClient): Promise<ActionOutcome> {
+  const mailId = draft.open!.id;
+  const m = await inTenant(ctx, (s) => s.sys().api().get("int.mail", mailId), client);
+  if (!parseAddresses(m?.mailTo).length) return draft;
+  const t = await getT(ctx.lang === "en" ? "en" : "cs", ctx.tenantId);
+  try {
+    const r = await sendMail(ctx, mailId, client);
+    return { message: r.test ? t("@INT:MailTestSentTo", { to: r.testTo ?? "—" }) : t("@INT:MailSentTo", { to: r.to.join(", ") }) };
+  } catch (e) {
+    const reason = e instanceof UserError ? t(e.label, e.params) : e instanceof Error ? e.message : String(e);
+    return { ...draft, message: t("@INT:MailNotSent", { reason }), warn: true };
+  }
+}
+
+export const invoiceMailSend = async (ctx: Ctx, id: string, client?: PrismaClient) => draftThenSend(ctx, await invoiceMailDraft(ctx, id, client), client);
+export const receiptMailSend = async (ctx: Ctx, id: string, client?: PrismaClient) => draftThenSend(ctx, await receiptMailDraft(ctx, id, client), client);
+export const advanceMailSend = async (ctx: Ctx, id: string, client?: PrismaClient) => draftThenSend(ctx, await advanceMailDraft(ctx, id, client), client);
 
 export const invoiceMailDraft = (ctx: Ctx, id: string, client?: PrismaClient) =>
   draftFor(ctx, id, { objectId: "ar.invoice", numField: "invoiceNum", amountField: "amountGross", dueField: "dueDate", subject: "@INT:MailInvoiceSubject", body: "@INT:MailInvoiceBody" }, client);

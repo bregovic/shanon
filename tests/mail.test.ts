@@ -24,6 +24,7 @@ import { listDocuRefs } from "@/server/docuref";
 import { provisionTenant } from "@/server/provision";
 import { isdocFromFile } from "@/modules/prt/isdoc";
 import { parseAddresses } from "@/modules/int/mail";
+import { invoiceMailDraft } from "@/server/mail";
 
 const client = createPrisma();
 const run = Date.now().toString(36);
@@ -48,11 +49,13 @@ describe("pošta", () => {
 
     // bez napojení pošty koncept vznikne, odeslat nejde
     const test = await saveRecord(T, "int.connection", null, { code: "TEST-MAIL", name: "Test", kind: "mail", driver: "mailTest", fromEmail: "fakturace@vzor.test", signature: "Jan Novák, tel. 777 000 000" }, undefined, client);
+    // e-mail odběratele je známý → Odeslat e-mailem odešle hned (koncept se neotevírá)
     const out = await runAction(T, "ar.invoice", String(inv.id), "email", client);
-    expect(out?.open?.object).toBe("int.mail");
-    const id = out!.open!.id;
+    expect(out?.open).toBeUndefined();
+    expect(out?.message).toContain("Testovací prostředí");
+    const id = String((await listRecords(T, "int.mail", { filter: { sourceId: String(inv.id) } }, client)).rows[0].id);
     const draft = (await getRecord(T, "int.mail", id, client))!;
-    expect([draft.mailTo, draft.status, draft.connectionId, draft.sourceObject]).toEqual(["faktury@ulipy.test", "draft", test.id, "ar.invoice"]);
+    expect([draft.mailTo, draft.connectionId, draft.sourceObject]).toEqual(["faktury@ulipy.test", test.id, "ar.invoice"]);
     expect(draft.subject).toBe(`Faktura ${inv.invoiceNum} – Uzeniny Vzor s.r.o.`);
     expect(String(draft.body)).toContain("na částku 242,00 CZK se splatností 28. 11. 2026");
     expect(String(draft.body)).toContain("Jan Novák, tel. 777 000 000");
@@ -60,7 +63,6 @@ describe("pošta", () => {
     expect(files.map((f) => f.name)).toEqual([expect.stringMatching(/\.pdf$/)]);
 
     // testovací schránka: odesláno, nic přes SMTP, faktura s datem odeslání, protokol
-    await runAction(T, "int.mail", id, "send", client);
     const done = (await getRecord(T, "int.mail", id, client))!;
     expect([done.status, !!done.sentAt, done.error]).toEqual(["sent", true, null]);
     expect(sent.length).toBe(0);
@@ -74,7 +76,7 @@ describe("pošta", () => {
     await saveRecord(T, "int.connection", String(test.id), { active: false }, undefined, client);
     const smtp = await saveRecord(T, "int.connection", null, { code: "SMTP", name: "Pošta", kind: "mail", driver: "smtp", smtpHost: "smtp.vzor.test", smtpPort: 465, smtpSecurity: "tls", smtpUser: "fakturace", smtpPassword: "tajne-heslo", fromEmail: "fakturace@vzor.test", fromName: "Uzeniny Vzor", bccSelf: true }, undefined, client);
     await runAction(T, "int.connection", String(smtp.id), "test", client);
-    const out2 = await runAction(T, "ar.invoice", String(inv.id), "email", client);
+    const out2 = await invoiceMailDraft(T, String(inv.id), client);
     await saveRecord(T, "int.mail", out2!.open!.id, { mailTo: "a@ulipy.test; b@ulipy.test", mailCc: "c@ulipy.test" }, undefined, client);
     await runAction(T, "int.mail", out2!.open!.id, "send", client);
     expect(transports.at(-1)).toMatchObject({ host: "smtp.vzor.test", port: 465, secure: true, auth: { user: "fakturace", pass: "tajne-heslo" } });
@@ -84,7 +86,7 @@ describe("pošta", () => {
     expect((await getRecord(T, "int.mail", out2!.open!.id, client))!.messageId).toBe("<m1@smtp.test>");
 
     // chyba adresy: zůstane koncept s chybou
-    const out3 = await runAction(T, "ar.invoice", String(inv.id), "email", client);
+    const out3 = await invoiceMailDraft(T, String(inv.id), client);
     await saveRecord(T, "int.mail", out3!.open!.id, { mailTo: "spatna-adresa" }, undefined, client);
     await expect(runAction(T, "int.mail", out3!.open!.id, "send", client)).rejects.toThrow();
     expect((await getRecord(T, "int.mail", out3!.open!.id, client))!.status).toBe("draft");

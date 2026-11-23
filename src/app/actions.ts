@@ -369,7 +369,7 @@ export async function cancelWorkflowAction(instanceId: string, objectId: string,
   }
 }
 
-export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult<{ open?: string; warnings?: string[] } | undefined>> {
+export async function runRecordAction(objectId: string, id: string, actionId: string): Promise<ActionResult<{ open?: string; warnings?: string[]; message?: string; warn?: boolean } | undefined>> {
   const s = await requireSession();
   try {
     const wctx = { ...s.ctx, warnings: [] as string[] };
@@ -386,7 +386,8 @@ export async function runRecordAction(objectId: string, id: string, actionId: st
     }
     // akce může otevřít vzniklý záznam (koncept e-mailu…)
     if (out?.href && out.href.startsWith("/")) return { ok: true, data: { open: out.href, warnings } };
-    return { ok: true, data: out?.open ? { open: objectHref(out.open.object, out.open.id), warnings } : warnings ? { warnings } : undefined };
+    const msg = out?.message ? { message: out.message, warn: !!out.warn } : {};
+    return { ok: true, data: out?.open ? { open: objectHref(out.open.object, out.open.id), warnings, ...msg } : warnings || out?.message ? { warnings, ...msg } : undefined };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

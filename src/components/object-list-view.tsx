@@ -26,9 +26,10 @@ import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
 import { printInFrame } from "@/lib/print-frame";
 import { printHref } from "@/lib/station-print";
 import type { ActionIcon as ActionIconName } from "@/core/object";
-import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Mail24Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
 import { DateInput } from "./date-input";
-import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction } from "@/app/actions";
+import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction, runRecordAction } from "@/app/actions";
+import { toast } from "./toast";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DeleteDialog } from "./delete-dialog";
@@ -265,6 +266,21 @@ export function ObjectListView(p: ObjectListProps) {
             }}
           >
             {p.printLabel}
+          </Button>
+        )}
+        {/* Odeslat e-mailem jeden vybraný doklad (i účtenka, která se tiskne rovnou bez tiskového dialogu) */}
+        {p.emailAction && p.printDialog && (
+          <Button
+            icon={<Mail24Regular />}
+            disabled={selected.length !== 1 || bulkBusy}
+            onClick={async () => {
+              const r = await runRecordAction(p.objectId, String(selected[0].id), "email");
+              if (!r.ok) return toast(r.message, "warning");
+              if (r.data?.message) toast(r.data.message, r.data.warn ? "warning" : "success");
+              if (r.data?.open) router.push(r.data.open);
+            }}
+          >
+            {p.printDialog.email}
           </Button>
         )}
         <ToolbarDivider />

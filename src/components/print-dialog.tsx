@@ -87,6 +87,7 @@ export function PrintDialog({
                   const r = await runRecordAction(email.objectId, email.id, "email");
                   setBusy(false);
                   if (!r.ok) return toast(r.message, "warning");
+                  if (r.data?.message) toast(r.data.message, r.data.warn ? "warning" : "success");
                   if (r.data?.open) router.push(r.data.open);
                   onClose();
                 }}

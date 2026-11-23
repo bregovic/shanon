@@ -413,8 +413,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
     if (a?.confirm && typed?.id !== actionId) return setTyped({ id: a.id, label: a.label, value: a.confirm.value, text: a.confirm.text, input: "" });
     setTyped(null);
     return start(async () => {
+      // rozepsané změny (např. příjemce v konceptu e-mailu) uložit, ať akce pracuje s nimi
+      if (dirtyRef.current && !p.readOnly && !(await doSave(values, false))) return;
       const res = await runRecordAction(p.objectId, p.id!, actionId);
       if (res.ok && res.data?.warnings?.length) toast(res.data.warnings.join(" · "), "warning");
+      if (res.ok && res.data?.message) toast(res.data.message, res.data.warn ? "warning" : "success");
       if (!res.ok) setMessage({ intent: "error", text: res.message });
       // stažení ze serveru (instalace Shanonu pro Windows): obyčejná navigace, ne stránka aplikace
       else if (res.data?.open?.startsWith("/api/")) {
