@@ -186,3 +186,26 @@ Návod: Nápověda → E-shop."
 - Bankovní výpis podle VS a částky spáruje platbu s účtenkou (Účtenka – QR platba) a po zaúčtování je účtenka **Zaplaceno**."
 2026-11-19;feature;Pokladna;Panel Váha a odběratel na účtence;CR-102;9840fe9;"- Panel **Váha** pro ověřenou váhu (Dialog 06): cena za kg jde do váhy, hmotnost a cena se převezmou z váhy beze změny; zatím se simulátorem, skutečná váha po dodání specifikace.
 - Odběratel bez evidence: jméno a adresu jde jen vytisknout na účtenku (doklad zůstává zjednodušený)."
+2026-11-23;feature;Integrace;Shanon pro Windows: tisk bez dialogu a správa tisku;CR-112;be83a7b;"- **Nastavení → Aplikace → Nainstalovat**: na Windows stáhne instalátor Shanonu (zástupce **Shanon** s ikonou na ploše, tisk bez dialogu tisku), jinde nainstaluje aplikaci z prohlížeče.
+- Tiskárny počítače se v **Integrace → Zařízení** objeví samy; papír (A4, role 80 / 58 mm, A6), kopie a zkušební stránka.
+- **Integrace → Správa tisku**: který doklad se tiskne na kterou tiskárnu (i jen z určitého počítače, pokladny nebo pro uživatele); u pokladny jde vybrat **Tiskárnu počítače** – účtenka se vytiskne hned po zaplacení."
+2026-11-23;feature;Pokladna;Kasa bez připojení;CR-114;b17aa81;"- Při výpadku internetu kasa prodává dál (hotově, kartou na samostatném terminálu): účtenka s číslem z offline řady kasy (OF-…) se vytiskne na místě.
+- Prodeje se odešlou samy, jakmile je připojení (EET dodatečně); uzávěrka až po odeslání. Kasu jde otevřít i bez internetu."
+2026-11-23;feature;Pokladna;Účtenka na A6 a na roli tiskárny;;8939dc2;"- Papír A6 u tiskárny pokladny: kratší účtenka na střed listu, QR kód s výzvou, VS a poděkováním vedle sebe.
+- Účtenka se přeskládá na šířku role tiskárny (80 / 58 mm), tiskne se rovnou bez náhledu, na střed papíru bez okrajů prohlížeče."
+2026-11-23;feature;Pokladna;Váha, druhy pokladny a mobilní kasa;CR-102;46f797b;"- Ověřená váha TEM (Dialog 06) vyzkoušená na skutečné váze: vážení na Hotovo, pípnutí, přidání po ustálení, Zkouška váhy s Diagnostikou.
+- Váha a tiskárna se vybírají přímo u pokladny (Zařízení); druh pokladny **Pult s váhou / Kasa bez váhy / Vážení do boxů**, výběr boxu kódem i ze seznamu.
+- Mobilní kasa (Zboží / Nákup spodní lištou), celá obrazovka tlačítkem, rychlejší dlaždice s náhledy obrázků."
+2026-11-23;change;Pokladna;QR platby na bankovní účet pokladny;CR-104;bf5f33a;"- QR platby se účtují na bankovní účet vybraný u pokladny (jinak výchozí účet firmy) a výpis je páruje proti němu."
+2026-11-23;feature;Workflow;Workflow a schvalování dokladů;;9f4d2f6;"- Definice workflow s kroky (automatická akce, úkol, schválení), typy účastníků a běhy; výchozí workflow pro doklady z integrace.
+- Proužek workflow nad dokladem: stav, krok, řešitel, Schválit / Zamítnout / Hotovo s komentářem, historie."
+2026-11-23;feature;Zaměstnanci;Aplikace Portál a zaměstnanci;;9e5ba4f;"- Modul **Zaměstnanci** a aplikace **Portál**: zaměstnanec se přihlásí osobním číslem a pošle účtenku k proplacení, dodavatel fakturu.
+- Dodavatel pro proplácení jde zaměstnanci vytvořit (i hromadně) nebo přiřadit ručně."
+2026-11-23;feature;Tisk;Tiskový dialog a e-mail dokladů;;dc4a7c3;"- Tisk otevře dialog s náhledem, výběrem šablony, PDF a **Odeslat e-mailem**; e-maily dokladů jdou Systémovou poštou Shanonu jménem firmy."
+2026-11-23;feature;Systém;Role, Nastavení a Můj profil;;9ca0a17;"- Výchozí role **Pokladník** (rovnou do kasy) a **Pracovník** (jen nahrání dokladů).
+- Ozubené kolo = **Nastavení** (jazyk, výchozí firma, oznámení, PIN, aplikace), iniciály = **Můj profil**; firma se pamatuje (Poslední použitá), Nedávné u uživatele.
+- **Společná data** organizace: nová firma převezme parametry a běžné číselníky; Duplikovat převezme kód."
+2026-11-23;feature;DPH;Podání datovou schránkou a změna data vykázání;;38bea89;"- Přiznání DPH a kontrolní hlášení jde podat datovou schránkou (napojení Datová schránka, i veřejný test).
+- Změnit datum vykázání daňové transakce (nárok na odpočet v jiném období)."
+2026-11-23;feature;Odběratelé;Smlouvy na období (členství, předplatné);CR-111;e8c081f;"- Prodejní smlouva s tarifem z položky: výzva k platbě, aktivace platbou, zaúčtovaná faktura, dávka s obnovou a blokací nezaplacených; portál pro uzavření smlouvy."
+2026-11-23;fix;Integrace;ISDOC v PDF z Pohody;;32f35e8;"- Vložený ISDOC v PDF z Pohody se znovu najde (doklad se načte i s řádky)."
