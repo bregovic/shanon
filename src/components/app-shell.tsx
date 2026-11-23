@@ -197,6 +197,8 @@ export function AppShell({ modules, companies, companyId, logoSrc, user, labels,
                   } catch {
                     /* úložiště nedostupné */
                   }
+                  // záloha stránek kasy (offline) patří odhlašovanému uživateli
+                  void navigator.serviceWorker?.getRegistration("/kasa").then((r) => r?.active?.postMessage("clear")).catch(() => undefined);
                   return logoutAction();
                 })
               } />

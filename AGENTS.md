@@ -327,6 +327,10 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   s `doc.title`/`customer.*`), uzávěrka dá účtenku s CZ DIČ od 10 000 Kč do KH jednotlivě (A.4, `sourceObject` pos.receipt);
   `sellOnInvoice` = vydaná faktura `pricesInclTax` zaúčtovaná přes `ar.cfg` + `postInvoice`. E-mail z pokladny `sendDocumentNow`
   (`src/server/mail.ts`, koncept s PDF + odeslání). Kód firmy z ARES = `companyCodeFromName` (4 znaky, jedinečný).
+- Kasa bez připojení (CR-114): každý prodej nese `clientId` (sell() je podle něj idempotentní); při výpadku `saleOffline`
+  v `pos-terminal.tsx` → fronta v localStorage (`src/lib/pos-offline.ts`, číslo `OF-<kód kasy>-<pořadí>`) → POST `/api/pos/offline`
+  (`src/server/pos-offline.ts` → `sellOffline`: ceny z kasy, čas prodeje, směna = ta prodeje nebo otevřená, EET ne-první).
+  Route místo serverové akce (stránka ze zálohy může být starší verze). Záloha stránek kasy `public/pos-sw.js` (rozsah /kasa, jen produkce).
 - Tisková stanice (`src/server/station.ts`, objekty `int.device` / `int.devicePrinter` (tiskárny hlásí stanice sama, `stationHello`) / `int.printRule`
   (Správa tisku, výběr `resolvePrintTarget` v `src/modules/int/print-rules.ts`: uživatel > počítač > pokladna > obecné) / `int.printJob`,
   program pro Windows `src/station/stanice.ps1`): prohlížeč tiskárnu vybrat nesmí → Shanon Pokladna na PC u tiskárny. Zařízení → Stáhnout

@@ -30,5 +30,5 @@ export const config = {
   // portal, api/portal: dodavatelský portál (veřejný odkaz s tajným klíčem, limity v src/server/supplier-portal.ts)
   // eshop, api/eshop: veřejný e-shop (src/server/eshop.ts); api/pay: oznámení platební brány
   // p/, api/p/: aplikace Portál (vlastní přihlášení, src/server/portal-auth.ts); manifesty a ikony aplikací
-  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1|api/station|stanice|api/portal|portal/|api/eshop|eshop/|api/pay/|pay-sim/|api/pay-sim/|p/|api/p/|manifest.webmanifest|portal-app.webmanifest|icons/).*)"],
+  matcher: ["/((?!login|_next/|icon.png|logo|api/health|api/files|api/v1|api/station|stanice|api/portal|portal/|api/eshop|eshop/|api/pay/|pay-sim/|api/pay-sim/|p/|api/p/|manifest.webmanifest|pos-sw.js|portal-app.webmanifest|icons/).*)"],
 };

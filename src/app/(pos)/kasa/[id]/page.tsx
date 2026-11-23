@@ -14,6 +14,8 @@ import { openShiftOf, topItems } from "@/modules/pos/sale";
 import { connectionsFor } from "@/modules/int/drivers";
 import { bestDiscount } from "@/modules/inv/handlers";
 import { fromCents, toCents } from "@/core/money";
+import { addressLine, orgOf } from "@/modules/org";
+import { vatPayer } from "@/modules/tax/orders";
 import pos from "@/modules/pos";
 
 export const metadata = { title: "Pokladna" };
@@ -53,11 +55,15 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       parentId: (c.parentId as string) ?? null,
     }));
     const units = new Map((await cat.find("inv.unit", {}, 500)).map((u) => [String(u.id), String(u.code)]));
+    // sazby DPH položek: účtenka vystavená bez připojení (rozpis DPH)
+    const rates = new Map((await cat.find("tax.taxCode", {}, 500).catch(() => [])).map((c) => [String(c.id), String(Number(c.rate ?? 0))]));
     const api = sess.sys().api();
     const shift = await openShiftOf(api, id);
     const conns = s.ctx.modules.has("int") ? await connectionsFor(api, id) : {};
     // Správa tisku: účtenky této pokladny na tiskárnu stanice (konkrétní tiskárnu vybere server při tisku)
     const stationRules = s.ctx.modules.has("int") ? (await api.find("int.printRule", { docType: "pos.receipt", active: true }, { take: 100 }).catch(() => [])).filter((r) => !r.registerId || r.registerId === id) : [];
+    // tiskárna počítače vybraná přímo u pokladny = účtenky sem, hned po zaplacení
+    if (s.ctx.modules.has("int") && reg.stationPrinterId) stationRules.unshift({ registerId: id, printerId: reg.stationPrinterId, autoPrint: true });
     const stationRule = stationRules.find((r) => r.registerId === id) ?? stationRules[0];
     const stationPrinter = stationRule ? await api.get("int.devicePrinter", String(stationRule.printerId)).catch(() => null) : null;
     const station = stationRule ? { paper: String(stationPrinter?.paper ?? "80"), autoPrint: stationRules.some((r) => r.autoPrint) } : null;
@@ -85,7 +91,25 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     } catch {
       receiptLayout = null;
     }
-    return { items, groups, units, shift, conns, station, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes };
+    // hlavička účtenky pro prodej bez připojení (stejná jako receiptPrint)
+    const org = await orgOf(api);
+    const [tp] = org ? [] : await api.find("tax.parameters", {}, { take: 1 }).catch(() => []);
+    const company = s.ctx.companyId ? await api.get("sys.company", s.ctx.companyId) : null;
+    const offline = {
+      company: {
+        name: String(org?.legalName ?? company?.name ?? ""),
+        tradeName: org?.tradeName && org.tradeName !== org.legalName ? String(org.tradeName) : null,
+        regNo: ((org?.regNo ?? company?.regNo) as string) ?? null,
+        vatId: ((org?.vatId ?? company?.vatId) as string) ?? null,
+        address: addressLine(org ?? tp),
+        registration: (org?.registration as string) || null,
+      },
+      vatPayer: await vatPayer(api),
+      footer: (reg.receiptFooter as string) ?? null,
+      // karta jen na samostatném terminálu (napojený terminál potřebuje připojení)
+      card: !conns.payment || conns.payment.driver === "manual",
+    };
+    return { items, groups, units, rates, offline, shift, conns, station, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -107,6 +131,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           groupId: String(i.groupId),
           categoryId: (i.categoryId as string) ?? null,
           unit: data.units.get(String(i.unitId)) ?? "",
+          rate: data.rates.get(String(i.taxCodeId)) ?? "0",
           price: data.promo.get(String(i.id)) ?? String(i.priceGross),
           regular: data.promo.has(String(i.id)) ? String(i.priceGross) : null,
           weighed: !!i.weighed,
@@ -162,6 +187,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           : null
       }
       eet={data.conns.eet ? { pending: data.eetPending } : null}
+      offline={data.offline}
       customers={s.ctx.modules.has("ar")}
       mail={s.ctx.modules.has("int")}
       user={s.user.name}

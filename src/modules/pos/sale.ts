@@ -55,6 +55,16 @@ export interface SaleInput {
   paymentRef?: string | null;
   /** odložený nákup, který se tímto platí (uzavře se) */
   basketId?: string | null;
+  /** id prodeje z kasy: opakované odeslání téhož prodeje (ztracená odpověď) vrátí stejnou účtenku */
+  clientId?: string | null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** účtenka prodeje z kasy podle jeho id (už zapsaný prodej) */
+export async function receiptOfClient(data: DataApi, clientId: string | null | undefined): Promise<RecordData | null> {
+  if (!clientId || !UUID.test(clientId)) return null;
+  return (await data.find("pos.receipt", { clientId: clientId.toLowerCase() }, { take: 1 }))[0] ?? null;
 }
 
 
@@ -219,6 +229,8 @@ function buyerFields(b: SaleInput["buyer"]): RecordData {
 /** Prodej: účtenka s řádky v otevřené směně pokladny. */
 export async function sell(data: DataApi, input: SaleInput): Promise<RecordData> {
   if (input.payment === "invoice") throw new UserError("@POS:CustomerRequired");
+  const done = await receiptOfClient(data, input.clientId);
+  if (done) return done;
   const customer = await customerOf(data, input.customerId);
   const { reg, shift, lines, gross, net, paid } = await quote(data, input);
   const cash = input.payment === "cash";
@@ -245,6 +257,7 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
     paymentRef: input.payment === "card" ? (input.paymentRef ?? null) : null,
     ...(qr ? { payStatus: "awaiting" } : {}),
     ...(customer ? { customerId: customer.id } : buyerFields(input.buyer)),
+    clientId: input.clientId && UUID.test(input.clientId) ? input.clientId.toLowerCase() : null,
   });
   // VS QR platby = číslice čísla účtenky (číslo přidělí řada až při založení)
   if (qr) {
@@ -273,6 +286,111 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
   // zaplacený odložený nákup se uzavře (box je volný)
   if (input.basketId) await closeBasket(data, input.basketId, "paid", String(receipt.id));
   return receipt;
+}
+
+/** Prodej uložený v kase bez připojení (ceny, které zákazník zaplatil, a číslo z offline řady kasy). */
+export interface OfflineSale {
+  clientId: string;
+  registerId: string;
+  /** směna, ve které se prodávalo (je-li ještě otevřená) */
+  shiftId?: string | null;
+  /** číslo z offline řady kasy OF-<kasa>-<pořadí> */
+  receiptNum: string;
+  /** čas prodeje (ISO) */
+  soldAt: string;
+  payment: "cash" | "card";
+  cashGiven?: string | null;
+  lines: { itemId: string; qty: string; unitPrice: string; scale?: ScaleLine | null }[];
+}
+
+export const OFFLINE_NUM = /^OF-[A-Z0-9]{5}-\d{5}$/;
+const DEC2 = /^\d{1,7}(\.\d{1,2})?$/;
+
+/**
+ * Zápis prodeje z kasy bez připojení. Prodej už proběhl (zákazník zaplatil a má účtenku), proto:
+ * ceny jsou ty z kasy (ne z dnešního ceníku), zablokovaná položka i pokladna nevadí, směna = ta, ve které
+ * se prodávalo, jinak právě otevřená. Opakované odeslání (stejné `clientId`) vrátí stejnou účtenku.
+ */
+export async function sellOffline(data: DataApi, input: OfflineSale): Promise<{ receipt: RecordData; existed: boolean }> {
+  const done = await receiptOfClient(data, input.clientId);
+  if (done) return { receipt: done, existed: true };
+  if (!UUID.test(String(input.clientId)) || !OFFLINE_NUM.test(String(input.receiptNum))) throw new UserError("@POS:InvalidQty");
+  const reg = await data.get("pos.register", String(input.registerId));
+  if (!reg) throw new UserError("@SYS:NotFound");
+  const sold = new Date(String(input.soldAt));
+  if (Number.isNaN(sold.getTime()) || sold.getTime() > Date.now() + 10 * 60_000) throw new UserError("@POS:InvalidQty");
+  let shift = input.shiftId ? await data.get("pos.shift", String(input.shiftId)).catch(() => null) : null;
+  if (!shift || shift.status !== "open" || shift.registerId !== reg.id) shift = await openShiftOf(data, String(reg.id));
+  if (!shift) throw new UserError("@POS:ShiftNotOpen");
+  if (!input.lines?.length || input.lines.length > 500) throw new UserError("@POS:EmptySale");
+  const lines = [];
+  for (const l of input.lines) {
+    const item = await data.get("inv.item", String(l.itemId));
+    if (!item) throw new UserError("@SYS:NotFound");
+    const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
+    const group = await data.get("inv.itemGroup", String(item.groupId));
+    const scale = l.scale && DEC[3].test(l.scale.weight) && DEC[2].test(l.scale.total) && DEC[2].test(l.scale.unitPrice) ? l.scale : null;
+    const qty = scale ? scale.weight : String(l.qty).replace(",", ".").trim();
+    const unitPrice = scale ? scale.unitPrice : String(l.unitPrice).replace(",", ".").trim();
+    if (!/^\d+(\.\d{1,4})?$/.test(qty) || Number(qty) <= 0 || !DEC2.test(unitPrice)) throw new UserError("@POS:InvalidQty");
+    const gross = scale ? toCents(scale.total) : mulCents(qty, 4, unitPrice, 2);
+    const net = netFromGross(gross, code?.rate ?? 0);
+    lines.push({
+      itemId: String(item.id),
+      description: String(item.name),
+      qty,
+      unitId: (item.unitId as string) ?? null,
+      unitPrice,
+      taxCodeId: (item.taxCodeId as string) ?? null,
+      revenueAccountId: (group?.revenueAccountId as string) ?? null,
+      gross,
+      net,
+      scale: scale ? ({ scaleWeight: scale.weight, scaleUnitPrice: scale.unitPrice, scaleTotal: scale.total, scaleProtocol: "dialog06", scaleRaw: String(scale.raw ?? "").slice(0, 2000), weighedAt: scale.weighedAt && !Number.isNaN(Date.parse(scale.weighedAt)) ? new Date(scale.weighedAt).toISOString() : sold.toISOString() } as RecordData) : null,
+    });
+  }
+  const gross = sumCents(lines.map((l) => l.gross));
+  const net = sumCents(lines.map((l) => l.net));
+  const cash = input.payment === "cash";
+  const r = await currencyRounding(data, await accountingCurrencyId(data, data.companyId ?? null));
+  const paid = cash ? roundCents(gross, r.cashUnit, r.cashMethod) : gross;
+  let given = cash && input.cashGiven && DEC2.test(String(input.cashGiven)) ? toCents(String(input.cashGiven)) : null;
+  if (given !== null && given < paid) given = null;
+  // stejné číslo z jiné kasy (náhodný kód kasy se shoduje) → odlišit příponou
+  let receiptNum = String(input.receiptNum);
+  for (let i = 2; (await data.find("pos.receipt", { receiptNum }, { take: 1 })).length; i++) receiptNum = `${input.receiptNum}-${i}`;
+  const receipt = await data.create("pos.receipt", {
+    receiptNum,
+    registerId: reg.id,
+    shiftId: shift.id,
+    date: sold.toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" }),
+    paymentMethod: cash ? "cash" : "card",
+    amountNet: fromCents(net),
+    taxAmount: fromCents(gross - net),
+    amountGross: fromCents(gross),
+    rounding: fromCents(paid - gross),
+    amountPaid: fromCents(paid),
+    cashGiven: given === null ? null : fromCents(given),
+    change: given === null ? null : fromCents(given - paid),
+    clientId: input.clientId.toLowerCase(),
+    offline: true,
+    soldAt: sold.toISOString(),
+  });
+  for (const l of lines)
+    await data.create("pos.receiptLine", {
+      receiptId: receipt.id,
+      itemId: l.itemId,
+      description: l.description,
+      qty: l.qty,
+      unitId: l.unitId,
+      unitPrice: l.unitPrice,
+      taxCodeId: l.taxCodeId,
+      revenueAccountId: l.revenueAccountId,
+      amountGross: fromCents(l.gross),
+      amountNet: fromCents(l.net),
+      taxAmount: fromCents(l.gross - l.net),
+      ...(l.scale ?? {}),
+    });
+  return { receipt, existed: false };
 }
 
 export interface ShiftTotals {
@@ -535,7 +653,7 @@ export async function receiptPrint(data: DataApi, companyId: string | null, rece
   return {
     id: String(r.id),
     receiptNum: String(r.receiptNum),
-    issuedAt: String(r.createdAt ?? r.date),
+    issuedAt: String(r.soldAt ?? r.createdAt ?? r.date),
     register: String(reg?.name ?? ""),
     company: {
       name: String(org?.legalName ?? company?.name ?? ""),

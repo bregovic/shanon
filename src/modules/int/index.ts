@@ -7,7 +7,7 @@
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
 import { retireTestScale } from "./test-env";
-import { DevicePaper, PrintJobStatus, device, devicePrinter, printJob, printRule } from "./devices";
+import { DevicePaper, PrintJobStatus, PrintRuleDoc, device, devicePrinter, printJob, printRule } from "./devices";
 import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -654,7 +654,7 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [PortalPurpose, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper],
+  enums: [PortalPurpose, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper, PrintRuleDoc],
   objects: [connection, log, portal, portalUpload, portalContact, document, documentLine, mail, device, devicePrinter, printRule, printJob],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
@@ -684,6 +684,7 @@ export default defineModule({
       PrintRule: "Pravidlo tisku",
       PrintRules: "Správa tisku",
       PrintRuleFrom: "Jen při tisku z počítače",
+      PrintAllDocs: "Ostatní doklady",
       DeviceSetupName: "Nový počítač",
       DeviceInstaller: "Stáhnout instalaci",
       DeviceUnpair: "Odpojit",
@@ -1305,6 +1306,7 @@ export default defineModule({
       PrintRule: "Print rule",
       PrintRules: "Print management",
       PrintRuleFrom: "Only when printing from computer",
+      PrintAllDocs: "Other documents",
       DeviceSetupName: "New computer",
       DeviceInstaller: "Download installer",
       DeviceUnpair: "Unpair",

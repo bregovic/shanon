@@ -1,10 +1,10 @@
 #--AGENT--
-# Shanon Pokladna — tisková stanice pro Windows (PowerShell 5.1, bez instalace dalšího běhového prostředí).
+# Shanon pro Windows — tisková stanice (PowerShell 5.1, bez instalace dalšího běhového prostředí).
 #
 # Instalace: osobní instalátor ze Shanonu (Integrace → Zařízení → Stáhnout instalaci) před tento text
 # doplní $SetupUrl, $SetupPair (párovací kód) a $SetupIcon. Instalace zkopíruje program do
 # %LOCALAPPDATA%\ShanonPokladna, spáruje stanici (klíč uložený šifrovaně pro uživatele Windows — DPAPI),
-# stáhne SumatraPDF (tichý tisk PDF), vytvoří zástupce „Shanon Pokladna“ s ikonou a spustí stanici
+# stáhne SumatraPDF (tichý tisk PDF), vytvoří zástupce „Shanon“ s ikonou a spustí stanici
 # po přihlášení do Windows.
 #
 # Stanice: dlouhým dotazem čeká na tiskové úlohy (/api/station/jobs), stáhne PDF a vytiskne ho
@@ -31,7 +31,7 @@ function Write-Log([string]$Text) {
 
 function Show-Message([string]$Text, [string]$Icon = 'Information') {
   Add-Type -AssemblyName System.Windows.Forms
-  [void][System.Windows.Forms.MessageBox]::Show($Text, 'Shanon Pokladna', 'OK', $Icon)
+  [void][System.Windows.Forms.MessageBox]::Show($Text, 'Shanon', 'OK', $Icon)
 }
 
 function Find-Browser {
@@ -54,7 +54,7 @@ function New-Shortcut([string]$Path, [string]$Target, [string]$Arguments, [strin
   $lnk.WorkingDirectory = $AppDir
   $lnk.IconLocation = "$Icon,0"
   $lnk.WindowStyle = $WindowStyle
-  $lnk.Description = 'Shanon Pokladna'
+  $lnk.Description = 'Shanon'
   $lnk.Save()
 }
 
@@ -110,21 +110,23 @@ function Install-Station {
   $cmd = '"' + $ps + '" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $AppDir 'stanice.ps1') + '"'
   [IO.File]::WriteAllText($vbs, 'CreateObject("WScript.Shell").Run "' + $cmd.Replace('"', '""') + '", 0, False', [System.Text.Encoding]::ASCII)
   $wscript = "$env:SystemRoot\System32\wscript.exe"
-  New-Shortcut (Join-Path ([Environment]::GetFolderPath('Startup')) 'Shanon Pokladna - tisk.lnk') $wscript ('"' + $vbs + '"') $icon 7
+  # starší názvy zástupců (Shanon Pokladna) pryč
+  foreach ($f in @('Startup', 'Desktop', 'Programs')) { Get-ChildItem ([Environment]::GetFolderPath($f)) -Filter 'Shanon Pokladna*.lnk' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue }
+  New-Shortcut (Join-Path ([Environment]::GetFolderPath('Startup')) 'Shanon - tisk.lnk') $wscript ('"' + $vbs + '"') $icon 7
 
   # zástupce aplikace (okno bez lišty prohlížeče, vlastní profil = vlastní přihlášení a ikona)
   $browser = Find-Browser
   $appArgs = '--app="' + "$SetupUrl/stanice?d=$($r.deviceId)" + '" --user-data-dir="' + (Join-Path $AppDir 'profil') + '" --no-first-run --no-default-browser-check'
   if ($browser) {
-    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Shanon Pokladna.lnk') $browser $appArgs $icon
-    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Programs')) 'Shanon Pokladna.lnk') $browser $appArgs $icon
+    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Shanon.lnk') $browser $appArgs $icon
+    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Programs')) 'Shanon.lnk') $browser $appArgs $icon
   }
 
   Stop-OldStation
   Start-Process $wscript -ArgumentList ('"' + $vbs + '"')
   Write-Log "Instalace hotová, zařízení $($r.name)"
-  $note = if ($browser) { 'Na ploše je zástupce Shanon Pokladna. Tiskárny nastavíte v Shanonu: Integrace → Napojení (tiskárna, ovladač Tisková stanice).' } else { 'Nenašel jsem Microsoft Edge ani Google Chrome — zástupce aplikace se nevytvořil. Tisková stanice běží.' }
-  Show-Message "Tisková stanice $($r.name) je nainstalovaná a spuštěná.`n`n$note"
+  $note = if ($browser) { 'Na ploše je zástupce Shanon. Tiskárny počítače najdete v Shanonu v Integrace → Zařízení.' } else { 'Nenašel jsem Microsoft Edge ani Google Chrome — zástupce aplikace se nevytvořil. Tisková stanice běží.' }
+  Show-Message "Shanon je na počítači $($r.name) nainstalovaný.`n`n$note"
   if ($browser) { Start-Process $browser -ArgumentList $appArgs }
 }
 

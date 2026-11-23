@@ -488,8 +488,10 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
       if (withInt) {
         const conns = await connectionsFor(api, sale.registerId);
         // QR platba je převod na účet — do EET nepatří (eviduje se hotovost a karta)
-        if (conns.eet && sale.payment !== "qr") {
-          await eetRegisterReceipt(api, s.ctx.companyId, conns.eet, (await api.get("pos.receipt", receiptId))!, true);
+        const rec = (await api.get("pos.receipt", receiptId))!;
+        // opakované odeslání téhož prodeje (clientId): EET už proběhla
+        if (conns.eet && sale.payment !== "qr" && !rec.eetStatus) {
+          await eetRegisterReceipt(api, s.ctx.companyId, conns.eet, rec, true);
           eetQueue = (await eetResendPending(api, s.ctx.companyId, sale.registerId, 5)).pending;
         }
       }
@@ -574,6 +576,7 @@ function saleInput(input: SaleInput): SaleInput {
     cashGiven: input.cashGiven ? String(input.cashGiven) : null,
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,
     basketId: input.basketId ? String(input.basketId) : null,
+    clientId: input.clientId ? String(input.clientId).slice(0, 36) : null,
     lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty), scale: scaleLineOf(l.scale), manual: l.manual === true })),
   };
 }

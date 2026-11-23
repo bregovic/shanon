@@ -3729,42 +3729,44 @@ model CashVoucher {
 
 /// pos.register — generováno z definice objektu
 model PosRegister {
-  id              String   @id @default(uuid(7)) @db.Uuid
-  tenantId        String   @map("tenant_id") @db.Uuid
-  companyId       String   @map("company_id") @db.Uuid
-  code            String   @db.VarChar(20)
-  name            String   @db.VarChar(120)
-  template        String   @default("counter") @db.VarChar(40)
-  boxPick         String   @default("both") @map("box_pick") @db.VarChar(40)
-  warehouseId     String?  @map("warehouse_id") @db.Uuid
-  cashAccountId   String   @map("cash_account_id") @db.Uuid
-  cardAccountId   String   @map("card_account_id") @db.Uuid
-  qrBankAccountId String?  @map("qr_bank_account_id") @db.Uuid
-  receiptFooter   String?  @map("receipt_footer") @db.VarChar(255)
-  pin             String?  @db.VarChar(200)
-  blocked         Boolean  @default(false)
-  scaleConnId     String?  @map("scale_conn_id") @db.Uuid
-  printerConnId   String?  @map("printer_conn_id") @db.Uuid
-  ext             Json     @default("{}")
-  version         Int      @default(1)
-  createdAt       DateTime @default(now()) @map("created_at")
-  createdBy       String?  @map("created_by") @db.Uuid
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy       String?  @map("updated_by") @db.Uuid
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  code             String   @db.VarChar(20)
+  name             String   @db.VarChar(120)
+  template         String   @default("counter") @db.VarChar(40)
+  boxPick          String   @default("both") @map("box_pick") @db.VarChar(40)
+  warehouseId      String?  @map("warehouse_id") @db.Uuid
+  cashAccountId    String   @map("cash_account_id") @db.Uuid
+  cardAccountId    String   @map("card_account_id") @db.Uuid
+  qrBankAccountId  String?  @map("qr_bank_account_id") @db.Uuid
+  receiptFooter    String?  @map("receipt_footer") @db.VarChar(255)
+  pin              String?  @db.VarChar(200)
+  blocked          Boolean  @default(false)
+  scaleConnId      String?  @map("scale_conn_id") @db.Uuid
+  printerConnId    String?  @map("printer_conn_id") @db.Uuid
+  stationPrinterId String?  @map("station_printer_id") @db.Uuid
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
 
-  company                SysCompany      @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
-  warehouse              WhsWarehouse?   @relation("PosRegister_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
-  cashAccount            GlAccount       @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
-  cardAccount            GlAccount       @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
-  qrBankAccount          BankAccount?    @relation("PosRegister_qrBankAccount", fields: [qrBankAccountId], references: [id], onDelete: Restrict)
-  scaleConn              IntConnection?  @relation("PosRegister_scaleConn", fields: [scaleConnId], references: [id], onDelete: Restrict)
-  printerConn            IntConnection?  @relation("PosRegister_printerConn", fields: [printerConnId], references: [id], onDelete: Restrict)
-  posShift_register      PosShift[]      @relation("PosShift_register")
-  posReceipt_register    PosReceipt[]    @relation("PosReceipt_register")
-  posBasket_register     PosBasket[]     @relation("PosBasket_register")
-  intConnection_register IntConnection[] @relation("IntConnection_register")
-  intDevice_register     IntDevice[]     @relation("IntDevice_register")
-  intPrintRule_register  IntPrintRule[]  @relation("IntPrintRule_register")
+  company                SysCompany        @relation("PosRegister_company", fields: [companyId], references: [id], onDelete: Restrict)
+  warehouse              WhsWarehouse?     @relation("PosRegister_warehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+  cashAccount            GlAccount         @relation("PosRegister_cashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
+  cardAccount            GlAccount         @relation("PosRegister_cardAccount", fields: [cardAccountId], references: [id], onDelete: Restrict)
+  qrBankAccount          BankAccount?      @relation("PosRegister_qrBankAccount", fields: [qrBankAccountId], references: [id], onDelete: Restrict)
+  scaleConn              IntConnection?    @relation("PosRegister_scaleConn", fields: [scaleConnId], references: [id], onDelete: Restrict)
+  printerConn            IntConnection?    @relation("PosRegister_printerConn", fields: [printerConnId], references: [id], onDelete: Restrict)
+  stationPrinter         IntDevicePrinter? @relation("PosRegister_stationPrinter", fields: [stationPrinterId], references: [id], onDelete: Restrict)
+  posShift_register      PosShift[]        @relation("PosShift_register")
+  posReceipt_register    PosReceipt[]      @relation("PosReceipt_register")
+  posBasket_register     PosBasket[]       @relation("PosBasket_register")
+  intConnection_register IntConnection[]   @relation("IntConnection_register")
+  intDevice_register     IntDevice[]       @relation("IntDevice_register")
+  intPrintRule_register  IntPrintRule[]    @relation("IntPrintRule_register")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -3774,6 +3776,7 @@ model PosRegister {
   @@index([qrBankAccountId])
   @@index([scaleConnId])
   @@index([printerConnId])
+  @@index([stationPrinterId])
   @@map("pos_register")
 }
 
@@ -3845,6 +3848,9 @@ model PosReceipt {
   eetMessage    String?   @map("eet_message") @db.VarChar(255)
   emailedAt     DateTime? @map("emailed_at")
   emailedTo     String?   @map("emailed_to") @db.VarChar(255)
+  clientId      String?   @map("client_id") @db.VarChar(36)
+  offline       Boolean   @default(false)
+  soldAt        DateTime? @map("sold_at")
   ext           Json      @default("{}")
   version       Int       @default(1)
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -3865,6 +3871,7 @@ model PosReceipt {
   @@index([shiftId])
   @@index([customerId])
   @@index([tenantId, companyId, vs])
+  @@index([tenantId, companyId, clientId])
   @@map("pos_receipt")
 }
 
@@ -4723,10 +4730,11 @@ model IntDevicePrinter {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy   String?  @map("updated_by") @db.Uuid
 
-  company              SysCompany     @relation("IntDevicePrinter_company", fields: [companyId], references: [id], onDelete: Restrict)
-  device               IntDevice      @relation("IntDevicePrinter_device", fields: [deviceId], references: [id], onDelete: Restrict)
-  intPrintRule_printer IntPrintRule[] @relation("IntPrintRule_printer")
-  intPrintJob_printer  IntPrintJob[]  @relation("IntPrintJob_printer")
+  company                    SysCompany     @relation("IntDevicePrinter_company", fields: [companyId], references: [id], onDelete: Restrict)
+  device                     IntDevice      @relation("IntDevicePrinter_device", fields: [deviceId], references: [id], onDelete: Restrict)
+  posRegister_stationPrinter PosRegister[]  @relation("PosRegister_stationPrinter")
+  intPrintRule_printer       IntPrintRule[] @relation("IntPrintRule_printer")
+  intPrintJob_printer        IntPrintJob[]  @relation("IntPrintJob_printer")
 
   @@unique([tenantId, companyId, deviceId, printerName])
   @@index([tenantId, companyId])

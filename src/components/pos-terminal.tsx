@@ -8,7 +8,7 @@
  * k tisku (80 mm), otevření směny a uzávěrka. Ceny a DPH počítá server;
  * terminál ukazuje jen orientační součet z cen s DPH.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Button,
   Dialog,
@@ -71,7 +71,21 @@ import type { PrintLayout } from "@/core/print";
 import { PrintDocument, QrSvg } from "@/lib/print-render";
 import { printInFrame } from "@/lib/print-frame";
 import { printViaStation } from "@/lib/station-print";
-import { ToastHost } from "./toast";
+import { ToastHost, toast } from "./toast";
+import {
+  addOfflineSale,
+  dropOfflineSale,
+  newClientId,
+  nextOfflineNumber,
+  parseQueue,
+  queueRaw,
+  registerPosWorker,
+  serverReachable,
+  subscribeOnline,
+  subscribeQueue,
+  syncOfflineQueue,
+  type OfflineSaleRec,
+} from "@/lib/pos-offline";
 import { receiptData } from "@/lib/receipt-data";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
@@ -89,6 +103,8 @@ export interface PosItem {
   categoryId?: string | null;
   unit: string;
   price: string;
+  /** sazba DPH v % (účtenka vystavená bez připojení) */
+  rate?: string;
   /** běžná cena, když platí akce */
   regular?: string | null;
   weighed: boolean;
@@ -368,6 +384,8 @@ export function PosTerminal(p: {
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
+  /** prodej bez připojení: hlavička účtenky, plátce DPH, patička; karta jen na samostatném terminálu */
+  offline?: { company: ReceiptPrint["company"]; vatPayer: boolean; footer: string | null; card: boolean } | null;
   /** pokladní váha (Integrace): sériový port v prohlížeči nebo simulátor */
   scale?: ({ driver: string } & ScaleConfig) | null;
   /** ověřená váha (Dialog 06): panel Váha, cenu počítá váha */
@@ -640,6 +658,54 @@ export function PosTerminal(p: {
   };
   const cardLoop = useRef(0);
   const [eetPending, setEetPending] = useState(p.eet?.pending ?? 0);
+
+  // prodej bez připojení: fronta v prohlížeči pokladny (src/lib/pos-offline.ts), odešle se sama
+  const offlineRaw = useSyncExternalStore(subscribeQueue, () => queueRaw(p.register.id), () => "[]");
+  const offlineQ = useMemo(() => parseQueue(offlineRaw), [offlineRaw]);
+  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
+  const [netDown, setNetDown] = useState(false);
+  const offlineMode = !online || netDown;
+  const [offlineDlg, setOfflineDlg] = useState(false);
+  const syncing = useRef(false);
+  const syncOffline = useCallback(
+    async (manual = false) => {
+      if (syncing.current) return;
+      syncing.current = true;
+      try {
+        if (!parseQueue(queueRaw(p.register.id)).length) {
+          if (await serverReachable()) setNetDown(false);
+          return;
+        }
+        const r = await syncOfflineQueue(p.register.id);
+        setNetDown(false);
+        if (r.sent) toast(L.OfflineSent.replace("{n}", String(r.sent)), "success");
+        if (typeof r.eetQueue === "number") setEetPending(r.eetQueue);
+        if (manual && r.failed) setOfflineDlg(true);
+      } catch {
+        setNetDown(true);
+        if (manual) toast(netError, "warning");
+      } finally {
+        syncing.current = false;
+      }
+    },
+    [p.register.id, L.OfflineSent, netError],
+  );
+  useEffect(() => {
+    registerPosWorker();
+  }, []);
+  useEffect(() => {
+    const tick = () => {
+      if (parseQueue(queueRaw(p.register.id)).length || netDown) void syncOffline();
+    };
+    const first = setTimeout(tick, 1500);
+    const t = setInterval(tick, 20_000);
+    window.addEventListener("online", tick);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+      window.removeEventListener("online", tick);
+    };
+  }, [p.register.id, netDown, syncOffline]);
   const serialPrinter = p.printer?.driver === "escposSerial";
   const [portReady, setPortReady] = useState(false);
   const terminalPay = !!p.payment && p.payment.driver !== "manual";
@@ -876,9 +942,16 @@ export function PosTerminal(p: {
       manual: !!verified && !l.scale && l.item.weighed && isKg(l.item),
     }));
 
+  /** prodej jde zapsat bez připojení: hotově / kartou na samostatném terminálu, bez odběratele a boxu */
+  const canOffline = (payment: "cash" | "card" | "qr"): payment is "cash" | "card" =>
+    !!p.offline && (payment === "cash" || (payment === "card" && p.offline.card)) && !customer && !hasBuyer(buyer) && !active;
+
   const finishSale = async (payment: "cash" | "card" | "qr", paymentRef: string | null) => {
-    setBusy(true);
     setError(undefined);
+    // id prodeje z kasy: ztracená odpověď + uložení bez připojení nikdy neudělá dva prodeje
+    const clientId = newClientId();
+    if (offlineMode && canOffline(payment)) return saleOffline(payment, clientId);
+    setBusy(true);
     const res = await safe(posSellAction({
       registerId: p.register.id,
       payment,
@@ -888,12 +961,24 @@ export function PosTerminal(p: {
       customerId: customer?.id ?? null,
       buyer: customer ? null : hasBuyer(buyer) ? buyer : null,
       lines: saleLines(),
+      clientId,
     }));
     setBusy(false);
     if (!res.ok) {
+      if (res.message === netError) {
+        setNetDown(true);
+        if (canOffline(payment)) return saleOffline(payment, clientId);
+        setError(`${netError} ${L.OfflineCashOnly}`);
+        return;
+      }
       setError(res.message);
       return;
     }
+    afterSale(res.data, payment);
+  };
+
+  /** po zaplacení: vyčistit nákup, ukázat účtenku, vytisknout / otevřít zásuvku */
+  const afterSale = (r: ReceiptPrint, payment: "cash" | "card" | "qr") => {
     setPayDlg(null);
     setCard(null);
     setGiven("");
@@ -911,12 +996,85 @@ export function PosTerminal(p: {
       loadLines(freeStash.current);
       freeStash.current = [];
     } else setLines([]);
-    setReceipt(res.data);
-    if (typeof res.data.eetQueue === "number") setEetPending(res.data.eetQueue);
+    setReceipt(r);
+    if (typeof r.eetQueue === "number") setEetPending(r.eetQueue);
     if (p.printer?.autoPrint) {
-      if (serialPrinter) void escpos(res.data);
-      else setTimeout(() => void browserPrint(res.data), 300);
+      if (serialPrinter) void escpos(r);
+      else setTimeout(() => void browserPrint(r), 300);
     } else if (serialPrinter && p.printer?.openDrawer && payment === "cash") void escpos(null, true);
+  };
+
+  /**
+   * Prodej bez připojení: ceny z kasy, číslo z offline řady kasy, uložit do fronty v prohlížeči
+   * a vystavit účtenku na místě (tisk z prohlížeče / tiskárna na sériovém portu). EET se odešle dodatečně.
+   */
+  const saleOffline = (payment: "cash" | "card", clientId: string) => {
+    const o = p.offline!;
+    const ls = lines.map((l) => {
+      const qty = l.scale ? l.scale.weight : String(Number(l.qty.toFixed(3)));
+      const unitPrice = l.scale ? l.scale.unitPrice : l.item.price;
+      // stejný výpočet jako server (haléře × množství na 4 místa, zaokrouhlení na haléře)
+      const cents = l.scale ? Math.round(Number(l.scale.total) * 100) : Math.round((Math.round(Number(unitPrice) * 100) * Math.round(Number(qty) * 10000)) / 10000);
+      return { l, qty, unitPrice, cents };
+    });
+    const total = ls.reduce((a, x) => a + x.cents, 0);
+    const paid = payment === "cash" ? Math.round(roundCash(total / 100, p.register.cashRounding) * 100) : total;
+    const g = payment === "cash" && given ? Math.round(Number(given.replace(",", ".")) * 100) : null;
+    if (g !== null && (!Number.isFinite(g) || g < paid)) return setError(L.NotEnoughCash);
+    const receiptNum = nextOfflineNumber();
+    if (!receiptNum) return setError(netError);
+    const soldAt = new Date().toISOString();
+    const rec: OfflineSaleRec = {
+      clientId,
+      registerId: p.register.id,
+      shiftId: shift?.id ?? null,
+      receiptNum,
+      soldAt,
+      payment,
+      cashGiven: g === null ? null : (g / 100).toFixed(2),
+      lines: ls.map((x) => ({ itemId: x.l.item.id, qty: x.qty, unitPrice: x.unitPrice, scale: x.l.scale ?? null })),
+      paid: (paid / 100).toFixed(2),
+    };
+    if (!addOfflineSale(rec)) return setError(netError);
+    const vat = new Map<string, { base: number; tax: number }>();
+    for (const x of ls) {
+      const rate = x.l.item.rate ?? "0";
+      const net = Math.round((x.cents * 100) / (100 + Number(rate)));
+      const v = vat.get(rate) ?? { base: 0, tax: 0 };
+      v.base += net;
+      v.tax += x.cents - net;
+      vat.set(rate, v);
+    }
+    afterSale(
+      {
+        receiptNum,
+        issuedAt: soldAt,
+        register: p.register.name,
+        company: o.company,
+        vatPayer: o.vatPayer,
+        customer: null,
+        lines: ls.map((x) => ({
+          description: x.l.item.name,
+          qty: x.l.scale ? Number(x.qty).toFixed(3) : String(Number(x.qty)),
+          unit: x.l.item.unit,
+          unitPrice: x.unitPrice,
+          amount: (x.cents / 100).toFixed(2),
+          rate: x.l.item.rate ?? "0",
+          originalPrice: x.l.scale ? null : (x.l.item.regular ?? null),
+        })),
+        vat: [...vat].map(([rate, v]) => ({ rate, base: (v.base / 100).toFixed(2), tax: (v.tax / 100).toFixed(2) })),
+        gross: (total / 100).toFixed(2),
+        rounding: ((paid - total) / 100).toFixed(2),
+        paid: (paid / 100).toFixed(2),
+        payment,
+        cashGiven: rec.cashGiven,
+        change: g === null ? null : ((g - paid) / 100).toFixed(2),
+        footer: o.footer,
+        eet: p.eet ? { status: "pending", pok: null } : null,
+      },
+      payment,
+    );
+    toast(L.OfflineSaved.replace("{num}", receiptNum), "warning");
   };
 
   /** Karta přes terminál: zahájit, čekat na výsledek, pak vystavit účtenku. */
@@ -1013,6 +1171,7 @@ export function PosTerminal(p: {
   };
 
   const showSummary = async () => {
+    if (offlineQ.length) return setError(L.OfflineCloseBlocked.replace("{n}", String(offlineQ.length)));
     setBusy(true);
     const res = await safe(posShiftSummaryAction(p.register.id));
     setBusy(false);
@@ -1021,6 +1180,7 @@ export function PosTerminal(p: {
   };
 
   const closeShift = async () => {
+    if (offlineQ.length) return setError(L.OfflineCloseBlocked.replace("{n}", String(offlineQ.length)));
     setBusy(true);
     const res = await safe(posCloseShiftAction(p.register.id));
     setBusy(false);
@@ -1040,6 +1200,16 @@ export function PosTerminal(p: {
           {shift ? `${L.Shift} ${shift.num}` : L.Closed} · {p.user}
         </span>
         <span className={st.spacer} />
+        {(offlineQ.length > 0 || offlineMode) && (
+          <Button
+            icon={<CloudArrowUp24Regular />}
+            onClick={() => setOfflineDlg(true)}
+            title={L.OfflineQueueInfo.replace("{n}", String(offlineQ.length))}
+            style={offlineMode ? { color: tokens.colorPaletteMarigoldForeground1 } : undefined}
+          >
+            {L.OfflineQueue.replace("{n}", String(offlineQ.length))}
+          </Button>
+        )}
         {eetPending > 0 && (
           <Button icon={<CloudArrowUp24Regular />} onClick={resendEet} disabled={busy} title={L.EetPendingInfo.replace("{n}", String(eetPending))}>
             {L.EetResend} ({eetPending})
@@ -1082,11 +1252,53 @@ export function PosTerminal(p: {
         )}
       </header>
 
+      {offlineMode && (
+        <MessageBar intent="warning">
+          <MessageBarBody>{L.OfflineMode}</MessageBarBody>
+        </MessageBar>
+      )}
       {error && !payDlg && (
         <MessageBar intent="error">
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}
+
+      {/* prodeje uložené bez připojení: přehled, odeslání, zahození */}
+      <Dialog open={offlineDlg} onOpenChange={(_, d) => setOfflineDlg(d.open)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{L.OfflineTitle}</DialogTitle>
+            <DialogContent>
+              <Text block>{L.OfflineQueueInfo.replace("{n}", String(offlineQ.length))}</Text>
+              {offlineQ.map((q) => (
+                <div key={q.clientId} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${tokens.colorNeutralStroke2}` }}>
+                  <div style={{ flex: 1 }}>
+                    <div>
+                      <b>{q.receiptNum}</b> · {new Date(q.soldAt).toLocaleString(locale)} · {fmt(q.paid)}
+                    </div>
+                    {q.error && <div style={{ color: tokens.colorPaletteRedForeground1 }}>{q.error}</div>}
+                  </div>
+                  <Button
+                    size="small"
+                    icon={<Delete24Regular />}
+                    onClick={() => {
+                      if (window.confirm(L.OfflineDropConfirm.replace("{num}", q.receiptNum))) dropOfflineSale(p.register.id, q.clientId);
+                    }}
+                  >
+                    {L.OfflineDrop}
+                  </Button>
+                </div>
+              ))}
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="primary" disabled={!offlineQ.length} onClick={() => void syncOffline(true)}>
+                {L.OfflineSend}
+              </Button>
+              <Button onClick={() => setOfflineDlg(false)}>{L.Cancel}</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
 
       {!shift && p.template !== "boxes" ? (
         <div className={st.openBox}>

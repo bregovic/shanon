@@ -32,7 +32,7 @@ describe("tisková stanice", () => {
 
   it("instalátor nese párovací kód a program stanice; kód spáruje jen jednou", async () => {
     const file = await inTenant(P, (s) => s.download("int.device", deviceId, "installer"), client);
-    expect(file.name).toBe("Shanon-Pokladna-KASA1.cmd");
+    expect(file.name).toBe("Shanon-KASA1.cmd");
     const cmd = String(file.data);
     expect(cmd.startsWith("@echo off\r\n")).toBe(true);
     expect(/^[\x09\x0a\x0d\x20-\x7e]*$/.test(cmd)).toBe(true);
@@ -63,6 +63,9 @@ describe("tisková stanice", () => {
     expect(by("Stará").present).toBe(false);
     xp = String(by("XP-58").id);
     canon = String(by("Canon LBP646C").id);
+    // první hlášení: výchozí pravidla pro tento počítač — účtenky na roli hned po zaplacení, ostatní na A4
+    const defaults = (await listRecords(P, "int.printRule", { filter: { fromDeviceId: deviceId } }, client)).rows;
+    expect(defaults.map((r) => [r.docType, r.printerId, r.autoPrint]).sort()).toEqual([["*", canon, false], ["pos.receipt", xp, true]].sort());
     await saveRecord(P, "int.devicePrinter", xp, { copies: 2 }, undefined, client);
   });
 
@@ -76,6 +79,12 @@ describe("tisková stanice", () => {
     expect((await t({ stationId: deviceId }))?.printer.id).toBe(xp);
     await saveRecord(P, "int.printRule", null, { docType: "ar.invoice", printerId: canon, userId: P.userId }, undefined, client);
     expect((await t({ stationId: deviceId, userId: P.userId }))?.printer.id).toBe(canon);
+    // ostatní doklady z tohoto počítače → A4 (výchozí pravidlo „*“)
+    expect((await inTenant(P, (s) => resolvePrintTarget(s.sys().api(), "pos.shift", { stationId: deviceId }), client))?.printer.id).toBe(canon);
+    // tiskárna vybraná u pokladny má u účtenek přednost před obecným pravidlem
+    await saveRecord(P, "pos.register", regId, { stationPrinterId: canon }, undefined, client);
+    expect((await inTenant(P, (s) => resolvePrintTarget(s.sys().api(), "pos.receipt", { registerId: regId }), client))?.printer.id).toBe(canon);
+    await saveRecord(P, "pos.register", regId, { stationPrinterId: null }, undefined, client);
     // pokladna a automatický tisk jen u účtenek
     const rules = (await listRecords(P, "int.printRule", { filter: { fromDeviceId: deviceId } }, client)).rows;
     expect([rules[0].registerId, rules[0].autoPrint]).toEqual([null, false]);
@@ -120,13 +129,13 @@ describe("tisková stanice", () => {
 
   it("instalace z Nastavení založí zařízení a při spárování ho pojmenuje podle počítače", async () => {
     const f = await stationSetup(P, null);
-    expect(f.name).toMatch(/^Shanon-Pokladna-PC\d+\.cmd$/);
+    expect(f.name).toMatch(/^Shanon-PC\d+\.cmd$/);
     const r = await pairStation(pairCode(f.data), { host: "kancelar-2", version: "1.0.0" });
     const dev = (await getRecord(P, "int.device", r!.deviceId, client))!;
     expect([dev.code, dev.name, dev.autoName]).toEqual(["KANCELAR-2", "kancelar-2", false]);
     // znovu z téhož počítače (zástupce zná zařízení) → stejné zařízení, nový kód
     const again = await stationSetup(P, r!.deviceId);
-    expect(again.name).toBe("Shanon-Pokladna-KANCELAR-2.cmd");
+    expect(again.name).toBe("Shanon-KANCELAR-2.cmd");
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

@@ -27,6 +27,7 @@ import { cashHandlers } from "@/modules/cash/handlers";
 import { posHandlers } from "@/modules/pos/sale";
 import { basketHandlers } from "@/modules/pos/basket";
 import int from "@/modules/int";
+import { PrintRuleDoc } from "@/modules/int/devices";
 import whs from "@/modules/whs";
 import { whsHandlers } from "@/modules/whs/stock";
 import { intHandlers, intJobs } from "@/modules/int/drivers";
@@ -61,6 +62,7 @@ ar.printables = [invoicePrintable, advancePrintable];
 pos.printables = [receiptPrintable];
 tax.printables = [vatPaymentPrintable];
 PrintDocType.values = modules.flatMap((m) => (m.printables ?? []).map((p) => ({ value: p.id, label: p.label })));
+PrintRuleDoc.values = [...PrintDocType.values, { value: "*", label: "@INT:PrintAllDocs" }];
 BatchClass.values = modules.flatMap((m) => (m.jobs ?? []).map((j) => ({ value: j.id, label: j.label })));
 
 // cíle oprávnění = všechny moduly a jejich objekty (modul, pak jeho objekty)

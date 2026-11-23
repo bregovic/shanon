@@ -18,7 +18,7 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
         const { code, hash, expires } = newPairCode(ctx.tenantId);
         await ctx.data.update("int.device", String(dev.id), { pairHash: hash, pairExpires: expires.toISOString() });
         return {
-          name: `Shanon-Pokladna-${String(dev.code).replace(/[^A-Za-z0-9_-]/g, "")}.cmd`,
+          name: `Shanon-${String(dev.code).replace(/[^A-Za-z0-9_-]/g, "")}.cmd`,
           mime: "application/octet-stream",
           data: await stationInstaller({ url: publicUrl(), code, deviceName: String(dev.name) }),
         };

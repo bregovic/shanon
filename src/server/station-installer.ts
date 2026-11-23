@@ -43,8 +43,8 @@ export async function stationInstaller(o: { url: string; code: string; deviceNam
   const payload = Buffer.concat([BOM, Buffer.from(header + agent, "utf8")]).toString("base64");
   return [
     "@echo off",
-    "title Shanon Pokladna - instalace",
-    `echo Instaluji Shanon Pokladna (tiskova stanice ${ascii(o.deviceName)})...`,
+    "title Shanon - instalace",
+    `echo Instaluji Shanon pro Windows (${ascii(o.deviceName)})...`,
     'set "SHANON_SETUP=%~f0"',
     'set "SHANON_PS=%TEMP%\\shanon-pokladna-setup.ps1"',
     `powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:SHANON_SETUP);$i=$t.LastIndexOf('::PAYLOAD::');[IO.File]::WriteAllBytes($env:SHANON_PS,[Convert]::FromBase64String($t.Substring($i+11).Trim()))"`,

@@ -145,35 +145,18 @@ export function UserSettings(p: {
                   </Dropdown>
                 </Field>
               )}
-              <div className={st.title}>{L.InstallApp}</div>
-              <Text size={200} className={st.muted}>
-                {L.InstallAppHelp}
-              </Text>
+              {/* Aplikace: Windows (správce) = instalace se zástupcem a tiskem bez dialogu, jinak aplikace z prohlížeče */}
+              <div className={st.title}>{L.StationApp}</div>
               <div>
-                <InstallAppButton label={L.InstallApp} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
+                {isWindows && p.canDevices ? (
+                  <Button appearance="primary" disabled={stationBusy} onClick={() => void installStation()}>
+                    {L.StationAppInstall}
+                  </Button>
+                ) : (
+                  <InstallAppButton label={L.StationAppInstall} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
+                )}
               </div>
-              {/* Windows: Shanon Pokladna = zástupce s ikonou + tisková stanice (tisk bez dialogu) */}
-              {isWindows && (
-                <>
-                  <div className={st.title}>{L.StationApp}</div>
-                  <Text size={200} className={st.muted}>
-                    {L.StationAppHelp}
-                  </Text>
-                  {p.canDevices ? (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <Button appearance="primary" disabled={stationBusy} onClick={() => void installStation()}>
-                        {L.StationAppInstall}
-                      </Button>
-                      <Button as="a" href="/int/device">
-                        {L.StationAppAdmin}
-                      </Button>
-                    </div>
-                  ) : (
-                    <Text size={200}>{L.StationAppAsk}</Text>
-                  )}
-                  {stationMsg && <Text size={200}>{stationMsg}</Text>}
-                </>
-              )}
+              {stationMsg && <Text size={200}>{stationMsg}</Text>}
               <div className={st.title}>{L.Notifications}</div>
               {/* jeden přepínač: oznámení e-mailem zapnutá / vypnutá (souhrn úkolů, faktury po splatnosti, chyby napojení) */}
               <Switch

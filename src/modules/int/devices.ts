@@ -7,7 +7,6 @@
  */
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineObject } from "@/core/object";
-import { PrintDocType } from "@/modules/prt";
 
 const Str = (id: string, label: string, maxLength: number) => defineEdt({ id, kind: "string", label, maxLength, transform: "trim" });
 
@@ -33,6 +32,9 @@ export const DevicePaper = defineEnum({
     { value: "a6", label: "@INT:PaperA6" },
   ],
 });
+
+/** doklad pravidla tisku: tisknutelné doklady + „Ostatní doklady“ (*) — hodnoty doplní registr */
+export const PrintRuleDoc = defineEnum({ id: "IntPrintRuleDoc", label: "@PRT:DocType", values: [] });
 
 export const device = defineObject({
   id: "int.device",
@@ -112,7 +114,7 @@ export const printRule = defineObject({
   labelPlural: "@INT:PrintRules",
   scope: "company",
   fields: {
-    docType: { edt: enumEdt(PrintDocType), mandatory: true },
+    docType: { edt: enumEdt(PrintRuleDoc), mandatory: true },
     printerId: { edt: refEdt("int.devicePrinter", "@INT:Printer"), mandatory: true },
     /** jen když se tiskne z tohoto počítače (zástupce Shanon Pokladna) */
     fromDeviceId: { edt: refEdt("int.device", "@INT:PrintRuleFrom"), optionalRef: true },

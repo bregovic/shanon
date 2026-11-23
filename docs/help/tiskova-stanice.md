@@ -1,56 +1,46 @@
 ---
-title: Shanon Pokladna pro Windows – tisková stanice a správa tisku
+title: Shanon pro Windows – tisk bez dialogu a správa tisku
 module: int
 objects: int.device, int.devicePrinter, int.printRule, int.printJob
 order: 40
-summary: Zástupce s ikonou na ploše a tisk účtenek a dokladů rovnou na tiskárny počítače podle pravidel Správy tisku, bez dialogu tisku.
+summary: Zástupce Shanon s ikonou na ploše a tisk účtenek a dokladů rovnou na tiskárny počítače, bez dialogu tisku.
 ---
-Prohlížeč sám tiskárnu vybrat nesmí — proto má Shanon malý program **Shanon Pokladna** pro Windows.
-Běží na počítači u tiskárny, sám zjistí jeho tiskárny, vyzvedává tiskové úlohy ze Shanonu a tiskne je
-bez dialogu na tiskárnu a papír podle nastavení.
+Prohlížeč sám tiskárnu vybrat nesmí — proto má Shanon pro Windows malý program, který na počítači u tiskárny
+sám zjistí jeho tiskárny, vyzvedává tiskové úlohy ze Shanonu a tiskne je bez dialogu.
 
 ## 1. Instalace na počítač
 
-Na počítači u tiskárny: **Nastavení → Nastavení → Nainstalovat na tento počítač**. Stáhne se soubor
-`Shanon-Pokladna-<kód>.cmd` s jednorázovým párovacím kódem (platí 3 dny). Spusťte ho dvojklikem; Windows se může
-zeptat „Systém Windows ochránil váš počítač“ → **Další informace → Přesto spustit**.
+Na počítači u tiskárny: **Nastavení → Aplikace → Nainstalovat** a stažený soubor spusťte. Windows se může zeptat
+„Systém Windows ochránil váš počítač“ → **Další informace → Přesto spustit**.
 
-Instalace spáruje počítač se Shanonem, stáhne prohlížeč PDF SumatraPDF (pro tichý tisk), na plochu a do nabídky Start
-dá zástupce **Shanon Pokladna** s ikonou a stanici spouští po každém přihlášení do Windows. Zařízení se založí samo
-a pojmenuje podle názvu počítače.
+Instalace spáruje počítač se Shanonem, dá na plochu a do nabídky Start zástupce **Shanon** s ikonou a tisk spouští
+po každém přihlášení do Windows. Zařízení se založí samo a pojmenuje podle názvu počítače.
+(Jinak: [Integrace → Zařízení](/int/device) → **Nový** → **Stáhnout instalaci**.)
 
-Jinak: [Integrace → Zařízení](/int/device) → **Nový** (kód, název) → **Stáhnout instalaci**.
+## 2. Tiskárny počítače
 
-## 2. Tiskárny zařízení
+U zařízení se na záložce **Tiskárny** objeví tiskárny Windows, které program na počítači našel (bez virtuálních
+jako „Tisk do PDF“). Papír se odhadne z názvu (XP-58 → 58 mm, POS / TM → 80 mm, ostatní A4) — upravte ho, případně
+kopie, a pošlete **Zkušební stránku**.
 
-Po spuštění stanice se u zařízení na záložce **Tiskárny** objeví tiskárny Windows, které na počítači našla
-(virtuální jako „Tisk do PDF“ se vynechají). U každé zkontrolujte:
-
-- **Tiskárna** — název, pod kterým ji uvidíte v pravidlech (např. „KASA1 · XP-58“, lze přejmenovat),
-- **Papír** — A4 (běžná tiskárna), role 80 mm, 58 mm nebo A6 (odhaduje se z názvu tiskárny),
-- **Kopie**.
-
-**Zkušební stránka** pošle na tiskárnu zkušební tisk. Tiskárna, kterou stanice už nehlásí, má zrušené **Nalezena na počítači**.
+Hned se založí i výchozí pravidla: **účtenky** na tiskárnu na roli (vytisknout hned po zaplacení) a **ostatní doklady**
+na tiskárnu A4 — obojí při tisku z tohoto počítače. Tiskárnu účtenek lze vybrat i přímo u pokladny
+(Pokladna → Zařízení → **Tiskárna počítače**).
 
 ## 3. Správa tisku
 
-[Integrace → Správa tisku](/int/printRule): co se kam tiskne. Každé pravidlo = **doklad → tiskárna**, případně jen:
-
-- **při tisku z počítače** — tiskne-li se ze zástupce Shanon Pokladna na tomto počítači,
-- **pro pokladnu** (účtenky) — a **Tisknout účtenku automaticky** hned po zaplacení,
-- **pro uživatele**.
-
-Platí nejpřesnější pravidlo: uživatel, pak počítač, ze kterého se tiskne, pak pokladna, pak pravidlo bez omezení.
-Fakturu lze tak poslat i na tiskárnu jiného počítače (z notebooku na velkou tiskárnu u kasy).
-Doklad bez pravidla se tiskne jako dřív z prohlížeče.
+[Integrace → Správa tisku](/int/printRule): co se kam tiskne. Pravidlo = **doklad** (nebo **Ostatní doklady**) → **tiskárna**,
+případně jen **při tisku z počítače**, jen pro **pokladnu** (účtenky; **Tisknout účtenku automaticky**) nebo pro **uživatele**.
+Platí nejpřesnější pravidlo. Doklad bez pravidla se tiskne jako dřív z prohlížeče.
 
 ## Tisk
 
-Tlačítko **Tisk** (v dokladu, v seznamu, v náhledu i v kase) pošle doklad na tiskárnu stanice a ukáže „Odesláno na tiskárnu …“.
-Když stanice zrovna neběží, úloha počká a vytiskne se po jejím spuštění. Přehled a chyby: [Tiskové úlohy](/int/printJob).
-Tiskárna na sériovém portu vybraná u pokladny tiskne účtenky dál sama.
+Tlačítko **Tisk** (v dokladu, v seznamu, v náhledu i v kase) pošle doklad na tiskárnu a ukáže „Odesláno na tiskárnu …“.
+Když program na počítači zrovna neběží, úloha počká. Přehled a chyby: [Tiskové úlohy](/int/printJob).
 
-## Zástupce Shanon Pokladna
+## Kasa bez připojení
 
-Otevře Shanon ve vlastním okně s ikonou. Pokladník se po přihlášení dostane rovnou do kasy, ostatní na úvod.
-Odpojení počítače: zařízení → **Odpojit** (pro nové spárování stáhněte instalaci znovu).
+Když vypadne internet, kasa prodává dál: platba **hotově** nebo **kartou na samostatném terminálu** se uloží v pokladně,
+účtenka dostane číslo z offline řady kasy (`OF-…`) a vytiskne se na místě. Nahoře svítí **Neodesláno: N** — prodeje se
+odešlou samy, jakmile je připojení (EET dodatečně). Uzávěrku směny jde udělat až po odeslání. Kasu otevřenou dříve
+na tomto počítači jde otevřít i bez připojení. Odběratel, QR platba, prodej na fakturu a odložené nákupy potřebují připojení.

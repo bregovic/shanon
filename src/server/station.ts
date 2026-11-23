@@ -22,7 +22,7 @@ import { inTenant, type Ctx } from "./data";
 import { findPrintable, printJob } from "./print";
 import { renderPdf } from "./print-pdf";
 import { onStationWake, wakeStation } from "./station-wake";
-import { devicePaperRoll, guessPaper, resolvePrintTarget } from "@/modules/int/print-rules";
+import { defaultPrintRules, devicePaperRoll, guessPaper, resolvePrintTarget } from "@/modules/int/print-rules";
 import { labelTable } from "@/registry";
 import { resolveLabel } from "@/core/labels";
 
@@ -82,7 +82,7 @@ export async function pairStation(code: string, info: { host?: string; version?:
       lastSeenAt: new Date().toISOString(),
     });
   });
-  return { token, deviceId: dev.id, name: dev.name };
+  return { token, deviceId: dev.id, name: dev.autoName && host ? host : dev.name };
 }
 
 /** Stanice podle klíče v hlavičce Authorization; null = neplatný klíč nebo vypnuté zařízení. */
@@ -130,6 +130,8 @@ export async function stationHello(st: Station, info: { host?: string; version?:
       else if (k.isDefault !== f.isDefault || !k.present) await api.update("int.devicePrinter", String(k.id), { isDefault: f.isDefault, present: true });
     }
     for (const k of known) if (k.present && !found.some((f) => f.name === k.printerName)) await api.update("int.devicePrinter", String(k.id), { present: false, isDefault: false });
+    // první hlášení tiskáren: výchozí pravidla tisku pro tento počítač
+    if (!known.length && found.length) await defaultPrintRules(api, st.deviceId);
   });
 }
 
@@ -310,5 +312,5 @@ export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{
     await api.update("int.device", String(dev.id), { pairHash: pc.hash, pairExpires: pc.expires.toISOString() });
     return { code: pc.code, dev };
   });
-  return { name: `Shanon-Pokladna-${String(dev.code).replace(/[^A-Za-z0-9_-]/g, "")}.cmd`, data: await stationInstaller({ url: publicUrl(), code, deviceName: String(dev.name) }) };
+  return { name: `Shanon-${String(dev.code).replace(/[^A-Za-z0-9_-]/g, "")}.cmd`, data: await stationInstaller({ url: publicUrl(), code, deviceName: String(dev.name) }) };
 }
