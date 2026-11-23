@@ -6,7 +6,8 @@
  * Bez --apply jen vypíše, co by se smazalo. Vybírá směny podle data otevření (bez --od/--do všechny směny firmy).
  * S --apply vše v jedné transakci: uzavřená směna → smaže se doklad uzávěrky (gl.trans, tax.trans, gl.voucher;
  * jen v otevřeném účetním období), pak řádky účtenek, účtenky a směna. Odkazy z ostatních záznamů (odložené nákupy…)
- * se vynulují; povinný odkaz z cizího záznamu nebo skladový pohyb z účtenky = konec bez změn (sklad řešit ručně).
+ * se vynulují; povinný odkaz z cizího záznamu = konec bez změn. Skladové pohyby z účtenek se smažou a vrátí
+ * zásobu i průměrnou cenu; jejich doklad ocenění (POS <den>) se smaže, jen když neobsahuje jiné pohyby.
  * Odeslané tržby EET zůstávají na straně správce daně. Cokoli selže → nic se nesmaže.
  */
 import "dotenv/config";
@@ -18,6 +19,7 @@ import { createPrisma, withTenant } from "../src/server/db";
 import { companyModules } from "../src/server/modules";
 import { registry } from "../src/registry";
 import { assertOpenPeriod } from "../src/modules/gl/posting";
+import { fromCents, toCents } from "../src/core/money";
 
 let enabled = new Set<string>();
 
@@ -76,12 +78,22 @@ async function main() {
         console.log(`\ncelkem: směn ${shifts.length}, účtenek ${receipts.length}, řádků ${lines.length}, ${sum.toFixed(2)} Kč, dokladů uzávěrky ${vouchers.length}`);
 
         const blockers: string[] = [];
-        // skladové pohyby z účtenek (výdej) — mazání by rozhodilo zásobu a ocenění
+        // skladové pohyby z účtenek (výdej): smazat a vrátit zásobu i ocenění; doklad ocenění jen celý
+        let moves: RecordData[] = [];
         if (modules.has("whs") && receiptIds.size) {
-          const moves = (await api.find("whs.trans", { sourceObject: "pos.receipt" }, { take: 100000 })).filter((m) => receiptIds.has(String(m.sourceId)));
-          if (moves.length) blockers.push(`skladové pohyby z účtenek: ${moves.length} (vyřešit ručně, např. inventurou)`);
+          moves = (await api.find("whs.trans", { sourceObject: "pos.receipt" }, { take: 100000 })).filter((m) => receiptIds.has(String(m.sourceId)));
+          const moveIds = new Set(moves.map((m) => String(m.id)));
+          for (const vId of new Set(moves.filter((m) => m.voucherId).map((m) => String(m.voucherId)))) {
+            const others = (await api.find("whs.trans", { voucherId: vId }, { take: 100000 })).filter((t) => !moveIds.has(String(t.id)));
+            if (others.length) blockers.push(`doklad ocenění skladu ${vId} obsahuje i jiné pohyby (${others.length})`);
+            else if (!voucherSet.has(vId)) {
+              vouchers.push(vId);
+              voucherSet.add(vId);
+            }
+          }
+          if (moves.length) console.log(`skladové pohyby k smazání (zásoba a ocenění se vrátí): ${moves.length}`);
         }
-        // doklady uzávěrky: otevřené období, zápisy a DPH
+        // doklady uzávěrky a ocenění skladu: otevřené období, zápisy a DPH
         const vRecs: RecordData[] = [];
         for (const id of vouchers) {
           const v = await api.get("gl.voucher", id);
@@ -104,11 +116,11 @@ async function main() {
             break;
           }
         }
-        if (vouchers.length) console.log(`zaúčtování k smazání: zápisů HK ${glTrans.length}, daňových transakcí ${taxTrans.length}`);
+        if (vouchers.length) console.log(`zaúčtování k smazání: dokladů ${vouchers.length}, zápisů HK ${glTrans.length}, daňových transakcí ${taxTrans.length}`);
 
         // odkazy z ostatních záznamů na mazané záznamy
-        const mine: Record<string, Set<string>> = { "pos.shift": shiftIds, "pos.receipt": receiptIds, "pos.receiptLine": lineIds, "gl.voucher": voucherSet };
-        const own = new Set(["pos.receipt.shiftId", "pos.receiptLine.receiptId", "gl.trans.voucherId", "tax.trans.voucherId", "pos.shift.voucherId"]);
+        const mine: Record<string, Set<string>> = { "pos.shift": shiftIds, "pos.receipt": receiptIds, "pos.receiptLine": lineIds, "gl.voucher": voucherSet, "whs.trans": new Set(moves.map((m) => String(m.id))) };
+        const own = new Set(["pos.receipt.shiftId", "pos.receiptLine.receiptId", "gl.trans.voucherId", "tax.trans.voucherId", "pos.shift.voucherId", "whs.trans.voucherId"]);
         const nulls: { obj: string; id: string; field: string; title: string }[] = [];
         for (const [target, ids] of Object.entries(mine)) {
           if (!ids.size) continue;
@@ -140,6 +152,21 @@ async function main() {
           const col = n.field.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}`);
           await s.tx.$executeRawUnsafe(`UPDATE "${registry.objects.get(n.obj)!.table}" SET "${col}" = NULL WHERE id = $1::uuid AND tenant_id = $2::uuid`, n.id, ctx.tenantId);
         }
+        // sklad: vrátit zásobu (pohyb z účtenky je výdej = záporné množství) a průměrnou cenu, pohyby smazat
+        const q4 = (v: unknown) => Math.round(Number(v ?? 0) * 10000) / 10000;
+        for (const m of moves) {
+          const [row] = await api.find("whs.onhand", { itemId: m.itemId, warehouseId: m.warehouseId, locationId: m.locationId ?? null }, { take: 1 });
+          if (row) await api.update("whs.onhand", String(row.id), { qty: (q4(row.qty) - q4(m.qty)).toFixed(4) });
+          if (m.value !== null && m.value !== undefined) {
+            const [cost] = await api.find("whs.itemCost", { itemId: m.itemId }, { take: 1 });
+            if (cost) {
+              const qty = q4(cost.qty) - q4(m.qty);
+              const value = toCents(cost.value) - toCents(m.value);
+              await api.update("whs.itemCost", String(cost.id), { qty: qty.toFixed(4), value: fromCents(value), ...(qty > 0 ? { avgCost: (Number(value) / 100 / qty).toFixed(2) } : {}) });
+            }
+          }
+        }
+        await sql("whs_trans", "id", moves.map((m) => String(m.id)));
         // zaúčtované zápisy nejdou smazat přes datovou službu (zámek) — přímo, v jedné transakci s ostatním
         await s.tx.$executeRawUnsafe(`UPDATE "pos_shift" SET "voucher_id" = NULL WHERE id = ANY($1::uuid[]) AND tenant_id = $2::uuid`, [...shiftIds], ctx.tenantId);
         await sql("tax_trans", "voucher_id", vouchers);
@@ -150,7 +177,7 @@ async function main() {
         await sql("pos_shift", "id", [...shiftIds]);
         forgetReads(s.tx);
         // stopa v historii změn
-        await s.tx.sysAudit.create({ data: { tenantId: ctx.tenantId, objectId: "pos.shift", recordId: String(shifts[0].id), action: "delete", userId: ctx.userId, changes: { script: "delete-receipts", shifts: shifts.map((x) => String(x.shiftNum)), receipts: receipts.map((r) => String(r.receiptNum)), vouchers: vRecs.map((v) => String(v.voucherNum ?? v.id)) } } });
+        await s.tx.sysAudit.create({ data: { tenantId: ctx.tenantId, objectId: "pos.shift", recordId: String(shifts[0].id), action: "delete", userId: ctx.userId, changes: { script: "delete-receipts", stockMoves: moves.length, shifts: shifts.map((x) => String(x.shiftNum)), receipts: receipts.map((r) => String(r.receiptNum)), vouchers: vRecs.map((v) => String(v.voucherNum ?? v.id)) } } });
         console.log("\nsmazáno");
       },
       client,
