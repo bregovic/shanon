@@ -6,7 +6,7 @@
 export const RESERVED_PATHS = new Set([
   // systémové cesty
   "api", "login", "logout", "portal", "help", "settings", "profile", "system", "report", "print", "kasa", "_next", "favicon.ico", "icon.png", "logo",
-  "admin", "app", "static", "public", "www", "shanon", "eshop", "pay-sim",
+  "admin", "app", "static", "public", "www", "shanon", "eshop", "pay-sim", "stanice",
   // aplikace Portál (zaměstnanci, dodavatelé) a soubory instalovatelných aplikací
   "p", "manifest.webmanifest", "portal-app.webmanifest", "icons",
   // moduly

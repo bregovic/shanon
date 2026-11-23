@@ -1,7 +1,9 @@
 "use client";
 
 /** Moje nastavení: údaje, jazyk, heslo, PIN do pokladny, upozornění e-mailem. */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+
+const noSubscribe = () => () => {};
 import { useRouter } from "next/navigation";
 import { Button, Dropdown, Switch, Field, Input, MessageBar, MessageBarBody, Option, Text, makeStyles, tokens } from "@fluentui/react-components";
 import { changePasswordAction, saveProfileAction, setPosPinAction } from "@/app/actions";
@@ -33,6 +35,8 @@ export function UserSettings(p: {
   user: { firstName: string; lastName: string; email: string; lang: string; hasPin: boolean; notify: Record<string, boolean>; defaultCompanyId: string };
   /** firmy, kam uživatel smí (výběr výchozí firmy) */
   companies: { id: string; label: string }[];
+  /** smí zakládat zařízení (Integrace → Zařízení) — instalace tiskové stanice pro Windows */
+  canDevices?: boolean;
   L: Record<string, string>;
 }) {
   const st = useStyles();
@@ -49,6 +53,7 @@ export function UserSettings(p: {
   const [msg, setMsg] = useState<Record<string, Msg>>({});
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const isWindows = useSyncExternalStore(noSubscribe, () => /Windows/i.test(navigator.userAgent), () => false);
 
   const run = async (key: string, fn: () => Promise<{ ok: boolean; message?: string; errors?: Record<string, string> }>, ok: string, after?: () => void) => {
     setBusy(true);
@@ -130,6 +135,16 @@ export function UserSettings(p: {
               <div>
                 <InstallAppButton label={L.InstallApp} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
               </div>
+              {/* Windows: Shanon Pokladna = zástupce s ikonou + tisková stanice (tisk bez dialogu) */}
+              {isWindows && (
+                <>
+                  <div className={st.title}>{L.StationApp}</div>
+                  <Text size={200} className={st.muted}>
+                    {L.StationAppHelp}
+                  </Text>
+                  <div>{p.canDevices ? <Button as="a" href="/int/device">{L.StationAppAdmin}</Button> : <Text size={200}>{L.StationAppAsk}</Text>}</div>
+                </>
+              )}
               <div className={st.title}>{L.Notifications}</div>
               {/* jeden přepínač: oznámení e-mailem zapnutá / vypnutá (souhrn úkolů, faktury po splatnosti, chyby napojení) */}
               <Switch

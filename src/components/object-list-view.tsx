@@ -24,6 +24,7 @@ import {
 import { actionIcon } from "./action-icon";
 import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
 import { printInFrame } from "@/lib/print-frame";
+import { printHref } from "@/lib/station-print";
 import type { ActionIcon as ActionIconName } from "@/core/object";
 import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
 import { DateInput } from "./date-input";
@@ -256,7 +257,10 @@ export function ObjectListView(p: ObjectListProps) {
             disabled={!selected.length || selected.length > 100}
             onClick={() => {
               const ids = selected.map((x) => String(x.id));
-              if (p.printDirect) void printInFrame(`${p.printHref}?ids=${ids.join(",")}`);
+              if (p.printDirect) {
+                const href = `${p.printHref}?ids=${ids.join(",")}`;
+                void printHref(href, () => printInFrame(href));
+              }
               else setPrinting(ids);
             }}
           >

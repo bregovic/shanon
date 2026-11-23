@@ -10,6 +10,7 @@ import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface
 import { DocumentPdf24Regular, Mail24Regular, Open24Regular, Print24Regular } from "@fluentui/react-icons";
 import { runRecordAction } from "@/app/actions";
 import { toast } from "./toast";
+import { parsePrintHref, printViaStation } from "@/lib/station-print";
 
 export interface PrintDialogLabels {
   title: string;
@@ -106,7 +107,10 @@ export function PrintDialog({
               appearance="primary"
               icon={<Print24Regular />}
               disabled={loading}
-              onClick={() => {
+              onClick={async () => {
+                // tisková stanice (tiskárna podle dokladu) — jinak tisk náhledu z prohlížeče
+                const p = parsePrintHref(current().page);
+                if (p && (await printViaStation(p.docType, p.ids, p.templateId))) return onClose();
                 const w = frame.current?.contentWindow;
                 if (!w) return;
                 w.focus();

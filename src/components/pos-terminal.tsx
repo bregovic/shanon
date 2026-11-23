@@ -70,6 +70,8 @@ import type { BasketView } from "@/modules/pos/basket";
 import type { PrintLayout } from "@/core/print";
 import { PrintDocument, QrSvg } from "@/lib/print-render";
 import { printInFrame } from "@/lib/print-frame";
+import { printViaStation } from "@/lib/station-print";
+import { ToastHost } from "./toast";
 import { receiptData } from "@/lib/receipt-data";
 import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
@@ -661,7 +663,11 @@ export function PosTerminal(p: {
     await writeToPort(port, bytes, pr.baudRate || 9600).catch((e) => setError(String(e)));
   };
   // tisk z prohlížeče: stejná tisková stránka jako ze seznamu účtenek (šablona, papír) — skrytým rámem
-  const browserPrint = (r: ReceiptPrint) => (r.id && p.receiptLayout ? printInFrame(`/print/pos.receipt/${r.id}`) : window.print());
+  // tisková stanice: účtenka do fronty stanice (bez dialogu); bez ní / jinak skrytým rámem
+  const browserPrint = async (r: ReceiptPrint) => {
+    if (r.id && p.printer?.driver === "station" && (await printViaStation("pos.receipt", [r.id]))) return;
+    return r.id && p.receiptLayout ? printInFrame(`/print/pos.receipt/${r.id}`) : window.print();
+  };
   const printReceipt = (r: ReceiptPrint) => (serialPrinter ? escpos(r) : browserPrint(r));
   const connectScale = async () => {
     if (!serialSupported()) return setError(L.PrinterUnsupported);
@@ -1025,6 +1031,7 @@ export function PosTerminal(p: {
 
   return (
     <div className={st.root}>
+      <ToastHost />
       <style>{PRINT_CSS.replace("72mm", p.printer?.paperWidth === "58" ? "48mm" : p.printer?.paperWidth === "a6" ? "93mm" : "72mm")}</style>
       <header className={st.bar}>
         <Button as="a" appearance="transparent" href="/pos" icon={<ArrowLeft24Regular />} aria-label={L.Back} style={{ color: "inherit" }} />

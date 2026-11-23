@@ -33,6 +33,7 @@ import {
 import { actionIcon } from "./action-icon";
 import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
 import { printInFrame } from "@/lib/print-frame";
+import { printHref } from "@/lib/station-print";
 import { WorkflowBar, type WorkflowBarLabels } from "./workflow-bar";
 import type { WorkflowBarData } from "@/server/workflow-bar";
 import type { ActionIcon as ActionIconName } from "@/core/object";
@@ -524,7 +525,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
           const printItems = [
             ...(p.printHref
               ? [
-                  <MenuItem key="print" icon={<Print24Regular />} onClick={() => (p.printDirect ? void printInFrame(p.printHref!) : setPrinting(true))}>
+                  <MenuItem key="print" icon={<Print24Regular />} onClick={() => (p.printDirect ? void printHref(p.printHref!, () => printInFrame(p.printHref!)) : setPrinting(true))}>
                     {p.labels.actions.print}
                   </MenuItem>,
                   <MenuItem key="pdf" icon={<DocumentPdf24Regular />} onClick={() => window.open(p.printHref!.replace(/^\/print\//, "/api/pdf/"), "_blank")}>

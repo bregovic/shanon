@@ -154,10 +154,7 @@ export async function renderPdfMany(
   opts: { locale?: string; title?: string } = {},
 ): Promise<Buffer> {
   const locale = opts.locale ?? "cs-CZ";
-  const doc = new PDFDocument({ margin: 0, autoFirstPage: false, info: { Title: opts.title ?? "", Producer: "Shanon" } });
-  doc.registerFont("R", join(FONT_DIR, "DejaVuSans.ttf"));
-  doc.registerFont("B", join(FONT_DIR, "DejaVuSans-Bold.ttf"));
-  doc.registerFont("I", join(FONT_DIR, "DejaVuSans-Oblique.ttf"));
+  const doc = newPdf({ Title: opts.title ?? "", Producer: "Shanon" });
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
   const done = new Promise<Buffer>((res) => doc.on("end", () => res(Buffer.concat(chunks))));
@@ -168,36 +165,60 @@ export async function renderPdfMany(
   return done;
 }
 
+/**
+ * Účtenka v toku: skupiny prvků pod sebou (ve skupině sloupce vedle sebe, `flowGroups`), delší obsah posune
+ * vše pod ním. Vrací spodní okraj obsahu v mm.
+ */
+function drawFlow(doc: Doc, layout: PrintLayout, data: PrintData, locale: string, fs: number, ox: number, top: number): number {
+  let cursor = top;
+  for (const g of flowGroups(layout, data)) {
+    const gTop = cursor + g.gap;
+    let bottom = gTop;
+    for (const c of g.columns) {
+      let y = gTop;
+      for (const { el, gap } of c.items) {
+        y += gap;
+        const real = drawElement(doc, { ...el, x: el.x + ox }, data, locale, fs, y - el.y) / MM;
+        y += el.type === "text" ? real : Math.max(real, el.h);
+      }
+      bottom = Math.max(bottom, y);
+    }
+    cursor = bottom;
+  }
+  return cursor;
+}
+
+/** Dokument na měření výšky účtenky (vysoká stránka, nikam se neukládá). */
+function scratchPdf(widthMm: number): Doc {
+  const doc = newPdf();
+  doc.addPage({ size: [widthMm * MM, 14000], margin: 0 });
+  return doc;
+}
+
+function newPdf(info: { Title?: string; Producer?: string } = {}): Doc {
+  const doc = new PDFDocument({ margin: 0, autoFirstPage: false, info });
+  doc.registerFont("R", join(FONT_DIR, "DejaVuSans.ttf"));
+  doc.registerFont("B", join(FONT_DIR, "DejaVuSans-Bold.ttf"));
+  doc.registerFont("I", join(FONT_DIR, "DejaVuSans-Oblique.ttf"));
+  return doc;
+}
+
 /** Jeden doklad od nové stránky. */
 function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string) {
   const paper = PAPERS[layout.paper] ?? PAPERS.a4;
   const fs = layout.fontSize || 9;
   const flow = !paper.h;
-  // účtenka: výška podle obsahu (odhad — dole se ořízne); účtenka na listu (A6) aspoň list, obsah na střed
-  const flowH = Math.max(60, ...layout.elements.map((e) => e.y + e.h)) + 20 + ((valueAt(data, "lines") as unknown[] | undefined)?.length ?? 0) * 5;
   const pageW = paper.sheet?.w ?? paper.w;
-  const pageH = flow ? Math.max(flowH, paper.sheet?.h ?? 0) : paper.h;
+  // účtenka: výška přesně podle obsahu (nanečisto vykreslená) — na roli bez prázdného papíru;
+  // účtenka na listu (A6) aspoň celý list, obsah na střed
+  const ox = paper.sheet ? (paper.sheet.w - paper.w) / 2 : 0;
+  const top = paper.sheet?.margin ?? 0;
+  const pageH = flow ? Math.max(Math.ceil(drawFlow(scratchPdf(pageW), layout, data, locale, fs, ox, top)) + 3, paper.sheet?.h ?? 0) : paper.h;
   doc.addPage({ size: [pageW * MM, pageH * MM], margin: 0 });
 
   const table = layout.elements.find((e) => e.type === "table");
   if (flow) {
-    // účtenka: skupiny prvků pod sebou (ve skupině sloupce vedle sebe), delší obsah posune vše pod ním
-    const ox = paper.sheet ? (paper.sheet.w - paper.w) / 2 : 0;
-    let cursor = paper.sheet?.margin ?? 0;
-    for (const g of flowGroups(layout, data)) {
-      const top = cursor + g.gap;
-      let bottom = top;
-      for (const c of g.columns) {
-        let y = top;
-        for (const { el, gap } of c.items) {
-          y += gap;
-          const real = drawElement(doc, { ...el, x: el.x + ox }, data, locale, fs, y - el.y) / MM;
-          y += el.type === "text" ? real : Math.max(real, el.h);
-        }
-        bottom = Math.max(bottom, y);
-      }
-      cursor = bottom;
-    }
+    drawFlow(doc, layout, data, locale, fs, ox, top);
   } else if (!table) {
     for (const el of layout.elements) drawElement(doc, el, data, locale, fs);
   } else {

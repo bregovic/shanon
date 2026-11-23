@@ -327,6 +327,13 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   s `doc.title`/`customer.*`), uzávěrka dá účtenku s CZ DIČ od 10 000 Kč do KH jednotlivě (A.4, `sourceObject` pos.receipt);
   `sellOnInvoice` = vydaná faktura `pricesInclTax` zaúčtovaná přes `ar.cfg` + `postInvoice`. E-mail z pokladny `sendDocumentNow`
   (`src/server/mail.ts`, koncept s PDF + odeslání). Kód firmy z ARES = `companyCodeFromName` (4 znaky, jedinečný).
+- Tisková stanice (`src/server/station.ts`, objekty `int.device` / `int.printRoute` / `int.printJob` v `src/modules/int/devices.ts`,
+  program pro Windows `src/station/stanice.ps1`): prohlížeč tiskárnu vybrat nesmí → Shanon Pokladna na PC u tiskárny. Zařízení → Stáhnout
+  instalaci = osobní `.cmd` (`station-installer.ts`, program + ikona + jednorázový párovací kód `shp.…`, v DB jen otisk) → `/api/station/pair`
+  dá klíč `shs.…` (DPAPI na PC). Stanice čeká dlouhým dotazem `/api/station/jobs` (probuzení `station-wake.ts`), PDF `jobs/<id>/pdf`
+  s `X-Print-Settings` pro SumatraPDF (`printSettings`), výsledek POST. Tisk z UI = `printViaStation` / `printHref` (`src/lib/station-print.ts`,
+  server action `stationPrintAction`): tiskárna `resolveStationPrinter` (účtenka → tiskárna pokladny, jinak pravidla dokladů: uživatel →
+  počítač ze zástupce `/stanice?d=` v localStorage → kód), bez ní tisk z prohlížeče. Účtenka v PDF má výšku přesně podle obsahu (měřicí průchod).
 - Pokladní váha (`src/lib/scale.ts`, napojení druhu `scale`: `scaleSerial` / `scaleSim`): Web Serial v kase, protokoly toledo8217 /
   casEcr / continuous (`parseScale`, testy bez hardwaru), bere se jen ustálená kladná hmotnost; port váhy zapamatovaný v localStorage
   (`pos.port.scale`), tiskárna ho přeskočí (`grantedPort`). Automatické zvážení po otevření dialogu `ScaleAutoStart`.

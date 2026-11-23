@@ -3,6 +3,7 @@
 import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
+import { queueStationPrint } from "@/server/station";
 import { createCompanyFromRegistry } from "@/server/company-lookup";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
@@ -1409,6 +1410,22 @@ export async function previewPostingAction(objectId: string, id: string): Promis
   const s = await requireSession();
   try {
     return { ok: true, data: await previewPosting(s.ctx, objectId, id) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/**
+ * Tisk na tiskárnu tiskové stanice (Shanon Pokladna): úloha do fronty stanice. `data` null = pro doklad
+ * žádná tiskárna stanice → tiskne prohlížeč. `stationId` = počítač, ze kterého se tiskne (zástupce stanice).
+ */
+export async function stationPrintAction(docType: string, ids: string[], stationId?: string | null, templateId?: string | null): Promise<ActionResult<{ message: string; warn: boolean } | null>> {
+  const s = await requireSession();
+  try {
+    const r = await queueStationPrint(s.ctx, docType, ids, { stationId: stationId && /^[0-9a-f-]{36}$/.test(stationId) ? stationId : null, templateId });
+    if (!r) return { ok: true, data: null };
+    const t = await getT(s.lang, s.ctx.tenantId);
+    return { ok: true, data: { message: t(r.online ? "@INT:StationQueued" : "@INT:StationOffline", { printer: r.printer, device: r.device }), warn: !r.online } };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
