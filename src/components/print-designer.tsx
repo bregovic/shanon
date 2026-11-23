@@ -324,8 +324,8 @@ export function PrintDesigner({
                   <Text weight="semibold">{tpl?.name}</Text>
                   <Field label={L.Paper}>
                     <Select value={layout.paper} onChange={(_, d) => update((l) => ({ ...l, paper: d.value as PaperKind }))}>
-                      {(["a4", "a5", "receipt80", "receipt58", "label"] as PaperKind[]).map((p) => (
-                        <option key={p} value={p}>{L[`Paper${p === "a4" ? "A4" : p === "a5" ? "A5" : p === "receipt80" ? "Receipt80" : p === "receipt58" ? "Receipt58" : "Label"}`]}</option>
+                      {(["a4", "a5", "receipt80", "receipt58", "receiptA6", "label"] as PaperKind[]).map((p) => (
+                        <option key={p} value={p}>{L[`Paper${p === "a4" ? "A4" : p === "a5" ? "A5" : p === "receipt80" ? "Receipt80" : p === "receipt58" ? "Receipt58" : p === "receiptA6" ? "ReceiptA6" : "Label"}`]}</option>
                       ))}
                     </Select>
                   </Field>

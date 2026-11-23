@@ -7,7 +7,7 @@
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-import { PAPERS, valueAt, type PrintData, type PrintElement, type PrintLayout } from "@/core/print";
+import { PAPERS, flowGroups, valueAt, type PrintData, type PrintElement, type PrintLayout } from "@/core/print";
 import { fillText, formatValue } from "@/lib/print-render";
 
 const MM = 72 / 25.4;
@@ -173,23 +173,30 @@ function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string)
   const paper = PAPERS[layout.paper] ?? PAPERS.a4;
   const fs = layout.fontSize || 9;
   const flow = !paper.h;
-  // účtenka: výška podle obsahu (odhad — dole se ořízne)
-  const pageH = flow ? Math.max(60, ...layout.elements.map((e) => e.y + e.h)) + 20 + ((valueAt(data, "lines") as unknown[] | undefined)?.length ?? 0) * 5 : paper.h;
-  doc.addPage({ size: [paper.w * MM, pageH * MM], margin: 0 });
+  // účtenka: výška podle obsahu (odhad — dole se ořízne); účtenka na listu (A6) aspoň list, obsah na střed
+  const flowH = Math.max(60, ...layout.elements.map((e) => e.y + e.h)) + 20 + ((valueAt(data, "lines") as unknown[] | undefined)?.length ?? 0) * 5;
+  const pageW = paper.sheet?.w ?? paper.w;
+  const pageH = flow ? Math.max(flowH, paper.sheet?.h ?? 0) : paper.h;
+  doc.addPage({ size: [pageW * MM, pageH * MM], margin: 0 });
 
   const table = layout.elements.find((e) => e.type === "table");
   if (flow) {
-    // účtenka: prvky pod sebou, delší obsah posune vše pod ním; skryté prvky nezabírají místo
-    const visible = layout.elements.filter((e) => {
-      if (!e.showIf) return true;
-      const v = valueAt(data, e.showIf);
-      return !(v === null || v === undefined || v === "" || v === "0" || v === "0.00");
-    });
-    const top = Math.min(...visible.map((e) => e.y));
-    let shift = -top;
-    for (const el of [...visible].sort((a, b) => a.y - b.y || a.x - b.x)) {
-      const real = drawElement(doc, el, data, locale, fs, shift) / MM;
-      shift += Math.max(0, real - el.h);
+    // účtenka: skupiny prvků pod sebou (ve skupině sloupce vedle sebe), delší obsah posune vše pod ním
+    const ox = paper.sheet ? (paper.sheet.w - paper.w) / 2 : 0;
+    let cursor = paper.sheet?.margin ?? 0;
+    for (const g of flowGroups(layout, data)) {
+      const top = cursor + g.gap;
+      let bottom = top;
+      for (const c of g.columns) {
+        let y = top;
+        for (const { el, gap } of c.items) {
+          y += gap;
+          const real = drawElement(doc, { ...el, x: el.x + ox }, data, locale, fs, y - el.y) / MM;
+          y += el.type === "text" ? real : Math.max(real, el.h);
+        }
+        bottom = Math.max(bottom, y);
+      }
+      cursor = bottom;
     }
   } else if (!table) {
     for (const el of layout.elements) drawElement(doc, el, data, locale, fs);
@@ -199,7 +206,7 @@ function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string)
     for (const el of head) drawElement(doc, el, data, locale, fs);
     const bottomLimit = (pageH - MARGIN) * MM;
     const newPage = () => {
-      doc.addPage({ size: [paper.w * MM, pageH * MM], margin: 0 });
+      doc.addPage({ size: [pageW * MM, pageH * MM], margin: 0 });
       return MARGIN * MM;
     };
     const rows = (valueAt(data, "lines") as Record<string, unknown>[]) ?? [];

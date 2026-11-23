@@ -1025,7 +1025,7 @@ export function PosTerminal(p: {
 
   return (
     <div className={st.root}>
-      <style>{PRINT_CSS.replace("72mm", p.printer?.paperWidth === "58" ? "48mm" : "72mm")}</style>
+      <style>{PRINT_CSS.replace("72mm", p.printer?.paperWidth === "58" ? "48mm" : p.printer?.paperWidth === "a6" ? "93mm" : "72mm")}</style>
       <header className={st.bar}>
         <Button as="a" appearance="transparent" href="/pos" icon={<ArrowLeft24Regular />} aria-label={L.Back} style={{ color: "inherit" }} />
         <span className={st.barTitle}>{p.register.name}</span>

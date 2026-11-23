@@ -20,6 +20,7 @@ export const Paper = defineEnum({
     { value: "a5", label: "@PRT:PaperA5" },
     { value: "receipt80", label: "@PRT:PaperReceipt80" },
     { value: "receipt58", label: "@PRT:PaperReceipt58" },
+    { value: "receiptA6", label: "@PRT:PaperReceiptA6" },
     { value: "label", label: "@PRT:PaperLabel" },
   ],
 });
@@ -119,6 +120,7 @@ export default defineModule({
       PaperA5: "A5",
       PaperReceipt80: "Účtenka 80 mm",
       PaperReceipt58: "Účtenka 58 mm",
+      PaperReceiptA6: "Účtenka na A6",
       PaperLabel: "Štítek 100×60 mm",
       IsDefault: "Výchozí",
       Layout: "Rozvržení",
@@ -237,6 +239,7 @@ export default defineModule({
       PaperA5: "A5",
       PaperReceipt80: "Receipt 80 mm",
       PaperReceipt58: "Receipt 58 mm",
+      PaperReceiptA6: "Receipt on A6",
       PaperLabel: "Label 100×60 mm",
       IsDefault: "Default",
       Layout: "Layout",

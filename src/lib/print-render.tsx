@@ -7,7 +7,7 @@
  * se posunou o skutečnou výšku tabulky.
  */
 import QRCode from "qrcode";
-import { PAPERS, valueAt, type PrintColumn, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
+import { PAPERS, flowGroups, valueAt, type PrintColumn, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
 
 export function formatValue(v: unknown, f: ValueFormat | undefined, locale: string): string {
   if (v === null || v === undefined || v === "") return "";
@@ -164,27 +164,22 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
   // účtenka (papír bez pevné výšky): prvky pod sebou podle obsahu — delší text nebo
   // víc sazeb DPH posune vše pod sebou, nic se nepřekrývá
   if (!paper.h) {
-    const shown = (el: PrintElement) => {
-      if (!el.showIf) return true;
-      const v = valueAt(data, el.showIf);
-      return !(v === null || v === undefined || v === "" || v === "0" || v === "0.00");
-    };
-    const visible = layout.elements.filter(shown);
-    // skrytý prvek nahoře (logo) nenechá prázdné místo: zbytek se posune
-    const top = Math.min(...visible.map((e) => e.y));
-    const sorted = visible.map((e) => ({ ...e, y: e.y - (Number.isFinite(top) ? top : 0) })).sort((a, b) => a.y - b.y || a.x - b.x);
-    // mezera nad prvkem = odstup od spodku předchozích prvků v návrhu
-    // (nejvýš 4 mm — větší mezera v návrhu je místo po skrytém prvku, např. QR platbě u hotovosti)
-    const gaps = sorted.map((el, i) => Math.min(4, Math.max(0, el.y - Math.max(0, ...sorted.slice(0, i).map((x) => x.y + x.h)))));
+    const groups = flowGroups(layout, data);
     return (
       <div className="print-page" style={{ width: `${paper.w}mm`, fontFamily: "Arial, Helvetica, sans-serif", color: "#000", background: "#fff" }}>
-        {sorted.map((el, i) => {
-          return (
-            <div key={el.id} style={{ position: "relative", marginTop: `${gaps[i]}mm`, marginLeft: `${el.x}mm`, width: `${el.w}mm`, minHeight: el.type === "text" ? undefined : `${el.h}mm` }}>
-              <ElementView el={{ ...el, x: 0, y: 0 }} data={data} locale={locale} fontSize={fs0} flow />
-            </div>
-          );
-        })}
+        {groups.map((g, gi) => (
+          <div key={gi} style={{ display: "flex", alignItems: "flex-start", marginTop: `${g.gap}mm` }}>
+            {g.columns.map((c, ci) => (
+              <div key={ci} style={{ flex: "none", width: `${c.w}mm`, marginLeft: `${c.x - (ci ? g.columns[ci - 1].x + g.columns[ci - 1].w : 0)}mm` }}>
+                {c.items.map(({ el, gap }) => (
+                  <div key={el.id} style={{ position: "relative", marginTop: `${gap}mm`, marginLeft: `${el.x - c.x}mm`, width: `${el.w}mm`, minHeight: el.type === "text" ? undefined : `${el.h}mm` }}>
+                    <ElementView el={{ ...el, x: 0, y: 0 }} data={data} locale={locale} fontSize={fs0} flow />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     );
   }
@@ -239,6 +234,9 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
  */
 export function printCss(layout: PrintLayout): string {
   const p = PAPERS[layout.paper] ?? PAPERS.a4;
+  // účtenka na listu (A6): list pevné velikosti, obsah na střed, delší pokračuje na dalším listu
+  if (p.sheet)
+    return `@page { size: ${p.sheet.w}mm ${p.sheet.h}mm; margin: ${p.sheet.margin}mm 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; } body > div { min-height: 0 !important; } .no-print { display: none !important; } .print-page { break-inside: auto; } body .print-sheet { margin: 0 auto !important; } }`;
   if (p.h)
     return `@page { size: ${p.w}mm ${p.h}mm; margin: 0; } @media print { html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; } .no-print { display: none !important; } .print-page { break-inside: auto; } }`;
   // role: na střed papíru; obal stránky nesmí mít výšku obrazovky (na roli by to byly metry prázdného papíru)

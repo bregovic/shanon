@@ -5,7 +5,7 @@
 import { storageFor } from "./storage";
 import { UserError, type RecordData } from "@/core/module";
 import { can } from "@/core/security";
-import { fitRoll, type PrintLayout, type PrintableDef } from "@/core/print";
+import { layoutForPaper, type PrintLayout, type PrintableDef } from "@/core/print";
 import { labelTable, registry, modules } from "@/registry";
 import { resolveLabel } from "@/core/labels";
 import { inTenant, type Ctx } from "./data";
@@ -46,7 +46,16 @@ export async function printJob(ctx: Ctx, docType: string, recordId: string, temp
       const api = s.sys().api();
       if (!(await s.get(docType, recordId))) throw new UserError("@SYS:NotFound");
       const templates = await api.find("prt.template", { docType }, { take: 50, orderBy: { code: "asc" } });
-      const tpl = templates.find((t) => t.id === templateId) ?? templates.find((t) => t.isDefault) ?? templates[0] ?? null;
+      // papír tiskárny (účtenka: role pokladny / A6) — šablona navržená přímo na něj má přednost
+      const roll = p.rollPaper ? await p.rollPaper(api, ctx.companyId, recordId).catch(() => null) : null;
+      const forPaper = roll ? templates.filter((t) => parseLayout(t.layout, p).paper === roll) : [];
+      const tpl =
+        templates.find((t) => t.id === templateId) ??
+        forPaper.find((t) => t.isDefault) ??
+        forPaper[0] ??
+        templates.find((t) => t.isDefault) ??
+        templates[0] ??
+        null;
       const data = await p.dataset(api, ctx.companyId, recordId);
       // způsob platby účtenky v jazyce uživatele
       const doc = data.doc as Record<string, unknown> | undefined;
@@ -64,11 +73,10 @@ export async function printJob(ctx: Ctx, docType: string, recordId: string, temp
       // přílohy PDF (ISDOC); chyba přílohy tisk nezastaví
       const attachments = p.attachments ? await p.attachments(api, ctx.companyId, recordId).catch(() => []) : [];
       const base = tpl ? parseLayout(tpl.layout, p) : p.defaultLayout();
-      const roll = p.rollPaper ? await p.rollPaper(api, ctx.companyId, recordId).catch(() => null) : null;
       return {
         attachments,
         title: String(record[p.numberField] ?? ""),
-        layout: fitRoll(base, roll),
+        layout: layoutForPaper(p, base, roll),
         templateId: tpl ? String(tpl.id) : null,
         templates: templates.map((t) => ({ id: String(t.id), name: String(t.name) })),
         data,

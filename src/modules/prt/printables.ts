@@ -1081,6 +1081,72 @@ function receiptLayout(): PrintLayout {
   };
 }
 
+/**
+ * Účtenka na listu A6 (tiskárna pokladny s papírem A6): obsah 93 mm na střed listu, kratší než role —
+ * platba a zaokrouhlení vedle sebe, QR platba vlevo a vedle ní výzva, VS, poznámka neplátce, EET a poděkování.
+ * Bez QR se texty patičky roztáhnou na celou šířku (`flowGroups`).
+ */
+export function receiptLayoutA6(): PrintLayout {
+  return {
+    paper: "receiptA6",
+    fontSize: 8.5,
+    elements: [
+      { id: "logo", type: "image", x: 31.5, y: 0, w: 30, h: 10, field: "company.logo", showIf: "company.logo", style: { align: "center" } },
+      T("name", 0, 11, 93, 5, "{company.name}", { bold: true, align: "center", size: 11 }),
+      T("addr", 0, 16, 93, 7, "{company.address}\nIČO {company.regNo}   DIČ {company.vatId}", { align: "center", size: 7.5 }),
+      { ...T("reg", 0, 23, 93, 1, "{company.registration}", { align: "center", size: 6.5 }), showIf: "company.registration" },
+      { id: "sep1", type: "line", x: 0, y: 24.5, w: 93, h: 1 },
+      T("title", 0, 25.5, 93, 5, "{doc.title} č. {doc.number}", { bold: true, align: "center", size: 9 }),
+      T("num", 0, 30.5, 93, 4, "{doc.dateTime}   pokladna {doc.register}", { align: "center", size: 7.5 }),
+      { ...T("cust", 0, 35, 93, 1, "Odběratel: {customer.name}\n{customer.address}\n{customer.ids}", { size: 7.5 }), showIf: "customer.name" },
+      {
+        id: "lines",
+        type: "table",
+        x: 0,
+        y: 36.5,
+        w: 93,
+        h: 20,
+        style: { size: 8 },
+        columns: [
+          { field: "description", label: "Položka", width: 47 },
+          { field: "qty", label: "Mn.", width: 13, align: "right", format: "qty" },
+          { field: "unit", label: "MJ", width: 7 },
+          { field: "rate", label: "%", width: 7, align: "right" },
+          { field: "gross", label: "Kč", width: 19, align: "right", format: "money" },
+        ],
+      },
+      T("total", 0, 58, 93, 7, "Celkem k úhradě {doc.paid:money} Kč", { bold: true, size: 12, align: "right" }),
+      T("pay", 0, 65, 52, 4, "Platba: {doc.payment}", { size: 7.5 }),
+      { ...T("cash", 0, 69, 52, 4, "Přijato {doc.cashGiven:money} Kč   Vráceno {doc.change:money} Kč", { size: 7.5 }), showIf: "doc.cashGiven" },
+      { ...T("round", 53, 65, 40, 8, "Zaokrouhlení {doc.rounding:money} Kč", { size: 7.5, align: "right" }), showIf: "doc.rounding" },
+      {
+        id: "vat",
+        type: "vat",
+        // rekapitulace DPH jen u plátce
+        showIf: "doc.vatPayer",
+        x: 0,
+        y: 75,
+        w: 93,
+        h: 12,
+        style: { size: 7.5 },
+        columns: [
+          { field: "rate", label: "Sazba %", width: 20, align: "right" },
+          { field: "base", label: "Základ", width: 25, align: "right", format: "money" },
+          { field: "tax", label: "DPH", width: 22, align: "right", format: "money" },
+          { field: "gross", label: "Celkem", width: 26, align: "right", format: "money" },
+        ],
+      },
+      // patička: QR platba vlevo, texty vedle ní (bez QR přes celou šířku)
+      { id: "qr", type: "qr", x: 0, y: 89, w: 30, h: 30, field: "doc.qr", showIf: "doc.qr" },
+      { ...T("qrNote", 33, 89, 60, 4, "{doc.qrNote}", { bold: true, align: "center", size: 8 }), showIf: "doc.qr" },
+      { ...T("qrVs", 33, 93, 60, 4, "VS {doc.vs}", { align: "center", size: 8 }), showIf: "doc.qr" },
+      { ...T("np", 33, 97, 60, 3, "{doc.nonPayerNote}", { size: 7.5, align: "center" }), showIf: "doc.nonPayerNote" },
+      { ...T("eet", 33, 100, 60, 6, "Evidence tržeb – běžný režim\nPOK: {doc.fik}", { size: 7, align: "center" }), showIf: "doc.fik" },
+      T("foot", 33, 106, 60, 8, "{doc.footer}\nDěkujeme za nákup", { align: "center", size: 8 }),
+    ],
+  };
+}
+
 /** Účtenka v5 (18. 11. 2026, bez QR platby) — neupravené šablony se převedou. */
 export function receiptLayoutV5(): PrintLayout {
   return {
@@ -1422,8 +1488,10 @@ export const receiptPrintable: PrintableDef = {
       printers.find((c) => registerId && c.registerId === registerId) ??
       printers.find((c) => !c.registerId);
     if (!pick) return null;
-    return String(pick.paperWidth) === "58" ? "receipt58" : "receipt80";
+    const w = String(pick.paperWidth);
+    return w === "58" ? "receipt58" : w === "a6" ? "receiptA6" : "receipt80";
   },
+  paperLayouts: { receiptA6: receiptLayoutA6 },
   numberField: "receiptNum",
   fields: [
     ...COMPANY_FIELDS.slice(0, 5),

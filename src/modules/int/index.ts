@@ -96,6 +96,7 @@ export const PaperWidth = defineEnum({
   values: [
     { value: "80", label: "@INT:Paper80" },
     { value: "58", label: "@INT:Paper58" },
+    { value: "a6", label: "@INT:PaperA6" },
   ],
 });
 
@@ -1184,9 +1185,10 @@ export default defineModule({
       PrinterSettings: "Tiskárna",
       PaymentSettings: "Platební terminál",
       State: "Stav",
-      PaperWidth: "Šířka papíru",
+      PaperWidth: "Papír",
       Paper80: "80 mm",
       Paper58: "58 mm",
+      PaperA6: "A6 (105 × 148 mm)",
       CodePage: "Kódová stránka",
       Cp852: "PC852 (čeština)",
       Ascii: "Bez diakritiky",
@@ -1763,9 +1765,10 @@ export default defineModule({
       PrinterSettings: "Printer",
       PaymentSettings: "Payment terminal",
       State: "State",
-      PaperWidth: "Paper width",
+      PaperWidth: "Paper",
       Paper80: "80 mm",
       Paper58: "58 mm",
+      PaperA6: "A6 (105 × 148 mm)",
       CodePage: "Code page",
       Cp852: "PC852 (Czech)",
       Ascii: "Without accents",
