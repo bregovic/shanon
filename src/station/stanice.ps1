@@ -116,10 +116,10 @@ function Install-Station {
 
   # zástupce aplikace (okno bez lišty prohlížeče, vlastní profil = vlastní přihlášení a ikona)
   $browser = Find-Browser
-  $appArgs = '--app="' + "$SetupUrl/stanice?d=$($r.deviceId)" + '" --user-data-dir="' + (Join-Path $AppDir 'profil') + '" --no-first-run --no-default-browser-check'
+  $appArgs = '--app="' + "$SetupUrl/stanice?d=$($r.deviceId)" + '" --user-data-dir="' + (Join-Path $AppDir 'profil') + '" --start-maximized --no-first-run --no-default-browser-check'
   if ($browser) {
-    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Shanon.lnk') $browser $appArgs $icon
-    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Programs')) 'Shanon.lnk') $browser $appArgs $icon
+    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Shanon.lnk') $browser $appArgs $icon 3
+    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Programs')) 'Shanon.lnk') $browser $appArgs $icon 3
   }
 
   Stop-OldStation
