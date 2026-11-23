@@ -5,12 +5,15 @@
  * dostane klíč `shs.<tenantId>.<náhodný>` — v DB jen otisky (int.device.pairHash / tokenHash).
  * Stanice si úlohy vyzvedává dlouhým dotazem (`takeJobs`, čeká až 25 s, nová úloha ji probudí),
  * stáhne PDF (`jobPdf`, nastavení tisku v hlavičce) a nahlásí výsledek (`reportJob`).
- * Tisk z Shanonu (`queueStationPrint`) = právo číst doklad; tiskárnu vybírá `resolveStationPrinter`.
+ * Tiskárny Windows hlásí stanice sama (`stationHello` → int.devicePrinter). Tisk z Shanonu (`queueStationPrint`)
+ * = právo číst doklad; tiskárnu vybírají pravidla Správy tisku (`resolvePrintTarget`).
  */
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { stationSha } from "./station-codes";
-import type { RecordData, DataApi } from "@/core/module";
+import { newPairCode, stationSha } from "./station-codes";
+import { stationInstaller } from "./station-installer";
+import { publicUrl } from "./system-mail";
+import type { RecordData } from "@/core/module";
 import { UserError } from "@/core/module";
 import { PAPERS, type PrintLayout } from "@/core/print";
 import { prisma, withTenant } from "./db";
@@ -19,6 +22,7 @@ import { inTenant, type Ctx } from "./data";
 import { findPrintable, printJob } from "./print";
 import { renderPdf } from "./print-pdf";
 import { onStationWake, wakeStation } from "./station-wake";
+import { devicePaperRoll, guessPaper, resolvePrintTarget } from "@/modules/int/print-rules";
 import { labelTable } from "@/registry";
 import { resolveLabel } from "@/core/labels";
 
@@ -56,20 +60,28 @@ export async function pairStation(code: string, info: { host?: string; version?:
   const ctx = await ctxFor(dev);
   if (!ctx) return null;
   const token = `shs.${tenantId}.${randomBytes(24).toString("base64url")}`;
-  await inTenant(ctx, (s) =>
-    s
-      .sys()
-      .api()
-      .update("int.device", dev.id, {
-        tokenHash: sha(token),
-        pairHash: null,
-        pairExpires: null,
-        paired: true,
-        hostName: info.host ? String(info.host).slice(0, 120) : null,
-        agentVersion: info.version ? String(info.version).slice(0, 40) : null,
-        lastSeenAt: new Date().toISOString(),
-      }),
-  );
+  const host = info.host ? String(info.host).slice(0, 120) : null;
+  await inTenant(ctx, async (s) => {
+    const api = s.sys().api();
+    // založeno z Nastavení: kód a název podle počítače (kód jen když je volný)
+    const named: RecordData = {};
+    if (dev.autoName && host) {
+      named.name = host;
+      named.autoName = false;
+      const code = host.toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 20);
+      if (code && !(await api.find("int.device", { code }, { take: 1 })).length) named.code = code;
+    }
+    await api.update("int.device", dev.id, {
+      ...named,
+      tokenHash: sha(token),
+      pairHash: null,
+      pairExpires: null,
+      paired: true,
+      hostName: host,
+      agentVersion: info.version ? String(info.version).slice(0, 40) : null,
+      lastSeenAt: new Date().toISOString(),
+    });
+  });
   return { token, deviceId: dev.id, name: dev.name };
 }
 
@@ -86,24 +98,39 @@ export async function stationAuth(authorization: string | null) {
 
 type Station = NonNullable<Awaited<ReturnType<typeof stationAuth>>>;
 
-/** Stanice hlásí počítač, verzi a tiskárny Windows. */
+/** virtuální tiskárny Windows (PDF, XPS, OneNote, fax) se mezi tiskárny zařízení nezapisují */
+const VIRTUAL = /fax|onenote|xps document writer|print to pdf|tisk do pdf|send to/i;
+
+/** Stanice hlásí počítač, verzi a tiskárny Windows — nové tiskárny se zapíší k zařízení (papír odhadem z názvu). */
 export async function stationHello(st: Station, info: { host?: string; version?: string; printers?: { name: string; default?: boolean }[] }) {
-  const printers = (info.printers ?? [])
-    .filter((p) => p && typeof p.name === "string")
+  const found = (info.printers ?? [])
+    .filter((p) => p && typeof p.name === "string" && p.name.trim() && !VIRTUAL.test(p.name))
     .slice(0, 50)
-    .map((p) => `${p.default ? "* " : ""}${p.name.slice(0, 200)}`)
-    .join("\n");
-  await inTenant(st.ctx, (s) =>
-    s
-      .sys()
-      .api()
-      .update("int.device", st.deviceId, {
-        hostName: info.host ? String(info.host).slice(0, 120) : null,
-        agentVersion: info.version ? String(info.version).slice(0, 40) : null,
-        printers,
-        lastSeenAt: new Date().toISOString(),
-      }),
-  );
+    .map((p) => ({ name: p.name.trim().slice(0, 200), isDefault: !!p.default }));
+  await inTenant(st.ctx, async (s) => {
+    const api = s.sys().api();
+    const dev = await api.update("int.device", st.deviceId, {
+      hostName: info.host ? String(info.host).slice(0, 120) : null,
+      agentVersion: info.version ? String(info.version).slice(0, 40) : null,
+      lastSeenAt: new Date().toISOString(),
+    });
+    const known = await api.find("int.devicePrinter", { deviceId: st.deviceId }, { take: 200 });
+    for (const f of found) {
+      const k = known.find((x) => x.printerName === f.name);
+      if (!k)
+        await api.create("int.devicePrinter", {
+          deviceId: st.deviceId,
+          label: `${dev.code} · ${f.name}`.slice(0, 120),
+          printerName: f.name,
+          paper: guessPaper(f.name),
+          copies: 1,
+          isDefault: f.isDefault,
+          present: true,
+        });
+      else if (k.isDefault !== f.isDefault || !k.present) await api.update("int.devicePrinter", String(k.id), { isDefault: f.isDefault, present: true });
+    }
+    for (const k of known) if (k.present && !found.some((f) => f.name === k.printerName)) await api.update("int.devicePrinter", String(k.id), { present: false, isDefault: false });
+  });
 }
 
 /** Úloha předaná stanici, která se do 2 minut neozvala (stanice spadla) — dostane ji znovu. */
@@ -120,11 +147,11 @@ async function pendingJobs(st: Station) {
     const rows = await api.find("int.printJob", { deviceId: st.deviceId, status: { in: ["queued", "sent"] } }, { take: 20, orderBy: { createdAt: "asc" } });
     const due = rows.filter((j) => j.status === "queued" || !j.sentAt || Date.now() - new Date(String(j.sentAt)).getTime() > RESEND_MS);
     if (!due.length) return [];
-    const conns = await api.find("int.connection", { id: { in: [...new Set(due.map((j) => String(j.connectionId)))] } }, { take: 50 });
+    const printers = await api.find("int.devicePrinter", { id: { in: [...new Set(due.map((j) => String(j.printerId)))] } }, { take: 50 });
     const now = new Date().toISOString();
     for (const j of due) await api.update("int.printJob", String(j.id), { status: "sent", sentAt: now });
     return due.map((j) => {
-      const c = conns.find((x) => x.id === j.connectionId);
+      const c = printers.find((x) => x.id === j.printerId);
       return { id: String(j.id), printer: c?.printerName ? String(c.printerName) : "", copies: Number(j.copies) || 1, reference: String(j.reference ?? "") };
     });
   });
@@ -170,12 +197,12 @@ export async function jobPdf(st: Station, jobId: string): Promise<{ pdf: Buffer;
     const api = s.sys().api();
     const job = await api.get("int.printJob", jobId);
     if (!job || job.deviceId !== st.deviceId) throw new UserError("@SYS:NotFound");
-    return { job, conn: await api.get("int.connection", String(job.connectionId)), dev: await api.get("int.device", st.deviceId) };
+    return { job, conn: await api.get("int.devicePrinter", String(job.printerId)), dev: await api.get("int.device", st.deviceId) };
   });
   const copies = Number(job.copies) || 1;
   if (!job.docType || !job.recordId) {
-    const layout = testPageLayout(String(conn?.paperWidth ?? "a4"));
-    const printer = String(conn?.printerName || conn?.name || ""), device = String(dev?.name ?? "");
+    const layout = testPageLayout(String(conn?.paper ?? "a4"));
+    const printer = String(conn?.printerName ?? ""), device = String(dev?.name ?? "");
     const t = (k: string, params: Record<string, string> = {}) => resolveLabel(labelTable, k, st.ctx.lang ?? "cs").replace(/\{(\w+)\}/g, (m, n: string) => params[n] ?? m);
     const data = { test: { title: t("@INT:StationTestTitle"), text: t("@INT:StationTestText", { printer, device }), printer, at: new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" }) } };
     return { pdf: await renderPdf(layout, data), settings: printSettings(layout, copies), name: "zkouska" };
@@ -183,7 +210,8 @@ export async function jobPdf(st: Station, jobId: string): Promise<{ pdf: Buffer;
   const docType = String(job.docType);
   // tisk za stanici = číst jen tento druh dokladu (datová služba hlídá firmu a RLS)
   const ctx: Ctx = { ...st.ctx, perms: { admin: false, levels: { [docType]: "read" } } };
-  const pj = await printJob(ctx, docType, String(job.recordId), job.templateId ? String(job.templateId) : null);
+  // papír tiskárny, na kterou úloha jde (role účtenky, A6); A4 tiskárna = výchozí rozvržení dokladu
+  const pj = await printJob(ctx, docType, String(job.recordId), job.templateId ? String(job.templateId) : null, undefined, devicePaperRoll(conn?.paper));
   return { pdf: await renderPdf(pj.layout, pj.data, { title: pj.title }), settings: printSettings(pj.layout, copies), name: pj.title || "doklad" };
 }
 
@@ -219,30 +247,6 @@ export async function reportJob(st: Station, jobId: string, ok: boolean, message
   });
 }
 
-/**
- * Tiskárna stanice pro doklad: účtenka → tiskárna pokladny (je-li to tiskárna stanice); jinak pravidla
- * „Doklady na tiskárnu“ — přednost má pravidlo pro uživatele, pak tiskárna počítače, ze kterého se tiskne
- * (`stationId` ze zástupce Shanon Pokladna), pak podle kódu tiskárny. null = tisk z prohlížeče.
- */
-export async function resolveStationPrinter(api: DataApi, docType: string, recordId: string | null, stationId: string | null, userId: string): Promise<RecordData | null> {
-  const printers = (await api.find("int.connection", { kind: "printer", driver: "station", active: true }, { take: 100, orderBy: { code: "asc" } })).filter((c) => c.deviceId);
-  if (!printers.length) return null;
-  if (docType === "pos.receipt" && recordId) {
-    const rec = await api.get("pos.receipt", recordId).catch(() => null);
-    const reg = rec?.registerId ? await api.get("pos.register", String(rec.registerId)).catch(() => null) : null;
-    // pokladna má vybranou tiskárnu: tiskárna stanice → sem, jiná (prohlížeč, sériová) → stanice ne
-    if (reg?.printerConnId) return printers.find((c) => c.id === reg.printerConnId) ?? null;
-  }
-  const routes = await api.find("int.printRoute", { docType }, { take: 100 });
-  const rank = (r: RecordData, c: RecordData) => (r.userId === userId ? 0 : 2) + (stationId && c.deviceId === stationId ? 0 : 1);
-  const cands = routes
-    .filter((r) => !r.userId || r.userId === userId)
-    .map((r) => ({ r, c: printers.find((c) => c.id === r.connectionId) }))
-    .filter((x): x is { r: RecordData; c: RecordData } => !!x.c)
-    .sort((a, b) => rank(a.r, a.c) - rank(b.r, b.c) || String(a.c.code).localeCompare(String(b.c.code)));
-  return cands[0]?.c ?? null;
-}
-
 export interface StationQueued {
   printer: string;
   device: string;
@@ -264,12 +268,13 @@ export async function queueStationPrint(ctx: Ctx, docType: string, ids: string[]
       recs.push(r);
     }
     const api = s.sys().api();
-    const conn = await resolveStationPrinter(api, docType, ids[0], opts.stationId ?? null, ctx.userId);
-    if (!conn) return null;
+    const target = await resolvePrintTarget(api, docType, { recordId: ids[0], stationId: opts.stationId ?? null, userId: ctx.userId });
+    if (!target) return null;
+    const conn = target.printer;
     for (const r of recs)
       await api.create("int.printJob", {
         deviceId: conn.deviceId,
-        connectionId: conn.id,
+        printerId: conn.id,
         docType,
         recordId: r.id,
         templateId: opts.templateId || null,
@@ -277,11 +282,33 @@ export async function queueStationPrint(ctx: Ctx, docType: string, ids: string[]
         copies: Number(conn.copies) || 1,
         status: "queued",
       });
-    const dev = await api.get("int.device", String(conn.deviceId));
-    const seen = dev?.lastSeenAt ? new Date(String(dev.lastSeenAt)).getTime() : 0;
-    return { deviceId: String(conn.deviceId), printer: String(conn.printerName || conn.name), device: String(dev?.name ?? ""), online: Date.now() - seen < ONLINE_MS };
+    const dev = target.device;
+    const seen = dev.lastSeenAt ? new Date(String(dev.lastSeenAt)).getTime() : 0;
+    return { deviceId: String(conn.deviceId), printer: String(conn.label), device: String(dev.name ?? ""), online: Date.now() - seen < ONLINE_MS };
   });
   if (!out) return null;
   wakeStation(out.deviceId);
   return { printer: out.printer, device: out.device, online: out.online };
+}
+
+/**
+ * Nastavení → „Nainstalovat na tento počítač“: instalátor pro zařízení tohoto počítače (zná ho zástupce
+ * Shanon Pokladna), jinak nové zařízení pojmenované při spárování podle názvu počítače. Právo = zápis zařízení.
+ */
+export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{ name: string; data: string }> {
+  const { code, dev } = await inTenant(ctx, async (s) => {
+    const api = s.sys().api();
+    let dev = deviceId ? await api.get("int.device", deviceId).catch(() => null) : null;
+    if (dev && !dev.active) dev = null;
+    if (!dev) {
+      const used = new Set((await api.find("int.device", {}, { take: 1000 })).map((d) => String(d.code)));
+      let n = 1;
+      while (used.has(`PC${n}`)) n++;
+      dev = await api.create("int.device", { code: `PC${n}`, name: resolveLabel(labelTable, "@INT:DeviceSetupName", ctx.lang ?? "cs"), autoName: true, active: true });
+    }
+    const pc = newPairCode(ctx.tenantId);
+    await api.update("int.device", String(dev.id), { pairHash: pc.hash, pairExpires: pc.expires.toISOString() });
+    return { code: pc.code, dev };
+  });
+  return { name: `Shanon-Pokladna-${String(dev.code).replace(/[^A-Za-z0-9_-]/g, "")}.cmd`, data: await stationInstaller({ url: publicUrl(), code, deviceName: String(dev.name) }) };
 }

@@ -422,7 +422,8 @@ model SysCompany {
   intDocumentLine_company          IntDocumentLine[]          @relation("IntDocumentLine_company")
   intMail_company                  IntMail[]                  @relation("IntMail_company")
   intDevice_company                IntDevice[]                @relation("IntDevice_company")
-  intPrintRoute_company            IntPrintRoute[]            @relation("IntPrintRoute_company")
+  intDevicePrinter_company         IntDevicePrinter[]         @relation("IntDevicePrinter_company")
+  intPrintRule_company             IntPrintRule[]             @relation("IntPrintRule_company")
   intPrintJob_company              IntPrintJob[]              @relation("IntPrintJob_company")
   shopShop_company                 ShopShop[]                 @relation("ShopShop_company")
   shopCategory_company             ShopCategory[]             @relation("ShopCategory_company")
@@ -3763,6 +3764,7 @@ model PosRegister {
   posBasket_register     PosBasket[]     @relation("PosBasket_register")
   intConnection_register IntConnection[] @relation("IntConnection_register")
   intDevice_register     IntDevice[]     @relation("IntDevice_register")
+  intPrintRule_register  IntPrintRule[]  @relation("IntPrintRule_register")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -4353,9 +4355,6 @@ model IntConnection {
   parity          String?   @default("none") @db.VarChar(40)
   stopBits        Int?      @default(1) @map("stop_bits")
   openDrawer      Boolean   @default(false) @map("open_drawer")
-  deviceId        String?   @map("device_id") @db.Uuid
-  printerName     String?   @map("printer_name") @db.VarChar(200)
-  copies          Int?      @default(1)
   autoPrint       Boolean   @default(false) @map("auto_print")
   merchantCode    String?   @map("merchant_code") @db.VarChar(20)
   apiKey          String?   @map("api_key") @db.VarChar(4000)
@@ -4392,21 +4391,17 @@ model IntConnection {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy       String?   @map("updated_by") @db.Uuid
 
-  company                  SysCompany      @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
-  register                 PosRegister?    @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
-  device                   IntDevice?      @relation("IntConnection_device", fields: [deviceId], references: [id], onDelete: Restrict)
-  posRegister_scaleConn    PosRegister[]   @relation("PosRegister_scaleConn")
-  posRegister_printerConn  PosRegister[]   @relation("PosRegister_printerConn")
-  intLog_connection        IntLog[]        @relation("IntLog_connection")
-  intDocument_connection   IntDocument[]   @relation("IntDocument_connection")
-  intMail_connection       IntMail[]       @relation("IntMail_connection")
-  intPrintRoute_connection IntPrintRoute[] @relation("IntPrintRoute_connection")
-  intPrintJob_connection   IntPrintJob[]   @relation("IntPrintJob_connection")
+  company                 SysCompany    @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register                PosRegister?  @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
+  posRegister_scaleConn   PosRegister[] @relation("PosRegister_scaleConn")
+  posRegister_printerConn PosRegister[] @relation("PosRegister_printerConn")
+  intLog_connection       IntLog[]      @relation("IntLog_connection")
+  intDocument_connection  IntDocument[] @relation("IntDocument_connection")
+  intMail_connection      IntMail[]     @relation("IntMail_connection")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
   @@index([registerId])
-  @@index([deviceId])
   @@map("int_connection")
 }
 
@@ -4686,7 +4681,7 @@ model IntDevice {
   lastSeenAt   DateTime? @map("last_seen_at")
   hostName     String?   @map("host_name") @db.VarChar(120)
   agentVersion String?   @map("agent_version") @db.VarChar(40)
-  printers     String?
+  autoName     Boolean   @default(false) @map("auto_name")
   tokenHash    String?   @map("token_hash") @db.VarChar(64)
   pairHash     String?   @map("pair_hash") @db.VarChar(64)
   pairExpires  DateTime? @map("pair_expires")
@@ -4697,10 +4692,11 @@ model IntDevice {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?   @map("updated_by") @db.Uuid
 
-  company              SysCompany      @relation("IntDevice_company", fields: [companyId], references: [id], onDelete: Restrict)
-  register             PosRegister?    @relation("IntDevice_register", fields: [registerId], references: [id], onDelete: Restrict)
-  intConnection_device IntConnection[] @relation("IntConnection_device")
-  intPrintJob_device   IntPrintJob[]   @relation("IntPrintJob_device")
+  company                 SysCompany         @relation("IntDevice_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register                PosRegister?       @relation("IntDevice_register", fields: [registerId], references: [id], onDelete: Restrict)
+  intDevicePrinter_device IntDevicePrinter[] @relation("IntDevicePrinter_device")
+  intPrintRule_fromDevice IntPrintRule[]     @relation("IntPrintRule_fromDevice")
+  intPrintJob_device      IntPrintJob[]      @relation("IntPrintJob_device")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -4708,14 +4704,48 @@ model IntDevice {
   @@map("int_device")
 }
 
-/// int.printRoute — generováno z definice objektu
-model IntPrintRoute {
+/// int.devicePrinter — generováno z definice objektu
+model IntDevicePrinter {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  deviceId    String   @map("device_id") @db.Uuid
+  label       String   @db.VarChar(120)
+  printerName String   @map("printer_name") @db.VarChar(200)
+  paper       String   @default("a4") @db.VarChar(40)
+  copies      Int?     @default(1)
+  isDefault   Boolean  @default(false) @map("is_default")
+  present     Boolean  @default(true)
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  company              SysCompany     @relation("IntDevicePrinter_company", fields: [companyId], references: [id], onDelete: Restrict)
+  device               IntDevice      @relation("IntDevicePrinter_device", fields: [deviceId], references: [id], onDelete: Restrict)
+  intPrintRule_printer IntPrintRule[] @relation("IntPrintRule_printer")
+  intPrintJob_printer  IntPrintJob[]  @relation("IntPrintJob_printer")
+
+  @@unique([tenantId, companyId, deviceId, printerName])
+  @@index([tenantId, companyId])
+  @@index([deviceId])
+  @@map("int_device_printer")
+}
+
+/// int.printRule — generováno z definice objektu
+model IntPrintRule {
   id           String   @id @default(uuid(7)) @db.Uuid
   tenantId     String   @map("tenant_id") @db.Uuid
   companyId    String   @map("company_id") @db.Uuid
-  connectionId String   @map("connection_id") @db.Uuid
   docType      String   @map("doc_type") @db.VarChar(40)
+  printerId    String   @map("printer_id") @db.Uuid
+  fromDeviceId String?  @map("from_device_id") @db.Uuid
+  registerId   String?  @map("register_id") @db.Uuid
   userId       String?  @map("user_id") @db.VarChar(36)
+  autoPrint    Boolean  @default(false) @map("auto_print")
+  active       Boolean  @default(true)
   ext          Json     @default("{}")
   version      Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at")
@@ -4723,45 +4753,48 @@ model IntPrintRoute {
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?  @map("updated_by") @db.Uuid
 
-  company    SysCompany    @relation("IntPrintRoute_company", fields: [companyId], references: [id], onDelete: Restrict)
-  connection IntConnection @relation("IntPrintRoute_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+  company    SysCompany       @relation("IntPrintRule_company", fields: [companyId], references: [id], onDelete: Restrict)
+  printer    IntDevicePrinter @relation("IntPrintRule_printer", fields: [printerId], references: [id], onDelete: Restrict)
+  fromDevice IntDevice?       @relation("IntPrintRule_fromDevice", fields: [fromDeviceId], references: [id], onDelete: Restrict)
+  register   PosRegister?     @relation("IntPrintRule_register", fields: [registerId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, companyId, connectionId, docType, userId])
   @@index([tenantId, companyId])
-  @@index([connectionId])
-  @@map("int_print_route")
+  @@index([printerId])
+  @@index([fromDeviceId])
+  @@index([registerId])
+  @@map("int_print_rule")
 }
 
 /// int.printJob — generováno z definice objektu
 model IntPrintJob {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
-  companyId    String    @map("company_id") @db.Uuid
-  deviceId     String    @map("device_id") @db.Uuid
-  connectionId String    @map("connection_id") @db.Uuid
-  docType      String?   @map("doc_type") @db.VarChar(40)
-  recordId     String?   @map("record_id") @db.VarChar(36)
-  templateId   String?   @map("template_id") @db.VarChar(36)
-  reference    String?   @db.VarChar(255)
-  copies       Int?      @default(1)
-  status       String    @default("queued") @db.VarChar(40)
-  message      String?   @db.VarChar(255)
-  sentAt       DateTime? @map("sent_at")
-  doneAt       DateTime? @map("done_at")
-  ext          Json      @default("{}")
-  version      Int       @default(1)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  createdBy    String?   @map("created_by") @db.Uuid
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy    String?   @map("updated_by") @db.Uuid
+  id         String    @id @default(uuid(7)) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  companyId  String    @map("company_id") @db.Uuid
+  deviceId   String    @map("device_id") @db.Uuid
+  printerId  String    @map("printer_id") @db.Uuid
+  docType    String?   @map("doc_type") @db.VarChar(40)
+  recordId   String?   @map("record_id") @db.VarChar(36)
+  templateId String?   @map("template_id") @db.VarChar(36)
+  reference  String?   @db.VarChar(255)
+  copies     Int?      @default(1)
+  status     String    @default("queued") @db.VarChar(40)
+  message    String?   @db.VarChar(255)
+  sentAt     DateTime? @map("sent_at")
+  doneAt     DateTime? @map("done_at")
+  ext        Json      @default("{}")
+  version    Int       @default(1)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  createdBy  String?   @map("created_by") @db.Uuid
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String?   @map("updated_by") @db.Uuid
 
-  company    SysCompany    @relation("IntPrintJob_company", fields: [companyId], references: [id], onDelete: Restrict)
-  device     IntDevice     @relation("IntPrintJob_device", fields: [deviceId], references: [id], onDelete: Restrict)
-  connection IntConnection @relation("IntPrintJob_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+  company SysCompany       @relation("IntPrintJob_company", fields: [companyId], references: [id], onDelete: Restrict)
+  device  IntDevice        @relation("IntPrintJob_device", fields: [deviceId], references: [id], onDelete: Restrict)
+  printer IntDevicePrinter @relation("IntPrintJob_printer", fields: [printerId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([deviceId])
-  @@index([connectionId])
+  @@index([printerId])
   @@index([tenantId, companyId, deviceId, status])
   @@map("int_print_job")
 }

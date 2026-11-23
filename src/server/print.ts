@@ -5,7 +5,7 @@
 import { storageFor } from "./storage";
 import { UserError, type RecordData } from "@/core/module";
 import { can } from "@/core/security";
-import { layoutForPaper, type PrintLayout, type PrintableDef } from "@/core/print";
+import { layoutForPaper, type PaperKind, type PrintLayout, type PrintableDef } from "@/core/print";
 import { labelTable, registry, modules } from "@/registry";
 import { resolveLabel } from "@/core/labels";
 import { inTenant, type Ctx } from "./data";
@@ -38,7 +38,8 @@ export function parseLayout(raw: unknown, p: PrintableDef): PrintLayout {
 }
 
 /** Data dokladu a šablona (zvolená, jinak výchozí druhu). */
-export async function printJob(ctx: Ctx, docType: string, recordId: string, templateId?: string | null, client?: PrismaClient) {
+/** `paper` = papír tiskárny, na kterou se tiskne (tisková stanice); jinak podle tiskárny pokladny */
+export async function printJob(ctx: Ctx, docType: string, recordId: string, templateId?: string | null, client?: PrismaClient, paper?: PaperKind | null) {
   const p = assertPrintable(ctx, docType);
   return inTenant(
     ctx,
@@ -47,7 +48,7 @@ export async function printJob(ctx: Ctx, docType: string, recordId: string, temp
       if (!(await s.get(docType, recordId))) throw new UserError("@SYS:NotFound");
       const templates = await api.find("prt.template", { docType }, { take: 50, orderBy: { code: "asc" } });
       // papír tiskárny (účtenka: role pokladny / A6) — šablona navržená přímo na něj má přednost
-      const roll = p.rollPaper ? await p.rollPaper(api, ctx.companyId, recordId).catch(() => null) : null;
+      const roll = !p.rollPaper ? null : paper !== undefined ? paper : await p.rollPaper(api, ctx.companyId, recordId).catch(() => null);
       const forPaper = roll ? templates.filter((t) => parseLayout(t.layout, p).paper === roll) : [];
       const tpl =
         templates.find((t) => t.id === templateId) ??

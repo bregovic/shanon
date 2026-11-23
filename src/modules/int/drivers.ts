@@ -19,7 +19,6 @@ import {
 } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
 import { newToken } from "@/server/api-token";
-import { wakeStation } from "@/server/station-wake";
 import { verifyMail } from "./mail";
 import QRCode from "qrcode";
 import { comgateCancel, comgateCreate, comgateStatus, comgateTestCall } from "./comgate";
@@ -45,7 +44,7 @@ export const DRIVERS: Record<string, string[]> = {
   mail: ["system", "smtp", "mailTest"],
   isds: ["isds", "isdsTest"],
   eet: ["eet2", "eetSimulator"],
-  printer: ["browser", "escposSerial", "station"],
+  printer: ["browser", "escposSerial"],
   payment: ["manual", "sumup", "simulator", "comgate", "gatewaySim"],
   scale: ["scaleSerial", "scaleSim"],
   api: ["rest"],
@@ -586,7 +585,6 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         d.posId ??= "TEST";
       }
       if (d.kind === "eet" && !d.unitId) e.unitId = "@SYS:Required";
-      if (d.driver === "station" && !d.deviceId) e.deviceId = "@SYS:Required";
       if (d.kind === "eet" && !d.posId) e.posId = "@SYS:Required";
       if (d.kind === "api") {
         const scopes = String(d.scopes ?? "")
@@ -792,13 +790,6 @@ export const intHandlers: Record<string, ObjectHandlers> = {
               reason: eetMessageText(r),
             });
           return;
-        }
-        // tisková stanice: zkušební stránka do fronty stanice
-        if (conn.driver === "station") {
-          if (!conn.deviceId) throw new UserError("@INT:StationNoDevice");
-          await ctx.data.create("int.printJob", { deviceId: conn.deviceId, connectionId: conn.id, reference: ctx.t("@INT:StationTestTitle"), copies: 1, status: "queued" });
-          wakeStation(String(conn.deviceId), 800);
-          return setCheck(ctx.data, conn, ctx.t("@INT:StationTestQueued", { printer: String(conn.printerName || conn.name) }));
         }
         if (conn.kind === "printer")
           return setCheck(ctx.data, conn, ctx.t("@INT:PrinterTestInfo"));

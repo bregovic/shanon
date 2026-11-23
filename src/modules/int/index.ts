@@ -7,7 +7,7 @@
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
 import { retireTestScale } from "./test-env";
-import { PrintJobStatus, device, printJob, printRoute } from "./devices";
+import { DevicePaper, PrintJobStatus, device, devicePrinter, printJob, printRule } from "./devices";
 import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -58,7 +58,6 @@ export const Driver = defineEnum({
     { value: "eet2", label: "@INT:DrvEet2" },
     { value: "browser", label: "@INT:DrvBrowser" },
     { value: "escposSerial", label: "@INT:DrvEscposSerial" },
-    { value: "station", label: "@INT:DrvStation" },
     { value: "manual", label: "@INT:DrvManual" },
     { value: "sumup", label: "@INT:DrvSumup" },
     { value: "simulator", label: "@INT:DrvSimulator" },
@@ -213,7 +212,6 @@ const PRINTER = { field: "kind", in: ["printer"] };
 const SUMUP = { field: "driver", in: ["sumup"] };
 const COMGATE = { field: "driver", in: ["comgate"] };
 const SERIAL = { field: "driver", in: ["escposSerial"] };
-const STATION = { field: "driver", in: ["station"] };
 const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
 const ISDS = { field: "kind", in: ["isds"] };
@@ -264,10 +262,6 @@ export const connection = defineObject({
     parity: { edt: enumEdt(SerialParity), default: "none", visibleWhen: { field: "driver", in: ["scaleSerial"] } },
     stopBits: { edt: Edts.Int, label: "@INT:StopBits", default: 1, visibleWhen: { field: "driver", in: ["scaleSerial"] } },
     openDrawer: { edt: Edts.NoYes, label: "@INT:OpenDrawer", visibleWhen: SERIAL },
-    // tisková stanice: počítač se Shanon Pokladna, tiskárna Windows, kopie
-    deviceId: { edt: refEdt("int.device", "@INT:Device"), visibleWhen: STATION },
-    printerName: { edt: Str("StationPrinter", "@INT:PrinterName", 200), help: "@INT:PrinterNameHelp", visibleWhen: STATION },
-    copies: { edt: Edts.Int, label: "@INT:Copies", default: 1, visibleWhen: STATION },
     autoPrint: { edt: Edts.NoYes, label: "@INT:AutoPrint", visibleWhen: PRINTER },
     // platební terminál SumUp (Cloud API, čtečka Solo)
     merchantCode: { edt: Str("SumupMerchant", "@INT:MerchantCode", 20), visibleWhen: { field: "driver", in: ["sumup", "comgate"] } },
@@ -311,7 +305,7 @@ export const connection = defineObject({
   form: [
     { label: "@SYS:General", fields: ["code", "name", "kind", "driver", "registerId", "active", "pausedByTest"] },
     { label: "@INT:EetSettings", fields: ["environment", "unitId", "posId", "certPassword", "certSubject", "certValidTo"], visibleWhen: EET },
-    { label: "@INT:PrinterSettings", fields: ["deviceId", "printerName", "copies", "paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
+    { label: "@INT:PrinterSettings", fields: ["paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
     { label: "@INT:ComgateSettings", fields: ["merchantCode", "apiKey", "testMode", "payMethods", "posQr", "pushUrl"], visibleWhen: COMGATE },
     { label: "@INT:GatewaySimSettings", fields: ["posQr"], visibleWhen: { field: "driver", in: ["gatewaySim"] } },
@@ -325,7 +319,6 @@ export const connection = defineObject({
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
   lines: [
-    { object: "int.printRoute", field: "connectionId", label: "@INT:PrintRoutes", inline: true },
     { object: "int.log", field: "connectionId", label: "@INT:Log", owned: false },
   ],
   actions: [
@@ -661,13 +654,13 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [PortalPurpose, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus],
-  objects: [connection, log, portal, portalUpload, portalContact, document, documentLine, mail, device, printRoute, printJob],
+  enums: [PortalPurpose, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper],
+  objects: [connection, log, portal, portalUpload, portalContact, document, documentLine, mail, device, devicePrinter, printRule, printJob],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
   menu: [
     { label: "@INT:Module", items: [{ object: "int.connection" }, { object: "int.log" }] },
-    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printJob" }] },
+    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }] },
     { label: "@INT:Documents", items: [{ object: "int.document" }, { object: "int.portal" }, { object: "int.portalContact" }] },
     { label: "@INT:Mails", items: [{ object: "int.mail" }] },
     { label: "@INT:Documents", kind: "functions", items: [{ href: "/int/doc-import", label: "@INT:DocImport" }] },
@@ -681,19 +674,25 @@ export default defineModule({
       DeviceLastSeen: "Naposledy online",
       DeviceHost: "Počítač",
       DeviceVersion: "Verze programu",
-      DevicePrinters: "Tiskárny ve Windows",
-      DevicePrinterConns: "Tiskárny stanice",
+      DevicePrinter: "Tiskárna zařízení",
+      DevicePrinters: "Tiskárny",
+      DeviceAutoName: "Pojmenovat podle počítače",
+      PaperA4: "A4 (běžná tiskárna)",
+      PrinterDefault: "Výchozí ve Windows",
+      PrinterPresent: "Nalezena na počítači",
+      PrinterTest: "Zkušební stránka",
+      PrintRule: "Pravidlo tisku",
+      PrintRules: "Správa tisku",
+      PrintRuleFrom: "Jen při tisku z počítače",
+      DeviceSetupName: "Nový počítač",
       DeviceInstaller: "Stáhnout instalaci",
       DeviceUnpair: "Odpojit",
       DeviceUnpaired: "Zařízení je odpojené — pro nové spárování stáhněte instalaci znovu.",
       DeviceInstallerName: "Shanon Pokladna – instalace",
-      DrvStation: "Tisková stanice (Shanon Pokladna pro Windows)",
       Printer: "Tiskárna",
       PrinterName: "Tiskárna ve Windows",
-      PrinterNameHelp: "Název tiskárny přesně jako ve Windows (seznam je u zařízení). Prázdné = výchozí tiskárna počítače.",
       Copies: "Kopie",
-      PrintRoute: "Doklad na tiskárnu",
-      PrintRoutes: "Doklady na tiskárnu",
+      CopiesRange: "Počet kopií 1 až 20.",
       PrintRouteUser: "Jen pro uživatele",
       PrintJob: "Tisková úloha",
       PrintJobs: "Tiskové úlohy",
@@ -707,7 +706,6 @@ export default defineModule({
       PJDoneAt: "Vytištěno",
       StationQueued: "Odesláno na tiskárnu {printer}",
       StationOffline: "Odesláno na tiskárnu {printer} — stanice {device} teď není online, vytiskne se po jejím spuštění.",
-      StationNoDevice: "Vyberte u tiskárny zařízení (tiskovou stanici).",
       StationTestQueued: "Zkušební stránka odeslána na {printer}.",
       StationTestTitle: "Zkouška tiskárny",
       StationTestText: "Tiskárna {printer} na stanici {device} tiskne ze Shanonu správně.",
@@ -1297,19 +1295,25 @@ export default defineModule({
       DeviceLastSeen: "Last online",
       DeviceHost: "Computer",
       DeviceVersion: "Program version",
-      DevicePrinters: "Windows printers",
-      DevicePrinterConns: "Station printers",
+      DevicePrinter: "Device printer",
+      DevicePrinters: "Printers",
+      DeviceAutoName: "Name after the computer",
+      PaperA4: "A4 (regular printer)",
+      PrinterDefault: "Windows default",
+      PrinterPresent: "Found on the computer",
+      PrinterTest: "Test page",
+      PrintRule: "Print rule",
+      PrintRules: "Print management",
+      PrintRuleFrom: "Only when printing from computer",
+      DeviceSetupName: "New computer",
       DeviceInstaller: "Download installer",
       DeviceUnpair: "Unpair",
       DeviceUnpaired: "The device is unpaired — download the installer again to pair it.",
       DeviceInstallerName: "Shanon POS – installer",
-      DrvStation: "Print station (Shanon POS for Windows)",
       Printer: "Printer",
       PrinterName: "Windows printer",
-      PrinterNameHelp: "Printer name exactly as in Windows (see the device). Empty = default printer of the computer.",
       Copies: "Copies",
-      PrintRoute: "Document to printer",
-      PrintRoutes: "Documents to printer",
+      CopiesRange: "Copies from 1 to 20.",
       PrintRouteUser: "Only for user",
       PrintJob: "Print job",
       PrintJobs: "Print jobs",
@@ -1323,7 +1327,6 @@ export default defineModule({
       PJDoneAt: "Printed",
       StationQueued: "Sent to printer {printer}",
       StationOffline: "Sent to printer {printer} — station {device} is not online now, it will print once it starts.",
-      StationNoDevice: "Select the device (print station) on the printer.",
       StationTestQueued: "Test page sent to {printer}.",
       StationTestTitle: "Printer test",
       StationTestText: "Printer {printer} at station {device} prints from Shanon correctly.",

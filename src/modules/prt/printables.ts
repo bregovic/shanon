@@ -2,6 +2,7 @@
  * Tisknutelné doklady: faktura vydaná (s QR platbou) a účtenka. Data pro
  * šablonu a výchozí rozvržení. Společná pole firmy pro všechny doklady.
  */
+import { devicePaperRoll, resolvePrintTarget } from "@/modules/int/print-rules";
 import { fromCents, percentOf, toCents, toScaled } from "@/core/money";
 import { vatPayer } from "@/modules/tax/orders";
 import type { DataApi, RecordData } from "@/core/module";
@@ -1487,7 +1488,11 @@ export const receiptPrintable: PrintableDef = {
       (reg?.printerConnId ? printers.find((c) => c.id === reg.printerConnId) : undefined) ??
       printers.find((c) => registerId && c.registerId === registerId) ??
       printers.find((c) => !c.registerId);
-    if (!pick) return null;
+    if (!pick) {
+      // bez tiskárny pokladny: papír tiskárny stanice ze Správy tisku
+      const st = await resolvePrintTarget(data, "pos.receipt", { registerId }).catch(() => null);
+      return st ? devicePaperRoll(st.printer.paper) : null;
+    }
     const w = String(pick.paperWidth);
     return w === "58" ? "receipt58" : w === "a6" ? "receiptA6" : "receipt80";
   },

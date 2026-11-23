@@ -9,7 +9,7 @@ import { can } from "@/core/security";
 const KEYS = [
   "UserSettings", "Profile", "Language", "ChangePassword", "CurrentPassword", "NewPassword", "RepeatPassword", "PasswordRules",
   "PasswordChanged", "PosPin", "PosPinHelp", "PosPinSet", "PosPinNone", "Notifications", "NotifyDailySummary", "NotifyOverdue",
-  "NotifyIntegration", "NotifyInfo", "NotifyEmail", "Saved", "Save", "Name", "Email", "FirstName", "LastName", "InstallApp", "InstallAppHelp", "InstallAppIos", "InstallAppDone", "DefaultCompany", "DefaultCompanyHelp", "DefaultCompanyFirst", "Preferences", "StationApp", "StationAppHelp", "StationAppAdmin", "StationAppAsk"];
+  "NotifyIntegration", "NotifyInfo", "NotifyEmail", "Saved", "Save", "Name", "Email", "FirstName", "LastName", "InstallApp", "InstallAppHelp", "InstallAppIos", "InstallAppDone", "DefaultCompany", "DefaultCompanyHelp", "DefaultCompanyFirst", "Preferences", "StationApp", "StationAppHelp", "StationAppAdmin", "StationAppAsk", "StationAppInstall", "StationAppInstalled"];
 
 /** Nastavení (ozubené kolo) a Můj profil (iniciály) — jedna komponenta, jiné karty. */
 export async function userSettingsPage(section: "profile" | "settings") {

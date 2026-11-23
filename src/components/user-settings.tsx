@@ -6,7 +6,8 @@ import { useState, useSyncExternalStore } from "react";
 const noSubscribe = () => () => {};
 import { useRouter } from "next/navigation";
 import { Button, Dropdown, Switch, Field, Input, MessageBar, MessageBarBody, Option, Text, makeStyles, tokens } from "@fluentui/react-components";
-import { changePasswordAction, saveProfileAction, setPosPinAction } from "@/app/actions";
+import { changePasswordAction, saveProfileAction, setPosPinAction, stationSetupAction } from "@/app/actions";
+import { stationId } from "@/lib/station-print";
 import { ActionBar, Crumbs, PageContent } from "./page";
 import { InstallAppButton } from "./install-app";
 
@@ -54,6 +55,22 @@ export function UserSettings(p: {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const isWindows = useSyncExternalStore(noSubscribe, () => /Windows/i.test(navigator.userAgent), () => false);
+  const [stationBusy, setStationBusy] = useState(false);
+  const [stationMsg, setStationMsg] = useState("");
+  /** instalátor Shanon Pokladna: zařízení tohoto počítače (ze zástupce), jinak nové → stáhnout .cmd */
+  const installStation = async () => {
+    setStationBusy(true);
+    const r = await stationSetupAction(stationId()).catch(() => null);
+    setStationBusy(false);
+    if (!r?.ok) return setStationMsg(r?.message ?? "");
+    const url = URL.createObjectURL(new Blob([r.data.data], { type: "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = r.data.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    setStationMsg(L.StationAppInstalled.replace("{name}", r.data.name));
+  };
 
   const run = async (key: string, fn: () => Promise<{ ok: boolean; message?: string; errors?: Record<string, string> }>, ok: string, after?: () => void) => {
     setBusy(true);
@@ -142,7 +159,19 @@ export function UserSettings(p: {
                   <Text size={200} className={st.muted}>
                     {L.StationAppHelp}
                   </Text>
-                  <div>{p.canDevices ? <Button as="a" href="/int/device">{L.StationAppAdmin}</Button> : <Text size={200}>{L.StationAppAsk}</Text>}</div>
+                  {p.canDevices ? (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <Button appearance="primary" disabled={stationBusy} onClick={() => void installStation()}>
+                        {L.StationAppInstall}
+                      </Button>
+                      <Button as="a" href="/int/device">
+                        {L.StationAppAdmin}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Text size={200}>{L.StationAppAsk}</Text>
+                  )}
+                  {stationMsg && <Text size={200}>{stationMsg}</Text>}
                 </>
               )}
               <div className={st.title}>{L.Notifications}</div>

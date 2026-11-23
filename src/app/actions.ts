@@ -3,7 +3,7 @@
 import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
-import { queueStationPrint } from "@/server/station";
+import { queueStationPrint, stationSetup } from "@/server/station";
 import { createCompanyFromRegistry } from "@/server/company-lookup";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
@@ -1426,6 +1426,17 @@ export async function stationPrintAction(docType: string, ids: string[], station
     if (!r) return { ok: true, data: null };
     const t = await getT(s.lang, s.ctx.tenantId);
     return { ok: true, data: { message: t(r.online ? "@INT:StationQueued" : "@INT:StationOffline", { printer: r.printer, device: r.device }), warn: !r.online } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Nastavení → Nainstalovat na tento počítač: instalátor Shanon Pokladna (`stationId` = zařízení ze zástupce, jinak nové). */
+export async function stationSetupAction(stationId?: string | null): Promise<ActionResult<{ name: string; data: string }>> {
+  const s = await requireSession();
+  try {
+    if (!s.ctx.modules.has("int") || !can(s.ctx.perms, "int.device", "write")) throw new UserError("@SYS:NoAccess");
+    return { ok: true, data: await stationSetup(s.ctx, stationId && /^[0-9a-f-]{36}$/.test(stationId) ? stationId : null) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

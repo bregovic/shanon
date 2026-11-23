@@ -56,6 +56,11 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     const api = sess.sys().api();
     const shift = await openShiftOf(api, id);
     const conns = s.ctx.modules.has("int") ? await connectionsFor(api, id) : {};
+    // Správa tisku: účtenky této pokladny na tiskárnu stanice (konkrétní tiskárnu vybere server při tisku)
+    const stationRules = s.ctx.modules.has("int") ? (await api.find("int.printRule", { docType: "pos.receipt", active: true }, { take: 100 }).catch(() => [])).filter((r) => !r.registerId || r.registerId === id) : [];
+    const stationRule = stationRules.find((r) => r.registerId === id) ?? stationRules[0];
+    const stationPrinter = stationRule ? await api.get("int.devicePrinter", String(stationRule.printerId)).catch(() => null) : null;
+    const station = stationRule ? { paper: String(stationPrinter?.paper ?? "80"), autoPrint: stationRules.some((r) => r.autoPrint) } : null;
     const eetPending = conns.eet ? (await api.find("pos.receipt", { registerId: id, eetStatus: "pending" }, { take: 1000 })).length : 0;
     // dnešní akční ceny (stejná pravidla jako při prodeji na serveru)
     const promo = new Map<string, string>();
@@ -80,7 +85,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     } catch {
       receiptLayout = null;
     }
-    return { items, groups, units, shift, conns, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes };
+    return { items, groups, units, shift, conns, station, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -114,7 +119,10 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       baskets={data.baskets}
       receiptLayout={data.receiptLayout}
       printer={
-        data.conns.printer
+        // tiskárna na sériovém portu tiskne sama; jinak má přednost tisková stanice (Správa tisku)
+        data.station && data.conns.printer?.driver !== "escposSerial"
+          ? { driver: "station", paperWidth: data.station.paper, codePage: "cp852", baudRate: 9600, openDrawer: false, autoPrint: data.station.autoPrint }
+          : data.conns.printer
           ? {
               driver: String(data.conns.printer.driver),
               paperWidth: String(data.conns.printer.paperWidth ?? "80"),
