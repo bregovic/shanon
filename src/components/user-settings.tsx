@@ -63,7 +63,9 @@ export function UserSettings(p: {
     const r = await stationSetupAction(stationId()).catch(() => null);
     setStationBusy(false);
     if (!r?.ok) return setStationMsg(r?.message ?? "");
-    // stažení přímo z adresy (ne přes blob): Windows si zapamatuje odkud — instalátor z toho vezme párovací kód
+    // stažení přímo z adresy (ne přes blob): Windows si zapamatuje odkud — instalátor z toho vezme párovací kód;
+    // záloha: odkaz i do schránky (instalátor se podívá i tam)
+    void navigator.clipboard?.writeText(new URL(r.data.href, window.location.href).href).catch(() => undefined);
     window.location.assign(r.data.href);
     setStationMsg(L.StationAppInstalled.replace("{name}", "Shanon-instalace.exe"));
   };

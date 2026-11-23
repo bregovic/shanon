@@ -417,7 +417,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       if (res.ok && res.data?.warnings?.length) toast(res.data.warnings.join(" · "), "warning");
       if (!res.ok) setMessage({ intent: "error", text: res.message });
       // stažení ze serveru (instalace Shanonu pro Windows): obyčejná navigace, ne stránka aplikace
-      else if (res.data?.open?.startsWith("/api/")) window.location.assign(res.data.open);
+      else if (res.data?.open?.startsWith("/api/")) {
+        // instalátor si odkaz najde v záznamu o stažení, záložně ve schránce
+        if (res.data.open.startsWith("/api/station/installer/")) void navigator.clipboard?.writeText(new URL(res.data.open, window.location.href).href).catch(() => undefined);
+        window.location.assign(res.data.open);
+      }
       else if (res.data?.open) router.push(res.data.open);
       else if (a?.confirm) router.push(objectHref(p.objectId));
       else {

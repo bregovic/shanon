@@ -2,7 +2,8 @@
 //
 // Jeden stejný soubor pro všechny (podepisuje se jednou — scripts/build-station-exe.ps1). Odkaz na instalaci
 // (adresa Shanonu + jednorázový párovací kód) si zjistí ze záznamu Windows o původu staženého souboru
-// (Zone.Identifier → HostUrl …/api/station/installer/<kód>), jinak z parametru nebo se na něj zeptá.
+// (Zone.Identifier → HostUrl …/api/station/installer/<kód>), jinak z parametru, ze schránky (Shanon ho tam při
+// kliknutí na Nainstalovat zkopíruje), nebo se na něj zeptá.
 // Stáhne instalační skript z téhož Shanonu (src/station/stanice.ps1 s adresou, kódem a ikonou) a spustí ho
 // skrytě; okno ukazuje průběh, závěrečnou zprávu ukáže skript.
 using System;
@@ -52,6 +53,11 @@ static class ShanonSetup
         try { return Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { return null; }
     }
 
+    static string Clip()
+    {
+        try { return Clipboard.ContainsText() ? Clipboard.GetText() : ""; } catch { return ""; }
+    }
+
     /// <summary>zeptat se na odkaz na instalaci (soubor bez záznamu o původu)</summary>
     static string AskLink()
     {
@@ -65,7 +71,7 @@ static class ShanonSetup
         f.ClientSize = new Size(460, 130);
         f.Font = new Font("Segoe UI", 9.5f);
         Label l = new Label();
-        l.Text = "Vložte odkaz na instalaci ze Shanonu (Nastavení → Aplikace → Nainstalovat):";
+        l.Text = "Vložte odkaz na instalaci ze Shanonu — najdete ho u staženého souboru v prohlížeči (Ctrl+J):";
         l.SetBounds(14, 12, 432, 36);
         TextBox t = new TextBox();
         t.SetBounds(14, 52, 432, 24);
@@ -90,6 +96,7 @@ static class ShanonSetup
         ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2
         string source = args.Length > 0 ? string.Join(" ", args) : ReadZone(Application.ExecutablePath);
         Match m = Link.Match(source);
+        if (!m.Success) m = Link.Match(Clip());
         if (!m.Success)
         {
             string typed = AskLink();
