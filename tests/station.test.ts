@@ -10,11 +10,10 @@ import { inTenant, listRecords, saveRecord, getRecord, runAction, type Ctx } fro
 import { provisionTenant } from "@/server/provision";
 import { sell } from "@/modules/pos/sale";
 import { guessPaper, resolvePrintTarget } from "@/modules/int/print-rules";
-import { jobPdf, pairStation, printSettings, queueStationPrint, reportJob, stationAuth, stationHello, stationSetup, takeJobs } from "@/server/station";
+import { jobPdf, pairStation, printSettings, queueStationPrint, reportJob, stationAuth, stationHello, stationInstallerFile, stationSetup, takeJobs } from "@/server/station";
 
 const client = createPrisma();
 const run = Date.now().toString(36);
-const pairCode = (cmd: string) => /\$SetupPair = '([^']+)'/.exec(Buffer.from(cmd.slice(cmd.lastIndexOf("::PAYLOAD::") + 11).trim(), "base64").toString("utf8"))![1];
 
 describe("tisková stanice", () => {
   let P: Ctx;
@@ -30,21 +29,24 @@ describe("tisková stanice", () => {
     deviceId = String((await saveRecord(P, "int.device", null, { code: "KASA1", name: "Pokladna u pultu", registerId: regId }, undefined, client)).id);
   }, 120_000);
 
-  it("instalátor nese párovací kód a program stanice; kód spáruje jen jednou", async () => {
-    const file = await inTenant(P, (s) => s.download("int.device", deviceId, "installer"), client);
-    expect(file.name).toBe("Shanon-KASA1.cmd");
-    const cmd = String(file.data);
-    expect(cmd.startsWith("@echo off\r\n")).toBe(true);
-    expect(/^[\x09\x0a\x0d\x20-\x7e]*$/.test(cmd)).toBe(true);
-    const ps1 = Buffer.from(cmd.slice(cmd.lastIndexOf("::PAYLOAD::") + 11).trim(), "base64").toString("utf8");
+  it("instalace: odkaz s párovacím kódem → instalátor .exe a skript s programem stanice; kód spáruje jen jednou", async () => {
+    const out = (await runAction(P, "int.device", deviceId, "installer", client)) as { href: string };
+    const code = out.href.split("/").pop()!;
+    expect(out.href).toBe(`/api/station/installer/${code}`);
+    expect(code.startsWith(`shp.${P.tenantId}.`)).toBe(true);
+    const exe = (await stationInstallerFile(code, "exe"))!;
+    expect(exe.subarray(0, 2).toString()).toBe("MZ");
+    const ps1 = (await stationInstallerFile(code, "script"))!.toString("utf8");
     expect(ps1.charCodeAt(0)).toBe(0xfeff);
     expect(ps1).toContain("#--AGENT--");
-    const code = pairCode(cmd);
-    expect(code.startsWith(`shp.${P.tenantId}.`)).toBe(true);
+    expect(/\$SetupPair = '([^']+)'/.exec(ps1)![1]).toBe(code);
+    expect(await stationInstallerFile(code.slice(0, -2) + "xx", "exe")).toBeNull();
     const r = await pairStation(code, { host: "PC-PULT", version: "1.0.0" });
     expect(r?.deviceId).toBe(deviceId);
     token = r!.token;
     expect(await pairStation(code, {})).toBeNull();
+    // spárováno → odkaz na instalaci už neplatí
+    expect(await stationInstallerFile(code, "script")).toBeNull();
     const dev = (await getRecord(P, "int.device", deviceId, client))!;
     // ručně založené zařízení si kód a název nechá
     expect([dev.paired, dev.hostName, dev.code]).toEqual([true, "PC-PULT", "KASA1"]);
@@ -129,13 +131,12 @@ describe("tisková stanice", () => {
 
   it("instalace z Nastavení založí zařízení a při spárování ho pojmenuje podle počítače", async () => {
     const f = await stationSetup(P, null);
-    expect(f.name).toMatch(/^Shanon-PC\d+\.cmd$/);
-    const r = await pairStation(pairCode(f.data), { host: "kancelar-2", version: "1.0.0" });
+    const r = await pairStation(f.href.split("/").pop()!, { host: "kancelar-2", version: "1.0.0" });
     const dev = (await getRecord(P, "int.device", r!.deviceId, client))!;
     expect([dev.code, dev.name, dev.autoName]).toEqual(["KANCELAR-2", "kancelar-2", false]);
     // znovu z téhož počítače (zástupce zná zařízení) → stejné zařízení, nový kód
     const again = await stationSetup(P, r!.deviceId);
-    expect(again.name).toBe("Shanon-KANCELAR-2.cmd");
+    expect((await pairStation(again.href.split("/").pop()!, { host: "kancelar-2" }))?.deviceId).toBe(r!.deviceId);
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

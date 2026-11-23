@@ -11,7 +11,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { newPairCode, stationSha } from "./station-codes";
-import { stationInstaller } from "./station-installer";
+import { stationSetupExe, stationSetupScript } from "./station-installer";
 import { publicUrl } from "./system-mail";
 import type { RecordData } from "@/core/module";
 import { UserError } from "@/core/module";
@@ -297,8 +297,8 @@ export async function queueStationPrint(ctx: Ctx, docType: string, ids: string[]
  * Nastavení → „Nainstalovat na tento počítač“: instalátor pro zařízení tohoto počítače (zná ho zástupce
  * Shanon Pokladna), jinak nové zařízení pojmenované při spárování podle názvu počítače. Právo = zápis zařízení.
  */
-export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{ name: string; data: string }> {
-  const { code, dev } = await inTenant(ctx, async (s) => {
+export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{ href: string }> {
+  const { code } = await inTenant(ctx, async (s) => {
     const api = s.sys().api();
     let dev = deviceId ? await api.get("int.device", deviceId).catch(() => null) : null;
     if (dev && !dev.active) dev = null;
@@ -312,5 +312,17 @@ export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{
     await api.update("int.device", String(dev.id), { pairHash: pc.hash, pairExpires: pc.expires.toISOString() });
     return { code: pc.code, dev };
   });
-  return { name: `Shanon-${String(dev.code).replace(/[^A-Za-z0-9_-]/g, "")}.cmd`, data: await stationInstaller({ url: publicUrl(), code, deviceName: String(dev.name) }) };
+  return { href: installerHref(code) };
+}
+
+/** odkaz na instalátor: v adrese je párovací kód — instalátor si ho po stažení přečte ze záznamu Windows o původu */
+export const installerHref = (code: string) => `/api/station/installer/${code}`;
+
+/** Instalátor / instalační skript pro platný párovací kód (jinak null = odkaz neplatí). */
+export async function stationInstallerFile(code: string, part: "exe" | "script"): Promise<Buffer | null> {
+  const m = /^shp\.([0-9a-f-]{36})\.[A-Za-z0-9_-]{20,}$/.exec(code);
+  if (!m) return null;
+  const dev = await withTenant(m[1], (tx) => tx.intDevice.findFirst({ where: { tenantId: m[1], pairHash: sha(code), active: true } }));
+  if (!dev?.pairExpires || dev.pairExpires.getTime() < Date.now()) return null;
+  return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }

@@ -327,6 +327,9 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
   s `doc.title`/`customer.*`), uzávěrka dá účtenku s CZ DIČ od 10 000 Kč do KH jednotlivě (A.4, `sourceObject` pos.receipt);
   `sellOnInvoice` = vydaná faktura `pricesInclTax` zaúčtovaná přes `ar.cfg` + `postInvoice`. E-mail z pokladny `sendDocumentNow`
   (`src/server/mail.ts`, koncept s PDF + odeslání). Kód firmy z ARES = `companyCodeFromName` (4 znaky, jedinečný).
+- Instalátor Windows `src/station/Shanon-instalace.exe` (zdroj `src/station/setup/ShanonSetup.cs`, sestavení a podpis
+  `scripts/build-station-exe.ps1` — po změně .cs znovu sestavit a commitnout .exe): stejný soubor pro všechny, párovací kód
+  si přečte ze Zone.Identifier (HostUrl `/api/station/installer/<kód>`), stáhne `…/setup.ps1` a spustí ho skrytě.
 - Kasa bez připojení (CR-114): každý prodej nese `clientId` (sell() je podle něj idempotentní); při výpadku `saleOffline`
   v `pos-terminal.tsx` → fronta v localStorage (`src/lib/pos-offline.ts`, číslo `OF-<kód kasy>-<pořadí>`) → POST `/api/pos/offline`
   (`src/server/pos-offline.ts` → `sellOffline`: ceny z kasy, čas prodeje, směna = ta prodeje nebo otevřená, EET ne-první).

@@ -10,12 +10,14 @@ sám zjistí jeho tiskárny, vyzvedává tiskové úlohy ze Shanonu a tiskne je 
 
 ## 1. Instalace na počítač
 
-Na počítači u tiskárny: **Nastavení → Aplikace → Nainstalovat** a stažený soubor spusťte. Windows se může zeptat
-„Systém Windows ochránil váš počítač“ → **Další informace → Přesto spustit**.
+Na počítači u tiskárny: **Nastavení → Aplikace → Nainstalovat** a spusťte stažený **Shanon-instalace.exe**
+(odkaz platí 3 dny a jen jednou). Dokud instalátor není podepsaný, Windows se zeptá „Systém Windows ochránil váš
+počítač“ → **Další informace → Přesto spustit**.
 
 Instalace spáruje počítač se Shanonem, dá na plochu a do nabídky Start zástupce **Shanon** s ikonou a tisk spouští
 po každém přihlášení do Windows. Zařízení se založí samo a pojmenuje podle názvu počítače.
-(Jinak: [Integrace → Zařízení](/int/device) → **Nový** → **Stáhnout instalaci**.)
+(Jinak: [Integrace → Zařízení](/int/device) → **Nový** → **Stáhnout instalaci**.) Instalátor si odkaz zjistí ze záznamu
+Windows o stažení; když ho nenajde (soubor zkopírovaný jinam), zeptá se na odkaz.
 
 ## 2. Tiskárny počítače
 

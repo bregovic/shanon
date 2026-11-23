@@ -72,7 +72,7 @@ export const device = defineObject({
     { object: "int.printJob", field: "deviceId", label: "@INT:PrintJobs", owned: false },
   ],
   actions: [
-    { id: "installer", label: "@INT:DeviceInstaller", download: true, downloadNeedsWrite: true },
+    { id: "installer", label: "@INT:DeviceInstaller", when: { field: "active", equals: true } },
     { id: "unpair", label: "@INT:DeviceUnpair", when: { field: "paired", equals: true } },
   ],
 });

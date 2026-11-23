@@ -1435,7 +1435,7 @@ export async function stationPrintAction(docType: string, ids: string[], station
 }
 
 /** Nastavení → Nainstalovat na tento počítač: instalátor Shanon Pokladna (`stationId` = zařízení ze zástupce, jinak nové). */
-export async function stationSetupAction(stationId?: string | null): Promise<ActionResult<{ name: string; data: string }>> {
+export async function stationSetupAction(stationId?: string | null): Promise<ActionResult<{ href: string }>> {
   const s = await requireSession();
   try {
     if (!s.ctx.modules.has("int") || !can(s.ctx.perms, "int.device", "write")) throw new UserError("@SYS:NoAccess");

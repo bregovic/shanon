@@ -63,13 +63,9 @@ export function UserSettings(p: {
     const r = await stationSetupAction(stationId()).catch(() => null);
     setStationBusy(false);
     if (!r?.ok) return setStationMsg(r?.message ?? "");
-    const url = URL.createObjectURL(new Blob([r.data.data], { type: "application/octet-stream" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = r.data.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    setStationMsg(L.StationAppInstalled.replace("{name}", r.data.name));
+    // stažení přímo z adresy (ne přes blob): Windows si zapamatuje odkud — instalátor z toho vezme párovací kód
+    window.location.assign(r.data.href);
+    setStationMsg(L.StationAppInstalled.replace("{name}", "Shanon-instalace.exe"));
   };
 
   const run = async (key: string, fn: () => Promise<{ ok: boolean; message?: string; errors?: Record<string, string> }>, ok: string, after?: () => void) => {

@@ -1,7 +1,7 @@
 /**
- * Osobní instalátor tiskové stanice: jeden soubor .cmd (dvojklik ve Windows). Obsahuje program stanice
- * (src/station/stanice.ps1) s adresou Shanonu, jednorázovým párovacím kódem a ikonou (base64 za značkou
- * ::PAYLOAD::) — rozbalí ho do dočasného souboru a spustí PowerShell. Bez importů registru (volá ho obsluha modulu).
+ * Instalace Shanonu pro Windows: Shanon-instalace.exe (src/station/setup) si podle odkazu
+ * /api/station/installer/<párovací kód> stáhne instalační skript (program stanice s adresou, kódem a ikonou)
+ * a spustí ho. Bez importů registru (volá ho obsluha modulu).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -33,26 +33,19 @@ export async function shanonIco(): Promise<Buffer> {
 }
 
 const psQuote = (s: string) => `'${s.replace(/'/g, "''")}'`;
-/** text do .cmd jen v ASCII (konzole cmd má jinou kódovou stránku) */
-const ascii = (s: string) => s.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/[&|<>^%"]/g, "");
 
-export async function stationInstaller(o: { url: string; code: string; deviceName: string }): Promise<string> {
+/** Instalátor pro Windows (stejný soubor pro všechny, podepisuje se jednou — scripts/build-station-exe.ps1). */
+export function stationSetupExe(): Buffer {
+  return readFileSync(join(process.cwd(), "src", "station", "Shanon-instalace.exe"));
+}
+
+/**
+ * Instalační skript, který si instalátor stáhne: program stanice (src/station/stanice.ps1) s adresou Shanonu,
+ * jednorázovým párovacím kódem a ikonou. UTF-8 s BOM (PowerShell 5.1 jinak čte češtinu špatně), řádky CRLF.
+ */
+export async function stationSetupScript(o: { url: string; code: string }): Promise<Buffer> {
   const agent = readFileSync(join(process.cwd(), "src", "station", "stanice.ps1"), "utf8").replace(/\r?\n/g, "\r\n");
   const ico = await shanonIco();
   const header = [`$SetupUrl = ${psQuote(o.url.replace(/\/$/, ""))}`, `$SetupPair = ${psQuote(o.code)}`, `$SetupIcon = ${psQuote(ico.toString("base64"))}`, ""].join("\r\n");
-  const payload = Buffer.concat([BOM, Buffer.from(header + agent, "utf8")]).toString("base64");
-  return [
-    "@echo off",
-    "title Shanon - instalace",
-    `echo Instaluji Shanon pro Windows (${ascii(o.deviceName)})...`,
-    'set "SHANON_SETUP=%~f0"',
-    'set "SHANON_PS=%TEMP%\\shanon-pokladna-setup.ps1"',
-    `powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText($env:SHANON_SETUP);$i=$t.LastIndexOf('::PAYLOAD::');[IO.File]::WriteAllBytes($env:SHANON_PS,[Convert]::FromBase64String($t.Substring($i+11).Trim()))"`,
-    'powershell -NoProfile -ExecutionPolicy Bypass -File "%SHANON_PS%"',
-    'del "%SHANON_PS%" >nul 2>&1',
-    "exit /b",
-    "::PAYLOAD::",
-    payload,
-    "",
-  ].join("\r\n");
+  return Buffer.concat([BOM, Buffer.from(header + agent, "utf8")]);
 }

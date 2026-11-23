@@ -6,12 +6,14 @@
  *   POST /api/station/hello             { host, version, printers: [{ name, default }] }
  *   GET  /api/station/jobs?wait=25      úlohy k tisku (čeká, dokud nějaká nepřijde)
  *   GET  /api/station/jobs/<id>/pdf     PDF úlohy, nastavení tisku v hlavičce X-Print-Settings
+ *   GET  /api/station/installer/<kód>             Shanon-instalace.exe (párovací kód v adrese = odkaz z Nastavení / Zařízení)
+ *   GET  /api/station/installer/<kód>/setup.ps1   instalační skript, který si instalátor stáhne
  *   POST /api/station/jobs/<id>         { ok, message } výsledek tisku
  */
 import { UserError } from "@/core/module";
 import { fillLabel, resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
-import { jobPdf, pairStation, reportJob, stationAuth, stationHello, takeJobs } from "@/server/station";
+import { jobPdf, pairStation, reportJob, stationAuth, stationHello, stationInstallerFile, takeJobs } from "@/server/station";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +65,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
 export async function GET(req: Request, { params }: { params: Promise<{ path?: string[] }> }) {
   const path = (await params).path ?? [];
   try {
+    // instalace (bez klíče stanice — tajemstvím je párovací kód v adrese)
+    if (path[0] === "installer" && (path.length === 2 || (path.length === 3 && path[2] === "setup.ps1"))) {
+      const file = await stationInstallerFile(path[1], path.length === 2 ? "exe" : "script");
+      if (!file)
+        return new Response("Odkaz na instalaci už neplatí (platí 3 dny a jen jednou). V Shanonu klikněte znovu na Nainstalovat.", {
+          status: 404,
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+        });
+      return new Response(new Uint8Array(file), {
+        headers:
+          path.length === 2
+            ? { "Content-Type": "application/x-msdownload", "Content-Disposition": 'attachment; filename="Shanon-instalace.exe"', "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
+            : { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
     const st = await stationAuth(req.headers.get("authorization"));
     if (!st) return json({ error: "Stanice není spárovaná nebo je vypnutá." }, 401);
     if (path[0] === "jobs" && path.length === 1) {
