@@ -76,6 +76,9 @@ export interface ShopMeta {
   intro: string;
   logo: boolean;
   hero: boolean;
+  heroStyle: "split" | "cover" | "banner" | "none";
+  heroAnimation: "none" | "fade" | "zoom";
+  accent2: string | null;
   contactEmail: string;
   contactPhone: string;
   company: { name: string; regNo: string; vatId: string; address: string; registration: string };
@@ -109,6 +112,9 @@ async function meta(l: Loaded, org: string, api: DataApi): Promise<ShopMeta> {
     intro: String(s.intro ?? ""),
     logo: !!(s.logo || e?.logo),
     hero: !!s.heroImage,
+    heroStyle: (["split", "cover", "banner", "none"].includes(String(s.heroStyle)) ? String(s.heroStyle) : "split") as ShopMeta["heroStyle"],
+    heroAnimation: (["fade", "zoom"].includes(String(s.heroAnimation)) ? String(s.heroAnimation) : "none") as ShopMeta["heroAnimation"],
+    accent2: /^#[0-9a-f]{6}$/i.test(String(s.accent2Color ?? "")) ? String(s.accent2Color) : null,
     contactEmail: String(s.contactEmail ?? e?.email ?? ""),
     contactPhone: String(s.contactPhone ?? e?.phone ?? ""),
     company: {

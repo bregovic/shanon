@@ -4820,6 +4820,9 @@ model ShopShop {
   publicUrl        String?  @map("public_url") @db.VarChar(120)
   layout           String   @default("classic") @db.VarChar(40)
   accentColor      String?  @default("#1f6f5c") @map("accent_color") @db.VarChar(7)
+  accent2Color     String?  @map("accent2_color") @db.VarChar(7)
+  heroStyle        String   @default("split") @map("hero_style") @db.VarChar(40)
+  heroAnimation    String   @default("none") @map("hero_animation") @db.VarChar(40)
   logo             String?  @db.VarChar(36)
   headline         String?  @db.VarChar(255)
   intro            String?

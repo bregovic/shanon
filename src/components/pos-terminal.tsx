@@ -248,8 +248,9 @@ const useStyles = makeStyles({
     objectFit: "contain",
     borderRadius: tokens.borderRadiusMedium,
     flexShrink: 0,
-    // podklad místo prázdného místa, obrázek se plynule objeví po načtení
-    backgroundColor: tokens.colorNeutralBackground3,
+    // podklad = barva dlaždice: fotka jiného poměru stran (čtverec v obdélníku) nemá po stranách šedé pruhy;
+    // obrázek se plynule objeví po načtení
+    backgroundColor: tokens.colorNeutralBackground1,
     opacity: 0,
     transitionProperty: "opacity",
     transitionDuration: "150ms",

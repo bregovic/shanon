@@ -49,7 +49,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
   const terms = meta.pages.find((p) => p.slug === "obchodni-podminky");
 
   return (
-    <div className={s.root} data-layout={meta.layout} style={{ ["--accent" as string]: meta.accent }}>
+    <div className={s.root} data-layout={meta.layout} style={{ ["--accent" as string]: meta.accent, ...(meta.accent2 ? { ["--accent2" as string]: meta.accent2 } : {}) }}>
       <header className={s.header}>
         <div className={s.wrap}>
           <div className={s.headerRow}>
@@ -79,16 +79,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
         <div className={s.wrap}>
           {view.kind === "home" && (
             <>
-              {!view.q && (headline || meta.intro || meta.hero) && (
-                <section className={`${s.hero} ${meta.hero ? s.heroWithImage : ""}`}>
-                  <div>
-                    {/* název obchodu je v hlavičce — v banneru jen vlastní nadpis */}
-                    {headline ? <h1>{headline}</h1> : <h1 className={s.srOnly}>{meta.name}</h1>}
-                    {meta.intro && <p>{meta.intro}</p>}
-                  </div>
-                  {meta.hero && <img src={img("hero", "x")} alt="" />}
-                </section>
-              )}
+              {!view.q && <Hero meta={meta} headline={headline} src={meta.hero ? img("hero", "x") : null} />}
               {view.q && <h1 className={s.h1}>Hledání: {view.q}</h1>}
               <Products base={meta.base} items={view.products} currency={meta.currency} img={img} />
             </>
@@ -353,5 +344,41 @@ function Footer({ meta }: { meta: ShopMeta }) {
         )}
       </div>
     </footer>
+  );
+}
+
+/**
+ * Úvod obchodu podle typu: vedle textu (obrázek 16:9 vpravo), přes celou šířku (fotka 3:1 s nadpisem přes ni),
+ * jen banner (fotka 3:1 bez textu), bez obrázku (barevný přechod). Animace: plynulé objevení / pomalé přiblížení.
+ */
+function Hero({ meta, headline, src }: { meta: ShopMeta; headline: string; src: string | null }) {
+  const style = src ? meta.heroStyle : "none";
+  const title = headline ? <h1>{headline}</h1> : <h1 className={s.srOnly}>{meta.name}</h1>;
+  if (style === "none" && !headline && !meta.intro) return null;
+  if (style === "banner")
+    return (
+      <section className={`${s.hero} ${s.heroBanner}`} data-anim={meta.heroAnimation}>
+        <h1 className={s.srOnly}>{headline || meta.name}</h1>
+        <img className={s.heroPhoto} src={src!} alt="" />
+      </section>
+    );
+  if (style === "cover")
+    return (
+      <section className={`${s.hero} ${s.heroCover}`} data-anim={meta.heroAnimation}>
+        <img className={s.heroPhoto} src={src!} alt="" />
+        <div className={s.heroText}>
+          {title}
+          {meta.intro && <p>{meta.intro}</p>}
+        </div>
+      </section>
+    );
+  return (
+    <section className={`${s.hero} ${style === "split" ? s.heroWithImage : ""}`} data-anim={meta.heroAnimation}>
+      <div className={s.heroText}>
+        {title}
+        {meta.intro && <p>{meta.intro}</p>}
+      </div>
+      {style === "split" && <img className={s.heroSide} src={src!} alt="" />}
+    </section>
   );
 }

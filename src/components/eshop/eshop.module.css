@@ -134,7 +134,7 @@
 .hero {
   position: relative;
   border-radius: var(--radius);
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000));
+  background: linear-gradient(135deg, var(--accent), var(--accent2, color-mix(in srgb, var(--accent) 55%, #000)));
   color: #fff;
   padding: 24px 24px;
   margin-bottom: 24px;
@@ -172,6 +172,89 @@
 @media (min-width: 760px) {
   .heroWithImage {
     grid-template-columns: 1.1fr 1fr;
+  }
+}
+.heroText {
+  position: relative;
+  z-index: 2;
+}
+/* fotka přes celou šířku s nadpisem (poměr 3:1, na mobilu vyšší) */
+.heroCover {
+  min-height: clamp(220px, 33vw, 420px);
+  padding: clamp(24px, 4vw, 56px);
+  align-content: end;
+  background: #111;
+}
+.heroCover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* ztmavení pod textem (rgba — průhlednost color-mix se v přechodu nevykreslí spolehlivě) */
+  background: linear-gradient(90deg, rgba(8, 12, 28, 0.82) 0%, rgba(8, 12, 28, 0.62) 40%, rgba(8, 12, 28, 0.15) 75%, rgba(8, 12, 28, 0) 100%);
+}
+.heroCover .heroText {
+  max-width: 720px;
+}
+@media (max-width: 759px) {
+  /* na mobilu text přes celou šířku — ztmavit celou fotku */
+  .heroCover::after {
+    background: rgba(8, 12, 28, 0.6);
+  }
+}
+.heroCover h1 {
+  font-size: clamp(26px, 3.6vw, 44px);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+.heroCover p {
+  font-size: clamp(15px, 1.4vw, 18px);
+}
+.hero .heroPhoto {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 0;
+}
+/* jen banner: fotka bez textu, pevný poměr 3:1 */
+.heroBanner {
+  padding: 0;
+  aspect-ratio: 3 / 1;
+  min-height: 160px;
+  background: #111;
+}
+/* animace úvodu (vypnuté při omezení pohybu) */
+@keyframes heroFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes heroZoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+.hero[data-anim="fade"] .heroText,
+.hero[data-anim="fade"] .heroPhoto,
+.hero[data-anim="fade"] .heroSide {
+  animation: heroFade 0.9s ease-out both;
+}
+.hero[data-anim="zoom"] .heroPhoto,
+.hero[data-anim="zoom"] .heroSide {
+  animation: heroZoom 18s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero[data-anim] .heroText,
+  .hero[data-anim] .heroPhoto,
+  .hero[data-anim] .heroSide {
+    animation: none;
   }
 }
 .h1 {

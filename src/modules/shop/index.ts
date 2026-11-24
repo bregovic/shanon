@@ -20,6 +20,28 @@ export const ShopLayout = defineEnum({
   ],
 });
 
+/** Úvod obchodu (nad katalogem): jak se ukáže úvodní obrázek. */
+export const ShopHeroStyle = defineEnum({
+  id: "ShopHeroStyle",
+  label: "@SHOP:HeroStyle",
+  values: [
+    { value: "split", label: "@SHOP:HeroSplit" },
+    { value: "cover", label: "@SHOP:HeroCover" },
+    { value: "banner", label: "@SHOP:HeroBanner" },
+    { value: "none", label: "@SHOP:HeroNone" },
+  ],
+});
+
+export const ShopHeroAnimation = defineEnum({
+  id: "ShopHeroAnimation",
+  label: "@SHOP:HeroAnimation",
+  values: [
+    { value: "none", label: "@SHOP:AnimNone" },
+    { value: "fade", label: "@SHOP:AnimFade" },
+    { value: "zoom", label: "@SHOP:AnimZoom" },
+  ],
+});
+
 export const DeliveryKind = defineEnum({
   id: "ShopDeliveryKind",
   label: "@SHOP:DeliveryKind",
@@ -75,6 +97,10 @@ export const shop = defineObject({
     publicUrl: { edt: Url, readOnly: true, share: { subject: "@SHOP:ShareSubject", body: "@SHOP:ShareBody" } },
     layout: { edt: enumEdt(ShopLayout), mandatory: true, default: "classic" },
     accentColor: { edt: Color, default: "#1f6f5c" },
+    /** druhá barva přechodu (úvod, tlačítka); prázdné = tmavší odstín hlavní barvy */
+    accent2Color: { edt: Color, label: "@SHOP:Accent2", help: "@SHOP:Accent2Help" },
+    heroStyle: { edt: enumEdt(ShopHeroStyle), mandatory: true, default: "split", help: "@SHOP:HeroStyleHelp" },
+    heroAnimation: { edt: enumEdt(ShopHeroAnimation), mandatory: true, default: "none" },
     logo: { edt: Image, label: "@SHOP:Logo", image: true, readOnly: true },
     headline: { edt: Edts.Description, label: "@SHOP:Headline" },
     intro: { edt: Edts.Notes, label: "@SHOP:Intro" },
@@ -102,7 +128,7 @@ export const shop = defineObject({
   list: ["name", "active", "publicUrl", "layout", "customerId"],
   form: [
     { label: "@SYS:General", fields: ["name", "active", "publicUrl", "contactEmail", "contactPhone"] },
-    { label: "@SHOP:Look", fields: ["layout", "accentColor", "headline", "intro", "logo", "heroImage"] },
+    { label: "@SHOP:Look", fields: ["layout", "accentColor", "accent2Color", "headline", "intro", "logo", "heroStyle", "heroAnimation", "heroImage"] },
     { label: "@SHOP:Sales", fields: ["customerId", "warehouseId", "sellOutOfStock", "minOrder", "freeShippingFrom", "orderHourLimit"] },
     { label: "@SHOP:Pickup", fields: ["pickupLeadDays", "pickupMaxDays", "pickupFrom", "pickupTo", "weighBufferPct"] },
   ],
@@ -276,7 +302,7 @@ export default defineModule({
   description: "@SHOP:ModuleDesc",
   icon: "Cart",
   dependsOn: ["org", "inv", "ar", "bank", "tax"],
-  enums: [ShopLayout, DeliveryKind, ShopOrderStatus, PickStatus],
+  enums: [ShopLayout, ShopHeroStyle, ShopHeroAnimation, DeliveryKind, ShopOrderStatus, PickStatus],
   objects: [shop, category, delivery, page, order, pick],
   menu: [
     { label: "@SHOP:Module", kind: "functions", items: [{ href: "/shop/vychystani", label: "@SHOP:Picking" }] },
@@ -299,6 +325,18 @@ export default defineModule({
       LayoutClassic: "Klasický",
       LayoutMinimal: "Minimalistický",
       LayoutShowcase: "Výkladní skříň",
+      HeroStyle: "Typ úvodu",
+      HeroStyleHelp: "Vedle textu = obrázek 16:9 vpravo od nadpisu. Přes celou šířku = fotka 3:1 s nadpisem přes ni (jako úvod webu). Jen banner = fotka 3:1 bez textu. Bez obrázku = barevný přechod s nadpisem.",
+      HeroSplit: "Obrázek vedle textu",
+      HeroCover: "Fotka přes celou šířku s textem",
+      HeroBanner: "Jen banner přes celou šířku",
+      HeroNone: "Bez obrázku",
+      HeroAnimation: "Animace úvodu",
+      AnimNone: "Bez animace",
+      AnimFade: "Plynulé objevení",
+      AnimZoom: "Pomalé přiblížení fotky",
+      Accent2: "Druhá barva",
+      Accent2Help: "Konec barevného přechodu v úvodu. Prázdné = tmavší odstín hlavní barvy.",
       AccentColor: "Barva",
       ColorHelp: "Barva ve tvaru #RRGGBB, např. #1f6f5c.",
       Logo: "Logo",
@@ -444,6 +482,18 @@ export default defineModule({
       LayoutClassic: "Classic",
       LayoutMinimal: "Minimal",
       LayoutShowcase: "Showcase",
+      HeroStyle: "Hero type",
+      HeroStyleHelp: "Beside text = 16:9 image right of the headline. Full width = 3:1 photo with the headline over it (like a website hero). Banner only = 3:1 photo without text. No image = colour gradient with the headline.",
+      HeroSplit: "Image beside text",
+      HeroCover: "Full-width photo with text",
+      HeroBanner: "Full-width banner only",
+      HeroNone: "No image",
+      HeroAnimation: "Hero animation",
+      AnimNone: "No animation",
+      AnimFade: "Fade in",
+      AnimZoom: "Slow photo zoom",
+      Accent2: "Second colour",
+      Accent2Help: "End of the hero colour gradient. Empty = darker shade of the main colour.",
       AccentColor: "Colour",
       ColorHelp: "Colour as #RRGGBB, e.g. #1f6f5c.",
       Logo: "Logo",

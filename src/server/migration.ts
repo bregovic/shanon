@@ -25,6 +25,7 @@ import { setImage } from "./docuref";
 import { prisma } from "./db";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
+import sharp from "sharp";
 
 export const MIGRATION_FORMAT = "shanon-migrace";
 export const MIGRATION_VERSION = 1;
@@ -46,8 +47,21 @@ export const MIGRATION_OBJECTS: { id: string; note: string }[] = [
 /** Údaje organizace, které registry neznají (zbytek doplní ARES a registr DPH). */
 const ORG_FIELDS = ["tradeName", "email", "phone", "web", "dataBoxId", "publicSlug", "mailSignature"] as const;
 /** E-shop firmy (jeden na firmu, zakládá ho výchozí nastavení modulu E-shop): vzhled, zveřejnění, objednávky. */
-const SHOP_FIELDS = ["name", "active", "layout", "accentColor", "headline", "intro", "sellOutOfStock", "minOrder", "freeShippingFrom", "contactEmail", "contactPhone", "orderHourLimit", "pickupLeadDays", "pickupMaxDays", "pickupFrom", "pickupTo", "weighBufferPct"] as const;
+const SHOP_FIELDS = ["name", "active", "layout", "accentColor", "accent2Color", "heroStyle", "heroAnimation", "headline", "intro", "sellOutOfStock", "minOrder", "freeShippingFrom", "contactEmail", "contactPhone", "orderHourLimit", "pickupLeadDays", "pickupMaxDays", "pickupFrom", "pickupTo", "weighBufferPct"] as const;
 const SHOP_IMAGES = ["logo", "heroImage"] as const;
+
+/**
+ * Požadavky na obrázky podle pole (objekt.pole): popis pro šablonu (agent podle něj připraví obrázky) a kontrola
+ * rozměrů při Zkontrolovat. ratio = šířka / výška (null = libovolný v rozmezí ratioMin…ratioMax).
+ */
+export const IMAGE_SPECS: Record<string, { note: string; minW: number; minH: number; ratio?: number; ratioMin?: number; ratioMax?: number }> = {
+  "inv.item.image": { note: "@ORG:MigImgItem", minW: 400, minH: 400, ratio: 1 },
+  "inv.category.image": { note: "@ORG:MigImgCategory", minW: 600, minH: 450, ratio: 4 / 3 },
+  "org.entity.logo": { note: "@ORG:MigImgLogo", minW: 200, minH: 80, ratioMin: 0.8, ratioMax: 5 },
+  "shop.shop.logo": { note: "@ORG:MigImgLogo", minW: 200, minH: 80, ratioMin: 0.8, ratioMax: 5 },
+  // poměr podle typu úvodu: vedle textu 16:9, přes celou šířku / banner 3:1 — kontrola přijme obojí
+  "shop.shop.heroImage": { note: "@ORG:MigImgHero", minW: 1200, minH: 400, ratioMin: 1.5, ratioMax: 3.6 },
+};
 
 export interface MigrationUser {
   email: string;
@@ -106,7 +120,11 @@ function fieldDoc(def: ObjectDef, name: string, f: FieldDef, lang: Lang): string
   if (f.mandatory && f.default === undefined && def.numberSeq?.field !== name) parts.push(tr(lang, "@ORG:MigFieldMandatory"));
   if (def.numberSeq?.field === name) parts.push(tr(lang, "@ORG:MigFieldNumberSeq"));
   if (def.unique?.some((u) => u.length === 1 && u[0] === name)) parts.push(tr(lang, "@ORG:MigFieldKey"));
-  if (f.image) parts.push(tr(lang, "@ORG:MigFieldImage"));
+  if (f.image) {
+    parts.push(tr(lang, "@ORG:MigFieldImage"));
+    const spec = IMAGE_SPECS[`${def.id}.${name}`];
+    if (spec) parts.push(tr(lang, spec.note));
+  }
   else
     switch (f.edt.kind) {
       case "ref":
@@ -151,7 +169,7 @@ export function migrationTemplate(lang: Lang): RecordData {
       ico: "",
       organizace: {
         pokyny: t("@ORG:MigNoteOrg"),
-        pole: Object.fromEntries([...ORG_FIELDS.map((n) => [n, fieldDoc(getObject("org.entity"), n, getObject("org.entity").fields[n], lang)]), ["logo", t("@ORG:MigFieldLogo")]]),
+        pole: Object.fromEntries([...ORG_FIELDS.map((n) => [n, fieldDoc(getObject("org.entity"), n, getObject("org.entity").fields[n], lang)]), ["logo", `${t("@ORG:MigFieldLogo")} · ${t("@ORG:MigImgLogo")}`]]),
         ...Object.fromEntries(ORG_FIELDS.map((n) => [n, ""])),
         logo: "",
       },
@@ -169,6 +187,7 @@ export function migrationTemplate(lang: Lang): RecordData {
     pokynyModuly: t("@ORG:MigNoteModules"),
     slozkaObrazku: "obrazky",
     pokynyObrazky: t("@ORG:MigNoteImages"),
+    pozadavkyObrazku: Object.fromEntries(Object.entries(IMAGE_SPECS).map(([k, v]) => [k, t(v.note)])),
     uzivatele: [],
     pokynyUzivatele: t("@ORG:MigNoteUsers"),
     vzorUzivatele: { email: "jmeno@firma.cz", jmeno: "Jan", prijmeni: "Novák", role: ["POKLADNIK"], spravceFirmy: false, pozvat: false },
@@ -349,6 +368,47 @@ function toTable(rows: Record<string, unknown>[], lang: Lang) {
   return { headers, rows: rows.map((r) => headers.map((h) => cell(r[h]))) };
 }
 
+/** Obrázky souboru s požadavkem na rozměr: cesta → klíč požadavku (objekt.pole). */
+function specImages(file: MigrationFile): [string, string][] {
+  const out: [string, string][] = [];
+  const add = (key: string, v: unknown) => typeof v === "string" && v && IMAGE_SPECS[key] && out.push([v, key]);
+  add("org.entity.logo", file.firma.organizace?.logo);
+  for (const n of SHOP_IMAGES) add(`shop.shop.${n}`, file.firma.obchod?.[n]);
+  for (const sec of file.data) {
+    const def = getObject(sec.objekt);
+    for (const [n, f] of Object.entries(def.fields)) if (f.image) for (const r of sec.zaznamy) add(`${sec.objekt}.${n}`, r[n]);
+  }
+  return [...new Map(out.map((x) => [x[0], x])).values()];
+}
+
+/** Rozměry obrázků proti požadavkům (jen varování: malé, jiný poměr stran). */
+async function imageSizeWarnings(file: MigrationFile, images: ImageSource, lang: Lang): Promise<string[]> {
+  const warn: string[] = [];
+  for (const [path, key] of specImages(file)) {
+    const img = images(path);
+    if (!img) continue;
+    const spec = IMAGE_SPECS[key];
+    let w = 0;
+    let h = 0;
+    try {
+      const m = await sharp(img.data).metadata();
+      w = m.width ?? 0;
+      h = m.height ?? 0;
+    } catch {
+      continue; // neplatný obrázek ohlásí import
+    }
+    if (!w || !h) continue;
+    const r = w / h;
+    const size = `${w}×${h} px`;
+    if (w < spec.minW || h < spec.minH) warn.push(tr(lang, "@ORG:MigImgSmall", { path, size, min: `${spec.minW}×${spec.minH} px` }));
+    else if (spec.ratio && Math.abs(r - spec.ratio) / spec.ratio > 0.12) warn.push(tr(lang, "@ORG:MigImgRatio", { path, size, ratio: ratioText(spec.ratio) }));
+    else if ((spec.ratioMin && r < spec.ratioMin) || (spec.ratioMax && r > spec.ratioMax)) warn.push(tr(lang, "@ORG:MigImgRatio", { path, size, ratio: `${ratioText(spec.ratioMin ?? 0)} – ${ratioText(spec.ratioMax ?? 0)}` }));
+  }
+  return warn;
+}
+
+const ratioText = (r: number) => (Math.abs(r - 1) < 0.01 ? "1:1" : Math.abs(r - 4 / 3) < 0.01 ? "4:3" : Math.abs(r - 16 / 9) < 0.01 ? "16:9" : `${Math.round(r * 10) / 10}:1`);
+
 /** Obrázky, na které soubor odkazuje a které ve vybrané složce nejsou (jen varování). */
 function missingImages(file: MigrationFile, images: ImageSource): string[] {
   const paths = [file.firma.organizace?.logo, ...SHOP_IMAGES.map((n) => file.firma.obchod?.[n]), ...file.data.flatMap((s) => {
@@ -377,6 +437,10 @@ export async function runMigration(
   const missing = missingImages(file, opts.images);
   for (const p of missing.slice(0, 10)) check.messages.push(t("@ORG:MigImage", { path: p }));
   if (missing.length > 10) check.messages.push(t("@ORG:MigMore", { n: String(missing.length - 10) }));
+  // rozměry obrázků proti doporučení (stejný problém u celé série = prvních 5 + počet)
+  const sizes = await imageSizeWarnings(file, opts.images, lang);
+  for (const w of sizes.slice(0, 5)) check.messages.push(w);
+  if (sizes.length > 5) check.messages.push(t("@ORG:MigMore", { n: String(sizes.length - 5) }));
   // role uživatelů podle kódu (role jsou společné pro organizaci)
   const roleRows = await inTenant(ctx, (s) => s.sys().find("sys.role", {}, 1000), client);
   const roleId = new Map(roleRows.map((r) => [String(r.code).toUpperCase(), String(r.id)]));
