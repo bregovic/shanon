@@ -5,7 +5,10 @@
  * přiznání a e-shop. Název, IČO a DIČ se propisují do firmy (sys.company).
  */
 import { MAIL_DEFAULTS, MAIL_FIELDS } from "./mail-template";
-import { aresByIco, splitPersonName } from "@/modules/gab/ares";
+import { aresByIco, aresNace, naceFields, splitPersonName } from "@/modules/gab/ares";
+import { czDic, vatRegistryStatus, type VatPayerStatus } from "@/modules/gab/vat-registry";
+import { createBankAccounts } from "@/modules/bank/registry-accounts";
+import { withService } from "@/modules/int/services";
 import { Edts, defineEdt, defineEnum, enumEdt } from "@/core/edt";
 import { UserError, defineModule, type DataApi, type ObjectHandlers, type ValidationErrors } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -101,6 +104,10 @@ export const entity = defineObject({
     fileNumber: { edt: Str("OrgFileNumber", "@ORG:FileNumber", 60), help: "@ORG:FileNumberHelp" },
     registerCourt: { edt: enumEdt(RegisterCourt), help: "@ORG:RegisterCourtHelp" },
     registration: { edt: Edts.Description, label: "@ORG:Registration", help: "@ORG:RegistrationHelp" },
+    // činnost podle CZ-NACE z Registru ekonomických subjektů (Doplnit z ARES)
+    naceCode: { edt: Str("OrgNaceCode", "@ORG:NaceCode", 6, /^\d{2,6}$/), help: "@ORG:NaceHelp" },
+    naceName: { edt: Edts.Description, label: "@ORG:NaceName" },
+    naceOther: { edt: Edts.Notes, label: "@ORG:NaceOther" },
     street: { edt: Str("OrgStreet", "@ORG:Street", 120) },
     houseNo: { edt: Str("OrgHouseNo", "@ORG:HouseNo", 10) },
     orientNo: { edt: Str("OrgOrientNo", "@ORG:OrientNo", 10) },
@@ -136,6 +143,7 @@ export const entity = defineObject({
   ],
   form: [
     { label: "@ORG:Identity", fields: ["legalName", "tradeName", "legalForm", "firstName", "lastName", "regNo", "vatId", "vatPayer", "fileNumber", "registerCourt", "registration"] },
+    { label: "@ORG:Activity", fields: ["naceCode", "naceName", "naceOther"] },
     { label: "@ORG:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode", "country"] },
     { label: "@ORG:Contacts", fields: ["email", "phone", "web", "dataBoxId", "publicSlug"] },
     { label: "@ORG:Bank", fields: ["bankAccount", "iban", "bic"] },
@@ -242,12 +250,24 @@ async function orgSetup(data: DataApi) {
 export const orgHandlers: Record<string, ObjectHandlers> = {
   "org.entity": {
     actions: {
-      /** údaje firmy z ARES podle IČO (jméno, forma, DIČ, sídlo); kontakty a banka zůstanou */
+      /**
+       * údaje firmy z ARES podle IČO (jméno, forma, DIČ, sídlo, CZ-NACE) a z registru plátců DPH (plátce, finanční
+       * úřad, zveřejněné bankovní účty → modul Banka); kontakty zůstanou, bankovní účet organizace jen když chybí
+       */
       async ares(ctx, rec) {
         if (!rec.regNo) throw new UserError("@ORG:RegNoFirst");
         const a = await aresByIco(String(rec.regNo), ctx.data);
         if (!a) throw new UserError("@ORG:AresNotFound");
         const { firstName: first, lastName: last } = splitPersonName(a.name);
+        const nace = await aresNace(a.ico, ctx.data).catch(() => null);
+        // plátce DPH rozhoduje registr plátců (DIČ má i identifikovaná osoba); výpadek registru = jen podle DIČ
+        const dic = a.country === "CZ" ? czDic(a.vatId) : null;
+        let vat: VatPayerStatus | null | undefined;
+        if (dic) vat = await withService(ctx.data, "dphreg", "dphreg.status", () => vatRegistryStatus([dic]), (m) => `${dic}: ${m.get(dic)?.reliability ?? "notFound"}`)
+          .then((m) => m.get(dic) ?? null)
+          .catch(() => undefined);
+        const vatPayer = vat === undefined ? (a.vatId ? true : rec.vatPayer) : !!vat && vat.reliability !== "notFound";
+        const published = vat?.accounts ?? [];
         await ctx.data.update("org.entity", String(rec.id), {
           legalName: a.name,
           legalForm: a.person ? "natural" : "legal",
@@ -255,7 +275,7 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
           lastName: a.person ? (rec.lastName ?? last) : rec.lastName,
           regNo: a.ico,
           vatId: a.vatId ?? rec.vatId ?? null,
-          vatPayer: a.vatId ? true : rec.vatPayer,
+          vatPayer,
           street: a.streetName,
           houseNo: a.houseNo,
           orientNo: a.orientNo,
@@ -264,7 +284,16 @@ export const orgHandlers: Record<string, ObjectHandlers> = {
           country: a.country,
           // spisová značka z ARES (veřejný rejstřík), jen když chybí — beforeSave ji rozloží a sestaví text
           ...(a.fileRef && !rec.fileNumber ? { fileNumber: a.fileRef } : {}),
+          ...(nace ? naceFields(nace) : {}),
+          ...(!rec.bankAccount && published.find((x) => x.accountNum) ? { bankAccount: published.find((x) => x.accountNum)!.accountNum } : {}),
         });
+        // finanční úřad do daňových parametrů (jen když chybí) a zveřejněné účty do Banky
+        if (vat?.taxOffice && ctx.modules?.has("tax")) {
+          const [tp] = await ctx.data.find("tax.parameters", {}, { take: 1 });
+          if (!tp) await ctx.data.create("tax.parameters", { taxOfficeCode: vat.taxOffice, subjectType: a.person ? "F" : "P" });
+          else if (!tp.taxOfficeCode) await ctx.data.update("tax.parameters", String(tp.id), { taxOfficeCode: vat.taxOffice });
+        }
+        if (published.length && ctx.modules?.has("bank")) await createBankAccounts(ctx.data, published);
       },
     },
     async beforeSave(ctx, d, isNew): Promise<ValidationErrors | void> {
@@ -350,6 +379,11 @@ export default defineModule({
       LastName: "Příjmení",
       VatPayer: "Plátce DPH",
       Registration: "Zápis v rejstříku (text na dokladech)",
+      Activity: "Činnost (CZ-NACE)",
+      NaceCode: "Převažující činnost",
+      NaceName: "Název činnosti",
+      NaceOther: "Další činnosti",
+      NaceHelp: "Kód CZ-NACE z Registru ekonomických subjektů — doplní akce Doplnit z ARES.",
       RegistrationHelp: "Sestaví se sám ze spisové značky a soudu. Jiný zápis (živnostenský rejstřík…) napište ručně, např. „Podnikatel zapsaný v živnostenském rejstříku.“",
       FileNumber: "Spisová značka",
       FileNumberHelp: "Oddíl a vložka, např. C 327865 (s.r.o. = C, a.s. = B, družstvo = Dr, spolek = L). Lze vložit i celou značku z rejstříku „C 327865/MSPH Městský soud v Praze“ — soud se doplní sám.",
@@ -421,6 +455,11 @@ export default defineModule({
       LastName: "Last name",
       VatPayer: "VAT payer",
       Registration: "Register entry (text on documents)",
+      Activity: "Activity (CZ-NACE)",
+      NaceCode: "Main activity",
+      NaceName: "Activity name",
+      NaceOther: "Other activities",
+      NaceHelp: "CZ-NACE code from the Register of Economic Subjects — filled in by Fill from ARES.",
       RegistrationHelp: "Built from the file number and court. For another register (trade licence…) write it manually.",
       FileNumber: "File number",
       FileNumberHelp: "Section and insert, e.g. C 327865 (s.r.o. = C, a.s. = B, cooperative = Dr, association = L). You can paste the full reference „C 327865/MSPH Městský soud v Praze“ — the court is filled in automatically.",

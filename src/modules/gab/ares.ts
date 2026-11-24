@@ -83,6 +83,75 @@ export function aresSearch(name: string, limit = 10, data?: DataApi): Promise<{ 
   return data ? withService(data, "ares", "ares.search", () => aresSearchRaw(name, limit), (r) => `${name}: ${r.total}`) : aresSearchRaw(name, limit);
 }
 
+/** Činnosti subjektu podle CZ-NACE z Registru ekonomických subjektů (RES). */
+export interface AresNace {
+  /** převažující činnost („46900“) */
+  main: string | null;
+  /** všechny uvedené činnosti (i převažující) */
+  codes: string[];
+  /** kód → název z číselníku CZ-NACE */
+  names: Map<string, string>;
+}
+
+const CODELIST = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ciselniky-nazevniky/vyhledat";
+let naceNames: Promise<Map<string, string>> | null = null;
+
+/** Číselník CZ-NACE z ARES (platné položky, česky) — jednou za běh serveru. */
+function naceCodelist(): Promise<Map<string, string>> {
+  naceNames ??= (async () => {
+    const res = await fetch(CODELIST, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ kodCiselniku: "CzNace", zdrojCiselniku: "res" }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new UserError("@GAB:AresUnavailable", { status: String(res.status) });
+    const d = (await res.json()) as { ciselniky?: { polozkyCiselniku?: { kod: string; nazev?: { kodJazyka: string; nazev: string }[]; platnostDo?: string }[] }[] };
+    const today = new Date().toISOString().slice(0, 10);
+    const map = new Map<string, string>();
+    for (const p of d.ciselniky?.[0]?.polozkyCiselniku ?? []) {
+      if (p.platnostDo && p.platnostDo < today) continue;
+      const name = p.nazev?.find((n) => n.kodJazyka === "cs")?.nazev;
+      if (name) map.set(p.kod, name);
+    }
+    return map;
+  })().catch((e) => {
+    naceNames = null; // výpadek: příště zkusit znovu
+    throw e;
+  });
+  return naceNames;
+}
+
+async function aresNaceRaw(ico: string): Promise<AresNace | null> {
+  const clean = ico.replace(/\s/g, "").padStart(8, "0");
+  const res = await fetch(`${API}-res/${clean}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new UserError("@GAB:AresUnavailable", { status: String(res.status) });
+  const d = (await res.json()) as { zaznamy?: RecordData[] };
+  const rec = d.zaznamy?.find((z) => z.primarniZaznam) ?? d.zaznamy?.[0];
+  if (!rec) return null;
+  const main = (rec.czNacePrevazujici as string) || null;
+  const codes = [...new Set([...(main ? [main] : []), ...((rec.czNace as string[]) ?? [])])];
+  const names = await naceCodelist().catch(() => new Map<string, string>());
+  return { main, codes, names };
+}
+
+/** CZ-NACE subjektu (RES); s `data` přes napojení ARES v Integraci. */
+export function aresNace(ico: string, data?: DataApi): Promise<AresNace | null> {
+  return data ? withService(data, "ares", "ares.nace", () => aresNaceRaw(ico), (r) => `${ico}: ${r?.main ?? "-"}`) : aresNaceRaw(ico);
+}
+
+/** Pole organizace z CZ-NACE: převažující kód, jeho název a ostatní činnosti po řádcích („28 Výroba strojů…“). */
+export function naceFields(n: AresNace): { naceCode: string | null; naceName: string | null; naceOther: string | null } {
+  const line = (c: string) => `${c} ${n.names.get(c) ?? ""}`.trim();
+  const other = n.codes.filter((c) => c !== n.main);
+  return {
+    naceCode: n.main,
+    naceName: n.main ? (n.names.get(n.main) ?? null) : null,
+    naceOther: other.length ? other.map(line).join("\n") : null,
+  };
+}
+
 /** Doplní subjekt a jeho adresu sídla z ARES (podle IČO, jinak jednoznačně podle názvu). */
 export async function fillFromAres(data: DataApi, subjectId: string) {
   const subj = await data.get("gab.subject", subjectId);

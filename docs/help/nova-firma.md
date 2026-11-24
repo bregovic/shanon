@@ -14,7 +14,10 @@ summary: Založení účtované firmy z IČO, výchozí nastavení, uživatelé 
    firma potřebuje (Hlavní kniha, Odběratelé, Pokladna…). Zapnutí spustí jejich výchozí nastavení: účtový rozvrh, číselné
    řady, deníky, daňové kódy, sklad, platební metody, workflow…
 4. Když firma už existuje, nabídne se **Aktualizovat z registru** (obnoví údaje a doplní bankovní účet z registru DPH).
-5. V [Organizaci](/org/entity) doplňte bankovní účet, kontakty a **logo** (tiskne se na fakturách a účtenkách).
+5. V [Organizaci](/org/entity) doplňte kontakty a **logo** (tiskne se na fakturách a účtenkách). Po zapnutí modulů
+   spusťte na organizaci **Doplnit z ARES**: obnoví jméno, sídlo, zápis v rejstříku a **činnost podle CZ-NACE**
+   (převažující i další), **plátce DPH** podle registru plátců (samotné DIČ nestačí — má ho i identifikovaná osoba),
+   finanční úřad do parametrů DPH a **zveřejněné bankovní účty** do modulu Banka (chybějící, opakování nic nezdvojí).
 6. V [Uživatelé](/system/users) přidělte firmu uživatelům (role, správce firmy).
 
 ## Dodavatelé a položky importem

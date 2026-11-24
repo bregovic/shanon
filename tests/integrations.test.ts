@@ -252,6 +252,62 @@ describe("organizace", () => {
     }, client);
     expect(print.company).toEqual({ name: "Hynek Cibulka", tradeName: "Uzeniny Hynek Cibulka", regNo: "41832744", vatId: "CZ12345678", address: "Uhelný trh 413/8, 110 00 Praha 1", logoId: null, registration: null });
   });
+
+  it("Doplnit z ARES: CZ-NACE, plátce podle registru DPH, finanční úřad, zveřejněné účty do Banky", async () => {
+    const O = (
+      await provisionTenant(client, {
+        code: `t-orgares-${run}`,
+        name: "OrgAres",
+        adminEmail: `orgares-${run}@test.local`,
+        adminPassword: "heslo-12345",
+        modules: ["org", "bank", "tax", "int"],
+        company: { code: "KE", name: "Ke", regNo: "11223344" },
+      })
+    ).ctx;
+    // registr DPH: 11223344 plátce s jedním účtem, 55667788 má DIČ, ale v registru plátců není (identifikovaná osoba)
+    let inRegistry = true;
+    vi.stubGlobal("fetch", async (url: string) => {
+      const u = String(url);
+      if (u.includes("ciselniky-nazevniky"))
+        return new Response(JSON.stringify({ ciselniky: [{ polozkyCiselniku: [
+          { kod: "46900", nazev: [{ kodJazyka: "cs", nazev: "Nespecializovaný velkoobchod" }], platnostDo: "9999-09-09" },
+          { kod: "28", nazev: [{ kodJazyka: "cs", nazev: "Výroba strojů a zařízení j. n." }], platnostDo: "9999-09-09" },
+        ] }] }), { status: 200 });
+      if (u.includes("ekonomicke-subjekty-res/"))
+        return new Response(JSON.stringify({ zaznamy: [{ primarniZaznam: true, czNacePrevazujici: "46900", czNace: ["28", "46900"] }] }), { status: 200 });
+      if (u.includes("ekonomicke-subjekty/"))
+        return new Response(JSON.stringify({ ico: "11223344", obchodniJmeno: "Prvky s.r.o.", dic: "CZ11223344", pravniForma: "112", sidlo: { kodStatu: "CZ", nazevObce: "Brandýs nad Labem-Stará Boleslav", nazevUlice: "Mariánské náměstí", cisloDomovni: 805, cisloOrientacni: 13, psc: 25001 } }), { status: 200 });
+      if (u.includes("rozhraniCRPDPH"))
+        return new Response(
+          inRegistry
+            ? '<x><status statusCode="0"/><statusPlatceDPH dic="11223344" nespolehlivyPlatce="NE" cisloFu="057"><zverejneneUcty><ucet datumZverejneni="2017-04-01"><standardniUcet cislo="123456789" kodBanky="0100"/></ucet></zverejneneUcty></statusPlatceDPH></x>'
+            : '<x><status statusCode="0"/><statusPlatceDPH dic="11223344" nespolehlivyPlatce="NENALEZEN"/></x>',
+          { status: 200 },
+        );
+      return new Response("", { status: 503 });
+    });
+    try {
+      const [e] = (await listRecords(O, "org.entity", {}, client)).rows;
+      await runAction(O, "org.entity", String(e.id), "ares", client);
+      const org = (await getRecord(O, "org.entity", String(e.id), client))!;
+      expect([org.legalName, org.vatPayer, org.naceCode, org.naceName, org.naceOther, org.bankAccount]).toEqual([
+        "Prvky s.r.o.", true, "46900", "Nespecializovaný velkoobchod", "28 Výroba strojů a zařízení j. n.", "123456789/0100",
+      ]);
+      const tp = (await listRecords(O, "tax.parameters", {}, client)).rows[0];
+      expect(tp.taxOfficeCode).toBe("057");
+      const accounts = (await listRecords(O, "bank.account", {}, client)).rows;
+      expect(accounts.map((a) => [a.accountNum, a.isDefault])).toEqual([["123456789/0100", true]]);
+      // podruhé nic nezdvojí
+      await runAction(O, "org.entity", String(e.id), "ares", client);
+      expect((await listRecords(O, "bank.account", {}, client)).rows.length).toBe(1);
+      // DIČ bez registrace k DPH = neplátce
+      inRegistry = false;
+      await runAction(O, "org.entity", String(e.id), "ares", client);
+      expect((await getRecord(O, "org.entity", String(e.id), client))!.vatPayer).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("položky: marže, slevy, ARES", () => {
