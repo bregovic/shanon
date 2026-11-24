@@ -233,6 +233,25 @@ async function finish(s: Session, inst: RecordData, status: "completed" | "rejec
       await s.save("wf.workItem", String(w.id), { status: "cancelled", completedAt: new Date().toISOString() }, { system: true });
 }
 
+/**
+ * Smazaný záznam: běžící / čekající běhy workflow skončí jako zrušené a otevřené úkoly k záznamu (i mimo běh) se zruší —
+ * jinak by v Mých úkolech zůstal úkol, který nejde vyřídit. Volá datová služba po smazání (Session.remove).
+ */
+export async function cancelRecordWorkflows(s: Session, objectId: string, id: string) {
+  if (objectId.startsWith("wf.")) return;
+  const sys = s.sys();
+  let runs: RecordData[];
+  try {
+    runs = await sys.find("wf.instance", { refObject: objectId, refId: id }, 20);
+  } catch {
+    return; // Workflow ve firmě vypnuté
+  }
+  for (const inst of runs) if (LIVE.includes(String(inst.status))) await finish(sys, inst, "cancelled");
+  const now = new Date().toISOString();
+  for (const w of await sys.find("wf.workItem", { refObject: objectId, refId: id, status: "open" }, 100))
+    await sys.save("wf.workItem", String(w.id), { status: "cancelled", completedAt: now }, { system: true });
+}
+
 /** Úkol z běhu dokončen / schválen / zamítnut / zrušen. */
 async function onWorkItem(s: Session, itemId: string, action: string) {
   const w = await s.get("wf.workItem", itemId);

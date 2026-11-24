@@ -4,14 +4,41 @@
  * původci / vlastníkovi) a schválení přijaté faktury vlastníkem s automatickým zaúčtováním.
  * Zakládá jen firmě, která ještě nic nemá (úpravy a smazání tenanta zůstanou).
  */
-import type { DataApi } from "@/core/module";
+import type { DataApi, RecordData } from "@/core/module";
 
 export const DEFAULT_PARTICIPANTS: [string, string][] = [
   ["OWNER", "Vlastník"],
   ["ACCOUNTANT", "Účetní"],
 ];
 
+/**
+ * Úklid: otevřené úkoly a čekající běhy k záznamům, které už neexistují (smazané dřív, než smazání workflow rušilo)
+ * se zruší. Hromadně po objektech — počet dotazů neroste s počtem úkolů.
+ */
+async function cancelOrphans(data: DataApi) {
+  const open = await data.find("wf.workItem", { status: "open" }, { take: 5000 });
+  const runs = (await data.find("wf.instance", {}, { take: 5000 })).filter((i) => i.status === "waiting" || i.status === "running");
+  const byObject = new Map<string, Set<string>>();
+  for (const r of [...open, ...runs]) if (r.refObject && r.refId && !String(r.refObject).startsWith("wf.")) (byObject.get(String(r.refObject)) ?? byObject.set(String(r.refObject), new Set()).get(String(r.refObject))!).add(String(r.refId));
+  const missing = new Set<string>();
+  for (const [obj, ids] of byObject) {
+    let found: RecordData[];
+    try {
+      found = await data.find(obj, { id: { in: [...ids] } }, { take: ids.size });
+    } catch {
+      continue; // agenda ve firmě vypnutá — záznam může existovat, nerušit
+    }
+    const have = new Set(found.map((f) => String(f.id)));
+    for (const id of ids) if (!have.has(id)) missing.add(`${obj}:${id}`);
+  }
+  if (!missing.size) return;
+  const now = new Date().toISOString();
+  for (const i of runs) if (missing.has(`${i.refObject}:${i.refId}`)) await data.update("wf.instance", String(i.id), { status: "cancelled", completedAt: now });
+  for (const w of open) if (missing.has(`${w.refObject}:${w.refId}`)) await data.update("wf.workItem", String(w.id), { status: "cancelled", completedAt: now });
+}
+
 export async function wfSetup(data: DataApi) {
+  await cancelOrphans(data);
   if (!(await data.find("wf.participantType", {}, { take: 1 })).length)
     for (const [code, name] of DEFAULT_PARTICIPANTS) await data.create("wf.participantType", { code, name });
   const existing = await data.find("wf.definition", {}, { take: 1 });

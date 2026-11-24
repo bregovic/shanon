@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPrisma } from "@/server/db";
-import { getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
+import { deleteRecord, getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { addFile } from "@/server/docuref";
 import { provisionTenant } from "@/server/provision";
 import { processPendingDocuments } from "@/server/doc-import";
@@ -87,6 +87,43 @@ describe("workflow — pracovní položky", () => {
     expect(await inTenant(T, (s) => closeWorkItems(s.sys().api(), { sourceKey: "k2" }, "cancelled"), client)).toBe(1);
     expect((await tasks(T, { status: "open" })).length).toBe(0);
   }, 120_000);
+
+  it("smazaný doklad: běh workflow a úkoly se zruší; úkol ke smazanému záznamu z dřívějška jde vyřídit", async () => {
+    const T = (await provisionTenant(client, { code: `t-wfd-${run}`, name: "WfD", adminEmail: `wfd-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ap", "int"], company: { code: "D", name: "D" } })).ctx;
+    const owner = (await listRecords(T, "wf.participantType", { filter: { code: "OWNER" } }, client)).rows[0];
+    await saveRecord(T, "wf.participantType", String(owner.id), { userId: T.userId }, undefined, client);
+    const vs = await saveRecord(T, "gab.subject", null, { name: "Nadace" }, undefined, client);
+    const [grp] = (await listRecords(T, "ap.group", {}, client)).rows;
+    const vendor = await saveRecord(T, "ap.vendor", null, { subjectId: vs.id, groupId: grp.id }, undefined, client);
+    const mk = async (num: string) => {
+      const inv = await saveRecord(T, "ap.invoice", null, { vendorId: vendor.id, invoiceDate: "2026-11-15", externalNum: num }, undefined, client);
+      const item = (await listRecords(T, "wf.workItem", { filter: { refId: String(inv.id), status: "open" } }, client)).rows[0];
+      expect(item?.kind).toBe("approval");
+      return { inv, item };
+    };
+    // 1) smazání dokladu zruší běh i úkol
+    const a = await mk("DAR-1");
+    await deleteRecord(T, "ap.invoice", String(a.inv.id), client);
+    expect((await getRecord(T, "wf.workItem", String(a.item.id), client))!.status).toBe("cancelled");
+    const run1 = (await listRecords(T, "wf.instance", { filter: { refId: String(a.inv.id) } }, client)).rows[0];
+    expect(run1.status).toBe("cancelled");
+    // 2) úkol, jehož doklad zmizel dřív (bez zrušení) — Schválit i Zamítnout ho uzavřou
+    for (const action of ["approve", "reject"] as const) {
+      const b = await mk(`DAR-${action}`);
+      await inTenant(T, (s) => s.tx.apInvoiceLine.deleteMany({ where: { invoiceId: String(b.inv.id) } }), client);
+      await inTenant(T, (s) => s.tx.apInvoice.delete({ where: { id: String(b.inv.id) } }), client);
+      await actOnWorkItem(T, String(b.item.id), action, null);
+      expect((await getRecord(T, "wf.workItem", String(b.item.id), client))!.status).not.toBe("open");
+      const r = (await listRecords(T, "wf.instance", { filter: { refId: String(b.inv.id) } }, client)).rows[0];
+      expect(["cancelled", "rejected"]).toContain(r.status);
+    }
+    // 3) úklid při nasazení: úkol k záznamu, který zmizel bez zrušení, se zruší sám
+    const c = await mk("DAR-3");
+    await inTenant(T, (s) => s.tx.apInvoice.delete({ where: { id: String(c.inv.id) } }), client);
+    const { wfSetup } = await import("@/modules/wf/setup");
+    await inTenant(T, (s) => wfSetup(s.sys().api()), client);
+    expect((await getRecord(T, "wf.workItem", String(c.item.id), client))!.status).toBe("cancelled");
+  });
 
   it("výchozí workflow: doklad z integrace → partner + zalistování nebo úkol původci; přijatá faktura → schválení vlastníkem → zaúčtování", async () => {
     process.env.SHANON_TEST_OCR_KEY = "sk-test";

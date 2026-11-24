@@ -35,7 +35,7 @@ import { prisma, withTenant, type Tx } from "./db";
 import { fieldWhere, orderByFor } from "./filter-where";
 import { setupCompany } from "./setup";
 import { defaultStorage, storageFor } from "./storage";
-import { flushWorkflow, queueWorkflow, workflowLock } from "./workflow";
+import { cancelRecordWorkflows, flushWorkflow, queueWorkflow, workflowLock } from "./workflow";
 import { moduleSet } from "./modules";
 import { SECRET_MASK, isEncrypted, sealSecret } from "./secrets";
 import { detachMember, virtualBeforeSave } from "./virtual";
@@ -856,6 +856,8 @@ export class Session {
     await this.audit(objectId, id, "delete", maskSecrets(def, existing), null);
     await this.releaseNumber(def, existing);
     for (const h of handlersFor(this.ctx, objectId)) await h.afterDelete?.(ectx, existing);
+    // běhy workflow a úkoly smazaného záznamu
+    await cancelRecordWorkflows(this, objectId, id);
     // odebraný řádek kopie číselníku ve firmě = kopie upravená ve firmě
     if (!this.datSync && !def.datLayer && datRelated(def)) await markDatLocal(this, def, existing);
   }
