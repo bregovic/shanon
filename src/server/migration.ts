@@ -86,7 +86,9 @@ const tr = (lang: Lang, ref: string, p?: Record<string, string>) => fillLabel(re
 /** Chyba kroku jako text: hláška a u chyb polí i pole (např. „Neplatná hodnota. (bankAccount: Číslo účtu …)“). */
 function errorText(e: unknown, lang: Lang): string {
   if (!(e instanceof UserError)) return String(e instanceof Error ? e.message : e);
-  const fields = Object.entries(e.fields ?? {}).map(([k, v]) => `${k}: ${tr(lang, String(v))}`);
+  const fields = Object.entries(e.fields ?? {})
+    .filter(([, v]) => v !== e.label)
+    .map(([k, v]) => `${k}: ${tr(lang, String(v), e.params)}`);
   return `${tr(lang, e.label, e.params)}${fields.length ? ` (${fields.join("; ")})` : ""}`;
 }
 
@@ -388,23 +390,29 @@ export async function runMigration(
   // 3. organizace: kontakty, logo; z registrů NACE, plátce DPH, finanční úřad a bankovní účty (Banka už je zapnutá)
   const orgStep: MigrationStep = { key: "org", label: t("@ORG:MigStepOrg"), status: "ok", messages: [] };
   report.steps.push(orgStep);
-  try {
-    const [org] = await inTenant(cctx, (s) => s.sys().find("org.entity", {}, 1), client);
-    if (org) {
-      const { logo, ...fields } = file.firma.organizace ?? {};
-      if (Object.keys(fields).length) await saveRecord(cctx, "org.entity", String(org.id), fields, undefined, client);
-      await runAction(cctx, "org.entity", String(org.id), "ares", client);
-      const img = logo ? opts.images(String(logo)) : null;
-      if (img) await setImage(cctx, "org.entity", String(org.id), "logo", img, client);
+  // každá část zvlášť — obsazená zkratka e-shopu nesmí zastavit registry, logo ani dimenze
+  const part = async (fn: () => Promise<unknown>) => {
+    try {
+      await fn();
+    } catch (e) {
+      orgStep.status = "warning";
+      orgStep.messages.push(errorText(e, lang));
     }
-    // dimenze z adresáře: hodnoty i subjektům založeným před zapnutím Hlavní knihy
-    if (cctx.modules.has("gl"))
+  };
+  const [org] = await inTenant(cctx, (s) => s.sys().find("org.entity", {}, 1), client);
+  if (org) {
+    const { logo, ...fields } = file.firma.organizace ?? {};
+    if (Object.keys(fields).length) await part(() => saveRecord(cctx, "org.entity", String(org.id), fields, undefined, client));
+    await part(() => runAction(cctx, "org.entity", String(org.id), "ares", client));
+    const img = logo ? opts.images(String(logo)) : null;
+    if (img) await part(() => setImage(cctx, "org.entity", String(org.id), "logo", img, client));
+  }
+  // dimenze z adresáře: hodnoty i subjektům založeným před zapnutím Hlavní knihy
+  if (cctx.modules.has("gl"))
+    await part(async () => {
       for (const dim of await inTenant(cctx, (s) => s.sys().find("gl.dimension", { source: "subject", active: true }, 6), client))
         await runAction(cctx, "gl.dimension", String(dim.id), "createSubjectValues", client);
-  } catch (e) {
-    orgStep.status = "warning";
-    orgStep.messages.push(errorText(e, lang));
-  }
+    });
 
   // 4. agendy v pořadí souboru (každá vše nebo nic; chyba jedné nezastaví další)
   for (const sec of file.data) report.steps.push(await importStep(cctx, sec, false, lang, opts.images, client));

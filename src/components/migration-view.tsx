@@ -1,7 +1,7 @@
 "use client";
 
 /** Organizace → Migrace firmy: šablona, export konfigurace, kontrola a spuštění migrace ze souboru JSON. */
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Badge,
@@ -44,6 +44,8 @@ const useStyles = makeStyles({
 
 type Labels = Record<"Migration" | "MigDesc" | "MigTemplate" | "MigExport" | "MigFile" | "MigImages" | "MigImagesCount" | "MigCheck" | "MigRun" | "MigRunConfirm" | "MigCreated" | "MigUpdated", string>;
 
+const REPORT_KEY = "shanon.migration.report";
+
 const COLOR = { ok: "success", warning: "warning", error: "danger" } as const;
 
 export function MigrationView({ crumbs, labels: L, cancel }: { crumbs: { label: string; href?: string }[]; labels: Labels; cancel: string }) {
@@ -57,10 +59,25 @@ export function MigrationView({ crumbs, labels: L, cancel }: { crumbs: { label: 
   const [confirm, setConfirm] = useState(false);
   const [busy, start] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
+  // výsledek spuštění přežije překreslení stránky (nová firma v přepínači, změna firmy)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(REPORT_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- úložiště prohlížeče (vnější zdroj, až po hydrataci)
+      if (saved) setReport(JSON.parse(saved) as MigrationReport);
+    } catch {
+      /* úložiště nedostupné */
+    }
+  }, []);
 
   const pick = async (f: File | null) => {
     setFile(f);
     setReport(null);
+    try {
+      sessionStorage.removeItem(REPORT_KEY);
+    } catch {
+      /* úložiště nedostupné */
+    }
     setErr(undefined);
     try {
       setIco(f ? String(JSON.parse(await f.text())?.firma?.ico ?? "") : "");
@@ -79,6 +96,12 @@ export function MigrationView({ crumbs, labels: L, cancel }: { crumbs: { label: 
       const r = await migrationAction(fd);
       if (r.ok) {
         setReport(r.data);
+        try {
+          if (r.data.applied) sessionStorage.setItem(REPORT_KEY, JSON.stringify(r.data));
+          else sessionStorage.removeItem(REPORT_KEY);
+        } catch {
+          /* úložiště nedostupné */
+        }
         if (r.data.applied) router.refresh();
       } else setErr(r.message);
     });
