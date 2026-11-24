@@ -21,6 +21,8 @@ summary: Nahrání faktur a dalších dokladů, vytěžení, kontrola, založen�
 3. Otevřete doklad, opravte údaje nebo řádky a dejte **Zkontrolovat**.
 4. **Zalistovat** – chybějícího dodavatele / odběratele založí z registru (ARES podle IČO, VIES podle DIČ, jinak z vytěžených
    údajů) a vznikne koncept faktury, zálohy nebo objednávky s řádky, DPH a přiloženým souborem.
+5. Když koncept ve fakturách (zálohách, objednávkách) smažete, doklad ke zpracování přejde do stavu **Smazáno**.
+   Jde znovu **Vytěžit** a zalistovat.
 
 ## Automatické zpracování (workflow)
 

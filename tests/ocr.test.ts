@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPrisma } from "@/server/db";
-import { getRecord, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
+import { deleteRecord, getRecord, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { addFile, listDocuRefs } from "@/server/docuref";
 import { provisionTenant } from "@/server/provision";
 import { processPendingDocuments } from "@/server/doc-import";
@@ -102,6 +102,11 @@ describe("vytěžování dokladů", () => {
     // denní limit 2 doklady
     const d2 = await newDoc(T);
     await expect(runAction(T, "int.document", String(d2.id), "extract", client)).rejects.toMatchObject({ label: "@INT:OcrDailyLimit" });
+
+    // smazání konceptu faktury ve fakturách → integrovaný doklad Smazáno (jde znovu vytěžit)
+    await deleteRecord(T, "ap.invoice", String(inv.id), client);
+    doc = (await getRecord(T, "int.document", String(d0.id), client))!;
+    expect([doc.status, doc.resultObject]).toEqual(["deleted", "ap.invoice"]);
   });
 
   it("dávka: nové doklady vytěží, připravené zalistuje (Zalistovat automaticky); záloha a objednávka", async () => {

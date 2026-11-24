@@ -121,6 +121,7 @@ export const DocStatus = defineEnum({
     { value: "listed", label: "@INT:DocListed", color: "success" },
     { value: "error", label: "@INT:DocError", color: "danger" },
     { value: "rejected", label: "@INT:DocRejected", color: "subtle" },
+    { value: "deleted", label: "@INT:DocDeleted", color: "danger" },
   ],
 });
 
@@ -1108,6 +1109,7 @@ export default defineModule({
       DocListed: "Zalistováno",
       DocError: "Chyba",
       DocRejected: "Zamítnuto",
+      DocDeleted: "Smazáno",
       PartnerName: "Partner",
       BankAccount: "Bankovní účet",
       Partner: "Partner",
@@ -1732,6 +1734,7 @@ export default defineModule({
       DocListed: "Listed",
       DocError: "Error",
       DocRejected: "Rejected",
+      DocDeleted: "Deleted",
       PartnerName: "Partner",
       BankAccount: "Bank account",
       Partner: "Partner",

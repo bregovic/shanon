@@ -8,7 +8,7 @@
  * (partner, součty, duplicita), založení partnera a vytvoření dokladu v agendě.
  */
 import { fromCents, toCents } from "@/core/money";
-import { UserError, type DataApi, type RecordData } from "@/core/module";
+import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import type { OcrParty, OcrResult } from "./ocr";
 import { createFromRegistry, createPartner } from "@/modules/gab/registry-lookup";
 
@@ -23,6 +23,27 @@ export const TARGETS: Record<string, { object: string; partner: "ap.vendor" | "a
 };
 
 type T = (ref: string, p?: Record<string, string>) => string;
+
+/**
+ * Smazání dokladu zalistovaného z integrace (koncept faktury, zálohy, objednávky): integrovaný doklad přejde do
+ * stavu Smazáno (výsledek zůstane v historii). Doklad jde znovu vytěžit a zalistovat.
+ */
+export const documentResultHandlers: Record<string, ObjectHandlers> = Object.fromEntries(
+  Object.values(TARGETS).map((tg) => [
+    tg.object,
+    {
+      async afterDelete(ctx, d) {
+        let docs: RecordData[];
+        try {
+          docs = await ctx.data.find("int.document", { resultObject: tg.object, resultId: String(d.id) }, { take: 20 });
+        } catch {
+          return; // Integrace ve firmě není
+        }
+        for (const doc of docs) if (doc.status === "listed") await ctx.data.update("int.document", String(doc.id), { status: "deleted" });
+      },
+    } satisfies ObjectHandlers,
+  ]),
+);
 
 const digits = (s: unknown) => String(s ?? "").replace(/\D/g, "");
 const normVat = (s: unknown) => String(s ?? "").replace(/\s/g, "").toUpperCase();
