@@ -361,7 +361,15 @@ export async function runMigration(
       return report;
     }
     const cctx: Ctx = { ...ctx, companyId, modules: await companyModules(ctx.tenantId, companyId, [], client), shared: undefined };
-    for (const sec of file.data) report.steps.push(await importStep(cctx, sec, true, lang, opts.images, client));
+    for (const sec of file.data) {
+      // modul ze souboru, který firma ještě nemá: zapne se až při spuštění, nanečisto agendu přeskočit
+      const mod = sec.objekt.split(".")[0];
+      if (!cctx.modules.has(mod) && file.moduly.includes(mod)) {
+        report.steps.push({ key: sec.objekt, label: resolveLabel(labelTable, getObject(sec.objekt).labelPlural, lang), status: "warning", messages: [t("@ORG:MigModuleLater", { module: mod })] });
+        continue;
+      }
+      report.steps.push(await importStep(cctx, sec, true, lang, opts.images, client));
+    }
     return report;
   }
 
