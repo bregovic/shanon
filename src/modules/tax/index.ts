@@ -237,6 +237,7 @@ export async function taxSetup(data: DataApi) {
  */
 export const taxTrans = defineObject({
   id: "tax.trans",
+  attachmentsFromSource: true,
   table: "tax_trans",
   label: "@TAX:Trans",
   labelPlural: "@TAX:TransPlural",

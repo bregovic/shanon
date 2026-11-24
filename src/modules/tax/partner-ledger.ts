@@ -518,6 +518,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
 
   const trans = defineObject({
     id: id("trans"),
+    attachmentsFromSource: true,
     table: `${m}_trans`,
     label: L("Trans"),
     labelPlural: L("TransPlural"),

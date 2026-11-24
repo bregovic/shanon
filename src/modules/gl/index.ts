@@ -351,6 +351,7 @@ export const account = defineObject({
 
 export const voucher = defineObject({
   id: "gl.voucher",
+  attachmentsFromSource: true,
   table: "gl_voucher",
   label: "@GL:Voucher",
   labelPlural: "@GL:Vouchers",
@@ -450,6 +451,7 @@ export const journalName = defineObject({
 
 export const trans = defineObject({
   id: "gl.trans",
+  attachmentsFromSource: true,
   table: "gl_trans",
   label: "@GL:Trans",
   labelPlural: "@GL:Transactions",

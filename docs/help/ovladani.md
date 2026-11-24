@@ -27,6 +27,8 @@ summary: Přehled zkratek po oblastech (všude, seznam, formulář, mřížka ř
 
 **Filtry a pohledy.** Nastavený filtr ukáže nad seznamem lištu „Filtrováno: …“ s tlačítkem **Zrušit filtry**. Filtr platí, dokud seznam neopustíte na jinou agendu (návrat z detailu záznamu ho zachová). **Uložit pohled** uloží filtry a řazení pod názvem do oblíbených, volitelně do složky (např. „Objednávky“); pohled otevřete z menu oblíbených (hvězdička v hlavičce). **Upravit oblíbené…** v tom menu přejmenuje, přesune do složky nebo odebere oblíbené. U zaškrtávacích polí filtr `""` najde nezaškrtnuté a `!""` zaškrtnuté. Sloupec s odkazem (kategorie, dodavatel…) jde filtrovat podle kódu i názvu.
 
+**Přílohy.** Tlačítko **Přílohy** je u každého záznamu (poznámky a soubory do 10 MB). Záznamy, které vznikly z dokladu – daňová transakce, účetní doklad, řádek hlavní knihy, položka salda – ukazují i přílohy toho dokladu (např. sken faktury dodavatele) s označením „z dokladu …“; soubor je uložený jednou u dokladu a smazat ho jde jen tam. Vydaná faktura, zálohová faktura a účtenka mají v přílohách své **PDF** (vzniká při otevření z tiskové šablony).
+
 **Sloučit.** U položek označte v seznamu dva a více záznamů stejného výrobku a zvolte **Sloučit**: ponechá se položka s nejnižším číslem, prodeje, faktury, slevy a přílohy ostatních se převedou na ni a ostatní se smažou. Cena je vyšší z cen, dodavatel zůstane jen shodný, z názvu zmizí „(dodavatel)“. Sloučit nejde vrátit.
 
 ## Formulář

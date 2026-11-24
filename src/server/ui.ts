@@ -222,6 +222,7 @@ export function uiLabels(t: T) {
       cancel: t("@SYS:Cancel"),
       close: t("@SYS:Close"),
       delete: t("@SYS:Delete"),
+      fromSource: t("@SYS:AttachmentFrom"),
     },
     actions: {
       new: t("@SYS:New"),

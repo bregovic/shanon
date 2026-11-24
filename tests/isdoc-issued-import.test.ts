@@ -39,7 +39,8 @@ describe("import vydané faktury z ISDOC", () => {
     expect([c.regNo, c.id]).toEqual(["11223344", imp.customerId]);
     const lines = (await listRecords(T, "ar.invoiceLine", { filter: { invoiceId: String(imp.id) } }, client)).rows;
     expect(lines.map((l) => [l.description, l.qty, l.unitPrice])).toEqual(expect.arrayContaining([["Klobása", "2.0000", "100.00"], ["Pečivo", "1.0000", "50.00"]]));
-    expect((await listDocuRefs(T, "ar.invoice", String(imp.id), client)).map((d) => d.name)).toEqual([x.name]);
+    // uložené přílohy (PDF z tiskové šablony je jen odkaz)
+    expect((await listDocuRefs(T, "ar.invoice", String(imp.id), client)).filter((d) => d.kind !== "pdf").map((d) => d.name)).toEqual([x.name]);
 
     // podruhé: faktura už existuje
     const again = await importIssuedIsdoc(T, file, false, "cs", client);

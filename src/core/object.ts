@@ -104,6 +104,11 @@ export interface ObjectDef {
   defaultSort?: { field: string; dir: "asc" | "desc" };
   /** Sloučit vybrané záznamy do jednoho (odkazy se přepojí, ostatní smažou) — `src/server/merge.ts`, úpravy v `ObjectHandlers.merge` */
   mergeable?: boolean;
+  /**
+   * Přílohy ukazují i přílohy dokladu, ze kterého záznam vznikl (`sourceObject` + `sourceId`, odkaz na účetní doklad)
+   * — jen ke čtení, uložené jednou u dokladu (daňová transakce, účetní doklad, řádek HK, saldo).
+   */
+  attachmentsFromSource?: boolean;
   /** automatické číslování: pole se vyplní z číselné řady */
   numberSeq?: { field: string; seq: string };
   /** jen pro správce tenanta (role, oprávnění) — oprávnění v rolích na ně nestačí */

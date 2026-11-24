@@ -21,7 +21,7 @@ import {
   Textarea,
   tokens,
 } from "@fluentui/react-components";
-import { ArrowUpload24Regular, Attach24Regular, Delete24Regular, Dismiss24Regular, Document24Regular, Note24Regular } from "@fluentui/react-icons";
+import { ArrowUpload24Regular, Attach24Regular, Delete24Regular, Dismiss24Regular, Document24Regular, DocumentPdf24Regular, Note24Regular } from "@fluentui/react-icons";
 import { addNoteAction, deleteDocuRefAction, docuRefCountAction, docuRefListAction } from "@/app/actions";
 import type { DocuRefItem } from "@/server/docuref";
 
@@ -36,6 +36,8 @@ export interface DocuRefLabels {
   cancel: string;
   close: string;
   delete: string;
+  /** „Z dokladu {doc}“ u přílohy dokladu, ze kterého záznam vznikl */
+  fromSource: string;
 }
 
 const useStyles = makeStyles({
@@ -302,22 +304,23 @@ function PanelBody({
         ) : (
           items.map((it) => (
             <div key={it.id} className={s.item}>
-              <span className={s.icon}>{it.kind === "file" ? <Document24Regular /> : <Note24Regular />}</span>
+              <span className={s.icon}>{it.kind === "pdf" ? <DocumentPdf24Regular /> : it.kind === "file" ? <Document24Regular /> : <Note24Regular />}</span>
               <div className={s.body}>
-                {it.kind === "file" ? (
-                  <a className={s.name} href={`/api/files/${it.id}`} target="_blank" rel="noopener" style={{ color: tokens.colorBrandForegroundLink }}>
+                {it.kind !== "note" ? (
+                  <a className={s.name} href={it.href ?? `/api/files/${it.id}`} target="_blank" rel="noopener" style={{ color: tokens.colorBrandForegroundLink }}>
                     {it.name}
                   </a>
                 ) : (
                   <div className={s.name}>{it.name}</div>
                 )}
                 <div className={s.meta}>
-                  {new Date(it.createdAt).toLocaleString("cs-CZ")}
+                  {it.kind !== "pdf" && new Date(it.createdAt).toLocaleString("cs-CZ")}
                   {it.kind === "file" && ` · ${fmtSize(it.size)}`}
+                  {it.source && `${it.kind !== "pdf" ? " · " : ""}${labels.fromSource.replace("{doc}", it.source.title)}`}
                 </div>
                 {it.note && <div className={s.note}>{it.note}</div>}
               </div>
-              {canWrite && (
+              {canWrite && !it.source && it.kind !== "pdf" && (
                 <Button appearance="subtle" size="small" icon={<Delete24Regular />} aria-label={labels.delete} onClick={() => remove(it.id)} />
               )}
             </div>

@@ -6,14 +6,21 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { UserError } from "@/core/module";
 import { can } from "@/core/security";
-import { getObject, inTenant, setImageField, type Ctx } from "./data";
+import { getObject, inTenant, setImageField, type Ctx, type Session } from "./data";
+import { resolveLabel } from "@/core/labels";
+import { labelTable, registry } from "@/registry";
 import { defaultStorage, storageFor } from "./storage";
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 export interface DocuRefItem {
   id: string;
-  kind: "note" | "file";
+  /** pdf = tiskový výstup dokladu (vzniká při otevření, nikde se neukládá) */
+  kind: "note" | "file" | "pdf";
+  /** odkaz na soubor (pdf); jinak /api/files/<id> */
+  href?: string;
+  /** příloha dokladu, ze kterého záznam vznikl (jen ke čtení): „Faktura dodavatele FP26001“ */
+  source?: { objectId: string; recordId: string; title: string };
   name: string;
   note: string | null;
   mime: string | null;
@@ -37,32 +44,114 @@ export function safeFileName(name: string): string {
   return (cleaned || "soubor").slice(0, 200);
 }
 
+interface Linked {
+  objectId: string;
+  recordId: string;
+  title: string;
+}
+
+/**
+ * Doklady, ze kterých záznam vznikl (obecně podle polí): `sourceObject` + `sourceId` (daňová transakce, účetní
+ * doklad → faktura) a odkaz na účetní doklad (řádek hlavní knihy, položka salda → doklad → faktura). Do hloubky 3,
+ * bez opakování a jen to, co uživatel smí číst. Přílohy se tak ukážou i na navázaných záznamech, uložené jednou.
+ */
+async function linkedSources(s: Session, ctx: Ctx, objectId: string, recordId: string): Promise<{ self: Linked | null; sources: Linked[] }> {
+  const seen = new Set([`${objectId}:${recordId}`]);
+  const sources: Linked[] = [];
+  const title = (oid: string, rec: Record<string, unknown>) => {
+    const def = getObject(oid);
+    return `${resolveLabel(labelTable, def.label, ctx.lang ?? "cs")} ${String(rec[def.titleField] ?? "")}`.trim();
+  };
+  const start = await s.sys().get(objectId, recordId);
+  if (!start) return { self: null, sources };
+  let level: [string, Record<string, unknown>][] = [[objectId, start]];
+  for (let depth = 0; depth < 3 && level.length; depth++) {
+    const next: [string, Record<string, unknown>][] = [];
+    for (const [oid, rec] of level) {
+      const def = getObject(oid);
+      // dál jen od záznamů, které přílohy zdroje přebírají (účetní záznamy); faktura, e-mail ani jiný doklad ne
+      if (!def.attachmentsFromSource) continue;
+      const parents: [string, string][] = [];
+      if (rec.sourceObject && rec.sourceId && registry.objects.has(String(rec.sourceObject))) parents.push([String(rec.sourceObject), String(rec.sourceId)]);
+      for (const [name, f] of Object.entries(def.fields)) if (f.edt.kind === "ref" && f.edt.refObject === "gl.voucher" && rec[name]) parents.push(["gl.voucher", String(rec[name])]);
+      for (const [pObj, pId] of parents) {
+        const key = `${pObj}:${pId}`;
+        if (seen.has(key) || !ctx.modules.has(pObj.split(".")[0]) || !can(ctx.perms, pObj, "read")) continue;
+        seen.add(key);
+        const p = await s.sys().get(pObj, pId).catch(() => null);
+        if (!p) continue;
+        sources.push({ objectId: pObj, recordId: pId, title: title(pObj, p) });
+        next.push([pObj, p]);
+      }
+    }
+    level = next;
+  }
+  return { self: { objectId, recordId, title: title(objectId, start) }, sources };
+}
+
+const toItem = (r: { id: string; kind: string; name: string; note: string | null; mime: string | null; size: number | null; createdAt: Date; createdBy: string | null }, source?: Linked): DocuRefItem => ({
+  id: r.id,
+  kind: r.kind as "note" | "file",
+  name: r.name,
+  note: r.note,
+  mime: r.mime,
+  size: r.size,
+  createdAt: r.createdAt.toISOString(),
+  createdBy: r.createdBy,
+  ...(source ? { source } : {}),
+});
+
+/** Tiskový výstup tisknutelného dokladu (vydaná faktura, záloha, účtenka) jako příloha — vzniká při otevření. */
+function pdfItem(doc: Linked, ctx: Ctx, printable: Set<string>, source?: Linked): DocuRefItem | null {
+  if (!printable.has(doc.objectId) || !ctx.modules.has(doc.objectId.split(".")[0]) || !can(ctx.perms, doc.objectId, "read")) return null;
+  return {
+    id: `pdf:${doc.objectId}:${doc.recordId}`,
+    kind: "pdf",
+    href: `/api/pdf/${doc.objectId}/${doc.recordId}`,
+    name: `${doc.title}.pdf`,
+    note: null,
+    mime: "application/pdf",
+    size: null,
+    createdAt: new Date(0).toISOString(),
+    createdBy: null,
+    ...(source ? { source } : {}),
+  };
+}
+
+/** Přílohy záznamu: vlastní, PDF dokladu a přílohy dokladů, ze kterých záznam vznikl (bez duplicit). */
 export async function listDocuRefs(ctx: Ctx, objectId: string, recordId: string, client?: PrismaClient): Promise<DocuRefItem[]> {
   await checkRecord(ctx, objectId, recordId, "read", client);
-  const rows = await inTenant(
+  return inTenant(
     ctx,
-    (s) =>
-      s.tx.sysDocuRef.findMany({
-        where: { tenantId: ctx.tenantId, objectId, recordId },
-        orderBy: { createdAt: "desc" },
-      }),
+    async (s) => {
+      const { self, sources } = await linkedSources(s, ctx, objectId, recordId);
+      const keys = [{ objectId, recordId }, ...sources.map((x) => ({ objectId: x.objectId, recordId: x.recordId }))];
+      const rows = await s.tx.sysDocuRef.findMany({ where: { tenantId: ctx.tenantId, OR: keys }, orderBy: { createdAt: "desc" } });
+      const byKey = new Map(sources.map((x) => [`${x.objectId}:${x.recordId}`, x]));
+      // tisknutelné doklady (ModuleDef.printables) — bez importu print.ts (smyčka data → … → docuref)
+      const printable = new Set([...registry.modules.values()].flatMap((m) => (m.printables ?? []).map((x) => x.id)));
+      const out: DocuRefItem[] = [];
+      const pdfSelf = self && pdfItem(self, ctx, printable);
+      if (pdfSelf) out.push(pdfSelf);
+      for (const r of rows) out.push(toItem(r, byKey.get(`${r.objectId}:${r.recordId}`)));
+      for (const src of sources) {
+        const p = pdfItem(src, ctx, printable, src);
+        if (p) out.push(p);
+      }
+      // stejný soubor dvěma cestami jen jednou
+      return [...new Map(out.map((i) => [i.id, i])).values()];
+    },
     client,
   );
-  return rows.map((r) => ({
-    id: r.id,
-    kind: r.kind as "note" | "file",
-    name: r.name,
-    note: r.note,
-    mime: r.mime,
-    size: r.size,
-    createdAt: r.createdAt.toISOString(),
-    createdBy: r.createdBy,
-  }));
 }
 
 export async function countDocuRefs(ctx: Ctx, objectId: string, recordId: string, client?: PrismaClient): Promise<number> {
   if (!can(ctx.perms, objectId, "read")) return 0;
-  return inTenant(ctx, (s) => s.tx.sysDocuRef.count({ where: { tenantId: ctx.tenantId, objectId, recordId } }), client);
+  try {
+    return (await listDocuRefs(ctx, objectId, recordId, client)).length;
+  } catch {
+    return 0;
+  }
 }
 
 export async function addNote(ctx: Ctx, objectId: string, recordId: string, name: string, note: string, client?: PrismaClient) {
