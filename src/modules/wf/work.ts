@@ -8,7 +8,7 @@
  */
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { notify } from "@/modules/sys/notify";
-import { registry } from "@/registry";
+import { appRegistry } from "@/core/registry-ref";
 
 export interface NewWorkItem {
   title: string;
@@ -109,12 +109,12 @@ export function parseCondition(text: unknown): [string, string][] {
 
 /** akce objektu, kterou smí spustit automatický krok (v transakci, bez souboru) */
 export function autoActionOk(objectId: string, actionId: string): boolean {
-  const a = registry.objects.get(objectId)?.actions?.find((x) => x.id === actionId);
+  const a = appRegistry().objects.get(objectId)?.actions?.find((x) => x.id === actionId);
   return !!a && !a.outside && !a.upload && !a.download;
 }
 
 function conditionErrors(objectId: string, text: unknown): string | null {
-  const def = registry.objects.get(objectId);
+  const def = appRegistry().objects.get(objectId);
   if (!def) return null;
   for (const [f] of parseCondition(text)) if (!(f in def.fields)) return f;
   return null;
@@ -162,7 +162,7 @@ export const wfHandlers: Record<string, ObjectHandlers> = {
   "wf.definition": {
     beforeSave(_ctx, d) {
       const e: Record<string, string> = {};
-      const def = registry.objects.get(String(d.objectId ?? ""));
+      const def = appRegistry().objects.get(String(d.objectId ?? ""));
       if (!def) e.objectId = "@WF:BadObject";
       else {
         if (d.trigger === "action" && !def.actions?.some((a) => a.id === d.triggerName)) e.triggerName = "@WF:BadAction";

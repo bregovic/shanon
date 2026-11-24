@@ -3,6 +3,7 @@
  */
 import { buildLabelTable } from "@/core/labels";
 import { buildRegistry } from "@/core/module";
+import { setAppRegistry } from "@/core/registry-ref";
 import { ADMIN_ONLY } from "@/core/security";
 import gab from "@/modules/gab";
 import gl from "@/modules/gl";
@@ -98,3 +99,4 @@ export const labelFiles = [
 ];
 
 export const labelTable = buildLabelTable(labelFiles);
+setAppRegistry(registry);

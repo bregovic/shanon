@@ -27,7 +27,7 @@ import { aresByIco } from "@/modules/gab/ares";
 import { viesLookup } from "@/modules/gab/registry-lookup";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
 import { fetchCnb, fetchEcb } from "@/modules/sys/currency";
-import { registry } from "@/registry";
+import { appRegistry } from "@/core/registry-ref";
 import { cancelWorkflows, closeWorkItems } from "@/modules/wf/work";
 import {
   buildEetMessage,
@@ -594,7 +594,7 @@ export const intHandlers: Record<string, ObjectHandlers> = {
         // jen existující moduly a objekty; správa systému a integrace přes API nikdy
         const bad = scopes.find(
           (s) =>
-            !(registry.modules.has(s) || registry.objects.has(s)) ||
+            !(appRegistry().modules.has(s) || appRegistry().objects.has(s)) ||
             s === "sys" ||
             s === "int" ||
             s.startsWith("sys.") ||
