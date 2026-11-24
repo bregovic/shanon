@@ -333,6 +333,8 @@ export const parameters = defineObject({
   fields: {
     taxOfficeCode: { edt: Str("TaxOfficeCode", "@TAX:TaxOffice", 4, /^\d{1,4}$/, "@TAX:TaxOfficeHelp"), mandatory: true },
     taxOfficeBranch: { edt: Str("TaxOfficeBranch", "@TAX:TaxOfficeBranch", 5, /^\d{1,5}$/, "@TAX:TaxOfficeHelp") },
+    /** kód ekonomické činnosti (CZ-NACE) do přiznání k DPH (c_okec); prázdné = převažující činnost organizace z ARES */
+    naceCode: { edt: Str("TaxNaceCode", "@TAX:NaceCode", 6, /^\d{2,6}$/), help: "@TAX:NaceCodeHelp" },
     /** dodavatel Finanční úřad (účet pro platbu DPH) — závazek z Platby DPH jde do jeho salda */
     taxOfficeVendorId: { edt: refEdt("ap.vendor", "@TAX:TaxOfficeVendor"), optionalRef: true },
     subjectType: { edt: enumEdt(SubjectKind), mandatory: true, default: "P" },
@@ -355,7 +357,7 @@ export const parameters = defineObject({
   titleField: "taxOfficeCode",
   list: ["taxOfficeCode", "taxOfficeBranch", "subjectType", "filingPeriod", "city", "dataBoxId"],
   form: [
-    { label: "@TAX:Office", fields: ["taxOfficeCode", "taxOfficeBranch", "subjectType", "filingPeriod", "taxOfficeVendorId"] },
+    { label: "@TAX:Office", fields: ["taxOfficeCode", "taxOfficeBranch", "subjectType", "filingPeriod", "naceCode", "taxOfficeVendorId"] },
     { label: "@TAX:NaturalPersonName", fields: ["firstName", "lastName"] },
     { label: "@TAX:Address", fields: ["street", "houseNo", "orientNo", "city", "zipCode"] },
     { label: "@TAX:Contact", fields: ["phone", "email", "dataBoxId", "taxOfficeDataBox", "preparerFirstName", "preparerLastName"] },
@@ -423,6 +425,8 @@ export const vatReturn = defineObject({
     { id: "xml", label: "@TAX:DownloadXml", download: true },
     { id: "file", label: "@TAX:MarkFiled", when: { field: "status", equals: "draft" } },
     // podání datovou schránkou: nevratné, uživatel opíše období
+    // nanečisto: přihlášení do schránky, odesílatel = schránka firmy, adresát vyplněný a jiný, XML — nic se neodešle
+    { id: "checkIsds", label: "@TAX:CheckIsds", outside: true, when: { field: "status", equals: "draft" } },
     { id: "sendIsds", label: "@TAX:SendIsds", outside: true, when: { field: "status", equals: "draft" }, confirm: { field: "period", text: "@TAX:SendIsdsConfirm" } },
   ],
   lockedWhen: { field: "status", equals: "filed" },
@@ -633,6 +637,15 @@ export default defineModule({
       SendIsdsConfirm: "Podání odejde na finanční úřad a nejde vzít zpět. Pro potvrzení opište období:",
       IsdsMessage: "Datová zpráva",
       IsdsSent: "Odesláno datovou schránkou, zpráva {id}.",
+      NaceCode: "Kód ekonomické činnosti",
+      NaceCodeHelp: "CZ-NACE do přiznání k DPH. Prázdné = převažující činnost z Organizace (doplní akce Doplnit z ARES).",
+      CheckIsds: "Zkontrolovat odeslání",
+      IsdsCheckOk: "Připraveno k odeslání ({env}): ze schránky {from} (napojení {conn}) do schránky finančního úřadu {to}, soubor {file}. Nic nebylo odesláno.",
+      IsdsEnvTest: "testovací schránka",
+      IsdsEnvLive: "OSTRÁ schránka",
+      IsdsNoRecipient: "Vyplňte datovou schránku finančního úřadu (Daňové parametry).",
+      IsdsToSelf: "Datová schránka finančního úřadu je stejná jako schránka firmy — opravte Daňové parametry.",
+      IsdsWrongSender: "Napojení se přihlásí do schránky {own}, ale v Daňových parametrech je schránka firmy {expected}. Podání by odešlo z cizí schránky — opravte napojení nebo parametry.",
       PreparerFirstName: "Sestavil – jméno",
       PreparerLastName: "Sestavil – příjmení",
       Office: "Úřad a období",
@@ -903,6 +916,15 @@ export default defineModule({
       SendIsdsConfirm: "The filing goes to the tax office and cannot be withdrawn. To confirm, type the period:",
       IsdsMessage: "Data message",
       IsdsSent: "Sent via data box, message {id}.",
+      NaceCode: "Economic activity code",
+      NaceCodeHelp: "CZ-NACE for the VAT return. Empty = main activity from the Organisation (filled by Fill from ARES).",
+      CheckIsds: "Check sending",
+      IsdsCheckOk: "Ready to send ({env}): from data box {from} (connection {conn}) to the tax office data box {to}, file {file}. Nothing was sent.",
+      IsdsEnvTest: "test data box",
+      IsdsEnvLive: "LIVE data box",
+      IsdsNoRecipient: "Fill in the tax office data box (Tax parameters).",
+      IsdsToSelf: "The tax office data box equals the company data box — correct the Tax parameters.",
+      IsdsWrongSender: "The connection logs in to data box {own}, but the Tax parameters say the company box is {expected}. The filing would leave from another box — correct the connection or parameters.",
       PreparerFirstName: "Prepared by – first name",
       PreparerLastName: "Prepared by – last name",
       Office: "Office and period",

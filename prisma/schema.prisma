@@ -1815,6 +1815,7 @@ model TaxParameters {
   companyId         String   @map("company_id") @db.Uuid
   taxOfficeCode     String   @map("tax_office_code") @db.VarChar(4)
   taxOfficeBranch   String?  @map("tax_office_branch") @db.VarChar(5)
+  naceCode          String?  @map("nace_code") @db.VarChar(6)
   taxOfficeVendorId String?  @map("tax_office_vendor_id") @db.Uuid
   subjectType       String   @default("P") @map("subject_type") @db.VarChar(40)
   filingPeriod      String   @default("month") @map("filing_period") @db.VarChar(40)

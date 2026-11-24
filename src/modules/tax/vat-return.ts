@@ -237,7 +237,12 @@ const amt = (c: bigint) => fromCents(c);
 export interface Subject {
   company: RecordData;
   params: RecordData;
+  /** organizace (převažující činnost CZ-NACE, když ji daňové parametry nemají) */
+  org?: RecordData | null;
 }
+
+/** Kód ekonomické činnosti do přiznání: daňové parametry, jinak převažující činnost organizace. */
+export const naceOf = (s: Subject): string | null => (s.params.naceCode as string) || (s.org?.naceCode as string) || null;
 
 /** Věta P — údaje o plátci (stejná pro přiznání i hlášení). */
 function vetaP({ company, params: p }: Subject) {
@@ -333,6 +338,7 @@ export function dp3Xml(c: VatComputation, subj: Subject): string {
       rok: period.year,
       d_poddp: today(),
       typ_platce: "P",
+      c_okec: naceOf(subj),
       // „Neexistují-li údaje pro C. ODDÍL, proškrtněte“: A = daňová povinnost vznikla (jsou údaje), N = prázdné přiznání
       trans: [...c.lines.values()].some(([b, t]) => b !== BigInt(0) || t !== BigInt(0)) ? "A" : "N",
     })}/>`,
@@ -403,7 +409,8 @@ async function subject(data: DataApi, companyId: string | null): Promise<Subject
   const company = companyId ? await data.get("sys.company", companyId) : null;
   const [params] = await data.find("tax.parameters", {}, { take: 1 });
   if (!company || !params) throw new UserError("@TAX:MissingParameters");
-  return { company, params };
+  const org = (await data.find("org.entity", {}, { take: 1 }).catch(() => [] as RecordData[]))[0] ?? null;
+  return { company, params, org };
 }
 
 /** Je DUZP v období podaného přiznání nebo kontrolního hlášení? (měsíc, případně čtvrtletí) */

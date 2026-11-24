@@ -23,6 +23,7 @@ const ACTIONS: Record<string, () => Promise<OutsideAction>> = {
   // smazání firmy i s daty (superuživatel — sys.company je adminOnly, ověří runAction)
   // podání přiznání / kontrolního hlášení datovou schránkou (potvrzení opsáním období ověřilo UI a runAction)
   "tax.return:sendIsds": async () => (await import("./tax-isds")).sendReturnIsds,
+  "tax.return:checkIsds": async () => (await import("./tax-isds")).checkReturnIsds,
   "sys.company:deleteWithData": async () => async (ctx: Ctx, id: string, client?: PrismaClient) => (await import("./company-delete")).deleteCompanyWithData(ctx, id, client),
 };
 

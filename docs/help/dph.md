@@ -81,8 +81,15 @@ do schránky finančního úřadu — nic se nepodepisuje, podáním je samotná
 1. **Integrace → Napojení → Nový**: druh *Datová schránka*, ovladač *Datová schránka (ostrá)* nebo *veřejný test (czebox)*,
    přihlašovací jméno a heslo schránky firmy (heslo se ukládá šifrovaně). **Test spojení** ověří přihlášení (nic neodešle).
 2. **Daňové parametry → Datová schránka finančního úřadu**: ID schránky příslušného finančního úřadu (7 znaků).
-3. Na spočítaném podání **Odeslat datovou schránkou** a pro potvrzení opište období. Po přijetí je podání *Podané*
-   s číslem datové zprávy, záznam je i v protokolu napojení.
+2b. **Daňové parametry → Datová schránka**: ID schránky **firmy** — Shanon podle něj ověří, že podání odchází z její schránky.
+3. **Zkontrolovat odeslání** (nic neodešle): přihlásí se do schránky a ukáže, **odkud** (schránka firmy, napojení, ostrá / testovací)
+   **kam** (schránka finančního úřadu) a jaký soubor by odešel. Zastaví se, když adresát chybí, je to schránka firmy samotné,
+   nebo se napojení přihlásí do jiné schránky, než je schránka firmy v parametrech.
+4. Na spočítaném podání **Odeslat datovou schránkou** a pro potvrzení opište období. Před odesláním proběhnou stejné kontroly.
+   Po přijetí je podání *Podané* s číslem datové zprávy, záznam je i v protokolu napojení.
+
+**Kód ekonomické činnosti** (CZ-NACE) jde do přiznání k DPH z Daňových parametrů; prázdné = převažující činnost z Organizace
+(doplní **Doplnit z ARES**).
 
 Odeslání je nevratné a nikdy neproběhne samo. Na testovacím serveru jde jen veřejný test (czebox), ostré podání jen z produkce.
 

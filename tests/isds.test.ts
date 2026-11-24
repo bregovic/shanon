@@ -24,9 +24,13 @@ describe("datová schránka", () => {
     await expect(runAction(P, "tax.return", String(ret.id), "sendIsds", client)).rejects.toMatchObject({ label: "@INT:IsdsNoConnection" });
     const conn = await saveRecord(P, "int.connection", null, { code: "ISDS", name: "Datová schránka", kind: "isds", driver: "isdsTest", isdsLogin: "firma1", isdsPassword: "tajne-heslo", active: true }, undefined, client);
     // bez schránky finančního úřadu
-    await expect(runAction(P, "tax.return", String(ret.id), "sendIsds", client)).rejects.toMatchObject({ label: "@INT:IsdsBadRecipient" });
+    await expect(runAction(P, "tax.return", String(ret.id), "sendIsds", client)).rejects.toMatchObject({ label: "@TAX:IsdsNoRecipient" });
     const [params] = (await listRecords(P, "tax.parameters", {}, client)).rows;
-    await saveRecord(P, "tax.parameters", String(params.id), { ...params, taxOfficeDataBox: "4n2aaaa" }, params.version as number, client);
+    // adresát = schránka firmy → odmítnout ještě před přihlášením
+    await saveRecord(P, "tax.parameters", String(params.id), { ...params, taxOfficeDataBox: "abc1234", dataBoxId: "abc1234", naceCode: "46900" }, params.version as number, client);
+    await expect(runAction(P, "tax.return", String(ret.id), "sendIsds", client)).rejects.toMatchObject({ label: "@TAX:IsdsToSelf" });
+    const p2 = (await listRecords(P, "tax.parameters", {}, client)).rows[0];
+    await saveRecord(P, "tax.parameters", String(p2.id), { ...p2, taxOfficeDataBox: "4n2aaaa", dataBoxId: "zzz9999" }, p2.version as number, client);
 
     // ověření napojení (Test spojení)
     const calls: { url: string; body: string; auth: string }[] = [];
@@ -39,6 +43,17 @@ describe("datová schránka", () => {
     expect(calls[0].auth).toBe(`Basic ${Buffer.from("firma1:tajne-heslo").toString("base64")}`);
     expect(String((await getRecord(P, "int.connection", String(conn.id), client))!.lastResult)).toContain("abc1234");
 
+    // napojení se přihlásí do jiné schránky, než je schránka firmy → neodeslat
+    await expect(runAction(P, "tax.return", String(ret.id), "sendIsds", client)).rejects.toMatchObject({ label: "@TAX:IsdsWrongSender", params: { own: "abc1234", expected: "zzz9999" } });
+    expect(calls.some((c) => c.url.endsWith("/DS/dz"))).toBe(false);
+    const p3 = (await listRecords(P, "tax.parameters", {}, client)).rows[0];
+    await saveRecord(P, "tax.parameters", String(p3.id), { ...p3, dataBoxId: "abc1234" }, p3.version as number, client);
+    // Zkontrolovat odeslání: souhrn odkud kam, nic neodešle
+    const check = await runAction(P, "tax.return", String(ret.id), "checkIsds", client);
+    expect(String((check as { message?: string })?.message)).toMatch(/testovací schránka.*abc1234.*4n2aaaa/);
+    expect(calls.some((c) => c.url.endsWith("/DS/dz"))).toBe(false);
+    expect((await getRecord(P, "tax.return", String(ret.id), client))!.status).toBe("draft");
+
     // odeslání přiznání
     await runAction(P, "tax.return", String(ret.id), "sendIsds", client);
     const sent = calls.at(-1)!;
@@ -46,6 +61,7 @@ describe("datová schránka", () => {
     expect(sent.body).toContain("<p:dbIDRecipient>4n2aaaa</p:dbIDRecipient>");
     const b64 = /<p:dmEncodedContent>([^<]+)</.exec(sent.body)![1];
     expect(Buffer.from(b64, "base64").toString("utf8")).toContain("DPHDP3");
+    expect(Buffer.from(b64, "base64").toString("utf8")).toContain('c_okec="46900"');
     const after = (await getRecord(P, "tax.return", String(ret.id), client))!;
     expect([after.status, after.isdsMessageId]).toEqual(["filed", "987654321"]);
     // podané už znovu odeslat nejde
