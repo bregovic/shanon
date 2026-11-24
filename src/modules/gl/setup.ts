@@ -144,12 +144,15 @@ export async function postingAccount(data: DataApi, synthetic: string): Promise<
 }
 
 export async function glSetup(data: DataApi): Promise<void> {
-  const some = await data.find("gl.account", {}, { take: 30 });
-  // rozvrh nezaložený: žádné účty, nebo jen účty založené automaticky před Hlavní knihou (bankovní účty 221xxx
-  // z registru DPH u firem založených podle IČO, účty položek) — doplnit celou osnovu, existující nechat
-  const unfounded = some.length < 30 && some.every((a) => /^(221|504|601|602)/.test(String(a.accountNum)));
+  const some = await data.find("gl.account", {}, { take: 5000 });
+  const have = new Set(some.map((a) => String(a.accountNum)));
+  // rozvrh nezaložený: žádné účty, nebo firma bez zaúčtovaných dokladů, které chybí víc než polovina osnovy
+  // (firmy založené podle IČO dřív dostaly účet 221000 z registru DPH a pár účtů modulů ještě před Hlavní knihou
+  // → osnova se nezaložila). Doplní se chybějící účty osnovy, existující zůstanou.
+  const unfounded =
+    !some.length ||
+    (DEFAULT_ACCOUNTS.filter(([n]) => have.has(n)).length < DEFAULT_ACCOUNTS.length / 2 && !(await data.find("gl.voucher", {}, { take: 1 })).length);
   if (unfounded) {
-    const have = new Set(some.map((a) => String(a.accountNum)));
     // syntetika před analytikou (analytika se k ní přiřadí)
     for (const [accountNum, name, type, postingType, noManualEntry] of DEFAULT_ACCOUNTS) {
       if (have.has(accountNum)) continue;

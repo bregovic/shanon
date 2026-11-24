@@ -1210,8 +1210,16 @@ describe("založení firmy z rejstříku: bankovní účty", () => {
     const id = await createCompanyFromRegistry(T, "27079864", client);
     // nová firma má jen jádro + Organizaci a Adresář: účty Banky až po zapnutí modulu (Doplnit z ARES)
     expect(await client.bankAccount.count({ where: { companyId: id } })).toBe(0);
-    // firma založená dřív: účet 221000 předvyplněný ještě před zapnutím Hlavní knihy
-    await inTenant({ ...T, companyId: id }, (s) => s.sys().api().create("gl.account", { accountNum: "221000", name: "Bankovní účet", type: "asset", postingType: "bank", noManualEntry: true }), client);
+    // firma založená dřív: účet 221000 z registru a pár účtů modulů ještě bez osnovy (stav firem z TESTu)
+    await inTenant(
+      { ...T, companyId: id },
+      async (s) => {
+        const api = s.sys().api();
+        for (const [accountNum, name, type] of [["221000", "Bankovní účet", "asset"], ["543100", "Dary", "expense"], ["343900", "DPH", "liability"], ["504000", "Prodané zboží", "expense"], ["311000", "Odběratelé", "asset"]])
+          await api.create("gl.account", { accountNum, name, type });
+      },
+      client,
+    );
     await enableModulesWithSetup(T, id, ["bank"], "cs", client);
     const C = { ...T, companyId: id, modules: await companyModules(T.tenantId, id, [], client) };
     // účtový rozvrh se založil celý (dřív ho předvyplněný 221000 zastavil)
