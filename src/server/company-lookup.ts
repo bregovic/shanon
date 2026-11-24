@@ -39,13 +39,19 @@ export function createCompanyFromRegistry(
       const vatStatus = dicDigits ? ((await vatRegistryStatus([dicDigits]).catch(() => null))?.get(dicDigits) ?? null) : null;
       const vatPayer = vatStatus ? vatStatus.reliability !== "notFound" : !!hit.vatId;
       if (vatPayer !== !!hit.vatId) await sess.save("sys.company", String(company.id), { ...company, vatPayer });
-      const companyApi = new Session(sess.tx, { ...ctx, companyId: String(company.id) }, true).api();
-      // moduly organizace (ne nové firmy): daňové parametry a účty Banky se předvyplní i firmě, která modul zapne až později
-      const has = (m: string) => ctx.modules.has(m);
+      // moduly účtované firmy (nová firma má jen jádro + starter): účty Banky a parametry DPH jen se zapnutým modulem —
+      // předvyplněný účet 221000 by jinak zastavil založení účtového rozvrhu při zapnutí Hlavní knihy. Po zapnutí
+      // modulů je doplní akce Doplnit z ARES na organizaci (migrace ji spouští sama).
+      const mods = new Set((await sess.tx.sysCompanyModule.findMany({ where: { tenantId: ctx.tenantId, companyId: String(company.id) }, select: { moduleId: true } })).map((r) => r.moduleId));
+      const own = mods.size ? mods : ctx.modules;
+      // přístup k agendám nové firmy i k těm, které má firma, ze které se zakládá (daňové parametry předem)
+      const companyApi = new Session(sess.tx, { ...ctx, companyId: String(company.id), modules: new Set([...ctx.modules, ...own]) }, true).api();
+      const has = (m: string) => own.has(m);
       // činnosti podle CZ-NACE (výpadek RES založení nezastaví)
       const nace = hit.regNo && hit.source === "ares" ? await aresNace(hit.regNo, sess.sys().api()).catch(() => null) : null;
       // daňové parametry pro přiznání: finanční úřad z registru, typ subjektu, jméno a sídlo (perioda a územní pracoviště ručně)
-      if (has("tax") && vatStatus?.taxOffice) {
+      // daňové parametry nic nezakládají jako závislost — předvyplní se i firmě, která DPH zapne později
+      if ((has("tax") || ctx.modules.has("tax")) && vatStatus?.taxOffice) {
         const nm = splitPersonName(hit.name);
         const tp = {
           taxOfficeCode: vatStatus.taxOffice,

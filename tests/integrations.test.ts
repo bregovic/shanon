@@ -1208,7 +1208,14 @@ describe("založení firmy z rejstříku: bankovní účty", () => {
         : new Response(JSON.stringify({ ico: "27079864", obchodniJmeno: "Uzenářství s.r.o.", dic: "CZ27079864", pravniForma: "112", sidlo: { kodStatu: "CZ", nazevObce: "Davle", psc: 25206 } }), { status: 200 }),
     );
     const id = await createCompanyFromRegistry(T, "27079864", client);
-    const C = { ...T, companyId: id };
+    // nová firma má jen jádro + Organizaci a Adresář: účty Banky až po zapnutí modulu (Doplnit z ARES)
+    expect(await client.bankAccount.count({ where: { companyId: id } })).toBe(0);
+    await enableModulesWithSetup(T, id, ["bank"], "cs", client);
+    const C = { ...T, companyId: id, modules: await companyModules(T.tenantId, id, [], client) };
+    // účtový rozvrh se založil celý (dřív ho předvyplněný 221000 zastavil)
+    expect((await listRecords(C, "gl.account", {}, client)).total).toBeGreaterThan(50);
+    const [org] = (await listRecords(C, "org.entity", {}, client)).rows;
+    await runAction(C, "org.entity", String(org.id), "ares", client);
     const banks = (await listRecords(C, "bank.account", { sort: "code" }, client)).rows;
     expect(banks.map((b) => [b.accountNum, b.iban, String((b._titles as Record<string, string>).glAccountId).slice(0, 6)])).toEqual([
       ["19-2000145399/0800", "CZ6508000000192000145399", "221000"],
@@ -1216,6 +1223,7 @@ describe("založení firmy z rejstříku: bankovní účty", () => {
     ]);
     // znovu: nic nového
     await createCompanyFromRegistry(T, "27079864", client);
+    await runAction(C, "org.entity", String(org.id), "ares", client);
     expect((await listRecords(C, "bank.account", {}, client)).total).toBe(2);
     // IBAN se dopočítá i u účtu v adresáři
     const subj = await saveRecord(C, "gab.subject", null, { name: "Dodavatel" }, undefined, client);

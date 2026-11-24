@@ -21,7 +21,8 @@ import { countAllRecords, getObject, getRecord, inTenant, listRecords, previewRe
 import { prisma, withTenant } from "@/server/db";
 import { addNote, countDocuRefs, deleteDocuRef, listDocuRefs, setImage, type DocuRefItem } from "@/server/docuref";
 import { recordHistory, type HistoryEntry } from "@/server/history";
-import { importRecords, imagesFromUploads, readTable, type ImportReport } from "@/server/import";
+import { decodeText, importRecords, imagesFromUploads, readTable, type ImportReport } from "@/server/import";
+import { runMigration, type MigrationReport } from "@/server/migration";
 import { importIssuedIsdoc, isdocXml } from "@/server/isdoc-import";
 import { runReport } from "@/server/report";
 import { can } from "@/core/security";
@@ -441,6 +442,34 @@ export async function importAction(form: FormData): Promise<ActionResult<ImportR
     }
     const report = await importRecords(s.ctx, objectId, table, { dryRun: form.get("dryRun") === "1", lang: s.lang, images: imagesFromUploads(uploads), fixed });
     if (report.applied) revalidatePath(objectHref(objectId));
+    return { ok: true, data: report };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Migrace firmy ze souboru JSON (Organizace → Migrace firmy); `dryRun` = jen kontrola. Jen superuživatel. */
+export async function migrationAction(form: FormData): Promise<ActionResult<MigrationReport>> {
+  const s = await requireSession();
+  try {
+    if (!s.superUser) throw new UserError("@SYS:NoAccess");
+    const file = form.get("file");
+    if (!(file instanceof File) || !file.size) throw new UserError("@SYS:Required");
+    let raw: unknown;
+    try {
+      raw = JSON.parse(decodeText(Buffer.from(await file.arrayBuffer())));
+    } catch {
+      throw new UserError("@ORG:MigFormat");
+    }
+    const uploads: { path: string; data: Buffer }[] = [];
+    for (const f of form.getAll("images")) if (f instanceof File && f.size) uploads.push({ path: f.name, data: Buffer.from(await f.arrayBuffer()) });
+    const report = await runMigration(s.ctx, raw, {
+      dryRun: form.get("dryRun") === "1",
+      lang: s.lang,
+      images: imagesFromUploads(uploads),
+      invite: (userId) => sendPasswordLink(s.ctx.tenantId, userId, "invite", { name: s.user.name, email: s.user.email }, s.tenant.name),
+    });
+    if (report.applied) revalidatePath("/", "layout");
     return { ok: true, data: report };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
