@@ -144,11 +144,19 @@ export async function postingAccount(data: DataApi, synthetic: string): Promise<
 }
 
 export async function glSetup(data: DataApi): Promise<void> {
-  if (!(await data.find("gl.account", {}, { take: 1 })).length) {
+  const some = await data.find("gl.account", {}, { take: 30 });
+  // rozvrh nezaložený: žádné účty, nebo jen účty založené automaticky před Hlavní knihou (bankovní účty 221xxx
+  // z registru DPH u firem založených podle IČO, účty položek) — doplnit celou osnovu, existující nechat
+  const unfounded = some.length < 30 && some.every((a) => /^(221|504|601|602)/.test(String(a.accountNum)));
+  if (unfounded) {
+    const have = new Set(some.map((a) => String(a.accountNum)));
     // syntetika před analytikou (analytika se k ní přiřadí)
     for (const [accountNum, name, type, postingType, noManualEntry] of DEFAULT_ACCOUNTS) {
+      if (have.has(accountNum)) continue;
       await data.create("gl.account", { accountNum, name, type, postingType: postingType ?? null, noManualEntry: !!noManualEntry });
     }
+    // dřívější účty (221000…) založené bez syntetiky se k ní teď přiřadí (uložení syntetiku dopočítá)
+    for (const a of some) if (!a.synthetic) await data.update("gl.account", String(a.id), { accountNum: a.accountNum });
   } else {
     // stávající rozvrh: 3místné účty doplnit na 6 míst (211 → 211000), dopočítat syntetiku a třídu
     for (const a of await data.find("gl.account", { synthetic: null }, { take: 5000, orderBy: { accountNum: "asc" } })) {
