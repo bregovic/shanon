@@ -45,6 +45,9 @@ export const MIGRATION_OBJECTS: { id: string; note: string }[] = [
 
 /** Údaje organizace, které registry neznají (zbytek doplní ARES a registr DPH). */
 const ORG_FIELDS = ["tradeName", "email", "phone", "web", "dataBoxId", "publicSlug", "mailSignature"] as const;
+/** E-shop firmy (jeden na firmu, zakládá ho výchozí nastavení modulu E-shop): vzhled, zveřejnění, objednávky. */
+const SHOP_FIELDS = ["name", "active", "layout", "accentColor", "headline", "intro", "sellOutOfStock", "minOrder", "freeShippingFrom", "contactEmail", "contactPhone", "orderHourLimit", "pickupLeadDays", "pickupMaxDays", "pickupFrom", "pickupTo", "weighBufferPct"] as const;
+const SHOP_IMAGES = ["logo", "heroImage"] as const;
 
 export interface MigrationUser {
   email: string;
@@ -57,7 +60,7 @@ export interface MigrationUser {
 export interface MigrationFile {
   format: string;
   verze: number;
-  firma: { ico: string; organizace?: Record<string, unknown> & { logo?: string } };
+  firma: { ico: string; organizace?: Record<string, unknown> & { logo?: string }; obchod?: Record<string, unknown> };
   moduly: string[];
   slozkaObrazku?: string;
   uzivatele?: MigrationUser[];
@@ -152,6 +155,14 @@ export function migrationTemplate(lang: Lang): RecordData {
         ...Object.fromEntries(ORG_FIELDS.map((n) => [n, ""])),
         logo: "",
       },
+      ...(registry.objects.has("shop.shop")
+        ? {
+            obchod: {
+              pokyny: t("@ORG:MigNoteShop"),
+              pole: Object.fromEntries([...SHOP_FIELDS, ...SHOP_IMAGES].map((n) => [n, fieldDoc(getObject("shop.shop"), n, getObject("shop.shop").fields[n], lang)])),
+            },
+          }
+        : {}),
     },
     moduly: [],
     dostupneModuly: Object.fromEntries(optionalModules().map((m) => [m.id, `${resolveLabel(labelTable, m.label, lang)} — ${resolveLabel(labelTable, m.description, lang)}`])),
@@ -198,10 +209,24 @@ export async function exportMigration(ctx: Ctx, lang: Lang, client: PrismaClient
     async (s) => {
       const api = s.sys().api();
       const [org] = await api.find("org.entity", {}, { take: 1 });
+      const [shop] = ctx.modules.has("shop") ? await api.find("shop.shop", {}, { take: 1 }) : [];
+      const shopImages = shop ? await imageNames(s, SHOP_IMAGES.map((n) => shop[n]).filter(Boolean).map(String)) : new Map<string, string>();
+      const shopDef = getObject("shop.shop");
+      const shopValue = (n: string) => {
+        const v = shop![n];
+        const k = shopDef.fields[n].edt.kind;
+        return k === "decimal" || k === "int" ? Number(v) : v;
+      };
+      const obchod = shop
+        ? {
+            ...Object.fromEntries(SHOP_FIELDS.filter((n) => shop[n] !== null && shop[n] !== undefined && shop[n] !== "").map((n) => [n, shopValue(n)])),
+            ...Object.fromEntries(SHOP_IMAGES.filter((n) => shop[n]).map((n) => [n, shopImages.get(String(shop[n])) ?? ""])),
+          }
+        : null;
       const company = await api.get("sys.company", ctx.companyId!);
       const logo = org?.logo ? (await imageNames(s, [String(org.logo)])).get(String(org.logo)) : undefined;
       const roles = new Map((await s.sys().find("sys.role", {}, 1000)).map((r) => [String(r.id), String(r.code)]));
-      return { org, company, logo, roles };
+      return { org, company, logo, roles, obchod };
     },
     client,
   );
@@ -253,13 +278,14 @@ export async function exportMigration(ctx: Ctx, lang: Lang, client: PrismaClient
   }
   const firma = tmpl.firma as RecordData;
   const orgTmpl = firma.organizace as RecordData;
-  const { org, company, logo } = head;
+  const { org, company, logo, obchod } = head;
   return {
     ...tmpl,
     firma: {
       ...firma,
       ico: String(org?.regNo ?? company?.regNo ?? ""),
       organizace: { pokyny: orgTmpl.pokyny, pole: orgTmpl.pole, ...Object.fromEntries(ORG_FIELDS.map((n) => [n, org?.[n] ?? ""])), logo: logo ?? "" },
+      ...(obchod && firma.obchod ? { obchod: { ...(firma.obchod as RecordData), ...obchod } } : {}),
     },
     moduly: mods,
     slozkaObrazku: folder,
@@ -308,8 +334,12 @@ export function parseMigration(raw: unknown, lang: Lang): { file: MigrationFile;
   const org = (firma.organizace ?? {}) as RecordData;
   const organizace: Record<string, unknown> = Object.fromEntries(ORG_FIELDS.filter((n) => org[n] !== undefined && org[n] !== "").map((n) => [n, org[n]]));
   if (org.logo) organizace.logo = String(org.logo);
+  const shopRaw = (firma.obchod ?? null) as RecordData | null;
+  const obchod = shopRaw
+    ? Object.fromEntries([...SHOP_FIELDS, ...SHOP_IMAGES].filter((n) => shopRaw[n] !== undefined && shopRaw[n] !== "" && shopRaw[n] !== null).map((n) => [n, shopRaw[n]]))
+    : null;
   if (step.messages.length) step.status = "warning";
-  return { file: { format: MIGRATION_FORMAT, verze: Number(o.verze ?? 1), firma: { ico, organizace }, moduly, slozkaObrazku: o.slozkaObrazku ? String(o.slozkaObrazku) : undefined, uzivatele: users, data }, step };
+  return { file: { format: MIGRATION_FORMAT, verze: Number(o.verze ?? 1), firma: { ico, organizace, ...(obchod && Object.keys(obchod).length ? { obchod } : {}) }, moduly, slozkaObrazku: o.slozkaObrazku ? String(o.slozkaObrazku) : undefined, uzivatele: users, data }, step };
 }
 
 /** Záznamy ze souboru → tabulka obecného importu (hlavička = názvy polí). */
@@ -321,7 +351,7 @@ function toTable(rows: Record<string, unknown>[], lang: Lang) {
 
 /** Obrázky, na které soubor odkazuje a které ve vybrané složce nejsou (jen varování). */
 function missingImages(file: MigrationFile, images: ImageSource): string[] {
-  const paths = [file.firma.organizace?.logo, ...file.data.flatMap((s) => {
+  const paths = [file.firma.organizace?.logo, ...SHOP_IMAGES.map((n) => file.firma.obchod?.[n]), ...file.data.flatMap((s) => {
     const def = getObject(s.objekt);
     const img = Object.entries(def.fields).filter(([, f]) => f.image).map(([n]) => n);
     return s.zaznamy.flatMap((r) => img.map((n) => r[n]));
@@ -425,9 +455,37 @@ export async function runMigration(
   // 4. agendy v pořadí souboru (každá vše nebo nic; chyba jedné nezastaví další)
   for (const sec of file.data) report.steps.push(await importStep(cctx, sec, false, lang, opts.images, client));
 
-  // 5. uživatelé
+  // 5. e-shop: vzhled, kontakty, zveřejnění (až s hotovým katalogem)
+  if (file.firma.obchod) report.steps.push(await shopStep(cctx, file.firma.obchod, lang, opts.images, client));
+
+  // 6. uživatelé
   if (file.uzivatele?.length) report.steps.push(await usersStep(cctx, file.uzivatele, roleId, opts, client));
   return report;
+}
+
+async function shopStep(cctx: Ctx, obchod: Record<string, unknown>, lang: Lang, images: ImageSource, client: PrismaClient): Promise<MigrationStep> {
+  const step: MigrationStep = { key: "shop", label: tr(lang, "@ORG:MigStepShop"), status: "ok", messages: [] };
+  if (!cctx.modules.has("shop")) {
+    step.status = "error";
+    step.messages.push(tr(lang, "@ORG:MigModuleOff"));
+    return step;
+  }
+  try {
+    const [shop] = await inTenant(cctx, (s) => s.sys().find("shop.shop", {}, 1), client);
+    if (!shop) throw new UserError("@ORG:MigShopMissing");
+    const fields = Object.fromEntries(Object.entries(obchod).filter(([k]) => !(SHOP_IMAGES as readonly string[]).includes(k)));
+    const saved = Object.keys(fields).length ? await saveRecord(cctx, "shop.shop", String(shop.id), fields, undefined, client) : shop;
+    step.updated = 1;
+    for (const n of SHOP_IMAGES) {
+      const img = obchod[n] ? images(String(obchod[n])) : null;
+      if (img) await setImage(cctx, "shop.shop", String(shop.id), n, img, client);
+    }
+    if (saved.publicUrl) step.messages.push(tr(lang, saved.active ? "@ORG:MigShopPublished" : "@ORG:MigShopHidden", { url: String(saved.publicUrl) }));
+  } catch (e) {
+    step.status = "error";
+    step.messages.push(errorText(e, lang));
+  }
+  return step;
 }
 
 async function importStep(cctx: Ctx, sec: MigrationFile["data"][number], dryRun: boolean, lang: Lang, images: ImageSource, client: PrismaClient): Promise<MigrationStep> {

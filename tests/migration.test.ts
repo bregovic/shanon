@@ -47,8 +47,8 @@ const FILE = {
   format: "shanon-migrace",
   verze: 1,
   pokyny: ["ignoruje se"],
-  firma: { ico: "11223344", organizace: { tradeName: "KO-EL test", email: "info@prvky.test", logo: "obrazky/logo.png" } },
-  moduly: ["gl", "tax", "inv", "ap", "bank", "hr"],
+  firma: { ico: "11223344", organizace: { tradeName: "KO-EL test", email: "info@prvky.test", logo: "obrazky/logo.png", publicSlug: `prvky-${run}` }, obchod: { name: "Prvky shop", active: true, headline: "Termostaty a regulace", accentColor: "#0f6cbd", logo: "obrazky/logo.png" } },
+  moduly: ["gl", "tax", "inv", "ap", "bank", "hr", "shop"],
   slozkaObrazku: "obrazky",
   uzivatele: [{ email: `pokladni-${run}@test.local`, jmeno: "Petra", prijmeni: "Pokladní", role: ["POKLADNIK"], spravceFirmy: false, pozvat: false }],
   data: [
@@ -108,6 +108,10 @@ describe("migrace firmy", () => {
     const [vendor] = (await listRecords(C, "ap.vendor", {}, client)).rows;
     expect(String(vendor[`dim${par.position}`])).toMatch(/^P\d{5}$/);
     expect((await listRecords(C, "hr.employee", {}, client)).rows.map((e) => e.personalNum)).toEqual(["1001"]);
+    // e-shop: zveřejněný s nadpisem a logem na adrese zkratky organizace
+    const shop = (await listRecords(C, "shop.shop", {}, client)).rows[0];
+    expect([shop.name, shop.active, shop.headline, shop.accentColor, !!shop.logo, shop.publicUrl]).toEqual(["Prvky shop", true, "Termostaty a regulace", "#0f6cbd", true, `/prvky-${run}`]);
+    expect(rep.steps.find((s) => s.key === "shop")?.messages.join()).toMatch(/zveřejněný/);
     const user = await client.sysUser.findUnique({ where: { email: `pokladni-${run}@test.local` }, include: { companies: true } });
     expect(user?.companies.map((c) => c.companyId)).toEqual([rep.companyId]);
     expect(user?.companies[0].roleIds.length).toBe(1);
@@ -118,6 +122,8 @@ describe("migrace firmy", () => {
     const expItems = (exp.data as { objekt: string; zaznamy: Record<string, unknown>[] }[]).find((d) => d.objekt === "inv.item")!.zaznamy;
     expect(expItems.find((i) => i.itemNum === "000110")).toMatchObject({ name: "Prostorový termostat RTR-E 6763", salesPrice: 992, priceInclTax: true, image: "obrazky/KE11.png" });
     expect((exp.uzivatele as { email: string }[]).map((u) => u.email)).toContain(`pokladni-${run}@test.local`);
+    expect((exp.firma as { obchod: Record<string, unknown> }).obchod).toMatchObject({ name: "Prvky shop", active: true, headline: "Termostaty a regulace" });
+    expect(String((exp.firma as { obchod: Record<string, unknown> }).obchod.logo)).toMatch(/^obrazky\//);
     const again = await runMigration(T, exp, { dryRun: false, lang: "cs", images }, client);
     expect(again.steps.filter((s) => s.status === "error")).toEqual([]);
     expect(again.steps.reduce((n, s) => n + (s.key !== "users" ? (s.created ?? 0) : 0), 0)).toBe(0);

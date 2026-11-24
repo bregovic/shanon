@@ -19,7 +19,8 @@ Soubor nikdy neobsahuje doklady, hesla ani tajné údaje napojení. Stránka je 
 2. Šablonu vyplňte (ručně, nebo ji dejte agentovi spolu s podklady – e-shop, ceník, seznam IČO dodavatelů):
    - `firma.ico` – IČO; vše ostatní o firmě doplní registry (sídlo, DIČ, **plátce DPH** podle registru plátců,
      finanční úřad, **CZ-NACE**, **bankovní účty** zveřejněné v registru DPH),
-   - `firma.organizace` – kontakty, zkratka e-shopu, `logo` (soubor ve složce obrázků),
+   - `firma.organizace` – kontakty, zkratka (adresa e-shopu a portálů), `logo` (soubor ve složce obrázků),
+   - `firma.obchod` – e-shop: název, `active: true` = zveřejnit, vzhled a barva, nadpis a úvod, kontakty, logo a úvodní obrázek,
    - `moduly` – kódy z `dostupneModuly`,
    - `slozkaObrazku` – složka s obrázky a logem,
    - `data` – záznamy agend (`zaznamy`), klíče = názvy polí z `pole`, odkazy kódem,
@@ -32,7 +33,8 @@ Soubor nikdy neobsahuje doklady, hesla ani tajné údaje napojení. Stránka je 
       (každý subjekt adresáře dostane hodnotu P00001…, jeho dodavatel a odběratel ji mají jako výchozí),
    3. organizace: kontakty, logo, **Doplnit z ARES** (NACE, plátce DPH, finanční úřad, bankovní účty do Banky),
    4. agendy v pořadí souboru – každá celá, nebo vůbec; chyba jedné nezastaví další,
-   5. uživatelé – založení / přiřazení k firmě s rolemi, pozvánka e-mailem jen s `pozvat: true`.
+   5. e-shop – vzhled, kontakty a zveřejnění (až s hotovým katalogem); výsledek ukáže adresu obchodu,
+   6. uživatelé – založení / přiřazení k firmě s rolemi, pozvánka e-mailem jen s `pozvat: true`.
 5. Výsledek ukáže každý krok (OK / varování / chyba, založeno / upraveno). Opravte soubor a spusťte znovu – záznamy se
    aktualizují podle klíče (číslo položky, kód, IČO, osobní číslo), nic se nezdvojí ani nesmaže.
 
@@ -46,4 +48,5 @@ Firmu založte a odlaďte na TESTu, pak na ní **Exportovat konfiguraci této fi
 - Obrázek do 2 MB (PNG, JPG, WebP); celý výběr (soubor + obrázky) do 5 MB – velký katalog rozdělte do více běhů
   (nejdřív bez položek, pak položky po částech).
 - Uživatel, který už je v jiné organizaci Shanonu, se nepřiřadí (e-mail je jedinečný v celé aplikaci).
-- Pokladny, e-shop (vzhled, platby), tiskové sestavy a napojení se migrací zatím nezakládají.
+- Pokladny, platby e-shopu, doprava, tiskové sestavy a napojení se migrací zatím nenastavují (výchozí nastavení modulů je založí).
+- E-shop je na adrese `/<zkratka organizace>`; bez zkratky nebo bez `active: true` vrací 404.
