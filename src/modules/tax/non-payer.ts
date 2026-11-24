@@ -45,7 +45,7 @@ export async function simplifyForNonPayer(data: DataApi): Promise<{ deleted: str
     if (Object.keys(diff).length) await data.update(obj, String(r.id), diff);
   };
   // výchozí nastavení → bez DPH
-  for (const g of await safeFind(data, "inv.itemGroup")) await set("inv.itemGroup", g, { taxCodeId: bez.id, purchaseTaxCodeId: p0.id, itemTaxGroupId: bezItem.id });
+  for (const g of await safeFind(data, "inv.itemGroup")) await set("inv.itemGroup", g, { taxCodeId: null, purchaseTaxCodeId: null, itemTaxGroupId: bezItem.id });
   for (const i of await safeFind(data, "inv.item")) await set("inv.item", i, { taxCodeId: bez.id, itemTaxGroupId: bezItem.id });
   for (const g of await safeFind(data, "ar.group")) await set("ar.group", g, { taxCodeId: bez.id, ...(tuz ? { taxGroupId: tuz.id } : {}) });
   for (const g of await safeFind(data, "ap.group")) await set("ap.group", g, { taxCodeId: p0.id, ...(tuz ? { taxGroupId: tuz.id } : {}) });

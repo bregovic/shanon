@@ -21,7 +21,8 @@ describe("neplátce DPH", () => {
     expect(codes).toEqual(["BEZ", "P0"]);
     const byId = new Map((await listRecords(T, "tax.taxCode", {}, client)).rows.map((c) => [c.id, c.code]));
     const groups = (await listRecords(T, "inv.itemGroup", {}, client)).rows;
-    expect(groups.map((g) => `${g.code}:${byId.get(g.taxCodeId)}/${byId.get(g.purchaseTaxCodeId)}`).sort()).toEqual(["SLUZBY:BEZ/P0", "ZBOZI:BEZ/P0"]);
+    const items = new Map((await listRecords(T, "tax.itemTaxGroup", {}, client)).rows.map((c) => [c.id, c.code]));
+    expect(groups.map((g) => `${g.code}:${items.get(g.itemTaxGroupId)}`).sort()).toEqual(["SLUZBY:BEZ", "ZBOZI:BEZ"]);
     const [arg] = (await listRecords(T, "ar.group", {}, client)).rows;
     const [apg] = (await listRecords(T, "ap.group", {}, client)).rows;
     expect([byId.get(arg.taxCodeId), byId.get(apg.taxCodeId)]).toEqual(["BEZ", "P0"]);

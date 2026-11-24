@@ -53,10 +53,10 @@ describe("DPH přes skupiny", () => {
       ["output", "5", "A2", "1000.00", "210.00"],
     ]);
 
-    // vlastní kód položky (potraviny 12 %) má přednost před položkou DPH skupiny položek (Z21)
+    // výjimka na položce (potraviny 12 %): položka DPH položky má přednost před skupinou položek (Z21), kód z kombinace
     const ig = await one("inv.itemGroup", { code: "ZBOZI" });
     expect(ig.itemTaxGroupId).toBe(await id("tax.itemTaxGroup", "Z21"));
-    const food = await saveRecord(C, "inv.item", null, { itemNum: "SUN01", name: "Šunka", groupId: ig.id, unitId: (await one("inv.unit", { code: "KG" })).id, salesPrice: "100", taxCodeId: await id("tax.taxCode", "V12") }, undefined, client);
+    const food = await saveRecord(C, "inv.item", null, { itemNum: "SUN01", name: "Šunka", groupId: ig.id, unitId: (await one("inv.unit", { code: "KG" })).id, salesPrice: "100", itemTaxGroupId: await id("tax.itemTaxGroup", "Z12") }, undefined, client);
     const cs = await saveRecord(C, "gab.subject", null, { name: "Odběratel" }, undefined, client);
     const cust = await saveRecord(C, "ar.customer", null, { subjectId: cs.id, groupId: (await one("ar.group", {})).id }, undefined, client);
     const sinv = await saveRecord(C, "ar.invoice", null, { customerId: cust.id }, undefined, client);

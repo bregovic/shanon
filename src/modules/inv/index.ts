@@ -5,7 +5,7 @@
  */
 import { DAT_FIELDS } from "@/core/dat-fields";
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
-import { defineModule, type DataApi } from "@/core/module";
+import { defineModule, type DataApi, type RecordData } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { postingAccount } from "@/modules/gl/setup";
 import { vatPayer } from "@/modules/tax/orders";
@@ -65,18 +65,19 @@ export const itemGroup = defineObject({
     code: { edt: Edts.Code, mandatory: true },
     name: { edt: Edts.Name, mandatory: true },
     /** položka DPH (zboží / služba, sazba) — se skupinou DPH partnera dá daňový kód */
-    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup") },
-    taxCodeId: { edt: TaxRef("@INV:SalesTax"), aliases: ["dph"] },
+    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup"), help: "@INV:GroupTaxHelp", aliases: ["položka dph"] },
+    // zastaralé: DPH řádku určuje kombinace skupina DPH partnera × položka DPH (výchozí nastavení údaj převede)
+    taxCodeId: { edt: TaxRef("@INV:SalesTax"), readOnly: true },
     revenueAccountId: { edt: AccountRef("@INV:RevenueAccount") },
-    purchaseTaxCodeId: { edt: TaxRef("@INV:PurchaseTax") },
+    purchaseTaxCodeId: { edt: TaxRef("@INV:PurchaseTax"), readOnly: true },
     costAccountId: { edt: AccountRef("@INV:CostAccount") },
   },
   titleField: "code",
-  list: ["code", "name", "taxCodeId", "revenueAccountId", "purchaseTaxCodeId", "costAccountId"],
+  list: ["code", "name", "itemTaxGroupId", "revenueAccountId", "costAccountId"],
   form: [
     { label: "@SYS:General", fields: ["code", "name"] },
-    { label: "@INV:Sales", fields: ["itemTaxGroupId", "taxCodeId", "revenueAccountId"] },
-    { label: "@INV:Purchase", fields: ["purchaseTaxCodeId", "costAccountId"] },
+    { label: "@INV:Sales", fields: ["itemTaxGroupId", "revenueAccountId"] },
+    { label: "@INV:Purchase", fields: ["costAccountId"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -145,8 +146,9 @@ export const item = defineObject({
     currencyId: { edt: refEdt("sys.currency", "@INV:PriceCurrency"), aliases: ["mena", "měna", "currency"] },
     priceInclTax: { edt: Edts.NoYes, label: "@INV:PriceInclTax", aliases: ["s dph", "vcetne dph", "včetně dph"] },
     /** prázdné = položka DPH skupiny položek */
-    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup"), aliases: ["položka dph"] },
-    taxCodeId: { edt: TaxRef(), aliases: ["dph", "sazba dph", "vat"] },
+    itemTaxGroupId: { edt: refEdt("tax.itemTaxGroup", "@TAX:ItemTaxGroup"), help: "@INV:ItemTaxGroupHelp", aliases: ["položka dph"] },
+    /** zastaralé — viz skupina položek */
+    taxCodeId: { edt: TaxRef(), readOnly: true },
     priceNet: { edt: Edts.Price, label: "@INV:PriceNet", readOnly: true },
     priceGross: { edt: Edts.Price, label: "@INV:PriceGross", readOnly: true },
     purchasePrice: { edt: Edts.Price, label: "@INV:PurchasePrice", aliases: ["nakupni cena", "nákupní cena", "cena bez dph nakup"] },
@@ -172,7 +174,7 @@ export const item = defineObject({
   list: ["image", "itemNum", "name", "categoryId", "groupId", "unitId", "purchasePrice", "priceNet", "priceGross", "marginPct", "brand", "vendorId", "weighed", "eshop", "blocked"],
   form: [
     { label: "@SYS:General", fields: ["itemNum", "name", "itemType", "categoryId", "groupId", "unitId", "ean", "weighed", "blocked"] },
-    { label: "@INV:Prices", fields: ["salesPrice", "currencyId", "priceInclTax", "itemTaxGroupId", "taxCodeId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
+    { label: "@INV:Prices", fields: ["salesPrice", "currencyId", "priceInclTax", "itemTaxGroupId", "priceNet", "priceGross", "purchasePrice", "marginPct"] },
     { label: "@INV:Purchase", fields: ["vendorId", "vendorItemName", "brand"] },
     { label: "@SYS:Image", fields: ["image"] },
     { label: "@INV:Description", fields: ["description"] },
@@ -245,42 +247,64 @@ async function invSetup(data: DataApi) {
     // jednotka „neurčeno“ i stávajícím firmám
     await data.create("inv.unit", { code: "NEURC", name: "neurčeno", decimals: 3 });
   }
-  // neplátce DPH: prodej a nákup bez DPH, položka DPH Bez DPH
+  // DPH skupin položek = položka DPH (Zboží 21 %, Služby 21 %…); daňový kód řádku z kombinace se skupinou DPH partnera.
+  // Neplátce: položka DPH Bez DPH.
   const payer = await vatPayer(data);
-  const SALES = payer ? "V21" : "BEZ";
-  const PURCHASE = payer ? "P21" : "P0";
   const acc = (n: string) => postingAccount(data, n);
-  const tax = async (c: string) => (await data.find("tax.taxCode", { code: c }, { take: 1 }))[0]?.id ?? null;
+  const itg = async (c: string) => (await data.find("tax.itemTaxGroup", { code: c }, { take: 1 }))[0]?.id ?? null;
   if (!(await data.find("inv.itemGroup", {}, { take: 1 })).length) {
     await data.create("inv.itemGroup", {
       code: "ZBOZI",
       name: "Zboží",
-      taxCodeId: await tax(SALES),
+      itemTaxGroupId: await itg(payer ? "Z21" : "BEZ"),
       revenueAccountId: await acc("604"),
-      purchaseTaxCodeId: await tax(PURCHASE),
       costAccountId: await acc("504"),
     });
   }
   // služby (i ve stávajících firmách): tržby 602, náklady 518, položka DPH Služby 21 % (EU / třetí země se liší od zboží)
   if (!(await data.find("inv.itemGroup", { code: "SLUZBY" }, { take: 1 })).length) {
-    const s21 = (await data.find("tax.itemTaxGroup", { code: payer ? "S21" : "BEZ" }, { take: 1 }))[0]?.id ?? null;
     await data.create("inv.itemGroup", {
       code: "SLUZBY",
       name: "Služby",
-      itemTaxGroupId: s21,
-      taxCodeId: await tax(SALES),
+      itemTaxGroupId: await itg(payer ? "S21" : "BEZ"),
       revenueAccountId: await acc("602"),
-      purchaseTaxCodeId: await tax(PURCHASE),
       costAccountId: await acc("518"),
     });
   }
   // položka DPH skupin položek bez ní: podle sazby prodejního kódu (21 % → Z21, 12 % → Z12)
-  const itg = async (c: string) => (await data.find("tax.itemTaxGroup", { code: c }, { take: 1 }))[0]?.id ?? null;
   for (const g of await data.find("inv.itemGroup", { itemTaxGroupId: null }, { take: 500 })) {
     const code = g.taxCodeId ? await data.get("tax.taxCode", String(g.taxCodeId)) : null;
     const rate = Number(code?.rate ?? 21);
     const id = await itg(!payer ? "BEZ" : rate >= 20 ? "Z21" : rate >= 11 ? "Z12" : "OSV");
     if (id) await data.update("inv.itemGroup", String(g.id), { itemTaxGroupId: id });
+  }
+  await convertItemTaxCodes(data, payer);
+}
+
+/**
+ * Převod zastaralého daňového kódu přímo na položce (z 25. 11. 2026): kód, který dává kombinace Tuzemsko × položka DPH
+ * skupiny, se jen smaže; jiný (výjimka, např. 12 % ve skupině 21 %) → položka DPH na položce podle prodejního kódu
+ * v kombinacích Tuzemska (služba → S…, jinak Z…). Kód položky se pak vynuluje. Idempotentní.
+ */
+async function convertItemTaxCodes(data: DataApi, payer: boolean) {
+  const items = (await data.find("inv.item", {}, { take: 20000 })).filter((i) => i.taxCodeId);
+  if (!items.length) return;
+  const [tuz] = await data.find("tax.taxGroup", { code: "TUZ" }, { take: 1 });
+  const rows = tuz ? await data.find("tax.taxGroupCode", { taxGroupId: tuz.id }, { take: 200 }) : [];
+  const itemGroups = new Map((await data.find("tax.itemTaxGroup", {}, { take: 200 })).map((x) => [String(x.id), String(x.code)]));
+  const groups = new Map((await data.find("inv.itemGroup", {}, { take: 2000 })).map((g) => [String(g.id), g]));
+  const viaGroup = (g: RecordData | undefined) => rows.find((r) => r.itemTaxGroupId === g?.itemTaxGroupId)?.salesCodeId ?? null;
+  for (const it of items) {
+    const g = groups.get(String(it.groupId));
+    const patch: RecordData = { taxCodeId: null };
+    if (!it.itemTaxGroupId && viaGroup(g) !== it.taxCodeId) {
+      const fits = rows.filter((r) => r.salesCodeId === it.taxCodeId).map((r) => String(r.itemTaxGroupId));
+      const prefer = it.itemType === "service" ? "S" : "Z";
+      const pick = fits.find((id) => itemGroups.get(id)?.startsWith(prefer)) ?? fits[0] ?? null;
+      if (pick) patch.itemTaxGroupId = pick;
+      else if (payer) continue; // kód bez kombinace v Tuzemsku (např. vývoz) — nechat, ať se cena nezmění
+    }
+    await data.update("inv.item", String(it.id), patch);
   }
 }
 
@@ -322,6 +346,8 @@ export default defineModule({
       CostAccount: "Účet nákladů",
       Ean: "EAN",
       EanHelp: "EAN má 8 nebo 12–14 číslic.",
+      ItemTaxGroupHelp: "Jen výjimka (např. kniha 12 % ve skupině 21 %). Prázdné = podle skupiny položek. Daňový kód na dokladu dá kombinace se skupinou DPH partnera.",
+      GroupTaxHelp: "Co skupina prodává z pohledu DPH (Zboží 21 %, Služby 12 %…). Daňový kód na faktuře dá kombinace se skupinou DPH partnera (Tuzemsko, EU, přenesená povinnost…), v pokladně a e-shopu s Tuzemskem.",
       SalesPrice: "Prodejní cena",
       PriceInclTax: "Cena včetně DPH",
       PriceNet: "Cena bez DPH",
@@ -391,6 +417,8 @@ export default defineModule({
       CostAccount: "Cost account",
       Ean: "EAN",
       EanHelp: "EAN has 8 or 12–14 digits.",
+      ItemTaxGroupHelp: "Exception only (e.g. a 12 % book in a 21 % group). Empty = from the item group. The tax code on documents comes from the combination with the partner VAT group.",
+      GroupTaxHelp: "What the group sells from the VAT point of view (Goods 21 %, Services 12 %…). The invoice tax code comes from the combination with the partner VAT group (domestic, EU, reverse charge…), POS and e-shop use domestic.",
       SalesPrice: "Sales price",
       PriceInclTax: "Price incl. VAT",
       PriceNet: "Price excl. VAT",

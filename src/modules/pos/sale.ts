@@ -21,7 +21,7 @@ import { fromCents, mulCents, roundCents, sumCents, toCents } from "@/core/money
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { qrBankRecord, qrGlAccount } from "@/modules/bank/qr-account";
 import { accountingCurrencyId, currencyRounding, postVoucher, systemAccount, type PostingLine } from "@/modules/gl/posting";
-import { bestDiscount, netFromGross } from "@/modules/inv/handlers";
+import { bestDiscount, itemSalesTaxCode, netFromGross } from "@/modules/inv/handlers";
 import { addressLine, orgOf } from "@/modules/org";
 import { closeBasket } from "./basket";
 import { ar } from "@/modules/ar";
@@ -84,8 +84,8 @@ async function saleLine(data: DataApi, itemId: string, qtyRaw: string, scale?: S
   if (scale || (verified && !manual && item.weighed && (await isKgItem(data, item)))) return scaleSaleLine(data, item, scale ?? null, verified ?? null);
   const qty = String(qtyRaw).replace(",", ".").trim();
   if (!/^\d+(\.\d{1,4})?$/.test(qty) || Number(qty) <= 0 || Number(qty) > 100000) throw new UserError("@POS:InvalidQty");
-  const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
   const group = await data.get("inv.itemGroup", String(item.groupId));
+  const code = await itemSalesTaxCode(data, item, { group });
   // akční cena / sleva platná dnes (nejvýhodnější)
   // cena v měně položky → účetní měna (kurz dne prodeje)
   const priceGross = await convertPrice(data, data.companyId ?? null, item.priceGross, item.currencyId as string, null, today());
@@ -102,7 +102,7 @@ async function saleLine(data: DataApi, itemId: string, qtyRaw: string, scale?: S
     unitPrice,
     originalPrice: disc ? String(priceGross) : null,
     discountId: disc ? String(disc.discount.id) : null,
-    taxCodeId: (item.taxCodeId as string) ?? null,
+    taxCodeId: (code?.id as string) ?? null,
     revenueAccountId: (group?.revenueAccountId as string) ?? null,
     gross,
     net,
@@ -127,8 +127,8 @@ async function scaleSaleLine(data: DataApi, item: RecordData, scale: ScaleLine |
     throw new UserError("@POS:ScaleBadValue", { item: name });
   const listPrice = await convertPrice(data, data.companyId ?? null, item.priceGross, item.currencyId as string, null, today());
   if (toCents(scale.unitPrice) !== toCents(listPrice)) throw new UserError("@POS:ScalePriceMismatch", { item: name, scale: scale.unitPrice, price: String(listPrice) });
-  const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
   const group = await data.get("inv.itemGroup", String(item.groupId));
+  const code = await itemSalesTaxCode(data, item, { group });
   const gross = toCents(scale.total); // cena z váhy — nepřepočítává se
   const net = netFromGross(gross, code?.rate ?? 0);
   return {
@@ -139,7 +139,7 @@ async function scaleSaleLine(data: DataApi, item: RecordData, scale: ScaleLine |
     unitPrice: scale.unitPrice,
     originalPrice: null,
     discountId: null,
-    taxCodeId: (item.taxCodeId as string) ?? null,
+    taxCodeId: (code?.id as string) ?? null,
     revenueAccountId: (group?.revenueAccountId as string) ?? null,
     gross,
     net,
@@ -327,8 +327,8 @@ export async function sellOffline(data: DataApi, input: OfflineSale): Promise<{ 
   for (const l of input.lines) {
     const item = await data.get("inv.item", String(l.itemId));
     if (!item) throw new UserError("@SYS:NotFound");
-    const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
     const group = await data.get("inv.itemGroup", String(item.groupId));
+    const code = await itemSalesTaxCode(data, item, { group });
     const scale = l.scale && DEC[3].test(l.scale.weight) && DEC[2].test(l.scale.total) && DEC[2].test(l.scale.unitPrice) ? l.scale : null;
     const qty = scale ? scale.weight : String(l.qty).replace(",", ".").trim();
     const unitPrice = scale ? scale.unitPrice : String(l.unitPrice).replace(",", ".").trim();
@@ -341,7 +341,7 @@ export async function sellOffline(data: DataApi, input: OfflineSale): Promise<{ 
       qty,
       unitId: (item.unitId as string) ?? null,
       unitPrice,
-      taxCodeId: (item.taxCodeId as string) ?? null,
+      taxCodeId: (code?.id as string) ?? null,
       revenueAccountId: (group?.revenueAccountId as string) ?? null,
       gross,
       net,

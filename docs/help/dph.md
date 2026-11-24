@@ -15,7 +15,8 @@ Každé zaúčtování dokladu s DPH (faktury, zálohy, pokladní doklady, směn
 Daňový kód se na dokladech určuje jako v AX: ze dvou údajů.
 
 - **Skupina DPH** ([Skupiny DPH](/tax/taxGroup)) říká *kde a komu*: Tuzemsko, Přenesená daňová povinnost, EU, EU bez DIČ, Třetí země, Dodavatel neplátce. Nastavuje se u skupiny odběratelů / dodavatelů nebo přímo u partnera a faktura ji převezme.
-- **Položka DPH** ([Položky DPH](/tax/itemTaxGroup)) říká *co*: Zboží 21 %, Zboží 12 %, Služby 21 %, Služby 12 %, Osvobozeno, Mimo předmět. Nastavuje se u položky nebo skupiny položek, pro řádky bez položky u účtu hlavní knihy.
+- **Položka DPH** ([Položky DPH](/tax/itemTaxGroup)) říká *co*: Zboží 21 %, Zboží 12 %, Služby 21 %, Služby 12 %, Osvobozeno, Mimo předmět. Nastavuje se u **skupiny položek** (u položky jen výjimka, např. kniha 12 % ve skupině 21 %), pro řádky bez položky u účtu hlavní knihy.
+- Daňový kód se do položek ani skupin položek nezadává: na faktuře ho dá kombinace skupina DPH partnera × položka DPH, v **pokladně a e-shopu** Tuzemsko × položka DPH (stejně se počítá cena s DPH na kartě položky).
 - V detailu skupiny DPH je tabulka **položka → kód při prodeji / kód při nákupu**.
 
 Kód jde vždy zadat i ručně – ručně zadaný kód se při změně skupin nepřepíše. V účetním deníku stačí zadat rovnou **Daňový kód** (sloupec v mřížce), skupina a položka DPH jsou v záložce **DPH**.

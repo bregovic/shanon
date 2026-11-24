@@ -289,8 +289,6 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         const userCode = (data.taxCodeId as string) || null;
         const before = !isNew && data.id ? await ctx.data.get(cfg.line, String(data.id)) : null;
         let itemTaxGroup: unknown = null;
-        // položka má vlastní kód (bez položky DPH) — skupiny se neuplatní
-        let itemDecides = false;
         // položka: doplní jen to, co uživatel nevyplnil
         if (data.itemId) {
           const item = await ctx.data.get("inv.item", String(data.itemId));
@@ -303,12 +301,10 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
               const date = String(h.invoiceDate ?? h.orderDate ?? new Date().toISOString().slice(0, 10));
               data.unitPrice = await convertPrice(ctx.data, ctx.companyId, item[cfg.item.price] ?? null, item.currencyId as string, h.currencyId as string, date);
             }
-            // pořadí: položka DPH položky → vlastní kód položky → položka DPH skupiny položek
-            // (konkrétnější údaj na položce má přednost před skupinou)
-            const ownCode = cfg.side === 1 ? item.taxCodeId : null;
-            itemTaxGroup = item.itemTaxGroupId ?? (ownCode ? null : (ig?.itemTaxGroupId ?? null));
-            if (!itemTaxGroup && ownCode) itemDecides = true;
-            if (isNew && !data.taxCodeId) data.taxCodeId = (cfg.side === 1 ? item.taxCodeId : null) ?? ig?.[cfg.item.tax] ?? null;
+            // DPH řádku = skupina DPH partnera × položka DPH (výjimka na položce, jinak skupina položek); daňový kód
+            // z kombinace — kód přímo z položky ani ze skupiny položek nerozhoduje (zastaralý údaj jen jako záloha)
+            itemTaxGroup = item.itemTaxGroupId ?? ig?.itemTaxGroupId ?? null;
+            if (isNew && !data.taxCodeId && !itemTaxGroup) data.taxCodeId = ig?.[cfg.item.tax] ?? null;
             if (isNew && !data[cfg.lineAccountField]) data[cfg.lineAccountField] = ig?.[cfg.item.groupAccount] ?? null;
           }
         }
@@ -325,8 +321,7 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         // DPH přes skupiny: skupina z hlavičky, položka DPH z položky / skupiny položek, jinak z účtu
         if (!data.taxGroupId && (isNew || !before?.taxGroupId)) data.taxGroupId = h.taxGroupId ?? null;
         const itemChanged = !!before && before.itemId !== data.itemId;
-        if (itemDecides && (isNew || itemChanged)) data.itemTaxGroupId = null;
-        else if (!data.itemTaxGroupId || (itemChanged && data.itemTaxGroupId === before?.itemTaxGroupId)) {
+        if (!data.itemTaxGroupId || (itemChanged && data.itemTaxGroupId === before?.itemTaxGroupId)) {
           const acc = itemTaxGroup ? null : await ctx.data.get("gl.account", String(data[cfg.lineAccountField]));
           data.itemTaxGroupId = (itemTaxGroup as string) ?? (acc?.itemTaxGroupId as string) ?? null;
         }

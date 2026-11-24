@@ -31,7 +31,8 @@ describe("zjednodušit DPH pro neplátce", () => {
     expect(codes.map((x) => x.code).sort()).toEqual(["BEZ", "P0", "V21"]);
     const id = (code: string) => codes.find((x) => x.code === code)!.id;
     const groups = (await listRecords(T, "inv.itemGroup", {}, client)).rows;
-    expect(groups.every((g) => g.taxCodeId === id("BEZ") && g.purchaseTaxCodeId === id("P0"))).toBe(true);
+    const bezItem = (await listRecords(T, "tax.itemTaxGroup", { filter: { code: "BEZ" } }, client)).rows[0];
+    expect(groups.every((g) => g.itemTaxGroupId === bezItem.id && !g.taxCodeId && !g.purchaseTaxCodeId)).toBe(true);
     const [arg] = (await listRecords(T, "ar.group", {}, client)).rows;
     const [apg] = (await listRecords(T, "ap.group", {}, client)).rows;
     expect([arg.taxCodeId, apg.taxCodeId]).toEqual([id("BEZ"), id("P0")]);

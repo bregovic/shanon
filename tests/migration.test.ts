@@ -52,7 +52,7 @@ const FILE = {
   slozkaObrazku: "obrazky",
   uzivatele: [{ email: `pokladni-${run}@test.local`, jmeno: "Petra", prijmeni: "Pokladní", role: ["POKLADNIK"], spravceFirmy: false, pozvat: false }],
   data: [
-    { objekt: "inv.itemGroup", nazev: "x", pole: {}, zaznamy: [{ code: "KE_REG", name: "Regulace a měření", itemTaxGroupId: "Z21", taxCodeId: "V21", purchaseTaxCodeId: "P21", revenueAccountId: "604000", costAccountId: "504000" }] },
+    { objekt: "inv.itemGroup", nazev: "x", pole: {}, zaznamy: [{ code: "KE_REG", name: "Regulace a měření", itemTaxGroupId: "Z21", revenueAccountId: "604000", costAccountId: "504000" }] },
     { objekt: "inv.category", zaznamy: [{ code: "KE", name: "KO-EL" }, { code: "KE_REG", name: "Regulace", parentId: "KE", sortOrder: 1 }] },
     {
       objekt: "inv.item",

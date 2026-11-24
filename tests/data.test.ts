@@ -597,8 +597,8 @@ describe("položky a import", () => {
     expect(units).toEqual(expect.arrayContaining(["KS", "KG", "BAL"]));
     const groups = (await listRecords(I, "inv.itemGroup", {}, client)).rows.map((r) => r.code);
     expect(groups).toEqual(["SLUZBY", "ZBOZI"]);
-    const v12 = (await listRecords(I, "tax.taxCode", { filter: { code: "V12" } }, client)).rows[0];
-    await saveRecord(I, "inv.itemGroup", null, { code: "UZENINY", name: "Uzeniny", taxCodeId: v12.id }, undefined, client);
+    const z12 = (await listRecords(I, "tax.itemTaxGroup", { filter: { code: "Z12" } }, client)).rows[0];
+    await saveRecord(I, "inv.itemGroup", null, { code: "UZENINY", name: "Uzeniny", itemTaxGroupId: z12.id }, undefined, client);
   });
 
   it("CSV z českého Excelu (Windows-1250, středníky, čárky), aktualizace podle čísla, vše nebo nic", async () => {
@@ -706,9 +706,9 @@ describe("pokladna", () => {
       company: { code: "UZ", name: "Uzeniny Test", regNo: "12345678", vatId: "CZ12345678" },
     });
     P = r.ctx;
-    const v12 = (await listRecords(P, "tax.taxCode", { filter: { code: "V12" } }, client)).rows[0];
+    const z12 = (await listRecords(P, "tax.itemTaxGroup", { filter: { code: "Z12" } }, client)).rows[0];
     const a601 = (await listRecords(P, "gl.account", { filter: { accountNum: "601000" } }, client)).rows[0];
-    await saveRecord(P, "inv.itemGroup", null, { code: "UZENINY", name: "Uzeniny", taxCodeId: v12.id, revenueAccountId: a601.id }, undefined, client);
+    await saveRecord(P, "inv.itemGroup", null, { code: "UZENINY", name: "Uzeniny", itemTaxGroupId: z12.id, revenueAccountId: a601.id }, undefined, client);
     regId = String((await listRecords(P, "pos.register", {}, client)).rows[0].id);
   });
 

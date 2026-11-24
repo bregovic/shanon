@@ -7,6 +7,8 @@ import { fromCents, percentOf, toCents, toScaled } from "@/core/money";
 import { slugify } from "@/lib/slug";
 
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
+import { taxCodeFor } from "@/modules/tax/tax-groups";
+import { vatPayer } from "@/modules/tax/orders";
 
 /** „Klobása (Antoni)“ → „Klobása“ — dodavatel v závorce na konci názvu. */
 const baseName = (n: unknown) => String(n ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
@@ -62,8 +64,22 @@ export function grossFromNet(net: bigint, rate: unknown): bigint {
   return neg ? -q : q;
 }
 
+/**
+ * Prodejní daňový kód položky: skupina DPH (partner; bez partnera Tuzemsko — pokladna, e-shop, ceny na kartě) ×
+ * položka DPH (výjimka na položce, jinak skupina položek). Zastaralý kód přímo na položce / skupině jen jako záloha,
+ * než ho převede výchozí nastavení.
+ */
+export async function itemSalesTaxCode(data: DataApi, item: RecordData, opts: { taxGroupId?: string | null; group?: RecordData | null } = {}): Promise<RecordData | null> {
+  const group = opts.group !== undefined ? opts.group : item.groupId ? await data.get("inv.itemGroup", String(item.groupId)) : null;
+  const itemTaxGroupId = item.itemTaxGroupId ?? group?.itemTaxGroupId ?? null;
+  let taxGroupId = opts.taxGroupId ?? null;
+  if (!taxGroupId && itemTaxGroupId) taxGroupId = ((await data.find("tax.taxGroup", { code: "TUZ" }, { take: 1 }).catch(() => [] as RecordData[]))[0]?.id as string) ?? null;
+  const id = (await taxCodeFor(data, taxGroupId, itemTaxGroupId, "sales").catch(() => null)) ?? (item.taxCodeId as string) ?? (group?.taxCodeId as string) ?? null;
+  return id ? data.get("tax.taxCode", String(id)) : null;
+}
+
 export async function itemPrices(data: DataApi, item: RecordData) {
-  const code = item.taxCodeId ? await data.get("tax.taxCode", String(item.taxCodeId)) : null;
+  const code = await itemSalesTaxCode(data, item);
   const rate = code?.rate ?? 0;
   const price = toCents(item.salesPrice);
   return item.priceInclTax
@@ -75,10 +91,6 @@ export const invHandlers: Record<string, ObjectHandlers> = {
   "inv.item": {
     ...itemMergeHandler,
     async beforeSave(ctx, data) {
-      if (!data.taxCodeId && data.groupId) {
-        const g = await ctx.data.get("inv.itemGroup", String(data.groupId));
-        data.taxCodeId = g?.taxCodeId ?? null;
-      }
       // neplatnou cenu už hlásí validace pole
       if (data.salesPrice === null || data.salesPrice === undefined || !/^-?\d+(\.\d+)?$/.test(String(data.salesPrice))) {
         data.priceNet = null;
@@ -91,6 +103,15 @@ export const invHandlers: Record<string, ObjectHandlers> = {
       // marže z prodejní ceny bez DPH
       const buy = data.purchasePrice !== null && data.purchasePrice !== undefined && data.purchasePrice !== "" ? toCents(data.purchasePrice) : null;
       data.marginPct = buy !== null && p.net > BigInt(0) ? (Number(((p.net - buy) * BigInt(1000000)) / p.net) / 10000).toFixed(2) : null;
+    },
+  },
+  "inv.itemGroup": {
+    // bez položky DPH by řádky neměly daňový kód — výchozí Zboží 21 % (neplátce Bez DPH)
+    async beforeSave(ctx, d) {
+      if (d.itemTaxGroupId) return;
+      const payer = await vatPayer(ctx.data).catch(() => true);
+      const [it] = await ctx.data.find("tax.itemTaxGroup", { code: payer ? "Z21" : "BEZ" }, { take: 1 }).catch(() => [] as RecordData[]);
+      if (it) d.itemTaxGroupId = it.id;
     },
   },
   "inv.category": {
