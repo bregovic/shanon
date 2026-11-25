@@ -1929,9 +1929,17 @@ const SWIPE_REMOVE_PX = 90;
  * i při překreslení kasy, funguje i z klávesnice); podržení spustí časovač a
  * následné kliknutí se pak ignoruje. Stav drží prvek, ne render.
  */
-/** Zařízení jen na dotyk (telefon, tablet bez klávesnice a myši). */
+/**
+ * Dotykové zařízení (telefon, tablet) – fokus do pole by tam vysunul klávesnici přes zboží, takže se píše jen
+ * po ťuknutí do pole. Android/iPad se berou podle systému: tablet se stylusem nebo připojenou myší hlásí
+ * i jemný ukazatel (`any-pointer: fine`) a dřív se tak choval jako počítač – kasa po otevření skočila do
+ * hledání a vysunula klávesnici. Počítač s dotykovým displejem a myší zůstává počítačem (čtečka píše do hledání).
+ */
 function touchOnly(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
+  const nav = window.navigator;
+  const mobileOs = /Android|iPhone|iPad|iPod/i.test(nav.userAgent) || (/Macintosh/.test(nav.userAgent) && nav.maxTouchPoints > 1);
+  if (mobileOs && nav.maxTouchPoints > 0) return true;
   return window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches;
 }
 
