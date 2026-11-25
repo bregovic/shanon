@@ -147,8 +147,8 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       baskets={data.baskets}
       receiptLayout={data.receiptLayout}
       printer={
-        // tiskárna na sériovém portu tiskne sama; jinak má přednost tisková stanice (Správa tisku)
-        data.station && data.conns.printer?.driver !== "escposSerial"
+        // tiskárna na sériovém portu / USB tiskne sama; jinak má přednost tisková stanice (Správa tisku)
+        data.station && !["escposSerial", "escposUsb"].includes(String(data.conns.printer?.driver))
           ? { driver: "station", paperWidth: data.station.paper, codePage: "cp852", baudRate: 9600, openDrawer: false, autoPrint: data.station.autoPrint }
           : data.conns.printer
           ? {

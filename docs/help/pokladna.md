@@ -43,6 +43,17 @@ summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a 
 - **Na fakturu** (zaplatí později): vystaví se zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele — je v saldu odběratele, zaplacení se spáruje z výpisu. **Tisk faktury** otevře PDF.
 - **Odeslat e-mailem**: účtenku i fakturu jde poslat jako PDF (adresa se předvyplní z odběratele), i dodatečně ze seznamu účtenek (Tisk ▾ → Odeslat e-mailem). Na účtence je pak *Odesláno e-mailem* a *Odesláno na*. Text e-mailu = šablona v Organizaci ([Odesílání dokladů e-mailem](/help/posta)).
 
+## Tiskárna účtenek na tabletu (USB)
+
+Termotiskárnu ESC/POS (např. Epson TM-m30III) připojenou kabelem USB k tabletu s Androidem kasa ovládá přímo z Chrome:
+
+1. [Integrace → Napojení](/int/connection) → **Nový**: druh **Tiskárna**, ovladač **ESC/POS přes USB – tablet (Chrome)**, papír 80 / 58 mm,
+   kódová stránka PC852 (čeština). Volitelně **Tisknout účtenku automaticky** a otevírání zásuvky.
+2. Na tabletu otevřete kasu, ťukněte na **Připojit tiskárnu** a v nabídce vyberte tiskárnu. Chrome si ji pamatuje, příště se tiskne hned.
+
+Když se po připojení kabelu nabídne jiná aplikace (třeba tisková služba Epson), nenastavujte ji jako výchozí pro toto zařízení –
+tiskárnu by si vzala a kasa by ji neviděla.
+
 ## Pokladní váha
 
 Váha se připojuje k počítači pokladny kabelem RS-232 nebo USB (převodník na sériový port) a čte se přímo z prohlížeče (Chrome nebo Edge).

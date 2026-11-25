@@ -58,6 +58,7 @@ export const Driver = defineEnum({
     { value: "eet2", label: "@INT:DrvEet2" },
     { value: "browser", label: "@INT:DrvBrowser" },
     { value: "escposSerial", label: "@INT:DrvEscposSerial" },
+    { value: "escposUsb", label: "@INT:DrvEscposUsb" },
     { value: "manual", label: "@INT:DrvManual" },
     { value: "sumup", label: "@INT:DrvSumup" },
     { value: "simulator", label: "@INT:DrvSimulator" },
@@ -212,7 +213,7 @@ const EET = { field: "kind", in: ["eet"] };
 const PRINTER = { field: "kind", in: ["printer"] };
 const SUMUP = { field: "driver", in: ["sumup"] };
 const COMGATE = { field: "driver", in: ["comgate"] };
-const SERIAL = { field: "driver", in: ["escposSerial"] };
+const SERIAL = { field: "driver", in: ["escposSerial", "escposUsb"] };
 const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
 const ISDS = { field: "kind", in: ["isds"] };
@@ -1207,6 +1208,7 @@ export default defineModule({
       DrvEet2: "EET 2.0 – Finanční správa",
       DrvBrowser: "Tisk z prohlížeče",
       DrvEscposSerial: "ESC/POS přes USB/sériový port",
+      DrvEscposUsb: "ESC/POS přes USB – tablet (Chrome)",
       DrvManual: "Ruční potvrzení na terminálu",
       DrvSumup: "SumUp Solo (Cloud API)",
       DrvSimulator: "Simulátor (zkoušení)",
@@ -1836,6 +1838,7 @@ export default defineModule({
       DrvEet2: "EET 2.0 – Financial Administration",
       DrvBrowser: "Browser printing",
       DrvEscposSerial: "ESC/POS over USB/serial port",
+      DrvEscposUsb: "ESC/POS over USB – tablet (Chrome)",
       DrvManual: "Manual confirmation on terminal",
       DrvSumup: "SumUp Solo (Cloud API)",
       DrvSimulator: "Simulator (testing)",

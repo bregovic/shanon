@@ -87,7 +87,19 @@ import {
   type OfflineSaleRec,
 } from "@/lib/pos-offline";
 import { receiptData } from "@/lib/receipt-data";
-import { EscPos, grantedPort, receiptEscPos, requestPort, serialSupported, writeToPort, type CodePage } from "@/lib/escpos";
+import {
+  EscPos,
+  grantedPort,
+  grantedUsbPrinter,
+  receiptEscPos,
+  requestPort,
+  requestUsbPrinter,
+  serialSupported,
+  usbSupported,
+  writeToPort,
+  writeToUsb,
+  type CodePage,
+} from "@/lib/escpos";
 import type { ReceiptPrint } from "@/modules/pos/sale";
 import { connectScalePort, readScale, readScaleSim, scalePort, type ScaleConfig, type ScaleReading } from "@/lib/scale";
 import type { ScaleWeighing } from "@/lib/scale-driver";
@@ -709,18 +721,22 @@ export function PosTerminal(p: {
       window.removeEventListener("online", tick);
     };
   }, [p.register.id, netDown, syncOffline]);
-  const serialPrinter = p.printer?.driver === "escposSerial";
+  // tiskárna ESC/POS přímo z kasy: sériový port (Web Serial) nebo USB kabel k tabletu (WebUSB)
+  const usbPrinter = p.printer?.driver === "escposUsb";
+  const serialPrinter = p.printer?.driver === "escposSerial" || usbPrinter;
   const [portReady, setPortReady] = useState(false);
   const terminalPay = !!p.payment && p.payment.driver !== "manual";
 
   useEffect(() => {
-    if (serialPrinter) void grantedPort().then((port) => setPortReady(!!port));
-  }, [serialPrinter]);
+    if (usbPrinter) void grantedUsbPrinter().then((d) => setPortReady(!!d));
+    else if (serialPrinter) void grantedPort().then((port) => setPortReady(!!port));
+  }, [serialPrinter, usbPrinter]);
 
   const escpos = async (r: ReceiptPrint | null, drawerOnly = false) => {
     const pr = p.printer!;
-    const port = await grantedPort();
-    if (!port) {
+    const usbDev = usbPrinter ? await grantedUsbPrinter() : null;
+    const port = usbPrinter ? null : await grantedPort();
+    if (!usbDev && !port) {
       setPortReady(false);
       return;
     }
@@ -729,7 +745,7 @@ export function PosTerminal(p: {
       drawerOnly || !r
         ? Uint8Array.from(new EscPos(width, pr.codePage).drawer().bytes)
         : receiptEscPos(r, L, fmt, { width, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale });
-    await writeToPort(port, bytes, pr.baudRate || 9600).catch((e) => setError(String(e)));
+    await (usbDev ? writeToUsb(usbDev, bytes) : writeToPort(port!, bytes, pr.baudRate || 9600)).catch((e) => setError(String(e)));
   };
   // tisk z prohlížeče: stejná tisková stránka jako ze seznamu účtenek (šablona, papír) — skrytým rámem
   // tisková stanice: účtenka do fronty stanice (bez dialogu); bez ní / jinak skrytým rámem
@@ -771,6 +787,10 @@ export function PosTerminal(p: {
     setScaleState({ busy: false, reading: null, error: L.ScaleNotStable });
   };
   const connectPrinter = async () => {
+    if (usbPrinter) {
+      if (!usbSupported()) return setError(L.PrinterUsbUnsupported);
+      return setPortReady(!!(await requestUsbPrinter().catch(() => null)));
+    }
     if (!serialSupported()) return setError(L.PrinterUnsupported);
     const port = await requestPort().catch(() => null);
     setPortReady(!!port);

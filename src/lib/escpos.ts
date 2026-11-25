@@ -189,3 +189,80 @@ export async function writeToPort(port: SerialPortLike, data: Uint8Array, baudRa
     await port.close();
   }
 }
+
+// ---------------------------------------------------------------------------
+// WebUSB – tiskárna připojená kabelem USB k tabletu s Androidem (Chrome). Web Serial tam USB tiskárnu nevidí
+// (Epson TM není USB-sériový převodník), WebUSB ano: tiskárna se jednou vybere v nabídce prohlížeče a Chrome
+// si povolení pamatuje (`getDevices`). Data jdou rovnou na výstupní koncový bod (bulk OUT) tiskového rozhraní.
+// ---------------------------------------------------------------------------
+
+interface UsbEndpointLike {
+  endpointNumber: number;
+  direction: "in" | "out";
+  type: "bulk" | "interrupt" | "isochronous";
+}
+interface UsbInterfaceLike {
+  interfaceNumber: number;
+  claimed?: boolean;
+  alternate: { interfaceClass: number; endpoints: UsbEndpointLike[] };
+}
+interface UsbDeviceLike {
+  vendorId: number;
+  productId: number;
+  productName?: string;
+  opened: boolean;
+  configuration: { interfaces: UsbInterfaceLike[] } | null;
+  configurations?: unknown[];
+  open(): Promise<void>;
+  close(): Promise<void>;
+  selectConfiguration(n: number): Promise<void>;
+  claimInterface(n: number): Promise<void>;
+  releaseInterface(n: number): Promise<void>;
+  transferOut(endpoint: number, data: BufferSource): Promise<{ status: string }>;
+}
+interface UsbLike {
+  getDevices(): Promise<UsbDeviceLike[]>;
+  requestDevice(o: { filters: { vendorId?: number; classCode?: number }[] }): Promise<UsbDeviceLike>;
+}
+const usb = () => (typeof navigator !== "undefined" ? (navigator as unknown as { usb?: UsbLike }).usb : undefined);
+
+/** Epson (vendor 0x04B8) a cokoli s rozhraním třídy tiskárna (7). */
+const EPSON = 0x04b8;
+const PRINTER_CLASS = 7;
+
+export const usbSupported = () => !!usb();
+
+/** Dříve povolená USB tiskárna (bez dotazu); null = nutno připojit tlačítkem. */
+export async function grantedUsbPrinter(): Promise<UsbDeviceLike | null> {
+  const list = (await usb()?.getDevices()) ?? [];
+  return list.find((d) => d.vendorId === EPSON) ?? list[0] ?? null;
+}
+
+export async function requestUsbPrinter(): Promise<UsbDeviceLike | null> {
+  return (await usb()?.requestDevice({ filters: [{ vendorId: EPSON }, { classCode: PRINTER_CLASS }] })) ?? null;
+}
+
+/** Rozhraní s výstupním koncovým bodem bulk – přednostně třída tiskárna, jinak první (Epson „vendor-defined“). */
+function printInterface(dev: UsbDeviceLike): { iface: UsbInterfaceLike; endpoint: number } | null {
+  const cands = (dev.configuration?.interfaces ?? [])
+    .map((iface) => ({ iface, ep: iface.alternate.endpoints.find((e) => e.direction === "out" && e.type === "bulk") }))
+    .filter((c): c is { iface: UsbInterfaceLike; ep: UsbEndpointLike } => !!c.ep);
+  const best = cands.find((c) => c.iface.alternate.interfaceClass === PRINTER_CLASS) ?? cands[0];
+  return best ? { iface: best.iface, endpoint: best.ep.endpointNumber } : null;
+}
+
+export async function writeToUsb(dev: UsbDeviceLike, data: Uint8Array) {
+  if (!dev.opened) await dev.open();
+  if (!dev.configuration) await dev.selectConfiguration(1);
+  const target = printInterface(dev);
+  if (!target) throw new Error("USB: tiskárna nemá tiskové rozhraní");
+  const n = target.iface.interfaceNumber;
+  if (!target.iface.claimed) await dev.claimInterface(n);
+  try {
+    // po částech – některé tiskárny na Androidu neunesou jeden velký přenos
+    for (let i = 0; i < data.length; i += 16384) await dev.transferOut(target.endpoint, data.slice(i, i + 16384));
+  } finally {
+    await dev.releaseInterface(n).catch(() => undefined);
+    await dev.close().catch(() => undefined);
+  }
+}

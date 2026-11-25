@@ -640,6 +640,7 @@ export default defineModule({
       PrinterConnect: "Připojit tiskárnu",
       PrinterConnected: "Tiskárna připojena",
       PrinterUnsupported: "Prohlížeč neumí sériový port — použijte Chrome nebo Edge.",
+      PrinterUsbUnsupported: "Prohlížeč neumí připojit tiskárnu přes USB — použijte Chrome.",
       OpenDrawer: "Otevřít zásuvku",
     },
     en: {
@@ -910,6 +911,7 @@ export default defineModule({
       PrinterConnect: "Connect printer",
       PrinterConnected: "Printer connected",
       PrinterUnsupported: "This browser has no serial port support — use Chrome or Edge.",
+      PrinterUsbUnsupported: "This browser cannot connect a USB printer — use Chrome.",
       OpenDrawer: "Open drawer",
     },
   },
