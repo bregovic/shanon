@@ -11,6 +11,7 @@ import { isdsOwnBox, isdsSend } from "@/modules/int/isds";
 import { fillLabel, resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
 import { downloadFile, inTenant, type Ctx } from "./data";
+import { usable } from "@/modules/int/live-guard";
 
 /**
  * Kontroly před podáním (i samostatně jako Zkontrolovat odeslání): adresát vyplněný a není to schránka firmy,
@@ -51,7 +52,10 @@ async function prepare(ctx: Ctx, id: string, client?: PrismaClient) {
       if (!ret.computedAt) throw new UserError("@TAX:NotComputed");
       const [params] = await api.find("tax.parameters", {}, { take: 1 });
       // napojení: testovací (TEST-…) má přednost, jinak ostré
-      const conns = (await api.find("int.connection", { kind: "isds", active: true }, { take: 20 })).sort((a, b) => Number(String(b.code).startsWith("TEST-")) - Number(String(a.code).startsWith("TEST-")));
+      const all = await api.find("int.connection", { kind: "isds", active: true }, { take: 20 });
+      const conns = usable(all).sort((a, b) => Number(String(b.code).startsWith("TEST-")) - Number(String(a.code).startsWith("TEST-")));
+      // testovací server: jen ostrá schránka bez povolení → říct proč, ne „chybí napojení“
+      if (!conns[0] && all.length) throw new UserError("@INT:IsdsLiveOnTest");
       if (!conns[0]) throw new UserError("@INT:IsdsNoConnection");
       return { ret, recipient: String(params?.taxOfficeDataBox ?? ""), ownBox: (params?.dataBoxId as string) ?? null, conn: conns[0] as RecordData };
     },

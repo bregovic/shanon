@@ -28,6 +28,7 @@ import { viesLookup } from "@/modules/gab/registry-lookup";
 import { vatRegistryStatus } from "@/modules/gab/vat-registry";
 import { fetchCnb, fetchEcb } from "@/modules/sys/currency";
 import { appRegistry } from "@/core/registry-ref";
+import { isLiveConnection, isTestServer, liveOnTestActive, usable } from "./live-guard";
 import { cancelWorkflows, closeWorkItems } from "@/modules/wf/work";
 import {
   buildEetMessage,
@@ -91,7 +92,8 @@ export async function connectionsFor(
   registerId: string,
 ): Promise<Partial<Record<"eet" | "printer" | "payment" | "scale", RecordData>>> {
   const reg = await data.get("pos.register", registerId).catch(() => null);
-  const all = (
+  // testovací server: ostrá napojení (EET, platby) bez ručního povolení se nepoužijí
+  const all = usable(
     await data.find("int.connection", { active: true }, { take: 200 })
   ).filter((c) => !c.registerId || c.registerId === registerId || c.id === reg?.scaleConnId || c.id === reg?.printerConnId);
   const out: Partial<Record<"eet" | "printer" | "payment" | "scale", RecordData>> = {};
@@ -608,6 +610,11 @@ export const intHandlers: Record<string, ObjectHandlers> = {
     async afterSave(ctx, d) {
       const url = d.driver === "comgate" ? `/api/pay/comgate/${ctx.tenantId}/${d.id}` : null;
       if ((d.pushUrl ?? null) !== url) await ctx.data.update("int.connection", String(d.id), { pushUrl: url });
+      // testovací server: ručně povolený ostrý provoz hlásit (toast + upozornění firmy), zablokovaný ostrý připomenout
+      if (liveOnTestActive(d) && d.active) {
+        ctx.data.warn?.("@INT:LiveOnTestWarn", { code: String(d.code) });
+        await notify(ctx.data, { kind: "warning", title: "@INT:LiveOnTestWarn", params: { code: String(d.code) }, href: "/int/connection", key: `live-on-test-${d.id}`, dedupeHours: 12 });
+      } else if (isTestServer() && isLiveConnection(d) && d.active) ctx.data.warn?.("@INT:LiveBlockedOnTest", { code: String(d.code) });
     },
     downloads: {
       /** nový klíč API: v databázi jen otisk, uživatel ho dostane jednou jako soubor */

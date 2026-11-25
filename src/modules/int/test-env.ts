@@ -36,6 +36,21 @@ export async function testEnvState(data: DataApi): Promise<TestEnvState> {
   };
 }
 
+/**
+ * Testovací protějšek ostrého napojení daného druhu (EET → TEST-EET Playground, pošta → TEST-MAIL), bez pozastavení
+ * čehokoli dalšího — migrace na testovacím serveru, kde se ostrá napojení nepoužijí. Vrací kód nově zapnutého, jinak null.
+ */
+export async function ensureTestConnection(data: DataApi, t: (ref: string) => string, kind: string): Promise<string | null> {
+  const def = TEST_CONNECTIONS.find((d) => d.kind === kind && (kind === "eet" || kind === "mail"));
+  if (!def) return null;
+  const [have] = await data.find("int.connection", { code: def.code }, { take: 1 });
+  // TEST-EET ze souboru migrace nemá certifikát (tajné údaje se nepřenáší) — doplnit veřejný testovací
+  if (have?.active && (def.kind !== "eet" || have.certData)) return null;
+  if (have) await data.update("int.connection", String(have.id), { active: true, driver: def.driver, ...def.extra });
+  else await data.create("int.connection", { code: def.code, name: t(def.name), kind: def.kind, driver: def.driver, active: true, ...def.extra });
+  return def.code;
+}
+
 /** Zapnout testovací prostředí (idempotentní). `t` = překlad názvů. */
 export async function enableTestEnv(data: DataApi, t: (ref: string) => string, withPos: boolean): Promise<void> {
   const all = await data.find("int.connection", {}, { take: 500 });

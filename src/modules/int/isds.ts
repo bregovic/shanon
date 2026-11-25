@@ -8,17 +8,16 @@
  */
 import { UserError, type RecordData } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
+import { liveBlocked } from "./live-guard";
 
 const NS = "http://isds.czechpoint.cz/v20";
 const base = (conn: RecordData) => (conn.driver === "isdsTest" ? "https://ws1.czebox.cz" : "https://ws1.datovka.gov.cz");
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const tag = (xml: string, name: string) => new RegExp(`<[^>]*\\b${name}[^>]*>([^<]*)<`).exec(xml)?.[1]?.trim();
 
-/** Server TEST (Railway prostředí jiné než production): ostrá schránka zakázaná — zkušební podání nesmí odejít na úřad. */
-const testServer = () => !!process.env.RAILWAY_ENVIRONMENT_NAME && process.env.RAILWAY_ENVIRONMENT_NAME !== "production";
-
 function credentials(conn: RecordData) {
-  if (conn.driver !== "isdsTest" && testServer()) throw new UserError("@INT:IsdsLiveOnTest");
+  // testovací server: ostrá schránka jen s ručním povolením u napojení — zkušební podání nesmí odejít na úřad
+  if (liveBlocked(conn)) throw new UserError("@INT:IsdsLiveOnTest");
   const login = String(conn.isdsLogin ?? "").trim();
   const password = revealSecret(conn.isdsPassword) ?? "";
   if (!login || !password) throw new UserError("@INT:IsdsNoLogin");

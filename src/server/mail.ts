@@ -19,6 +19,7 @@ import { fillMail, MAIL_DEFAULTS, MAIL_FIELDS, type MailDocKind } from "@/module
 import { registry } from "@/registry";
 import { renderPdf } from "./print-pdf";
 import { getT } from "./i18n";
+import { liveBlocked, usable } from "@/modules/int/live-guard";
 
 const sysCtx = (ctx: Ctx): Ctx => ({ ...ctx, perms: ADMIN });
 
@@ -51,7 +52,7 @@ async function draftFor(ctx: Ctx, id: string, spec: DraftSpec, client?: PrismaCl
       const company = ctx.companyId ? await api.get("sys.company", ctx.companyId) : null;
       const org = (await api.find("org.entity", {}, { take: 1 }).catch(() => []))[0];
       const currency = doc.currencyId ? await api.get("sys.currency", String(doc.currencyId)) : null;
-      const conn = mailConnections(await api.find("int.connection", { kind: "mail", active: true }, { take: 20 }))[0];
+      const conn = mailConnections(await api.find("int.connection", { kind: "mail", active: true }, { take: 20 }))[0]; // jen podpis konceptu, odeslání hlídá sendMail
       const taxDoc = spec.objectId === "ar.advance" && !!doc.taxDocNum;
       const num = String(taxDoc ? doc.taxDocNum : doc[spec.numField] ?? "");
       const locale = ctx.lang === "en" ? "en-GB" : "cs-CZ";
@@ -164,9 +165,12 @@ export async function sendMail(ctx: Ctx, id: string, client?: PrismaClient): Pro
       const m = await api.get("int.mail", id);
       if (!m) throw new UserError("@SYS:NotFound");
       if (m.status === "sent") throw new UserError("@SYS:Locked");
-      const conns = mailConnections(await api.find("int.connection", { kind: "mail", active: true }, { take: 20 }));
+      const all = await api.find("int.connection", { kind: "mail", active: true }, { take: 20 });
+      const conns = mailConnections(usable(all));
       // testovací prostředí má přednost i před napojením uloženým v konceptu (ostré je pozastavené)
-      const conn = conns.find((c) => String(c.code).startsWith("TEST-")) ?? conns.find((c) => c.id === m.connectionId) ?? conns[0];
+      // testovací server bez povoleného ostrého provozu: ostrá pošta jako testovací (zprávu dostane přihlášený uživatel)
+      const blocked = mailConnections(all.filter((c) => liveBlocked(c)))[0];
+      const conn = conns.find((c) => String(c.code).startsWith("TEST-")) ?? conns.find((c) => c.id === m.connectionId) ?? conns[0] ?? (blocked ? { ...blocked, driver: "mailTest" } : undefined);
       if (!conn) throw new UserError("@INT:MailNoConnection");
       const to = parseAddresses(m.mailTo);
       if (!to.length) throw new UserError("@INT:MailNoRecipient");

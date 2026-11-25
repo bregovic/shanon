@@ -7,7 +7,10 @@
  *   nastavením (i finanční dimenze Partner z adresáře — proto před zakládáním partnerů), údaje organizace
  *   a logo, pak agendy v pořadí souboru obecným importem (aktualizace podle klíče, opakování nic nezdvojí),
  *   nakonec uživatelé s rolemi ve firmě.
- * Hesla, tajné údaje napojení a doklady soubor nikdy neobsahuje.
+ * - Integrace (napojení): testovací (TEST-…, Playground, simulátory) i ostrá v jednom souboru. Na testovacím serveru
+ *   se ostrá napojení nepoužijí (live-guard.ts) a k ostrému EET / poště se založí testovací protějšek; na produkci se
+ *   testovací napojení nezakládají. Export „pro ostrý provoz“ testovací napojení vynechá a ostrá zapne.
+ * Hesla, tajné údaje napojení (certifikát EET, hesla) a doklady soubor nikdy neobsahuje.
  */
 import "server-only";
 import type { PrismaClient } from "@/generated/prisma/client";
@@ -22,6 +25,8 @@ import { enableModulesWithSetup } from "./company-modules";
 import { companyModules } from "./modules";
 import { importRecords, type ImageSource } from "./import";
 import { setImage } from "./docuref";
+import { isLiveConnection, isTestServer } from "@/modules/int/live-guard";
+import { ensureTestConnection } from "@/modules/int/test-env";
 import { prisma } from "./db";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -42,7 +47,15 @@ export const MIGRATION_OBJECTS: { id: string; note: string }[] = [
   { id: "hr.employee", note: "@ORG:MigObjEmployee" },
   { id: "org.site", note: "@ORG:MigObjSite" },
   { id: "bank.account", note: "@ORG:MigObjBankAccount" },
+  { id: "int.connection", note: "@ORG:MigObjConnection" },
 ];
+
+/** Pole agendy, která migrace vynechává (odkaz na pokladnu — pokladny se nemigrují; stav napojení). */
+const SKIP_FIELDS: Record<string, string[]> = { "int.connection": ["registerId", "lastCheckAt", "lastResult"] };
+/** Napojení, která se nemigrují: veřejné služby zakládá výchozí nastavení, klíč API nejde přenést. */
+const skipConnection = (r: Record<string, unknown>) => r.kind === "service" || r.kind === "api";
+/** Testovací napojení (testovací server ho používá místo ostrého). */
+const isTestConnection = (r: Record<string, unknown>) => String(r.code ?? "").startsWith("TEST-");
 
 /** Údaje organizace, které registry neznají (zbytek doplní ARES a registr DPH). */
 const ORG_FIELDS = ["tradeName", "email", "phone", "web", "dataBoxId", "publicSlug", "mailSignature"] as const;
@@ -111,7 +124,8 @@ function errorText(e: unknown, lang: Lang): string {
 
 /** Pole, která se v souboru vyplňují (bez počítaných, tajných a systémových). */
 function migrationFields(def: ObjectDef): [string, FieldDef][] {
-  return Object.entries(def.fields).filter(([, f]) => !f.readOnly || f.image).filter(([, f]) => !f.secret && !f.edt.user);
+  const skip = SKIP_FIELDS[def.id] ?? [];
+  return Object.entries(def.fields).filter(([n, f]) => (!f.readOnly || f.image) && !skip.includes(n)).filter(([, f]) => !f.secret && !f.edt.user);
 }
 
 /** Popis pole pro šablonu: popisek, povinnost, klíč, povolené hodnoty / odkaz, nápověda. */
@@ -211,8 +225,11 @@ export function migrationTemplate(lang: Lang): RecordData {
 
 const PAGE = 2000;
 
-/** Konfigurace aktuální firmy ve tvaru migračního souboru (bez dokladů, hesel a tajných údajů). */
-export async function exportMigration(ctx: Ctx, lang: Lang, client: PrismaClient = prisma): Promise<RecordData> {
+/**
+ * Konfigurace aktuální firmy ve tvaru migračního souboru (bez dokladů, hesel a tajných údajů).
+ * `production` = pro ostrý provoz: bez testovacích napojení, ostrá napojení zapnutá (i pozastavená testem).
+ */
+export async function exportMigration(ctx: Ctx, lang: Lang, client: PrismaClient = prisma, opts: { production?: boolean } = {}): Promise<RecordData> {
   if (!ctx.companyId) throw new UserError("@SYS:NoAccess");
   const tmpl = migrationTemplate(lang);
   const folder = "obrazky";
@@ -274,7 +291,8 @@ export async function exportMigration(ctx: Ctx, lang: Lang, client: PrismaClient
           if (r.rows.length < PAGE) break;
         }
         const images = await imageNames(s, fields.filter(([, f]) => f.image).flatMap(([n]) => rows.map((r) => r[n]).filter(Boolean).map(String)));
-        return rows.map((r) => {
+        const kept = id !== "int.connection" ? rows : rows.filter((r) => !skipConnection(r) && !(opts.production && isTestConnection(r)));
+        return kept.map((r) => {
           const out: Record<string, unknown> = {};
           for (const [n, f] of fields) {
             const v = r[n];
@@ -287,6 +305,11 @@ export async function exportMigration(ctx: Ctx, lang: Lang, client: PrismaClient
             else if (f.edt.kind === "date") out[n] = String(v instanceof Date ? v.toISOString() : v).slice(0, 10);
             else out[n] = v;
             if (out[n] === null) delete out[n];
+          }
+          // ostrý provoz: ostré napojení zapnuté, povolení pro testovací server nemá smysl
+          if (id === "int.connection" && opts.production) {
+            if (isLiveConnection(r) || r.pausedByTest) out.active = true;
+            delete out.liveOnTest;
           }
           return out;
         });
@@ -309,6 +332,7 @@ export async function exportMigration(ctx: Ctx, lang: Lang, client: PrismaClient
     moduly: mods,
     slozkaObrazku: folder,
     uzivatele: users,
+    provoz: opts.production ? "ostry" : "test",
     data,
   };
 }
@@ -517,7 +541,10 @@ export async function runMigration(
     });
 
   // 4. agendy v pořadí souboru (každá vše nebo nic; chyba jedné nezastaví další)
-  for (const sec of file.data) report.steps.push(await importStep(cctx, sec, false, lang, opts.images, client));
+  for (const sec of file.data) {
+    if (sec.objekt === "int.connection") report.steps.push(await connectionStep(cctx, sec, lang, opts.images, client));
+    else report.steps.push(await importStep(cctx, sec, false, lang, opts.images, client));
+  }
 
   // 5. e-shop: vzhled, kontakty, zveřejnění (až s hotovým katalogem)
   if (file.firma.obchod) report.steps.push(await shopStep(cctx, file.firma.obchod, lang, opts.images, client));
@@ -549,6 +576,46 @@ async function shopStep(cctx: Ctx, obchod: Record<string, unknown>, lang: Lang, 
     step.status = "error";
     step.messages.push(errorText(e, lang));
   }
+  return step;
+}
+
+/**
+ * Napojení: na produkci bez testovacích (TEST-…); na testovacím serveru všechna a k ostrému EET a poště testovací
+ * protějšek (ostrá se tam nepoužijí, dokud je u napojení nepovolíte). Ostré EET bez certifikátu = připomínka.
+ */
+async function connectionStep(cctx: Ctx, sec: MigrationFile["data"][number], lang: Lang, images: ImageSource, client: PrismaClient): Promise<MigrationStep> {
+  const test = isTestServer();
+  const rows = sec.zaznamy.filter((r) => !skipConnection(r) && (test || !isTestConnection(r)));
+  const skipped = sec.zaznamy.length - rows.length;
+  const step = rows.length ? await importStep(cctx, { ...sec, zaznamy: rows }, false, lang, images, client) : { key: sec.objekt, label: resolveLabel(labelTable, getObject(sec.objekt).labelPlural, lang), status: "ok" as const, messages: [] as string[] };
+  if (skipped) step.messages.push(tr(lang, "@ORG:MigConnSkipped", { n: String(skipped) }));
+  if (step.status === "error") return step;
+  const live = rows.filter((r) => isLiveConnection(r));
+  try {
+    await inTenant(
+      cctx,
+      async (s) => {
+        const api = s.sys().api();
+        const saved = await api.find("int.connection", { code: { in: live.map((r) => String(r.code)) } }, { take: 200 });
+        for (const c of saved) {
+          if (c.kind === "eet" && !c.certData) step.messages.push(tr(lang, "@ORG:MigConnCert", { code: String(c.code) }));
+          if (c.kind === "isds" || (c.kind === "mail" && c.driver === "smtp") || c.kind === "payment") step.messages.push(tr(lang, "@ORG:MigConnSecret", { code: String(c.code) }));
+        }
+        if (test) {
+          for (const kind of new Set(live.map((r) => String(r.kind)))) {
+            const code = await ensureTestConnection(api, (ref) => tr(lang, ref), kind);
+            if (code) step.messages.push(tr(lang, "@ORG:MigConnTest", { code }));
+          }
+          if (live.length) step.messages.push(tr(lang, "@ORG:MigConnLiveOnTest", { codes: live.map((r) => String(r.code)).join(", ") }));
+        }
+      },
+      client,
+    );
+  } catch (e) {
+    step.status = "warning";
+    step.messages.push(errorText(e, lang));
+  }
+  if (step.messages.length && step.status === "ok") step.status = "warning";
   return step;
 }
 

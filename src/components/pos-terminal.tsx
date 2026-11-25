@@ -385,6 +385,8 @@ export function PosTerminal(p: {
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
+  /** testovací server: kódy ručně povolených ostrých napojení (upozornění nahoře) */
+  liveOnTest?: string[];
   /** prodej bez připojení: hlavička účtenky, plátce DPH, patička; karta jen na samostatném terminálu */
   offline?: { company: ReceiptPrint["company"]; vatPayer: boolean; footer: string | null; card: boolean } | null;
   /** pokladní váha (Integrace): sériový port v prohlížeči nebo simulátor */
@@ -1253,6 +1255,11 @@ export function PosTerminal(p: {
         )}
       </header>
 
+      {!!p.liveOnTest?.length && (
+        <MessageBar intent="warning">
+          <MessageBarBody>{L.LiveOnTest.replace("{codes}", p.liveOnTest.join(", "))}</MessageBarBody>
+        </MessageBar>
+      )}
       {offlineMode && (
         <MessageBar intent="warning">
           <MessageBarBody>{L.OfflineMode}</MessageBarBody>

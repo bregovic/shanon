@@ -12,6 +12,7 @@ import { accountingCurrencyId, convertPrice } from "@/modules/gl/posting";
 import { bestDiscount, itemPrices } from "@/modules/inv/handlers";
 import { notify } from "@/modules/sys/notify";
 import { slugify } from "@/lib/slug";
+import { usable } from "@/modules/int/live-guard";
 
 const zero = BigInt(0);
 /** Datum a hodina v Praze (server běží v UTC — kolem půlnoci by „dnes“ byl jiný den). */
@@ -248,7 +249,7 @@ export function bufferOf(item: RecordData, shop: RecordData): number {
 /** Aktivní platební brána pro e-shop (Comgate), nebo null. */
 export async function gatewayConnection(data: DataApi): Promise<RecordData | null> {
   try {
-    const list = (await data.find("int.connection", { kind: "payment", active: true }, { take: 50, orderBy: { code: "asc" } })).filter((c) => c.driver === "comgate" || c.driver === "gatewaySim");
+    const list = usable(await data.find("int.connection", { kind: "payment", active: true }, { take: 50, orderBy: { code: "asc" } })).filter((c) => c.driver === "comgate" || c.driver === "gatewaySim");
     // testovací prostředí: testovací kopie Comgate, pak simulátor brány, pak ostrá brána
     return list.find((c) => c.code === "TEST-COMGATE") ?? list.find((c) => String(c.code).startsWith("TEST-")) ?? list[0] ?? null;
   } catch {

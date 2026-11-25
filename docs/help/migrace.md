@@ -38,15 +38,34 @@ Soubor nikdy neobsahuje doklady, hesla ani tajné údaje napojení. Stránka je 
 5. Výsledek ukáže každý krok (OK / varování / chyba, založeno / upraveno). Opravte soubor a spusťte znovu – záznamy se
    aktualizují podle klíče (číslo položky, kód, IČO, osobní číslo), nic se nezdvojí ani nesmaže.
 
+## Integrace (napojení)
+
+Agenda `int.connection` v souboru drží ostrá i testovací napojení zároveň – např. ostré EET (`environment: production`,
+provozovna `unitId`, pokladna `posId`) a testovací `TEST-EET` (Playground). Kód `TEST-…` = testovací.
+
+- **Na testovacím serveru** se ostrá napojení (ostré EET, datová schránka, pošta skutečným adresátům, platby kartou) nepoužijí.
+  Migrace k ostrému EET a poště založí testovací protějšek (TEST-EET, TEST-MAIL). Ostré napojení jde pro zkoušku zapnout
+  u napojení volbou **Povolit ostrý provoz na testovacím serveru** – kasa pak nahoře upozorňuje, že účtenky jdou naostro.
+- **Na produkci** se testovací napojení (`TEST-…`) nezaloží.
+- Veřejné služby (ARES, ČNB) zakládá výchozí nastavení, napojení REST API se nepřenáší (klíč nejde zkopírovat).
+- **Certifikát EET a hesla soubor nikdy neobsahuje.** Po migraci je doplňte u napojení (EET → Nahrát certifikát + heslo);
+  výsledek migrace na to upozorní.
+
 ## TEST → PROD
 
 Firmu založte a odlaďte na TESTu, pak na ní **Exportovat konfiguraci této firmy** – vznikne stejný soubor, jen vyplněný
-(obrázky jako názvy souborů ve složce `obrazky`). Na PROD ho spusťte se stejnou složkou obrázků.
+(obrázky jako názvy souborů ve složce `obrazky`). V dialogu zvolte:
+
+- **Pro ostrý provoz** – bez testovacích napojení, ostrá napojení zapnutá (i ta, která na TESTu pozastavil test),
+- **Pro testovací provoz** – včetně testovacích napojení (další zkouška na TESTu).
+
+Na PROD ho spusťte se stejnou složkou obrázků a doplňte certifikát EET a hesla u napojení.
 
 ## Na co si dát pozor
 
 - Obrázek do 2 MB (PNG, JPG, WebP); celý výběr (soubor + obrázky) do 5 MB – velký katalog rozdělte do více běhů
   (nejdřív bez položek, pak položky po částech).
 - Uživatel, který už je v jiné organizaci Shanonu, se nepřiřadí (e-mail je jedinečný v celé aplikaci).
-- Pokladny, platby e-shopu, doprava, tiskové sestavy a napojení se migrací zatím nenastavují (výchozí nastavení modulů je založí).
+- Pokladny, platby e-shopu, doprava a tiskové sestavy se migrací zatím nenastavují (výchozí nastavení modulů je založí).
+  Napojení bez pokladny platí pro všechny pokladny firmy.
 - E-shop je na adrese `/<zkratka organizace>`; bez zkratky nebo bez `active: true` vrací 404.

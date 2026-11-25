@@ -14,6 +14,8 @@ import {
   DialogTitle,
   Field,
   makeStyles,
+  Radio,
+  RadioGroup,
   MessageBar,
   MessageBarBody,
   Text,
@@ -42,7 +44,11 @@ const useStyles = makeStyles({
   msgs: { margin: 0, paddingLeft: "20px", color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200 },
 });
 
-type Labels = Record<"Migration" | "MigDesc" | "MigTemplate" | "MigExport" | "MigFile" | "MigImages" | "MigImagesCount" | "MigCheck" | "MigRun" | "MigRunConfirm" | "MigCreated" | "MigUpdated", string>;
+type Labels = Record<
+  | "Migration" | "MigDesc" | "MigTemplate" | "MigExport" | "MigFile" | "MigImages" | "MigImagesCount" | "MigCheck" | "MigRun" | "MigRunConfirm" | "MigCreated" | "MigUpdated"
+  | "MigExportTitle" | "MigExportTest" | "MigExportTestDesc" | "MigExportProd" | "MigExportProdDesc" | "MigDownload",
+  string
+>;
 
 const REPORT_KEY = "shanon.migration.report";
 
@@ -51,6 +57,8 @@ const COLOR = { ok: "success", warning: "warning", error: "danger" } as const;
 export function MigrationView({ crumbs, labels: L, cancel }: { crumbs: { label: string; href?: string }[]; labels: Labels; cancel: string }) {
   const s = useStyles();
   const router = useRouter();
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportMode, setExportMode] = useState<"test" | "production">("production");
   const [file, setFile] = useState<File | null>(null);
   const [ico, setIco] = useState("");
   const [images, setImages] = useState<File[]>([]);
@@ -108,6 +116,25 @@ export function MigrationView({ crumbs, labels: L, cancel }: { crumbs: { label: 
 
   return (
     <>
+      <Dialog open={exportOpen} onOpenChange={(_, d) => setExportOpen(d.open)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{L.MigExportTitle}</DialogTitle>
+            <DialogContent>
+              <RadioGroup value={exportMode} onChange={(_, d) => setExportMode(d.value as "test" | "production")}>
+                <Radio value="test" label={{ children: <><b>{L.MigExportTest}</b><br /><Text size={200} className={s.muted}>{L.MigExportTestDesc}</Text></> }} />
+                <Radio value="production" label={{ children: <><b>{L.MigExportProd}</b><br /><Text size={200} className={s.muted}>{L.MigExportProdDesc}</Text></> }} />
+              </RadioGroup>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setExportOpen(false)}>{cancel}</Button>
+              <Button appearance="primary" as="a" href={`/api/migration?kind=export${exportMode === "production" ? "&mode=production" : ""}`} icon={<ArrowDownload24Regular />} onClick={() => setExportOpen(false)}>
+                {L.MigDownload}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
       <ActionBar>
         <Crumbs items={crumbs} />
       </ActionBar>
@@ -118,7 +145,7 @@ export function MigrationView({ crumbs, labels: L, cancel }: { crumbs: { label: 
             <Button as="a" href="/api/migration?kind=template" icon={<ArrowDownload24Regular />}>
               {L.MigTemplate}
             </Button>
-            <Button as="a" href="/api/migration?kind=export" icon={<ArrowDownload24Regular />}>
+            <Button icon={<ArrowDownload24Regular />} onClick={() => setExportOpen(true)}>
               {L.MigExport}
             </Button>
           </div>

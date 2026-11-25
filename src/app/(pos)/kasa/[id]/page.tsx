@@ -1,4 +1,5 @@
 /** Prodejní terminál pokladny (šablona „Pult s váhou“). */
+import { liveOnTestActive } from "@/modules/int/live-guard";
 import type { PrintLayout } from "@/core/print";
 import { openBaskets } from "@/modules/pos/basket";
 import { accountingCurrencyId, currencyRounding } from "@/modules/gl/posting";
@@ -109,7 +110,9 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       // karta jen na samostatném terminálu (napojený terminál potřebuje připojení)
       card: !conns.payment || conns.payment.driver === "manual",
     };
-    return { items, groups, units, rates, offline, shift, conns, station, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes };
+    // testovací server s ručně povoleným ostrým napojením (EET, platby): kasa to musí hlásit
+    const liveOnTest = Object.values(conns).filter((c) => liveOnTestActive(c)).map((c) => String(c!.code));
+    return { items, groups, units, rates, offline, shift, conns, station, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes, liveOnTest };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -187,6 +190,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
           : null
       }
       eet={data.conns.eet ? { pending: data.eetPending } : null}
+      liveOnTest={data.liveOnTest}
       offline={data.offline}
       customers={s.ctx.modules.has("ar")}
       mail={s.ctx.modules.has("int")}
