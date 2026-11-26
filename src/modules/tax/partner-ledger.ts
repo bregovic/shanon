@@ -10,7 +10,7 @@ import { defineObject, type ObjectDef } from "@/core/object";
 import { DIM_NAMES, DupCheck, JournalStatus, dimFields } from "@/modules/gl";
 import { documentLineHandlers, invoiceHandlers, type InvoiceConfig } from "./document";
 import { orderHandlers, releaseOrder, vatPayer } from "./orders";
-import { AgreementStatus, agreementHandlers, agreementObject, agreementParamFields, runAgreements, type AgreementDocs } from "./agreements";
+import { AgreementStatus, agreementDeleteHooks, agreementHandlers, agreementObject, agreementParamFields, runAgreements, type AgreementDocs } from "./agreements";
 import { postingAccount } from "@/modules/gl/setup";
 import { fillFromAres } from "@/modules/gab/ares";
 import { createFromRegistry } from "@/modules/gab/registry-lookup";
@@ -577,6 +577,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   const docs = { cfg, order: order.id, orderLine: orderLine.id, invoiceLine: invoiceLine.id, advance: advance.id, vsSource: sp.externalNum ? "externalNum" : "advanceNum" };
   const inv = invoiceHandlers(cfg);
   const agrDocs: AgreementDocs = { ...docs, agreement: agreement.id, parameters: params.id, partnerField: partnerId, sales: sp.side === 1 };
+  const agrDel = agreementDeleteHooks(agrDocs);
 
   return {
     /** konfigurace faktur (zaúčtování faktury z jiného modulu, např. prodej na fakturu z pokladny) */
@@ -602,6 +603,10 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       ...agreementHandlers(agrDocs),
       ...documentLineHandlers(orderCfg),
       ...orderHandlers(docs),
+      // mazání nezaúčtované smlouvy / objednávky / zálohy přes vzájemné odkazy (agreementDeleteHooks)
+      [agrDocs.agreement]: { ...agreementHandlers(agrDocs)[agrDocs.agreement], beforeDelete: agrDel.agreement },
+      [docs.order]: { ...orderHandlers(docs)[docs.order], beforeDelete: agrDel.order },
+      [docs.advance]: { ...orderHandlers(docs)[docs.advance], beforeDelete: agrDel.advance },
       // faktura z objednávky: smazáním konceptu se objednávka vrátí k fakturaci
       [invoice.id]: { ...inv[invoice.id], beforeDelete: (ctx: EventContext, d: RecordData) => releaseOrder(ctx.data, docs, d) },
       // řádek profilu: partner jen pro „Partner“, skupina jen pro „Skupina“

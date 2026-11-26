@@ -284,6 +284,45 @@ export function agreementHandlers(docs: AgreementDocs): Record<string, ObjectHan
   };
 }
 
+/**
+ * Mazání nezaúčtovaných dokladů smlouvy. Smlouva, její objednávka a záloha na sebe odkazují navzájem
+ * (smlouva → objednávka / záloha, ty → smlouva, záloha → objednávka), takže bez téhle obsluhy databáze
+ * smazání odmítla („záznam se používá“), i když nic nebylo zaúčtované.
+ *  - záloha: zaplacená ne; nezaplacená → smlouva ji přestane čekat (bez zaplaceného období zpět do konceptu)
+ *  - objednávka: s ní i její nezaplacené zálohy (zaplacená záloha smazání zastaví), smlouva ji zapomene
+ *  - smlouva: jen bez faktur a zaplacených záloh (jinak Ukončit); smažou se i její objednávky a zálohy
+ */
+export function agreementDeleteHooks(docs: AgreementDocs) {
+  const forget = async (data: DataApi, field: "orderId" | "advanceId", id: string) => {
+    for (const agr of await data.find(docs.agreement, { [field]: id }, { take: 50 })) {
+      const patch: RecordData = { [field]: null };
+      if (field === "advanceId" && agr.status === "awaiting" && !agr.paidUntil) Object.assign(patch, { status: "draft", dueDate: null, periodFrom: null, periodTo: null });
+      await data.update(docs.agreement, String(agr.id), patch);
+    }
+  };
+  const paid = (a: RecordData) => toCents(a.paidAmount) > BigInt(0);
+  return {
+    async advance(ctx: EventContext, d: RecordData) {
+      if (paid(d)) return "@TAX:AdvancePaidNoDelete";
+      await forget(ctx.data, "advanceId", String(d.id));
+    },
+    async order(ctx: EventContext, d: RecordData) {
+      const advs = await ctx.data.find(docs.advance, { orderId: d.id }, { take: 50 });
+      if (advs.some(paid)) return "@TAX:AdvancePaidNoDelete";
+      await forget(ctx.data, "orderId", String(d.id));
+      for (const a of advs) await ctx.data.remove(docs.advance, String(a.id));
+    },
+    async agreement(ctx: EventContext, d: RecordData) {
+      if ((await ctx.data.find(docs.cfg.header, { agreementId: d.id }, { take: 1 })).length) return "@TAX:AgrHasInvoices";
+      const advs = await ctx.data.find(docs.advance, { agreementId: d.id }, { take: 200 });
+      if (advs.some(paid)) return "@TAX:AgrHasInvoices";
+      await ctx.data.update(docs.agreement, String(d.id), { orderId: null, advanceId: null });
+      for (const a of advs) await ctx.data.remove(docs.advance, String(a.id));
+      for (const o of await ctx.data.find(docs.order, { agreementId: d.id }, { take: 200 })) await ctx.data.remove(docs.order, String(o.id));
+    },
+  };
+}
+
 /** Pole parametrů modulu pro smlouvy. */
 export const agreementParamFields = {
   agreementDueDays: { edt: Edts.Int, label: "@TAX:AgrDueDays", default: 7 },

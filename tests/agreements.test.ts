@@ -4,7 +4,7 @@
  */
 import { afterAll, describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
-import { getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
+import { deleteRecord, getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { agreementState, periodEnd, runAgreements, type AgreementDocs } from "@/modules/tax/agreements";
 import { ar } from "@/modules/ar";
@@ -109,6 +109,27 @@ describe("prodejní smlouva", () => {
     a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
     expect(a.status).toBe("ended");
     await expect(runAction(T, "ar.agreement", String(agr.id), "requestPayment", client)).rejects.toMatchObject({ label: "@GL:Locked" });
+
+    // mazání nezaúčtovaného (smlouva ↔ objednávka ↔ záloha na sebe odkazují)
+    const b = await saveRecord(T, "ar.agreement", null, { customerId: cust.id, itemId: tariff.id, startDate: plus(0) }, undefined, client);
+    await runAction(T, "ar.agreement", String(b.id), "requestPayment", client);
+    let bb = (await getRecord(T, "ar.agreement", String(b.id), client))!;
+    await deleteRecord(T, "ar.advance", String(bb.advanceId), client);
+    bb = (await getRecord(T, "ar.agreement", String(b.id), client))!;
+    expect([bb.advanceId, bb.status]).toEqual([null, "draft"]);
+    await deleteRecord(T, "ar.order", String(bb.orderId), client);
+    expect((await getRecord(T, "ar.agreement", String(b.id), client))!.orderId).toBeNull();
+    await runAction(T, "ar.agreement", String(b.id), "requestPayment", client);
+    bb = (await getRecord(T, "ar.agreement", String(b.id), client))!;
+    const advId = String(bb.advanceId);
+    await deleteRecord(T, "ar.order", String(bb.orderId), client); // s ní i nezaplacená záloha
+    expect(await getRecord(T, "ar.advance", advId, client)).toBeNull();
+    await runAction(T, "ar.agreement", String(b.id), "requestPayment", client);
+    await deleteRecord(T, "ar.agreement", String(b.id), client); // i s objednávkou a zálohou
+    expect(await getRecord(T, "ar.agreement", String(b.id), client)).toBeNull();
+    expect((await listRecords(T, "ar.order", { filter: { agreementId: b.id } }, client)).total).toBe(0);
+    // smlouva s fakturami ani zaplacená záloha smazat nejde
+    await expect(deleteRecord(T, "ar.agreement", String(agr.id), client)).rejects.toMatchObject({ label: "@SYS:Locked" });
   });
 });
 
