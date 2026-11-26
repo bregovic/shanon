@@ -391,9 +391,13 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }
 
+const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating"];
+
 export interface StationDiagnostics {
-  /** podle čeho Shanon počítač pozná: zapamatovaný v prohlížeči, uživatel počítače, nepozná */
-  source: "browser" | "user" | "none";
+  /** texty komponenty (jazyk uživatele) */
+  texts: Record<string, string>;
+  /** podle čeho Shanon počítač pozná: zapamatovaný v prohlížeči, uživatel počítače, nepozná; device = vybrané zařízení */
+  source: "browser" | "user" | "none" | "device";
   /** zapamatovaný počítač prohlížeče v Shanonu není (smazané / neaktivní zařízení) */
   staleBrowser: boolean;
   /** kolik aktivních počítačů má uživatel jako Uživatel počítače */
@@ -408,14 +412,17 @@ export interface StationDiagnostics {
 }
 
 /** Nastavení → Diagnostika tohoto počítače: pozná Shanon prohlížeč, běží stanice, jaké tiskárny, kam se tiskne. */
-export async function stationDiagnostics(ctx: Ctx, browserStationId: string | null): Promise<StationDiagnostics> {
+export async function stationDiagnostics(ctx: Ctx, browserStationId: string | null, deviceId: string | null = null): Promise<StationDiagnostics> {
   return inTenant(ctx, async (s) => {
     const api = s.sys().api();
     const active = await api.find("int.device", { active: true }, { take: 500 });
     const mine = active.filter((d) => d.userId === ctx.userId);
+    const chosen = deviceId ? ((await api.get("int.device", deviceId)) ?? undefined) : undefined;
     const fromBrowser = browserStationId ? active.find((d) => d.id === browserStationId) : undefined;
-    const dev = fromBrowser ?? (mine.length === 1 ? mine[0] : undefined);
-    const source = fromBrowser ? "browser" : dev ? "user" : "none";
+    const dev = chosen ?? fromBrowser ?? (mine.length === 1 ? mine[0] : undefined);
+    const source = chosen ? "device" : fromBrowser ? "browser" : dev ? "user" : "none";
+    const lang = ctx.lang ?? "cs";
+    const texts = Object.fromEntries(DIAG_KEYS.map((k) => [k, resolveLabel(labelTable, `@SYS:${k}`, lang)]));
     const printers = dev ? await api.find("int.devicePrinter", { deviceId: dev.id }, { take: 100, orderBy: { label: "asc" } }) : [];
     const target = async (docType: string) => {
       const t = await resolvePrintTarget(api, docType, { stationId: dev ? String(dev.id) : null, userId: ctx.userId }).catch(() => null);
@@ -423,8 +430,9 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
     };
     const seen = dev?.lastSeenAt ? new Date(String(dev.lastSeenAt)).getTime() : 0;
     return {
+      texts,
       source,
-      staleBrowser: !!browserStationId && !fromBrowser,
+      staleBrowser: !chosen && !!browserStationId && !fromBrowser,
       userDevices: mine.length,
       device: dev
         ? {

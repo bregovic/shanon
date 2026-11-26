@@ -6,17 +6,14 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 const noSubscribe = () => () => {};
 import { useRouter } from "next/navigation";
 import { Button, Dropdown, Switch, Field, Input, MessageBar, MessageBarBody, Option, Text, makeStyles, tokens } from "@fluentui/react-components";
-import { changePasswordAction, saveProfileAction, setPosPinAction, stationClaimAction, stationDiagnosticsAction, stationRefreshAction, stationSetupAction, stationTestPageAction } from "@/app/actions";
-import type { StationDiagnostics } from "@/server/station";
+import { changePasswordAction, saveProfileAction, setPosPinAction, stationClaimAction, stationSetupAction } from "@/app/actions";
+import { StationDiag } from "./station-diag";
 import { STATION_KEY, stationId } from "@/lib/station-print";
 import { ActionBar, Crumbs, PageContent } from "./page";
 import { InstallAppButton } from "./install-app";
 
 const useStyles = makeStyles({
   diag: { display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" },
-  diagBox: { display: "flex", flexDirection: "column", gap: "4px", padding: "10px 12px", borderRadius: tokens.borderRadiusMedium, background: tokens.colorNeutralBackground2, width: "100%", boxSizing: "border-box" },
-  diagList: { display: "flex", flexDirection: "column", gap: "2px", margin: "4px 0" },
-  diagRow: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px", maxWidth: "1100px" },
   card: {
     display: "flex",
@@ -68,24 +65,8 @@ export function UserSettings(p: {
   // počítač tohoto prohlížeče z úložiště (vnější zdroj, až po hydrataci)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setThisStation(stationId() ?? ""), []);
-  const [diag, setDiag] = useState<StationDiagnostics | null>(null);
-  const [diagMsg, setDiagMsg] = useState("");
-  const runDiag = async () => {
-    setDiagMsg("");
-    const r = await stationDiagnosticsAction(stationId()).catch(() => null);
-    if (!r?.ok) return setDiagMsg(r?.message ?? "");
-    setDiag(r.data);
-  };
-  /** Obnovit stav: stanice pošle tiskárny hned, diagnostika se za chvíli načte znovu */
-  const refreshState = async (deviceId: string) => {
-    setDiagMsg(L.StationDiagRefreshing);
-    await stationRefreshAction(deviceId).catch(() => null);
-    setTimeout(() => void runDiag().then(() => setDiagMsg("")), 4000);
-  };
-  const testPage = async (printerId: string) => {
-    const r = await stationTestPageAction(printerId).catch(() => null);
-    setDiagMsg(r?.ok ? L.StationDiagTestSent : (r?.message ?? ""));
-  };
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagKey, setDiagKey] = useState(0);
   /** výběr počítače pro tisk z tohoto prohlížeče (bez zástupce Shanon) */
   const chooseStation = async (id: string) => {
     setThisStation(id);
@@ -97,6 +78,7 @@ export function UserSettings(p: {
     }
     if (id) await stationClaimAction(id).catch(() => null);
     setStationMsg(id ? L.StationChosen : "");
+    setDiagKey((k) => k + 1);
   };
   /** instalátor Shanon Pokladna: zařízení tohoto počítače (ze zástupce), jinak nové → stáhnout .cmd */
   const installStation = async () => {
@@ -221,63 +203,13 @@ export function UserSettings(p: {
               {stationMsg && <Text size={200}>{stationMsg}</Text>}
               {p.stations !== undefined && (
                 <div className={st.diag}>
-                  <Button size="small" onClick={() => void runDiag()}>
-                    {L.StationDiag}
-                  </Button>
-                  {diag && (
-                    <div className={st.diagBox}>
-                      <Text weight="semibold">
-                        {diag.source === "browser" ? L.StationDiagBrowser : diag.source === "user" ? L.StationDiagUser : L.StationDiagNone}
-                      </Text>
-                      {diag.staleBrowser && <Text size={200}>{L.StationDiagStale}</Text>}
-                      {diag.source === "none" && diag.userDevices > 1 && <Text size={200}>{L.StationDiagMany}</Text>}
-                      {diag.device && (
-                        <>
-                          <Text size={200}>
-                            {diag.device.name}
-                            {diag.device.hostName && diag.device.hostName !== diag.device.name ? ` · ${diag.device.hostName}` : ""}
-                            {" · "}
-                            {!diag.device.paired ? L.StationDiagUnpaired : diag.device.online ? L.StationDiagOnline : L.StationDiagOffline}
-                            {diag.device.lastSeenAt ? ` (${new Date(diag.device.lastSeenAt).toLocaleString()})` : ""}
-                            {diag.device.version ? ` · v${diag.device.version}` : ""}
-                          </Text>
-                          {diag.device.version && diag.agentVersion && diag.device.version !== diag.agentVersion && (
-                            <Text size={200}>{(diag.device.version === "1.0.0" ? L.StationDiagReinstall : L.StationDiagUpdating).replace("{v}", diag.agentVersion)}</Text>
-                          )}
-                          {diag.device.paired && (
-                            <Button size="small" appearance="subtle" onClick={() => void refreshState(diag.device!.id)}>
-                              {L.StationDiagRefresh}
-                            </Button>
-                          )}
-                          <div className={st.diagList}>
-                            {diag.printers.length === 0 && <Text size={200}>{L.StationDiagNoPrinters}</Text>}
-                            {diag.printers.map((x) => (
-                              <div key={x.id} className={st.diagRow}>
-                                <Text size={200}>
-                                  {x.label}
-                                  {x.printerName !== x.label ? ` (${x.printerName})` : ""} · {x.paper === "a4" ? "A4" : x.paper === "a6" ? "A6" : `${x.paper} mm`}
-                                  {x.isDefault ? ` · ${L.StationDiagDefault}` : ""}
-                                  {!x.present ? ` · ${L.StationDiagMissing}` : ""}
-                                  {x.state ? ` · ${x.stateLabel}` : ""}
-                                  {x.queued ? ` · ${L.StationDiagQueue.replace("{n}", String(x.queued))}` : ""}
-                                </Text>
-                                <Button size="small" appearance="subtle" disabled={!x.present} onClick={() => void testPage(x.id)}>
-                                  {L.StationDiagTest}
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                      <Text size={200}>
-                        {L.StationDiagReceipt}: {diag.receipt ?? L.StationDiagBrowserPrint}
-                      </Text>
-                      <Text size={200}>
-                        {L.StationDiagDocs}: {diag.documents ?? L.StationDiagBrowserPrint}
-                      </Text>
-                    </div>
+                  {diagOpen ? (
+                    <StationDiag key={diagKey} />
+                  ) : (
+                    <Button size="small" onClick={() => setDiagOpen(true)}>
+                      {L.StationDiag}
+                    </Button>
                   )}
-                  {diagMsg && <Text size={200}>{diagMsg}</Text>}
                 </div>
               )}
               <div className={st.title}>{L.Notifications}</div>

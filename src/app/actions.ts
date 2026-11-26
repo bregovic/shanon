@@ -1532,11 +1532,14 @@ export async function stationClaimAction(deviceId: string): Promise<ActionResult
 }
 
 /** Nastavení → Diagnostika tohoto počítače (stanice, tiskárny, kam se tiskne). */
-export async function stationDiagnosticsAction(browserStationId: string | null): Promise<ActionResult<StationDiagnostics>> {
+export async function stationDiagnosticsAction(browserStationId: string | null, deviceId?: string | null): Promise<ActionResult<StationDiagnostics>> {
   const s = await requireSession();
   try {
     if (!s.ctx.modules.has("int")) throw new UserError("@SYS:NoAccess");
-    return { ok: true, data: await stationDiagnostics(s.ctx, browserStationId && /^[0-9a-f-]{36}$/.test(browserStationId) ? browserStationId : null) };
+    const uuid = (v?: string | null) => (v && /^[0-9a-f-]{36}$/.test(v) ? v : null);
+    // vybrané zařízení (detail zařízení) jen s právem číst zařízení
+    if (uuid(deviceId) && !can(s.ctx.perms, "int.device", "read")) throw new UserError("@SYS:NoAccess");
+    return { ok: true, data: await stationDiagnostics(s.ctx, uuid(browserStationId), uuid(deviceId)) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

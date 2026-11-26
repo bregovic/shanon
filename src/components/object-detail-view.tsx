@@ -51,6 +51,7 @@ import { ImportButton } from "./import-dialog";
 import { InlineLines } from "./inline-lines";
 import { SettleDialog } from "./settle-dialog";
 import { MarkSettleDialog } from "./mark-settle-dialog";
+import { StationDiag } from "./station-diag";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
@@ -125,7 +126,7 @@ export interface ObjectDetailProps {
   autoCreate?: boolean;
   /** text místo řádků u nového dokladu */
   newLinesHint?: string;
-  actions: { id: string; label: string; icon?: ActionIconName; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more"; confirm?: { value: string; text: string }; dialog?: "markSettle" }[];
+  actions: { id: string; label: string; icon?: ActionIconName; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more"; confirm?: { value: string; text: string }; dialog?: "markSettle" | "stationDiag" }[];
   /** Náhled dokladu (zaúčtování nanečisto) — dokud jde zaúčtovat */
   postingPreview?: boolean;
   /** pole s číslem / kódem záznamu (souhrn sbalené hlavičky, klik = uložit nový doklad) */
@@ -455,7 +456,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
 
   // nevratná akce s potvrzením opsáním hodnoty (Smazat firmu s daty)
   const [typed, setTyped] = useState<{ id: string; label: string; value: string; text: string; input: string } | null>(null);
-  const [dialog, setDialog] = useState<"markSettle" | null>(null);
+  const [dialog, setDialog] = useState<"markSettle" | "stationDiag" | null>(null);
   const act = (actionId: string) => {
     const a = p.actions.find((x) => x.id === actionId);
     // akce s vlastním dialogem (Označit k vyrovnání)
@@ -741,6 +742,18 @@ export function ObjectDetailView(p: ObjectDetailProps) {
             router.refresh();
           }}
         />
+      )}
+      {dialog === "stationDiag" && p.id && (
+        <Dialog open onOpenChange={(_, d) => !d.open && setDialog(null)}>
+          <DialogSurface style={{ maxWidth: "min(760px, 96vw)" }}>
+            <DialogBody>
+              <DialogTitle>{p.actions.find((a) => a.dialog === "stationDiag")?.label}</DialogTitle>
+              <DialogContent>
+                <StationDiag deviceId={p.id} />
+              </DialogContent>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
       )}
       <Dialog open={!!typed} onOpenChange={(_, d) => !d.open && setTyped(null)}>
         <DialogSurface>

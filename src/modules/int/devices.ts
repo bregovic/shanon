@@ -97,6 +97,8 @@ export const device = defineObject({
   actions: [
     { id: "installer", label: "@INT:DeviceInstaller", when: { field: "active", equals: true } },
     { id: "unpair", label: "@INT:DeviceUnpair", when: { field: "paired", equals: true } },
+    // Diagnostika: stanice běží, tiskárny se stavem z Windows, kam se tiskne, Obnovit stav, zkušební stránka
+    { id: "diagnose", label: "@INT:DeviceDiag", dialog: "stationDiag", group: "inquiry" },
   ],
 });
 
