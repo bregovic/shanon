@@ -12,7 +12,6 @@
  * řádky doplní účetní v deníku).
  */
 import { qrGlAccount } from "./qr-account";
-import { activateScheduleByPayment } from "@/modules/tax/agreements";
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type DownloadFile, type ObjectHandlers, type RecordData } from "@/core/module";
 import { transformByCode } from "@/core/transform";
@@ -177,6 +176,17 @@ export async function checkStatementChain(data: DataApi, st: RecordData, t: (r: 
   return status;
 }
 
+/** Vyrovnání řádku deníku podle spárování řádku výpisu (kladná částka). */
+function statementSettlement(l: RecordData, amt: bigint): RecordData | null {
+  const a = fromCents(amt < zero ? -amt : amt);
+  if (l.matchKind === "customer" && l.customerTransId) return { partnerType: "customer", settleKind: "invoice", customerTransId: l.customerTransId, amount: a };
+  if (l.matchKind === "vendor" && l.vendorTransId) return { partnerType: "vendor", settleKind: "invoice", vendorTransId: l.vendorTransId, amount: a };
+  if (l.matchKind === "customerAdvance" && l.customerAdvanceId) return { partnerType: "customer", settleKind: "advance", customerAdvanceId: l.customerAdvanceId, amount: a };
+  if (l.matchKind === "vendorAdvance" && l.vendorAdvanceId) return { partnerType: "vendor", settleKind: "advance", vendorAdvanceId: l.vendorAdvanceId, amount: a };
+  if (l.matchKind === "customerAgreement" && l.agreementId) return { partnerType: "customer", settleKind: "agreement", agreementId: l.agreementId, amount: a };
+  return null;
+}
+
 /** Deník HK z výpisu: řádek = banka proti partnerovi / účtu podle spárování. */
 export async function journalFromStatement(data: DataApi, st: RecordData, t: (r: string, p?: Record<string, string>) => string, only?: RecordData[]) {
   if (st.status === "posted") throw new UserError("@BANK:JournalExists", { num: String(st.statementNum) });
@@ -207,11 +217,10 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
         });
   for (const l of lines) {
     const amt = toCents(l.amount);
-    // první platba smlouvy (Kalendář): aktivace = faktura první splátky; platba se s ní spáruje VS jako s běžnou fakturou
+    // smlouva (první platba): partner smlouvy; aktivuje ji až zaúčtování deníku (vyrovnání níže)
     if (l.matchKind === "customerAgreement" && l.agreementId) {
-      const t = await activateScheduleByPayment(data, String(l.agreementId));
-      Object.assign(l, { matchKind: "customer", customerTransId: t.id });
-      await data.update("bank.statementLine", String(l.id), { matchKind: "customer", customerTransId: t.id });
+      const agr = await data.get("ar.agreement", String(l.agreementId));
+      if (agr) Object.assign(l, { customerId: agr.customerId });
     }
     // částky z pohledu účtu řádku: příjem na banku = Dal partnera (MD banky v protiúčtu)
     const base: RecordData = {
@@ -228,7 +237,7 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
       const tr = l.customerTransId ? await data.get("ar.trans", String(l.customerTransId)) : null;
       const adv = l.customerAdvanceId ? await data.get("ar.advance", String(l.customerAdvanceId)) : null;
       Object.assign(base, { accountType: "customer", customerId: tr?.customerId ?? adv?.customerId ?? null });
-    } else if (l.matchKind === "customerAccount") {
+    } else if (l.matchKind === "customerAccount" || l.matchKind === "customerAgreement") {
       Object.assign(base, { accountType: "customer", customerId: l.customerId ?? null });
     } else if (l.matchKind === "vendorAccount") {
       Object.assign(base, { accountType: "vendor", vendorId: l.vendorId ?? null });
@@ -247,8 +256,14 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
       // nespárované: účet doplní účetní v deníku
       Object.assign(base, { accountType: "ledger", accountId: null });
     }
-    await data.create("gl.journalLine", base);
+    const jl = await data.create("gl.journalLine", base);
     await data.update("bank.statementLine", String(l.id), { journalId: j.id });
+    // spárovaný doklad = označeno k vyrovnání (faktura, záloha, smlouva); zaúčtování deníku vyrovnání provede
+    const settle = statementSettlement(l, amt);
+    if (settle) {
+      await data.create("gl.journalSettlement", { journalId: j.id, journalLineId: jl.id, ...settle });
+      await data.update("gl.journalLine", String(jl.id), { settleStatus: "full" });
+    }
   }
   await data.update("bank.statement", String(st.id), { journalId: j.id });
   void t;

@@ -2407,6 +2407,7 @@ model ArAgreement {
   arOrder_agreement             ArOrder[]             @relation("ArOrder_agreement")
   arInvoice_agreement           ArInvoice[]           @relation("ArInvoice_agreement")
   arAdvance_agreement           ArAdvance[]           @relation("ArAdvance_agreement")
+  arTrans_agreement             ArTrans[]             @relation("ArTrans_agreement")
   bankStatementLine_agreement   BankStatementLine[]   @relation("BankStatementLine_agreement")
 
   @@index([tenantId, companyId])
@@ -2433,6 +2434,7 @@ model ArAgreementLine {
   status      String    @default("planned") @db.VarChar(40)
   orderId     String?   @map("order_id") @db.Uuid
   invoiceId   String?   @map("invoice_id") @db.Uuid
+  paymentDate DateTime? @map("payment_date") @db.Date
   dueDate     DateTime? @map("due_date") @db.Date
   ext         Json      @default("{}")
   version     Int       @default(1)
@@ -2736,6 +2738,7 @@ model ArTrans {
   customerId  String    @map("customer_id") @db.Uuid
   invoiceId   String?   @map("invoice_id") @db.Uuid
   advanceId   String?   @map("advance_id") @db.Uuid
+  agreementId String?   @map("agreement_id") @db.Uuid
   voucherId   String?   @map("voucher_id") @db.Uuid
   kind        String    @default("invoice") @db.VarChar(40)
   documentNum String?   @map("document_num") @db.VarChar(255)
@@ -2759,6 +2762,7 @@ model ArTrans {
   customer                          ArCustomer            @relation("ArTrans_customer", fields: [customerId], references: [id], onDelete: Restrict)
   invoice                           ArInvoice?            @relation("ArTrans_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
   advance                           ArAdvance?            @relation("ArTrans_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  agreement                         ArAgreement?          @relation("ArTrans_agreement", fields: [agreementId], references: [id], onDelete: Restrict)
   voucher                           GlVoucher?            @relation("ArTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   currency                          SysCurrency?          @relation("ArTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   account                           GlAccount?            @relation("ArTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
@@ -2769,6 +2773,7 @@ model ArTrans {
   @@index([customerId])
   @@index([invoiceId])
   @@index([advanceId])
+  @@index([agreementId])
   @@index([voucherId])
   @@index([currencyId])
   @@index([accountId])
@@ -3024,6 +3029,7 @@ model ApAgreement {
   apOrder_agreement         ApOrder[]         @relation("ApOrder_agreement")
   apInvoice_agreement       ApInvoice[]       @relation("ApInvoice_agreement")
   apAdvance_agreement       ApAdvance[]       @relation("ApAdvance_agreement")
+  apTrans_agreement         ApTrans[]         @relation("ApTrans_agreement")
 
   @@index([tenantId, companyId])
   @@index([vendorId])
@@ -3049,6 +3055,7 @@ model ApAgreementLine {
   status      String    @default("planned") @db.VarChar(40)
   orderId     String?   @map("order_id") @db.Uuid
   invoiceId   String?   @map("invoice_id") @db.Uuid
+  paymentDate DateTime? @map("payment_date") @db.Date
   dueDate     DateTime? @map("due_date") @db.Date
   ext         Json      @default("{}")
   version     Int       @default(1)
@@ -3347,6 +3354,7 @@ model ApTrans {
   vendorId    String    @map("vendor_id") @db.Uuid
   invoiceId   String?   @map("invoice_id") @db.Uuid
   advanceId   String?   @map("advance_id") @db.Uuid
+  agreementId String?   @map("agreement_id") @db.Uuid
   voucherId   String?   @map("voucher_id") @db.Uuid
   kind        String    @default("invoice") @db.VarChar(40)
   documentNum String?   @map("document_num") @db.VarChar(255)
@@ -3370,6 +3378,7 @@ model ApTrans {
   vendor                           ApVendor               @relation("ApTrans_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
   invoice                          ApInvoice?             @relation("ApTrans_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
   advance                          ApAdvance?             @relation("ApTrans_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  agreement                        ApAgreement?           @relation("ApTrans_agreement", fields: [agreementId], references: [id], onDelete: Restrict)
   voucher                          GlVoucher?             @relation("ApTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   currency                         SysCurrency?           @relation("ApTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   account                          GlAccount?             @relation("ApTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
@@ -3381,6 +3390,7 @@ model ApTrans {
   @@index([vendorId])
   @@index([invoiceId])
   @@index([advanceId])
+  @@index([agreementId])
   @@index([voucherId])
   @@index([currencyId])
   @@index([accountId])

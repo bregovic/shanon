@@ -1,6 +1,6 @@
 "use server";
 
-import { settleSave, settleView, type SettleView } from "@/server/journal-settle";
+import { markSettleSave, markSettleView, settleSave, settleView, type MarkView, type SettleView } from "@/server/journal-settle";
 import type { SettleCriteria } from "@/modules/gl/settlement";
 import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
@@ -1492,6 +1492,27 @@ export async function settleSaveAction(lineId: string, items: { kind: "customer"
   const s = await requireSession();
   try {
     await settleSave(s.ctx, lineId, Array.isArray(items) ? items.slice(0, 200) : []);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Doklad → Označit k vyrovnání: nezaúčtované řádky deníků k vyrovnání s dokladem. */
+export async function markSettleViewAction(objectId: string, id: string, criteria: { all?: boolean; vs?: string; amount?: string }): Promise<ActionResult<MarkView>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: await markSettleView(s.ctx, objectId, id, criteria ?? {}, s.lang) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Doklad → Označit k vyrovnání → uložit: řádek deníku vyrovná doklad při zaúčtování. */
+export async function markSettleSaveAction(objectId: string, id: string, lineId: string, amount: string): Promise<ActionResult<null>> {
+  const s = await requireSession();
+  try {
+    await markSettleSave(s.ctx, objectId, id, lineId, String(amount ?? ""));
     return { ok: true, data: null };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);

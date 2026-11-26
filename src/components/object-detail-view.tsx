@@ -50,6 +50,7 @@ import { HistoryButton } from "./history-panel";
 import { ImportButton } from "./import-dialog";
 import { InlineLines } from "./inline-lines";
 import { SettleDialog } from "./settle-dialog";
+import { MarkSettleDialog } from "./mark-settle-dialog";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
@@ -124,7 +125,7 @@ export interface ObjectDetailProps {
   autoCreate?: boolean;
   /** text místo řádků u nového dokladu */
   newLinesHint?: string;
-  actions: { id: string; label: string; icon?: ActionIconName; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more"; confirm?: { value: string; text: string } }[];
+  actions: { id: string; label: string; icon?: ActionIconName; upload?: string; download?: boolean; disabled?: boolean; group?: "process" | "print" | "inquiry" | "more"; confirm?: { value: string; text: string }; dialog?: "markSettle" }[];
   /** Náhled dokladu (zaúčtování nanečisto) — dokud jde zaúčtovat */
   postingPreview?: boolean;
   /** pole s číslem / kódem záznamu (souhrn sbalené hlavičky, klik = uložit nový doklad) */
@@ -454,8 +455,11 @@ export function ObjectDetailView(p: ObjectDetailProps) {
 
   // nevratná akce s potvrzením opsáním hodnoty (Smazat firmu s daty)
   const [typed, setTyped] = useState<{ id: string; label: string; value: string; text: string; input: string } | null>(null);
+  const [dialog, setDialog] = useState<"markSettle" | null>(null);
   const act = (actionId: string) => {
     const a = p.actions.find((x) => x.id === actionId);
+    // akce s vlastním dialogem (Označit k vyrovnání)
+    if (a?.dialog) return setDialog(a.dialog);
     if (a?.confirm && typed?.id !== actionId) return setTyped({ id: a.id, label: a.label, value: a.confirm.value, text: a.confirm.text, input: "" });
     setTyped(null);
     return start(async () => {
@@ -724,6 +728,20 @@ export function ObjectDetailView(p: ObjectDetailProps) {
       {p.postingPreview && p.id && <PostingPreviewDrawer objectId={p.objectId} id={p.id} open={posting} onClose={() => setPosting(false)} labels={p.labels.posting} lang={p.lang} />}
 
       {unsaved.dialog(p.labels.drawer.unsaved)}
+      {dialog === "markSettle" && p.id && (
+        <MarkSettleDialog
+          objectId={p.objectId}
+          id={p.id}
+          open
+          lang={p.lang}
+          onClose={() => setDialog(null)}
+          onSaved={() => {
+            setDialog(null);
+            toast(p.labels.actions.saved, "success");
+            router.refresh();
+          }}
+        />
+      )}
       <Dialog open={!!typed} onOpenChange={(_, d) => !d.open && setTyped(null)}>
         <DialogSurface>
           <DialogBody>

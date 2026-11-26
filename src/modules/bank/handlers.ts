@@ -299,11 +299,11 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
   const posting: PostingLine[] = [];
   for (const l of lines) {
     const text = [l.vs ? `VS ${l.vs}` : null, l.message].filter(Boolean).join(" · ") || null;
-    // první platba smlouvy: aktivace = faktura první splátky, platba pak jde na ni jako na běžnou fakturu
+    // první platba smlouvy: aktivace (objednávka K fakturaci, den platby); platba = úhrada smlouvy v saldu,
+    // uhradí fakturu splátky, až se vystaví
     if (l.matchKind === "customerAgreement") {
-      const t = await activateScheduleByPayment(data, String(l.agreementId));
-      Object.assign(l, { matchKind: "customer", customerTransId: t.id });
-      await data.update("bank.statementLine", String(l.id), { matchKind: "customer", customerTransId: t.id });
+      const agr = await activateScheduleByPayment(data, String(l.agreementId), String(l.date).slice(0, 10));
+      Object.assign(l, { matchKind: "customerAccount", customerId: agr.customerId, _agreementId: agr.id });
     }
     let other: string;
     if (l.matchKind === "customer") other = await summaryAccount(data, (await data.get("ar.trans", String(l.customerTransId)))!, "customer");
@@ -359,6 +359,7 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
       await data.create(isCust ? "ar.trans" : "ap.trans", {
         [isCust ? "customerId" : "vendorId"]: isCust ? l.customerId : l.vendorId,
         kind: "payment",
+        ...(isCust && l._agreementId ? { agreementId: l._agreementId } : {}),
         voucherId: voucher.id,
         documentNum: `${account.code}/${st.statementNum}/${l.lineNum ?? i + 1}`,
         vs: l.vs ?? null,

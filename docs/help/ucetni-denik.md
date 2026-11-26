@@ -46,7 +46,7 @@ V dialogu nejdřív zvolte **Co vyrovnat**:
 - Dialog ukáže otevřené položky **partnera řádku**; vypnutím *Jen partner řádku* hledáte u všech – podle druhu (odběratelé / dodavatelé), **VS**, **částky**, data a čísla dokladu nebo jména partnera.
 - Zaškrtněte doklady a u každého částku **Uhradit** (předvyplní se zbytek řádku, nejvýš zbytek dokladu) – jde uhradit i část.
 - Řádek bez partnera ho po výběru převezme (na stranu účtu), prázdný VS se doplní z jediného dokladu a prázdná částka součtem.
-- Sloupec **Vyrovnání** ukazuje *Nevyrovnáno / Částečně / Vyrovnáno*. Změna partnera řádku vyrovnání zruší; **Zrušit vyrovnání** v dialogu také.
+- Sloupec **Vyrovnání** ukazuje *Nevyrovnáno / Označeno částečně / Označeno k vyrovnání* a po zaúčtování *Vyrovnáno*. Deník z bankovního výpisu označí spárované doklady (faktura, záloha, smlouva) rovnou. Z druhé strany jde vyrovnání označit u faktury, zálohy nebo prodejní smlouvy akcí **Označit k vyrovnání** (vybere se nezaúčtovaný řádek deníku). Změna partnera řádku vyrovnání zruší; **Zrušit vyrovnání** v dialogu také.
 - Zaúčtování uhradí přesně vybrané doklady a částky; řádek bez vyrovnání se dál páruje jednoznačným VS. Ověřit hlídá, že položka patří partnerovi řádku, je otevřená a částky nepřesahují zbytek dokladu ani řádek.
 
 Před vytvořením deníku ukáže výpis **Zobrazit ▾ Náhled dokladu** účetní zápisy nanečisto (banka proti partnerům a účtům, nic se neuloží); nespárovaný řádek náhled ohlásí.

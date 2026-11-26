@@ -109,11 +109,75 @@ describe("vyrovnání řádku deníku", () => {
     expect((await getRecord(C, "ar.advance", String(adv.id), client))!.paidAmount).toBe("500.00");
     const a = (await getRecord(C, "ar.agreement", String(agr.id), client))!;
     expect(a.status).toBe("active");
+    // aktivace = objednávka K fakturaci, platba smlouvy v saldu; Vyfakturovat ji použije
+    expect((await listRecords(C, "ar.trans", { filter: { agreementId: agr.id, kind: "payment" } }, client)).rows.map((x) => [x.amountCur, x.closed])).toEqual([["-800.00", false]]);
+    await runAction(C, "ar.agreement", String(agr.id), "invoiceDue", client);
     const invs = (await listRecords(C, "ar.trans", { filter: { kind: "invoice" } }, client)).rows;
     expect(invs.map((x) => [x.amount, x.paidAmount, x.closed])).toEqual([["800.00", "800.00", true]]);
+    expect((await getRecord(C, "gl.journalLine", String(l2.id), client))!.settleStatus).toBe("settled");
     // záloha šla na účet záloh (324)
     const a324 = await acc("324000");
     const tr = (await listRecords(C, "gl.trans", { filter: { accountId: a324 } }, client)).rows;
     expect(tr.map((x) => x.amount)).toContain("-500.00"); // + DPH ze zálohy (daňový doklad k přijaté platbě)
+  }, 120_000);
+
+  it("výpis → deník: spárovaná smlouva je Označeno k vyrovnání, aktivuje ji až zaúčtování deníku", async () => {
+    const C = (await provisionTenant(client, { code: `t-js3-${run}`, name: "JS3", adminEmail: `js3-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "bank", "inv"], company: { code: "J", name: "J" } })).ctx;
+    const acc = async (n: string) => String((await listRecords(C, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
+    const [grp] = (await listRecords(C, "ar.group", {}, client)).rows;
+    const subj = await saveRecord(C, "gab.subject", null, { name: "Člen Výpis" }, undefined, client);
+    const cust = await saveRecord(C, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const [prm] = (await listRecords(C, "ar.parameters", {}, client)).rows;
+    await saveRecord(C, "ar.parameters", String(prm.id), { agreementMode: "schedule" }, prm.version as number, client);
+    const g = (await listRecords(C, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(C, "inv.unit", {}, client)).rows[0];
+    const tariff = await saveRecord(C, "inv.item", null, { itemNum: "M1", name: "Měsíc", groupId: g.id, unitId: u.id, salesPrice: "900", priceInclTax: true, agreementMonths: 1 }, undefined, client);
+    const agr = await saveRecord(C, "ar.agreement", null, { customerId: cust.id, itemId: tariff.id, startDate: "2026-11-20" }, undefined, client);
+    await runAction(C, "ar.agreement", String(agr.id), "requestPayment", client);
+    const vs = String((await getRecord(C, "ar.agreement", String(agr.id), client))!.vs);
+    const bank = await saveRecord(C, "bank.account", null, { code: "KB", name: "Účet", accountNum: "2000145399/0800", glAccountId: await acc("221000") }, undefined, client);
+    const st = await saveRecord(C, "bank.statement", null, { bankAccountId: bank.id, statementNum: "1", date: "2026-11-25", openingBalance: "0" }, undefined, client);
+    await saveRecord(C, "bank.statementLine", null, { statementId: st.id, lineNum: 1, date: "2026-11-25", amount: "900", vs }, undefined, client);
+    await runAction(C, "bank.statement", String(st.id), "match", client);
+    await runAction(C, "bank.statement", String(st.id), "createJournal", client);
+    const jId = String((await getRecord(C, "bank.statement", String(st.id), client))!.journalId);
+    const [jl] = (await listRecords(C, "gl.journalLine", { filter: { journalId: jId } }, client)).rows;
+    expect([jl.accountType, jl.customerId, jl.vs, jl.settleStatus]).toEqual(["customer", cust.id, vs, "full"]);
+    expect((await getRecord(C, "ar.agreement", String(agr.id), client))!.status).toBe("awaiting"); // ještě ne
+    await runAction(C, "gl.journal", jId, "post", client);
+    const a = (await getRecord(C, "ar.agreement", String(agr.id), client))!;
+    expect(a.status).toBe("active");
+    const [ln] = (await listRecords(C, "ar.agreementLine", { filter: { agreementId: agr.id }, sort: "lineNum" }, client)).rows;
+    expect([ln.status, String(ln.paymentDate).slice(0, 10)]).toEqual(["toInvoice", "2026-11-25"]);
+    expect((await getRecord(C, "gl.journalLine", String(jl.id), client))!.settleStatus).toBe("settled");
+    await runAction(C, "ar.agreement", String(agr.id), "invoiceDue", client);
+    const [it] = (await listRecords(C, "ar.trans", { filter: { kind: "invoice" } }, client)).rows;
+    expect([it.amount, it.closed]).toEqual(["900.00", true]);
+  }, 120_000);
+
+  it("Označit k vyrovnání z faktury: volná platba v deníku → po zaúčtování uhrazená faktura", async () => {
+    const { markSettleSave, markSettleView } = await import("@/server/journal-settle");
+    const C = (await provisionTenant(client, { code: `t-js4-${run}`, name: "JS4", adminEmail: `js4-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "bank"], company: { code: "J", name: "J" } })).ctx;
+    const acc = async (n: string) => String((await listRecords(C, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
+    const [grp] = (await listRecords(C, "ar.group", {}, client)).rows;
+    const subj = await saveRecord(C, "gab.subject", null, { name: "Fakturovaný" }, undefined, client);
+    const cust = await saveRecord(C, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const j1 = await saveRecord(C, "gl.journal", null, { date: "2026-11-10", description: "Faktura" }, undefined, client);
+    await saveRecord(C, "gl.journalLine", null, { journalId: j1.id, accountType: "customer", customerId: cust.id, debit: "650", vs: "55", offsetType: "ledger", offsetAccountId: await acc("602000") }, undefined, client);
+    await runAction(C, "gl.journal", String(j1.id), "post", client);
+    // faktura jako doklad: položka salda z deníku nemá ar.invoice – vytvořím fakturu přímo
+    const inv = await saveRecord(C, "ar.invoice", null, { customerId: cust.id, invoiceDate: "2026-11-12" }, undefined, client);
+    await saveRecord(C, "ar.invoiceLine", null, { invoiceId: inv.id, description: "Služba", qty: "1", unitPrice: "1000" }, undefined, client);
+    await runAction(C, "ar.invoice", String(inv.id), "post", client);
+    const j2 = await saveRecord(C, "gl.journal", null, { date: "2026-11-20", description: "Výpis" }, undefined, client);
+    const free = await saveRecord(C, "gl.journalLine", null, { journalId: j2.id, accountType: "ledger", credit: "1210", offsetType: "ledger", offsetAccountId: await acc("261000"), text: "Neznámá platba" }, undefined, client);
+    const v = await markSettleView(C, "ar.invoice", String(inv.id), {}, "cs", client);
+    expect(v.rows.map((r) => r.lineId)).toContain(String(free.id));
+    await markSettleSave(C, "ar.invoice", String(inv.id), String(free.id), "", client);
+    const l = (await getRecord(C, "gl.journalLine", String(free.id), client))!;
+    expect([l.accountType, l.customerId, l.settleStatus]).toEqual(["customer", cust.id, "full"]);
+    await runAction(C, "gl.journal", String(j2.id), "post", client);
+    const it = (await listRecords(C, "ar.trans", { filter: { invoiceId: inv.id, kind: "invoice" } }, client)).rows[0];
+    expect([it.paidAmount, it.closed]).toEqual([it.amountCur, true]);
   }, 120_000);
 });

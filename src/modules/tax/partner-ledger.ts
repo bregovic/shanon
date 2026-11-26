@@ -10,7 +10,7 @@ import { defineObject, type ObjectDef } from "@/core/object";
 import { DIM_NAMES, DupCheck, JournalStatus, dimFields } from "@/modules/gl";
 import { documentLineHandlers, invoiceHandlers, type InvoiceConfig } from "./document";
 import { orderHandlers, releaseOrder, vatPayer } from "./orders";
-import { AgreementLineStatus, AgreementMode, AgreementStatus, agreementDeleteHooks, agreementHandlers, agreementLineObject, agreementObject, agreementParamFields, runAgreements, type AgreementDocs } from "./agreements";
+import { AgreementLineStatus, AgreementMode, AgreementStatus, agreementDeleteHooks, agreementHandlers, agreementLineObject, agreementObject, agreementParamFields, invoiceScheduleLine, runAgreements, type AgreementDocs } from "./agreements";
 import { postingAccount } from "@/modules/gl/setup";
 import { fillFromAres } from "@/modules/gab/ares";
 import { createFromRegistry } from "@/modules/gab/registry-lookup";
@@ -339,6 +339,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     actions: [
       // hromadně ze seznamu (vybrané faktury, každá zvlášť)
       { id: "post", label: "@GL:Post", when: { field: "status", equals: "draft" }, bulk: true },
+      // úhrada z nezaúčtovaného řádku deníku (výpis) – vyrovná se zaúčtováním deníku
+      { id: "markSettle", label: "@GL:MarkSettle", dialog: "markSettle", when: { field: "status", equals: "posted" }, group: "process" as const },
       { id: "unpost", label: "@TAX:Unpost", when: { field: "status", equals: "posted" }, adminOnly: true, group: "more" as const, confirm: { field: "invoiceNum", text: "@TAX:UnpostConfirm" } },
       ...(sp.side === 1
         ? [
@@ -428,7 +430,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     actions: [
       { id: "confirm", label: "@TAX:Confirm", when: { field: "status", equals: "open" } },
       { id: "createAdvance", label: "@TAX:CreateAdvance" },
-      { id: "createInvoice", label: "@TAX:CreateInvoice" },
+      // i hromadně ze seznamu (objednávky splátek smluv K fakturaci)
+      { id: "createInvoice", label: "@TAX:CreateInvoice", bulk: true },
       ...(sp.side === -1 ? [{ id: "receive", label: "@TAX:Receive", module: "whs" }] : []),
       { id: "cancel", label: "@TAX:CancelDoc" },
     ],
@@ -512,6 +515,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     defaultSort: { field: "issueDate", dir: "desc" },
     actions: [
       { id: "cancel", label: "@TAX:CancelDoc", when: { field: "status", equals: "open" } },
+      { id: "markSettle", label: "@GL:MarkSettle", dialog: "markSettle", group: "process" as const },
       ...(sp.side === 1 ? [{ id: "email", label: "@INT:SendByEmail", outside: true, module: "int", group: "print" as const }] : []),
     ],
     lockedWhen: { field: "status", equals: "settled" },
@@ -532,6 +536,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       [partnerId]: { edt: refEdt(id(sp.partner), L("Partner")), mandatory: true },
       invoiceId: { edt: refEdt(id("invoice"), L("Invoice")) },
       advanceId: { edt: refEdt(id("advance"), L("Advance")) },
+      /** platba smlouvy přijatá před fakturou (uhradí fakturu splátky, až vznikne) */
+      agreementId: { edt: refEdt(id("agreement"), L("Agreement")) },
       voucherId: { edt: refEdt("gl.voucher", "@GL:Voucher") },
       kind: { edt: enumEdt(TransKind), mandatory: true, default: "invoice" },
       documentNum: { edt: Edts.Description, label: "@TAX:DocumentNum" },
@@ -609,7 +615,19 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       ...orderHandlers(docs),
       // mazání nezaúčtované smlouvy / objednávky / zálohy přes vzájemné odkazy (agreementDeleteHooks)
       [agrDocs.agreement]: { ...agreementHandlers(agrDocs)[agrDocs.agreement], beforeDelete: agrDel.agreement },
-      [docs.order]: { ...orderHandlers(docs)[docs.order], beforeDelete: agrDel.order },
+      [docs.order]: {
+        ...orderHandlers(docs)[docs.order],
+        beforeDelete: agrDel.order,
+        actions: {
+          ...orderHandlers(docs)[docs.order].actions,
+          // objednávka splátky smlouvy: faktura se VS smlouvy, DUZP = den platby, úhrada přijatou platbou smlouvy
+          async createInvoice(ctx: EventContext, o: RecordData) {
+            const [ln] = o.agreementId ? await ctx.data.find(agrDocs.agreementLine, { orderId: o.id, status: "toInvoice" }, { take: 1 }) : [];
+            if (ln) await invoiceScheduleLine(ctx.data, agrDocs, ln);
+            else await orderHandlers(docs)[docs.order].actions!.createInvoice(ctx, o);
+          },
+        },
+      },
       [docs.advance]: { ...orderHandlers(docs)[docs.advance], beforeDelete: agrDel.advance },
       // faktura z objednávky: smazáním konceptu se objednávka vrátí k fakturaci
       [invoice.id]: { ...inv[invoice.id], beforeDelete: (ctx: EventContext, d: RecordData) => releaseOrder(ctx.data, docs, d) },

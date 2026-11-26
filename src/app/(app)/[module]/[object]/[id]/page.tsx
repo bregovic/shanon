@@ -186,7 +186,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
           ? []
           : (def.actions ?? [])
               .filter((a) => (!a.module || s.ctx.modules.has(a.module)) && (!a.adminOnly || s.ctx.perms.admin))
-              .map((a) => ({ id: a.id, label: t(a.label), icon: a.icon, upload: a.upload, download: a.download, group: a.group ?? (a.download ? "print" : "process"), confirm: a.confirm ? { value: String(record[a.confirm.field] ?? ""), text: t(a.confirm.text) } : undefined, disabled: !!a.when && record[a.when.field] !== a.when.equals }))
+              .map((a) => ({ id: a.id, label: t(a.label), icon: a.icon, upload: a.upload, download: a.download, group: a.group ?? (a.download ? "print" : "process"), confirm: a.confirm ? { value: String(record[a.confirm.field] ?? ""), text: t(a.confirm.text) } : undefined, dialog: a.dialog, disabled: !!a.when && record[a.when.field] !== a.when.equals }))
       }
       titleField={def.titleField}
       postingPreview={

@@ -302,18 +302,32 @@ describe("smlouva v režimu Kalendář (bez zálohy)", () => {
     const m = await pay(2, "1000");
     expect(m.matchKind).toBe("customerAgreement");
     a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
+    // aktivace = objednávka K fakturaci (bez faktury), platba v saldu jako úhrada smlouvy
+    expect([a.status, a.paidUntil, (await listRecords(T, "ar.invoice", { filter: { agreementId: agr.id } }, client)).total]).toEqual(["active", periodEnd(start, 1), 0]);
+    let ls = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100, sort: "lineNum" }, client)).rows;
+    expect([ls[0].status, String(ls[0].paymentDate).slice(0, 10), ls[1].status]).toEqual(["toInvoice", iso(new Date()), "planned"]);
+    const prepay = (await listRecords(T, "ar.trans", { filter: { agreementId: agr.id, kind: "payment" } }, client)).rows;
+    expect(prepay.map((x) => [x.amountCur, x.closed])).toEqual([["-1000.00", false]]);
+    // Vyfakturovat: faktura s DUZP = den platby, uhrazená přijatou platbou
+    await runAction(T, "ar.agreement", String(agr.id), "invoiceDue", client);
     let inv = (await listRecords(T, "ar.invoice", { filter: { agreementId: agr.id } }, client)).rows;
-    expect([a.status, a.paidUntil, inv.length, inv[0].status, inv[0].vs, inv[0].paidAmount]).toEqual(["active", periodEnd(start, 1), 1, "posted", a.vs, "1000.00"]);
-    const ls = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100 }, client)).rows;
+    expect([inv.length, inv[0].status, inv[0].vs, inv[0].paidAmount, String(inv[0].taxDate).slice(0, 10)]).toEqual([1, "posted", a.vs, "1000.00", iso(new Date())]);
+    expect((await getRecord(T, "ar.trans", String(prepay[0].id), client))!.closed).toBe(true);
+    ls = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100, sort: "lineNum" }, client)).rows;
     expect(ls.slice(0, 2).map((l) => l.status)).toEqual(["paid", "planned"]);
+    await expect(runAction(T, "ar.agreement", String(agr.id), "invoiceDue", client)).rejects.toMatchObject({ label: "@TAX:AgrNothingToInvoice" });
 
     // dávka: druhá splátka se vystaví před začátkem období, splatnost 3 dny
     const job = async (today: string) => inTenant(T, (s) => runAgreements(s.sys().api(), regDocs(), today), client);
     const from2 = String(ls[1].periodFrom).slice(0, 10);
     expect(await job(from2)).toEqual({ issued: 1, blocked: 0 });
+    // druhá splátka K fakturaci → faktura z objednávky (Vytvořit fakturu, i hromadně)
+    ls = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100, sort: "lineNum" }, client)).rows;
+    expect(ls[1].status).toBe("toInvoice");
+    await runAction(T, "ar.order", String(ls[1].orderId), "createInvoice", client);
     inv = (await listRecords(T, "ar.invoice", { filter: { agreementId: agr.id }, sort: "invoiceNum" }, client)).rows;
     const inv2 = inv.find((x) => x.paidAmount !== "1000.00")!;
-    const due2 = iso(new Date(new Date(`${from2}T00:00:00Z`).getTime() + 3 * 86400000));
+    const due2 = plus(3);
     expect([inv.length, String(inv2.dueDate).slice(0, 10), inv2.vs]).toEqual([2, due2, a.vs]);
     // po splatnosti nezaplaceno → blokovaná, další splátky se nevystavují
     const late = iso(new Date(new Date(`${due2}T00:00:00Z`).getTime() + 86400000));
@@ -328,11 +342,13 @@ describe("smlouva v režimu Kalendář (bez zálohy)", () => {
     a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
     expect([a.status, a.paidUntil]).toEqual(["active", String(ls[1].periodTo).slice(0, 10)]);
 
-    // ruční aktivace (zaplaceno na recepci): faktura první splátky, smlouva aktivní
+    // ruční aktivace (zaplaceno na recepci): objednávka K fakturaci, smlouva aktivní; faktura až Vyfakturovat
     const b = await saveRecord(T, "ar.agreement", null, { customerId: cust.id, itemId: tariff.id, startDate: start }, undefined, client);
     await runAction(T, "ar.agreement", String(b.id), "activate", client);
     const bb = (await getRecord(T, "ar.agreement", String(b.id), client))!;
-    expect([bb.status, (await listRecords(T, "ar.invoice", { filter: { agreementId: b.id } }, client)).total]).toEqual(["active", 1]);
+    expect([bb.status, (await listRecords(T, "ar.invoice", { filter: { agreementId: b.id } }, client)).total]).toEqual(["active", 0]);
+    await runAction(T, "ar.agreement", String(b.id), "invoiceDue", client);
+    expect((await listRecords(T, "ar.invoice", { filter: { agreementId: b.id } }, client)).total).toBe(1);
 
     // tarif za kartu: cena smlouvy = cena × počet karet, řádek faktury 3 ks × 800
     const firm = await saveRecord(T, "inv.item", null, { itemNum: "FIRMA1", name: "Firemní členství", groupId: g.id, unitId: u.id, salesPrice: "800", priceInclTax: true, agreementMonths: 1, agreementPerUnit: true }, undefined, client);
@@ -347,6 +363,7 @@ describe("smlouva v režimu Kalendář (bez zálohy)", () => {
     const c2 = await saveRecord(T, "ar.agreement", String(c.id), { quantity: 5 }, cv.version as number, client);
     expect(c2.amount).toBe("4000.00");
     await runAction(T, "ar.agreement", String(c.id), "activate", client);
+    await runAction(T, "ar.agreement", String(c.id), "invoiceDue", client);
     const [ci] = (await listRecords(T, "ar.invoice", { filter: { agreementId: c.id } }, client)).rows;
     const cl = (await listRecords(T, "ar.invoiceLine", { filter: { invoiceId: ci.id } }, client)).rows;
     expect([ci.amountGross, cl[0].qty, cl[0].unitPrice]).toEqual(["4000.00", "5.0000", "800.00"]);
@@ -404,7 +421,7 @@ describe("portál smluv – platba kartou, začátek od platby, PDF", () => {
     agr = (await getRecord(T, "ar.agreement", r.agreementId!, client))!;
     expect([agr.status, agr.startDate, agr.startOnPayment]).toEqual(["active", iso(new Date()), false]);
     const lines = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100, sort: "lineNum" }, client)).rows;
-    expect([lines[0].status, lines[0].periodFrom]).toEqual(["paid", iso(new Date())]);
+    expect([lines[0].status, lines[0].periodFrom, String(lines[0].paymentDate).slice(0, 10)]).toEqual(["toInvoice", iso(new Date()), iso(new Date())]);
     // opakované ověření nic nezmění
     expect(await agreementPortalPaid(T.tenantId, String(p.token), r.payRef!, client)).toMatchObject({ status: "active" });
   }, 120_000);

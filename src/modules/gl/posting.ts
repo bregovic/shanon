@@ -463,7 +463,8 @@ export const glHandlers: Record<string, ObjectHandlers> = {
           data.settleStatus = "none";
         } else if (a) {
           const list = await ctx.data.find("gl.journalSettlement", { journalLineId: data.id }, { take: 500 });
-          if (list.length) data.settleStatus = settleStatusOf(lineAmount(data), list.reduce((x, y) => x + toCents(String(y.amount ?? 0)), BigInt(0)));
+          // po zaúčtování zůstane Vyrovnáno
+          if (list.length && data.settleStatus !== "settled") data.settleStatus = settleStatusOf(lineAmount(data), list.reduce((x, y) => x + toCents(String(y.amount ?? 0)), BigInt(0)));
         }
       }
     },

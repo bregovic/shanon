@@ -74,6 +74,12 @@ export async function defaultDimsOf(data: DataApi, type: unknown, refId: unknown
     if (acc?.[`dim${n}Req`] === "notAllowed") out.notAllowed.add(f);
     else if (src?.[f]) out.dims[f] = String(src[f]);
   }
+  // dimenze se zdrojem Partner: hodnota = číslo odběratele / dodavatele řádku (vidět už v deníku, ne až v zápisech)
+  if ((t === "customer" || t === "vendor") && src?.accountNum)
+    for (const d of await activeDimensions(data).catch(() => [] as DimDef[])) {
+      const f = dimField(d.slot);
+      if (d.source === "partner" && !out.dims[f]) out.dims[f] = String(src.accountNum);
+    }
   return out;
 }
 

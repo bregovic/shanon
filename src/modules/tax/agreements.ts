@@ -21,6 +21,7 @@ import { UserError, type DataApi, type EventContext, type ObjectHandlers, type R
 import { defineObject } from "@/core/object";
 import { accountingCurrencyId } from "@/modules/gl/posting";
 import { postInvoice } from "./document";
+import { notify } from "@/modules/sys/notify";
 import { invoiceFromOrder, type OrderDocs } from "./orders";
 
 export const AgreementStatus = defineEnum({
@@ -40,6 +41,7 @@ export const AgreementLineStatus = defineEnum({
   label: "@TAX:AgrLineStatus",
   values: [
     { value: "planned", label: "@TAX:AgrLinePlanned" },
+    { value: "toInvoice", label: "@TAX:AgrLineToInvoice", color: "brand" },
     { value: "invoiced", label: "@TAX:AgrLineInvoiced", color: "warning" },
     { value: "paid", label: "@TAX:AgrLinePaid", color: "success" },
     { value: "cancelled", label: "@TAX:AgrLineCancelled" },
@@ -149,6 +151,10 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
     actions: [
       { id: "requestPayment", label: "@TAX:AgrRequestPayment" },
       { id: "activate", label: "@TAX:AgrActivate" },
+      // splátky K fakturaci → faktury (i hromadně ze seznamu smluv)
+      { id: "invoiceDue", label: "@TAX:AgrInvoiceDue", bulk: true },
+      // první platba z nezaúčtovaného řádku deníku (výpis) – aktivuje zaúčtování deníku (jen prodejní smlouvy)
+      ...(m === "ar" ? [{ id: "markSettle", label: "@GL:MarkSettle", dialog: "markSettle" as const, when: { field: "status", equals: "awaiting" } }] : []),
       { id: "end", label: "@TAX:AgrEndAction" },
     ],
     lockedWhen: { field: "status", equals: "ended" },
@@ -173,6 +179,8 @@ export function agreementLineObject(m: string, L: (k: string) => string) {
       status: { edt: enumEdt(AgreementLineStatus), mandatory: true, default: "planned" },
       orderId: { edt: refEdt(`${m}.order`, L("Order")) },
       invoiceId: { edt: refEdt(`${m}.invoice`, L("Invoice")) },
+      /** platba přijatá před fakturou (aktivace první platbou): DUZP faktury, fakturovat do 15 dnů */
+      paymentDate: { edt: Edts.TransDate, label: "@TAX:AgrPaymentDate" },
       dueDate: { edt: Edts.TransDate, label: "@TAX:DueDate" },
     },
     titleField: "lineNum",
@@ -375,6 +383,11 @@ export function agreementHandlers(docs: AgreementDocs): Record<string, ObjectHan
           if (!(await agreementParams(ctx.data, docs)).schedule) throw new UserError("@TAX:AgrActivateMode");
           await activateSchedule(ctx.data, docs, agr);
         },
+        async invoiceDue(ctx: EventContext, agr: RecordData) {
+          const lines = await ctx.data.find(docs.agreementLine, { agreementId: agr.id, status: "toInvoice" }, { take: 100, orderBy: { lineNum: "asc" } });
+          if (!lines.length) throw new UserError("@TAX:AgrNothingToInvoice");
+          for (const ln of lines) await invoiceScheduleLine(ctx.data, docs, ln);
+        },
         async end(ctx: EventContext, agr: RecordData) {
           const today = iso(new Date());
           // kalendář: nevystavené splátky se zruší
@@ -475,9 +488,12 @@ async function requestSchedulePayment(data: DataApi, docs: AgreementDocs, agr: R
   });
 }
 
-/** Vystaví splátku kalendáře: objednávka → zaúčtovaná faktura (VS smlouvy, splatnost z parametrů). */
+/**
+ * Vystaví splátku kalendáře: potvrzená objednávka, splátka K fakturaci. Fakturu vystaví Vyfakturovat
+ * (smlouva / objednávka, i hromadně) – `invoiceScheduleLine`.
+ */
 async function issueScheduleLine(data: DataApi, docs: AgreementDocs, agr: RecordData, line: RecordData, today: string) {
-  const prm = await agreementParams(data, docs);
+  void today;
   const pf = docs.partnerField;
   const from = String(line.periodFrom).slice(0, 10), to = String(line.periodTo).slice(0, 10);
   const text = `${agr.description || agr.agreementNum} · ${dmy(from)} – ${dmy(to)}`.slice(0, 255);
@@ -492,20 +508,86 @@ async function issueScheduleLine(data: DataApi, docs: AgreementDocs, agr: Record
   const o = (await data.get(docs.order, String(order.id)))!;
   if (toCents(o.amountGross) <= BigInt(0)) throw new UserError("@GL:NoLines");
   await data.update(docs.order, String(o.id), { status: "confirmed" });
+  await data.update(docs.agreementLine, String(line.id), { status: "toInvoice", orderId: o.id });
+  await data.update(docs.agreement, String(agr.id), { orderId: o.id, periodFrom: from, periodTo: to });
+  return o;
+}
+
+/**
+ * Faktura splátky K fakturaci: z objednávky splátky, VS smlouvy, DUZP = den přijaté platby (jinak dnes),
+ * splatnost z parametrů; zaúčtuje se a otevřené platby smlouvy (přijaté před fakturou) ji uhradí.
+ */
+export async function invoiceScheduleLine(data: DataApi, docs: AgreementDocs, line: RecordData, today = iso(new Date())) {
+  if (line.status !== "toInvoice" || !line.orderId) throw new UserError("@TAX:AgrNothingToInvoice");
+  const prm = await agreementParams(data, docs);
+  const agr = (await data.get(docs.agreement, String(line.agreementId)))!;
+  const o = (await data.get(docs.order, String(line.orderId)))!;
   const inv = await invoiceFromOrder(data, docs, o);
   const due = addDays(today, prm.dueDays);
-  await data.update(docs.cfg.header, String(inv.id), { vs: agr.vs ?? null, dueDate: due, agreementId: agr.id });
+  const taxDate = line.paymentDate ? String(line.paymentDate).slice(0, 10) : today;
+  await data.update(docs.cfg.header, String(inv.id), { vs: agr.vs ?? null, dueDate: due, taxDate, agreementId: agr.id });
   await postInvoice(data, data.companyId ?? null, docs.cfg, (await data.get(docs.cfg.header, String(inv.id)))!);
-  await data.update(docs.agreementLine, String(line.id), { status: "invoiced", orderId: o.id, invoiceId: inv.id, dueDate: due });
-  await data.update(docs.agreement, String(agr.id), { orderId: o.id, periodFrom: from, periodTo: to, dueDate: due });
+  await data.update(docs.agreementLine, String(line.id), { status: "invoiced", invoiceId: inv.id, dueDate: due });
+  await data.update(docs.agreement, String(agr.id), { dueDate: due });
+  await applyAgreementPayments(data, docs, agr, String(inv.id));
+  await refreshSchedule(data, docs, (await data.get(docs.agreement, String(agr.id)))!, today);
   return (await data.get(docs.cfg.header, String(inv.id)))!;
 }
 
-/** Aktivace první platbou (banka) nebo ručně: faktura první splátky, smlouva aktivní. Vrací fakturu. */
-export async function activateSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
+/** Otevřené platby smlouvy (přijaté před fakturou) uhradí fakturu – nejstarší první. */
+async function applyAgreementPayments(data: DataApi, docs: AgreementDocs, agr: RecordData, invoiceId: string) {
+  const T = docs.cfg.partnerTrans;
+  const [it] = await data.find(T, { invoiceId, kind: "invoice" }, { take: 1 });
+  if (!it) return;
+  let open = toCents(String(it.amountCur ?? it.amount)) - toCents(String(it.paidAmount ?? 0));
+  const pays = await data.find(T, { agreementId: agr.id, kind: "payment", closed: false }, { take: 100, orderBy: { date: "asc" } });
+  let paidInv = toCents(String(it.paidAmount ?? 0));
+  for (const p of pays) {
+    if (open <= BigInt(0)) break;
+    // platba odběratele je záporná (snižuje saldo); paidAmount = kolik z ní už se použilo (také záporně)
+    const rest = -(toCents(String(p.amountCur ?? p.amount)) - toCents(String(p.paidAmount ?? 0)));
+    if (rest <= BigInt(0)) continue;
+    const use = rest < open ? rest : open;
+    open -= use;
+    paidInv += use;
+    const used = toCents(String(p.paidAmount ?? 0)) - use;
+    await data.update(T, String(p.id), { paidAmount: fromCents(used), closed: -used >= -toCents(String(p.amountCur ?? p.amount)) });
+  }
+  const total = toCents(String(it.amountCur ?? it.amount));
+  await data.update(T, String(it.id), { paidAmount: fromCents(paidInv), closed: paidInv >= total });
+  await data.update(docs.cfg.header, invoiceId, { paidAmount: fromCents(paidInv) });
+}
+
+/**
+ * Platba smlouvy před fakturou (první platba z výpisu / deníku): otevřená položka „Úhrada“ v saldu se smlouvou;
+ * uhradí fakturu splátky, až vznikne. `paid` = kladná částka v měně, `paidAcc` v účetní měně.
+ */
+export async function recordAgreementPayment(data: DataApi, agr: RecordData, p: { paid: bigint; paidAcc: bigint; voucherId: string; documentNum: string; date: unknown; vs: unknown; currencyId: string | null }) {
+  const docs = REGISTRY.customer!;
+  await data.create(docs.cfg.partnerTrans, {
+    customerId: agr.customerId,
+    agreementId: agr.id,
+    kind: "payment",
+    voucherId: p.voucherId,
+    documentNum: p.documentNum,
+    vs: p.vs ?? agr.vs ?? null,
+    date: p.date,
+    currencyId: p.currencyId,
+    amount: fromCents(-p.paidAcc),
+    amountCur: fromCents(-p.paid),
+    paidAmount: "0",
+    closed: false,
+  });
+}
+
+/**
+ * Aktivace první platbou (banka, deník, karta) nebo ručně: objednávka první splátky (K fakturaci), smlouva aktivní.
+ * `paymentDate` = den přijaté platby (DUZP faktury, hlídání 15 dnů). Vrací splátku.
+ */
+export async function activateSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date()), paymentDate: string | null = null) {
   if (agr.status === "ended") throw new UserError("@GL:Locked");
   // začátek od první platby: dosud nevystavený kalendář se přestaví od dneška
-  if (agr.startOnPayment && !(await data.find(docs.agreementLine, { agreementId: agr.id, status: { in: ["invoiced", "paid"] } }, { take: 1 })).length) {
+  if (agr.startOnPayment && !(await data.find(docs.agreementLine, { agreementId: agr.id, status: { in: ["toInvoice", "invoiced", "paid"] } }, { take: 1 })).length) {
     for (const ln of await data.find(docs.agreementLine, { agreementId: agr.id }, { take: 1000 })) await data.remove(docs.agreementLine, String(ln.id));
     await data.update(docs.agreement, String(agr.id), { startDate: today, startOnPayment: false });
     agr = (await data.get(docs.agreement, String(agr.id)))!;
@@ -513,9 +595,10 @@ export async function activateSchedule(data: DataApi, docs: AgreementDocs, agr: 
   await ensureSchedule(data, docs, agr, today);
   const [first] = await data.find(docs.agreementLine, { agreementId: agr.id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
   if (!first) throw new UserError("@TAX:AgrBeyondEnd");
-  const inv = await issueScheduleLine(data, docs, agr, first, today);
-  await data.update(docs.agreement, String(agr.id), { status: "active", blockedDate: null });
-  return inv;
+  await issueScheduleLine(data, docs, agr, first, today);
+  if (paymentDate) await data.update(docs.agreementLine, String(first.id), { paymentDate });
+  await data.update(docs.agreement, String(agr.id), { status: "active", blockedDate: null, ...(paymentDate ? { paidUntil: String(first.periodTo).slice(0, 10) } : {}) });
+  return (await data.get(docs.agreementLine, String(first.id)))!;
 }
 
 /** První splátka smlouvy čekající na aktivaci (pro párování první platby podle VS). */
@@ -525,19 +608,17 @@ export async function awaitingScheduleByVs(data: DataApi, vs: string): Promise<{
   const list = await data.find(docs.agreement, { vs, status: "awaiting" }, { take: 2 });
   if (list.length !== 1) return null;
   const [first] = await data.find(docs.agreementLine, { agreementId: list[0].id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
-  if (!first || (await data.find(docs.agreementLine, { agreementId: list[0].id, status: { in: ["invoiced", "paid"] } }, { take: 1 })).length) return null;
+  if (!first || (await data.find(docs.agreementLine, { agreementId: list[0].id, status: { in: ["toInvoice", "invoiced", "paid"] } }, { take: 1 })).length) return null;
   return { agreement: list[0], amount: String(first.amount) };
 }
 
-/** Banka: první platba podle VS smlouvy → aktivace (faktura), vrací položku salda faktury pro úhradu. */
-export async function activateScheduleByPayment(data: DataApi, agreementId: string): Promise<RecordData> {
+/** Banka / deník: první platba podle VS smlouvy → aktivace (objednávka K fakturaci, den platby). Vrací smlouvu. */
+export async function activateScheduleByPayment(data: DataApi, agreementId: string, paymentDate: string): Promise<RecordData> {
   const docs = REGISTRY.customer!;
   const agr = await data.get(docs.agreement, agreementId);
   if (!agr) throw new UserError("@SYS:NotFound");
-  const inv = await activateSchedule(data, docs, agr);
-  const [t] = await data.find(docs.cfg.partnerTrans, { invoiceId: inv.id, kind: "invoice" }, { take: 1 });
-  if (!t) throw new UserError("@SYS:NotFound");
-  return t;
+  await activateSchedule(data, docs, agr, iso(new Date()), paymentDate);
+  return (await data.get(docs.agreement, agreementId))!;
 }
 
 /**
@@ -549,22 +630,25 @@ export async function agreementGatewayPaid(data: DataApi, logId: string): Promis
   if (!docs) return false;
   const [agr] = await data.find(docs.agreement, { paymentLogId: logId }, { take: 1 }).catch(() => [] as RecordData[]);
   if (!agr || agr.status !== "awaiting" || !(await agreementParams(data, docs)).schedule) return false;
-  const inv = await activateSchedule(data, docs, agr);
-  const [ln] = await data.find(docs.agreementLine, { agreementId: agr.id, invoiceId: inv.id }, { take: 1 });
-  if (ln) await data.update(docs.agreementLine, String(ln.id), { status: "paid" });
-  await refreshSchedule(data, docs, (await data.get(docs.agreement, String(agr.id)))!);
+  // zaplaceno kartou: aktivní, splátka K fakturaci s dnem platby (výplata brány se spáruje s fakturou podle VS)
+  await activateSchedule(data, docs, agr, iso(new Date()), iso(new Date()));
   return true;
 }
 
 /** Stav smlouvy podle zaplacenosti faktur kalendáře (po úhradě i v dávce). */
 export async function refreshSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
   const prm = await agreementParams(data, docs);
-  const lines = await data.find(docs.agreementLine, { agreementId: agr.id, status: { in: ["invoiced", "paid"] } }, { take: 1000, orderBy: { lineNum: "asc" } });
+  const lines = await data.find(docs.agreementLine, { agreementId: agr.id, status: { in: ["toInvoice", "invoiced", "paid"] } }, { take: 1000, orderBy: { lineNum: "asc" } });
   const invIds = lines.filter((l) => l.invoiceId).map((l) => String(l.invoiceId));
   const trans = invIds.length ? await data.find(docs.cfg.partnerTrans, { invoiceId: { in: invIds }, kind: "invoice" }, { take: 1000 }) : [];
   const closed = new Set(trans.filter((t) => t.closed).map((t) => String(t.invoiceId)));
   let paidUntil: string | null = null, overdue = false;
   for (const l of lines) {
+    // K fakturaci: zaplacená předem (den platby) = zaplaceno, jinak čeká na fakturu (nezablokuje)
+    if (l.status === "toInvoice") {
+      if (l.paymentDate) paidUntil = String(l.periodTo).slice(0, 10);
+      continue;
+    }
     const isPaid = l.status === "paid" || (l.invoiceId && closed.has(String(l.invoiceId)));
     if (isPaid) {
       if (l.status !== "paid") await data.update(docs.agreementLine, String(l.id), { status: "paid" });
@@ -619,6 +703,10 @@ async function runSchedules(data: DataApi, docs: AgreementDocs, today: string, p
       }
     }
   }
+  // DPH: platba přijatá před fakturou = plnění ke dni platby → fakturovat do 15 dnů (upozornění od 10. dne)
+  const late = (await data.find(docs.agreementLine, { status: "toInvoice" }, { take: 1000 })).filter((l) => l.paymentDate && addDays(String(l.paymentDate).slice(0, 10), 10) <= today);
+  if (late.length)
+    await notify(data, { kind: "warning", title: "@TAX:AgrToInvoiceLate", params: { n: String(late.length) }, href: `/${docs.agreementLine.split(".")[0]}/${docs.agreement.split(".")[1]}`, key: `agr-late-${docs.agreement}-${today}` }).catch(() => undefined);
   return { issued, blocked };
 }
 

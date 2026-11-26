@@ -39,9 +39,11 @@ V [parametrech odběratelů](/ar/parameters) zvolte **Placení smluv → Kalend�
 
 1. Smlouva dostane **VS** = číslice čísla smlouvy (SM2600012 → 2600012) a můžete vyplnit **číslo členské karty**.
 2. **Vyzvat k platbě** vytvoří **kalendář splátek** (měsíčně nebo ročně podle délky období tarifu; do konce smlouvy, bez konce na rok dopředu). Objednávka ani záloha nevzniká.
-3. **První platba** s VS smlouvy a částkou první splátky (krok párování výpisu *VS smlouvy*) smlouvu **aktivuje**: vznikne objednávka a zaúčtovaná faktura první splátky a platba se na ni spáruje. Platbu kartou nebo hotově na recepci potvrďte tlačítkem **Aktivovat (zaplaceno)**.
-4. Denní dávka pak podle kalendáře vystavuje další splátky (objednávka → faktura = pohledávka, VS smlouvy, splatnost z parametrů). Platby s VS smlouvy se párují na nejstarší neuhrazenou fakturu smlouvy.
-5. Faktura neuhrazená po **splatnosti + lhůtě k blokaci** (parametry, např. splatnost 3 dny a lhůta 0) smlouvu **zablokuje** – další splátky se nevystavují. Úhradou se smlouva zase aktivuje.
+3. **První platba** s VS smlouvy a částkou první splátky (krok párování výpisu *VS smlouvy*) smlouvu **aktivuje** – při zaúčtování výpisu, nebo když z výpisu vytvoříte deník, až při **zaúčtování deníku** (řádek je mezitím *Označeno k vyrovnání*). Aktivace vytvoří **objednávku** první splátky, splátka má stav **K fakturaci** a platba zůstane v saldu jako úhrada smlouvy. Platbu kartou nebo hotově na recepci potvrďte tlačítkem **Aktivovat (zaplaceno)**; platbu, kterou automat nespároval, přiřadíte u smlouvy akcí **Označit k vyrovnání** (vybere se nezaúčtovaný řádek deníku / výpisu).
+4. **Vyfakturovat** (u smlouvy, i hromadně v seznamu smluv) nebo **Vytvořit fakturu** u objednávky (i hromadně) vystaví fakturu splátky: VS smlouvy, DUZP = den přijaté platby, splatnost z parametrů; přijatá platba smlouvy ji rovnou uhradí.
+5. **DPH:** platba přijatá před fakturou je zdanitelné plnění ke dni platby – fakturu vystavte **do 15 dnů**. Denní dávka upozorní na splátky K fakturaci zaplacené před více než 10 dny.
+6. Denní dávka podle kalendáře připravuje objednávky dalších splátek (K fakturaci); po vyfakturování se platby s VS smlouvy párují na nejstarší neuhrazenou fakturu smlouvy.
+7. Faktura neuhrazená po **splatnosti + lhůtě k blokaci** (parametry, např. splatnost 3 dny a lhůta 0) smlouvu **zablokuje** – další splátky se nevystavují. Úhradou se smlouva zase aktivuje.
 
 Nezaúčtovanou smlouvu, objednávku i nezaplacenou zálohu jde smazat (smaže se i to, co k nim patří); smlouvu s fakturami nebo zaplacenou zálohou ukončete tlačítkem **Ukončit**.
 

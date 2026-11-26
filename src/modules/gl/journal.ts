@@ -15,7 +15,7 @@ import { allocateVoucher, checkText, convertLines, postVoucher, resolveJournalNa
 import { dimsOf, offsetDimsOf } from "./dimensions";
 import { applySettlements, checkSettlements, linePartner, settleRef, settlementsOf } from "./settlement";
 import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
-import { activateScheduleByPayment, agreementAdvancePaid } from "@/modules/tax/agreements";
+import { activateScheduleByPayment, agreementAdvancePaid, agreementInvoicePaid, recordAgreementPayment } from "@/modules/tax/agreements";
 
 const zero = BigInt(0);
 
@@ -300,13 +300,6 @@ export function cachedReads(data: DataApi): DataApi {
 
 export async function runJournal(ctx: EventContext, journal: RecordData, dryRun: boolean) {
   const data = cachedReads(ctx.data);
-  // vyrovnání se smlouvou (první platba): zaúčtování smlouvu aktivuje – faktura první splátky, platba ji uhradí
-  if (!dryRun)
-    for (const list of (await settlementsOf(data, String(journal.id))).values())
-      for (const s of list.filter((x) => x.settleKind === "agreement" && x.agreementId)) {
-        const t = await activateScheduleByPayment(data, String(s.agreementId));
-        await data.update("gl.journalSettlement", String(s.id), { settleKind: "invoice", customerTransId: t.id });
-      }
   const plan = await planJournal(data, journal, ctx.companyId);
   // chyby: pro Ověřit text, pro Zaúčtovat první chyba jako výjimka (původní hláška)
   const raw: { ref: string; params?: Record<string, string>; prefix?: string }[] = [...plan.errors];
@@ -380,6 +373,8 @@ export async function runJournal(ctx: EventContext, journal: RecordData, dryRun:
           sourceId: String(journal.id),
         });
   }
+  // vyrovnání provedené zaúčtováním: Označeno → Vyrovnáno
+  for (const id of plan.settles.keys()) await data.update("gl.journalLine", id, { settleStatus: "settled" });
   await data.update("gl.journal", String(journal.id), { status: "posted", voucherId: first?.id ?? null });
   return summary;
 }
@@ -407,21 +402,37 @@ async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher:
   const lp = linePartner(x.line);
   const own = settles.length && lp && lp.kind === p.kind && lp.id === String(p.rec.id) ? settles : [];
   // záloha: úhrada zálohy (Uhrazeno, položka „Záloha“ v saldu, DPH zálohy) a případně aktivace smlouvy – bez další položky salda
+  // smlouva (první platba): aktivace (objednávka K fakturaci, den platby) a platba smlouvy v saldu – uhradí fakturu splátky
+  const agrSettle = own.find((s) => s.settleKind === "agreement");
+  if (agrSettle && isPayment) {
+    const agr = await activateScheduleByPayment(data, String(agrSettle.agreementId), String(voucher.date).slice(0, 10));
+    await recordAgreementPayment(data, agr, { paid: -cur, paidAcc: -acc, voucherId: String(voucher.id), documentNum: String(voucher.voucherNum ?? ""), date: voucher.date, vs, currencyId: posted.currencyId ?? null });
+    return;
+  }
   const adv = own.find((s) => s.settleKind === "advance");
   if (adv) {
     await recordAdvancePayment(data, p.kind, settleRef(adv), { paidCur: -cur, paidAcc: -acc, voucherId: String(voucher.id), documentNum: String(voucher.voucherNum ?? ""), date: voucher.date, vs, currencyId: posted.currencyId ?? null });
     await agreementAdvancePaid(data, p.kind, settleRef(adv));
     return;
   }
-  if (own.length) await applySettlements(data, p.kind, own);
-  else if (isPayment && vs) {
+  // uhrazené faktury smluv (kalendář): stav smlouvy – zaplaceno do, odblokování
+  const paidInvoices: string[] = [];
+  if (own.length) {
+    await applySettlements(data, p.kind, own);
+    const ids = own.filter((x) => (x.settleKind ?? "invoice") === "invoice").map(settleRef);
+    for (const t of ids.length ? await data.find(obj, { id: { in: ids } }, { take: 200 }) : []) if (t.invoiceId) paidInvoices.push(String(t.invoiceId));
+  } else if (isPayment && vs) {
     const [inv] = (await data.find(obj, { [field]: p.rec.id, kind: "invoice", vs, closed: false }, { take: 1 })) as RecordData[];
     if (inv) {
       const paid = toCents(inv.paidAmount ?? 0) - cur;
       await data.update(obj, String(inv.id), { paidAmount: fromCents(paid), closed: paid >= toCents(inv.amountCur ?? inv.amount) });
-      if (inv.invoiceId) await data.update(p.kind === "customer" ? "ar.invoice" : "ap.invoice", String(inv.invoiceId), { paidAmount: fromCents(paid) });
+      if (inv.invoiceId) {
+        await data.update(p.kind === "customer" ? "ar.invoice" : "ap.invoice", String(inv.invoiceId), { paidAmount: fromCents(paid) });
+        paidInvoices.push(String(inv.invoiceId));
+      }
     }
   }
+  for (const id of paidInvoices) await agreementInvoicePaid(data, p.kind, id);
   await data.create(obj, {
     [field]: p.rec.id,
     kind: isPayment ? "payment" : "invoice",
