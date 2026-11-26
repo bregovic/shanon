@@ -10,6 +10,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { RecordData } from "@/core/module";
+import { toCents } from "@/core/money";
 import { notify } from "@/modules/sys/notify";
 import { ar } from "@/modules/ar";
 import { requestAgreementPayment } from "@/modules/tax/agreements";
@@ -22,6 +23,10 @@ import { sendAgreementMail } from "./mail";
 import { renderTextPdf } from "./print-pdf";
 import { formFieldVisible } from "@/lib/form-visible";
 import { aresByIco } from "@/modules/gab/ares";
+import { gatewayConnection } from "@/modules/shop/catalog";
+import { comgateCreate } from "@/modules/int/comgate";
+import { paymentRedirectOf, writeLog } from "@/modules/int/drivers";
+import { settleGatewayLog } from "./eshop";
 
 export interface AgreementTariff {
   id: string;
@@ -51,6 +56,8 @@ export interface PortalFormField {
 }
 
 export interface AgreementPortalInfo {
+  /** platba kartou (Apple Pay, Google Pay) bránou – Comgate / simulátor, jen režim Kalendář */
+  cardPay: boolean;
   form: { heading: string; intro: string; fields: PortalFormField[] } | null;
   design: PortalDesign;
   companyName: string;
@@ -84,12 +91,36 @@ export interface AgreementResult {
   agreementId?: string;
   /** smlouva odešla členovi e-mailem (na tuto adresu) */
   mailedTo?: string;
+  /** odkaz na platbu kartou (id smlouvy – zná ho jen ten, kdo smlouvu uzavřel) */
+  payRef?: string;
   payment?: { amount: string; currency: string; vs: string; dueDate: string; bankAccount: string; iban: string; qr: string; advanceNum: string };
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Api = Parameters<typeof requestAgreementPayment>[0];
+
+/** Stát: kód ISO (CZ, SK…) nebo český / anglický název → kód; nic = CZ. */
+const COUNTRIES: Record<string, string> = {
+  "česko": "CZ", "česká republika": "CZ", "czech republic": "CZ", "czechia": "CZ", "slovensko": "SK", "slovakia": "SK", "německo": "DE", "germany": "DE",
+  "rakousko": "AT", "austria": "AT", "polsko": "PL", "poland": "PL", "maďarsko": "HU", "hungary": "HU", "ukrajina": "UA", "ukraine": "UA",
+  "velká británie": "GB", "spojené království": "GB", "united kingdom": "GB", "usa": "US", "spojené státy": "US", "united states": "US",
+  "itálie": "IT", "italy": "IT", "francie": "FR", "france": "FR", "španělsko": "ES", "spain": "ES", "nizozemsko": "NL", "netherlands": "NL",
+  "belgie": "BE", "švýcarsko": "CH", "chorvatsko": "HR", "slovinsko": "SI", "rumunsko": "RO", "bulharsko": "BG", "vietnam": "VN", "rusko": "RU",
+};
+function countryCode(v: string): string {
+  const t = String(v ?? "").trim();
+  if (!t) return "CZ";
+  if (/^[A-Za-z]{2}$/.test(t)) return t.toUpperCase();
+  return COUNTRIES[t.toLowerCase()] ?? "CZ";
+}
+
+/** Platba kartou na portálu: režim Kalendář a aktivní platební brána (Comgate, na testu simulátor). */
+async function cardPayAvailable(api: Api): Promise<boolean> {
+  const [prm] = await api.find("ar.parameters", {}, { take: 1 }).catch(() => [] as RecordData[]);
+  if (prm?.agreementMode !== "schedule") return false;
+  return !!(await gatewayConnection(api));
+}
 const ARES_ROLE: Record<string, string> = {
   "subject.regNo": "lookup", "subject.name": "name", "subject.vatId": "vatId", "address.street": "street", "address.city": "city", "address.zipCode": "zip",
   // firma jako plátce (firemní členství): jen do smlouvy, ale s ARES
@@ -135,6 +166,8 @@ interface FormPerson {
   zip: string;
   country: string;
   start: string;
+  /** bez zadaného počátku: členství od první platby */
+  startOnPayment: boolean;
   subjectExtra: RecordData;
   contact: { street: string; city: string; zip: string } | null;
   agreementExtra: RecordData;
@@ -196,8 +229,9 @@ async function formAnswers(api: Api, formId: string, answers: Record<string, unk
     street: m("address.street"),
     city: m("address.city"),
     zip: m("address.zipCode").replace(/\s/g, ""),
-    country: (m("address.country") || "CZ").toUpperCase().slice(0, 2),
+    country: countryCode(m("address.country")),
     start: m("agreement.startDate") || new Date().toISOString().slice(0, 10),
+    startOnPayment: !m("agreement.startDate"),
     subjectExtra,
     contact: m("contact.city") ? { street: m("contact.street"), city: m("contact.city"), zip: m("contact.zipCode").replace(/\s/g, "") } : null,
     agreementExtra,
@@ -218,12 +252,17 @@ async function tariffsOf(api: Parameters<typeof requestAgreementPayment>[0]): Pr
 export async function agreementPortalInfo(tenantId: string, token: string, client: PrismaClient = prisma): Promise<AgreementPortalInfo | null> {
   const l = await loadPortal(tenantId, token, client);
   if (!l || l.portal.purpose !== "agreement" || !l.ctx.modules.has("ar")) return null;
-  const { tariffs, form } = await inTenant(
+  const { tariffs, form, cardPay } = await inTenant(
     l.ctx,
-    async (s) => ({ tariffs: await tariffsOf(s.sys().api()), form: l.portal.formId ? await portalForm(s.sys().api(), String(l.portal.formId)) : null }),
+    async (s) => ({
+      tariffs: await tariffsOf(s.sys().api()),
+      form: l.portal.formId ? await portalForm(s.sys().api(), String(l.portal.formId)) : null,
+      cardPay: await cardPayAvailable(s.sys().api()),
+    }),
     client,
   );
   return {
+    cardPay,
     form,
     design: await portalDesign(l, tenantId, token, client),
     companyName: l.companyName,
@@ -277,6 +316,7 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
         const r = await formAnswers(api, String(p.formId), input.answers ?? {}, t);
         if (typeof r === "string") return reject(r);
         ({ name, email, phone, street, city, zip, country, start, subjectExtra, contact, agreementExtra, formData, formText } = r);
+        if (r.startOnPayment) agreementExtra = { ...agreementExtra, startOnPayment: true };
         if (!name || !EMAIL.test(email)) return reject(t("@INT:PortalFormNoName"));
       } else {
         if (!first || !last) return reject(t("@INT:PortalAgrName"));
@@ -295,7 +335,7 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
       const [have] = await api.find("ar.customer", { subjectId: subject.id }, { take: 1 });
       const customer = have ?? (await api.create("ar.customer", { subjectId: subject.id, groupId: p.agreementGroupId ?? null }));
 
-      const terms = [String(p.agreementTerms ?? "").trim(), `Tarif: ${tariff.name} – ${tariff.price} Kč za ${tariff.months} měs.`, `Potvrzeno na portálu ${p.name} ${new Date().toISOString()}`].filter(Boolean).join("\n\n");
+      const terms = [String(p.agreementTerms ?? "").trim(), `Potvrzeno na portálu ${p.name} dne ${new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}.`].filter(Boolean).join("\n\n");
       const agr = await api.create("ar.agreement", {
         customerId: customer.id,
         itemId: tariff.id,
@@ -322,6 +362,7 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
           ok: true,
           agreementId: String(agr.id),
           agreementNum: String(a2.agreementNum ?? ""),
+          payRef: String(agr.id),
           payment: {
             amount,
             currency: "CZK",
@@ -342,6 +383,7 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
         ok: true,
         agreementId: String(agr.id),
         agreementNum: String(agr.agreementNum ?? ""),
+        payRef: String(agr.id),
         payment: {
           amount: String(doc.due ?? advance.amount),
           currency: String(doc.currency ?? "CZK"),
@@ -404,4 +446,87 @@ export async function agreementPortalAres(tenantId: string, token: string, ico: 
   const r = await aresByIco(clean.padStart(8, "0")).catch(() => null);
   if (!r) return { ok: false as const, error: "Firmu s tímto IČO jsme v ARES nenašli." };
   return { ok: true as const, ico: r.ico, name: r.name, vatId: r.vatId ?? "", street: r.street ?? "", city: r.city ?? "", zip: r.zipCode ?? "", closed: r.closed };
+}
+
+/**
+ * Platba kartou (Apple Pay, Google Pay) za první splátku smlouvy z portálu: platební stránka brány; po návratu
+ * nebo oznámení brány se stav ověří u brány (`settleGatewayLog`) a smlouva se aktivuje (`agreementGatewayPaid`).
+ */
+export async function agreementPortalPay(tenantId: string, token: string, ref: string, origin: string, back: string, client: PrismaClient = prisma): Promise<string | null> {
+  const l = await loadPortal(tenantId, token, client);
+  if (!l || l.portal.purpose !== "agreement" || !/^[0-9a-f-]{36}$/i.test(ref)) return null;
+  const prep = await inTenant(
+    l.ctx,
+    async (s) => {
+      const api = s.sys().api();
+      const agr = await api.get("ar.agreement", ref);
+      if (!agr || agr.status !== "awaiting" || !(await cardPayAvailable(api))) return null;
+      const [first] = await api.find("ar.agreementLine", { agreementId: agr.id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
+      if (!first) return null;
+      const conn = (await gatewayConnection(api))!;
+      const log = agr.paymentLogId ? await api.get("int.log", String(agr.paymentLogId)) : null;
+      const cust = await api.get("ar.customer", String(agr.customerId));
+      const subj = cust ? await api.get("gab.subject", String(cust.subjectId)) : null;
+      return { agr, first, conn, log, subj };
+    },
+    client,
+  );
+  if (!prep) return null;
+  const { agr, first, conn, log, subj } = prep;
+  const reuse = log && log.status === "pending" && log.connectionId === conn.id ? paymentRedirectOf(log) : null;
+  if (reuse) return reuse;
+  const cents = toCents(first.amount);
+  const num = String(agr.agreementNum ?? "");
+  if (conn.driver === "gatewaySim") {
+    return inTenant(
+      l.ctx,
+      async (s) => {
+        const api = s.sys().api();
+        const lg = await writeLog(api, conn, "payment.start", "pending", { reference: num, externalId: `SIMG-${num}`.slice(0, 40), detail: `amount=${cents}` });
+        const url = `${origin}/pay-sim/${l.ctx.tenantId}/${lg.id}`;
+        await api.update("int.log", String(lg.id), { detail: `amount=${cents} redirect=${url} return=${back}` });
+        await api.update("ar.agreement", String(agr.id), { paymentLogId: lg.id });
+        return url;
+      },
+      client,
+    );
+  }
+  try {
+    const res = await comgateCreate(conn, { amountCents: cents, currency: "CZK", label: `Smlouva ${num}`.slice(0, 16), refId: num, email: String(subj?.email ?? ""), phone: (subj?.phone as string) || null, fullName: String(subj?.name ?? ""), returnUrl: back });
+    await inTenant(
+      l.ctx,
+      async (s) => {
+        const api = s.sys().api();
+        const lg = await writeLog(api, conn, "payment.start", "pending", { reference: num, externalId: res.transId, detail: `amount=${cents} redirect=${res.redirect}` });
+        await api.update("ar.agreement", String(agr.id), { paymentLogId: lg.id });
+      },
+      client,
+    );
+    return res.redirect;
+  } catch (e) {
+    await inTenant(l.ctx, (s) => writeLog(s.sys().api(), conn, "payment.start", "error", { reference: num, message: String((e as Error).message).slice(0, 240) }), client);
+    return null;
+  }
+}
+
+/** Návrat z brány: ověří stav platby u brány a vrátí stav smlouvy (active = zaplaceno a aktivní). */
+export async function agreementPortalPaid(tenantId: string, token: string, ref: string, client: PrismaClient = prisma): Promise<{ status: string; agreementNum: string } | null> {
+  const l = await loadPortal(tenantId, token, client);
+  if (!l || l.portal.purpose !== "agreement" || !/^[0-9a-f-]{36}$/i.test(ref)) return null;
+  const prep = await inTenant(
+    l.ctx,
+    async (s) => {
+      const api = s.sys().api();
+      const agr = await api.get("ar.agreement", ref);
+      if (!agr) return null;
+      const log = agr.paymentLogId ? await api.get("int.log", String(agr.paymentLogId)) : null;
+      const conn = log?.connectionId ? await api.get("int.connection", String(log.connectionId)) : null;
+      return { agr, log, conn };
+    },
+    client,
+  );
+  if (!prep) return null;
+  if (prep.log && prep.conn) await settleGatewayLog(l.ctx, prep.conn, prep.log, client);
+  const agr = await inTenant(l.ctx, (s) => s.sys().api().get("ar.agreement", ref), client);
+  return agr ? { status: String(agr.status), agreementNum: String(agr.agreementNum ?? "") } : null;
 }

@@ -2306,41 +2306,43 @@ model ArCustomer {
 
 /// ar.agreement — generováno z definice objektu
 model ArAgreement {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
-  companyId    String    @map("company_id") @db.Uuid
-  agreementNum String    @map("agreement_num") @db.VarChar(20)
-  customerId   String    @map("customer_id") @db.Uuid
-  itemId       String?   @map("item_id") @db.Uuid
-  description  String?   @db.VarChar(255)
-  amount       Decimal?  @db.Decimal(18, 2)
-  currencyId   String?   @map("currency_id") @db.Uuid
-  periodMonths Int       @default(1) @map("period_months")
-  quantity     Int?      @default(1)
-  startDate    DateTime  @default(now()) @map("start_date") @db.Date
-  endDate      DateTime? @map("end_date") @db.Date
-  autoRenew    Boolean   @default(true) @map("auto_renew")
-  status       String    @default("draft") @db.VarChar(40)
-  paidUntil    DateTime? @map("paid_until") @db.Date
-  periodFrom   DateTime? @map("period_from") @db.Date
-  periodTo     DateTime? @map("period_to") @db.Date
-  dueDate      DateTime? @map("due_date") @db.Date
-  vs           String?   @db.VarChar(10)
-  cardNumber   String?   @map("card_number") @db.VarChar(40)
-  orderId      String?   @map("order_id") @db.Uuid
-  advanceId    String?   @map("advance_id") @db.Uuid
-  blockedDate  DateTime? @map("blocked_date") @db.Date
-  signedAt     DateTime? @map("signed_at")
-  terms        String?
-  formData     String?   @map("form_data")
-  formText     String?   @map("form_text")
-  notes        String?
-  ext          Json      @default("{}")
-  version      Int       @default(1)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  createdBy    String?   @map("created_by") @db.Uuid
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy    String?   @map("updated_by") @db.Uuid
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  agreementNum   String    @map("agreement_num") @db.VarChar(20)
+  customerId     String    @map("customer_id") @db.Uuid
+  itemId         String?   @map("item_id") @db.Uuid
+  description    String?   @db.VarChar(255)
+  amount         Decimal?  @db.Decimal(18, 2)
+  currencyId     String?   @map("currency_id") @db.Uuid
+  periodMonths   Int       @default(1) @map("period_months")
+  quantity       Int?      @default(1)
+  startDate      DateTime  @default(now()) @map("start_date") @db.Date
+  startOnPayment Boolean   @default(false) @map("start_on_payment")
+  endDate        DateTime? @map("end_date") @db.Date
+  autoRenew      Boolean   @default(true) @map("auto_renew")
+  status         String    @default("draft") @db.VarChar(40)
+  paidUntil      DateTime? @map("paid_until") @db.Date
+  periodFrom     DateTime? @map("period_from") @db.Date
+  periodTo       DateTime? @map("period_to") @db.Date
+  dueDate        DateTime? @map("due_date") @db.Date
+  vs             String?   @db.VarChar(10)
+  cardNumber     String?   @map("card_number") @db.VarChar(40)
+  orderId        String?   @map("order_id") @db.Uuid
+  advanceId      String?   @map("advance_id") @db.Uuid
+  blockedDate    DateTime? @map("blocked_date") @db.Date
+  paymentLogId   String?   @map("payment_log_id") @db.Uuid
+  signedAt       DateTime? @map("signed_at")
+  terms          String?
+  formData       String?   @map("form_data")
+  formText       String?   @map("form_text")
+  notes          String?
+  ext            Json      @default("{}")
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?   @map("updated_by") @db.Uuid
 
   company                     SysCompany          @relation("ArAgreement_company", fields: [companyId], references: [id], onDelete: Restrict)
   customer                    ArCustomer          @relation("ArAgreement_customer", fields: [customerId], references: [id], onDelete: Restrict)
@@ -2348,6 +2350,7 @@ model ArAgreement {
   currency                    SysCurrency?        @relation("ArAgreement_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   order                       ArOrder?            @relation("ArAgreement_order", fields: [orderId], references: [id], onDelete: Restrict)
   advance                     ArAdvance?          @relation("ArAgreement_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  paymentLog                  IntLog?             @relation("ArAgreement_paymentLog", fields: [paymentLogId], references: [id], onDelete: Restrict)
   arAgreementLine_agreement   ArAgreementLine[]   @relation("ArAgreementLine_agreement")
   arOrder_agreement           ArOrder[]           @relation("ArOrder_agreement")
   arInvoice_agreement         ArInvoice[]         @relation("ArInvoice_agreement")
@@ -2360,6 +2363,7 @@ model ArAgreement {
   @@index([currencyId])
   @@index([orderId])
   @@index([advanceId])
+  @@index([paymentLogId])
   @@index([tenantId, companyId, status])
   @@map("ar_agreement")
 }
@@ -2917,41 +2921,43 @@ model ApVendor {
 
 /// ap.agreement — generováno z definice objektu
 model ApAgreement {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
-  companyId    String    @map("company_id") @db.Uuid
-  agreementNum String    @map("agreement_num") @db.VarChar(20)
-  vendorId     String    @map("vendor_id") @db.Uuid
-  itemId       String?   @map("item_id") @db.Uuid
-  description  String?   @db.VarChar(255)
-  amount       Decimal?  @db.Decimal(18, 2)
-  currencyId   String?   @map("currency_id") @db.Uuid
-  periodMonths Int       @default(1) @map("period_months")
-  quantity     Int?      @default(1)
-  startDate    DateTime  @default(now()) @map("start_date") @db.Date
-  endDate      DateTime? @map("end_date") @db.Date
-  autoRenew    Boolean   @default(true) @map("auto_renew")
-  status       String    @default("draft") @db.VarChar(40)
-  paidUntil    DateTime? @map("paid_until") @db.Date
-  periodFrom   DateTime? @map("period_from") @db.Date
-  periodTo     DateTime? @map("period_to") @db.Date
-  dueDate      DateTime? @map("due_date") @db.Date
-  vs           String?   @db.VarChar(10)
-  cardNumber   String?   @map("card_number") @db.VarChar(40)
-  orderId      String?   @map("order_id") @db.Uuid
-  advanceId    String?   @map("advance_id") @db.Uuid
-  blockedDate  DateTime? @map("blocked_date") @db.Date
-  signedAt     DateTime? @map("signed_at")
-  terms        String?
-  formData     String?   @map("form_data")
-  formText     String?   @map("form_text")
-  notes        String?
-  ext          Json      @default("{}")
-  version      Int       @default(1)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  createdBy    String?   @map("created_by") @db.Uuid
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy    String?   @map("updated_by") @db.Uuid
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  agreementNum   String    @map("agreement_num") @db.VarChar(20)
+  vendorId       String    @map("vendor_id") @db.Uuid
+  itemId         String?   @map("item_id") @db.Uuid
+  description    String?   @db.VarChar(255)
+  amount         Decimal?  @db.Decimal(18, 2)
+  currencyId     String?   @map("currency_id") @db.Uuid
+  periodMonths   Int       @default(1) @map("period_months")
+  quantity       Int?      @default(1)
+  startDate      DateTime  @default(now()) @map("start_date") @db.Date
+  startOnPayment Boolean   @default(false) @map("start_on_payment")
+  endDate        DateTime? @map("end_date") @db.Date
+  autoRenew      Boolean   @default(true) @map("auto_renew")
+  status         String    @default("draft") @db.VarChar(40)
+  paidUntil      DateTime? @map("paid_until") @db.Date
+  periodFrom     DateTime? @map("period_from") @db.Date
+  periodTo       DateTime? @map("period_to") @db.Date
+  dueDate        DateTime? @map("due_date") @db.Date
+  vs             String?   @db.VarChar(10)
+  cardNumber     String?   @map("card_number") @db.VarChar(40)
+  orderId        String?   @map("order_id") @db.Uuid
+  advanceId      String?   @map("advance_id") @db.Uuid
+  blockedDate    DateTime? @map("blocked_date") @db.Date
+  paymentLogId   String?   @map("payment_log_id") @db.Uuid
+  signedAt       DateTime? @map("signed_at")
+  terms          String?
+  formData       String?   @map("form_data")
+  formText       String?   @map("form_text")
+  notes          String?
+  ext            Json      @default("{}")
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy      String?   @map("updated_by") @db.Uuid
 
   company                   SysCompany        @relation("ApAgreement_company", fields: [companyId], references: [id], onDelete: Restrict)
   vendor                    ApVendor          @relation("ApAgreement_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
@@ -2959,6 +2965,7 @@ model ApAgreement {
   currency                  SysCurrency?      @relation("ApAgreement_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   order                     ApOrder?          @relation("ApAgreement_order", fields: [orderId], references: [id], onDelete: Restrict)
   advance                   ApAdvance?        @relation("ApAgreement_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  paymentLog                IntLog?           @relation("ApAgreement_paymentLog", fields: [paymentLogId], references: [id], onDelete: Restrict)
   apAgreementLine_agreement ApAgreementLine[] @relation("ApAgreementLine_agreement")
   apOrder_agreement         ApOrder[]         @relation("ApOrder_agreement")
   apInvoice_agreement       ApInvoice[]       @relation("ApInvoice_agreement")
@@ -2970,6 +2977,7 @@ model ApAgreement {
   @@index([currencyId])
   @@index([orderId])
   @@index([advanceId])
+  @@index([paymentLogId])
   @@index([tenantId, companyId, status])
   @@map("ap_agreement")
 }
@@ -4531,9 +4539,11 @@ model IntLog {
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy    String?  @map("updated_by") @db.Uuid
 
-  company              SysCompany    @relation("IntLog_company", fields: [companyId], references: [id], onDelete: Restrict)
-  connection           IntConnection @relation("IntLog_connection", fields: [connectionId], references: [id], onDelete: Restrict)
-  shopOrder_paymentLog ShopOrder[]   @relation("ShopOrder_paymentLog")
+  company                SysCompany    @relation("IntLog_company", fields: [companyId], references: [id], onDelete: Restrict)
+  connection             IntConnection @relation("IntLog_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+  arAgreement_paymentLog ArAgreement[] @relation("ArAgreement_paymentLog")
+  apAgreement_paymentLog ApAgreement[] @relation("ApAgreement_paymentLog")
+  shopOrder_paymentLog   ShopOrder[]   @relation("ShopOrder_paymentLog")
 
   @@index([tenantId, companyId])
   @@index([connectionId])

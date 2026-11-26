@@ -7,6 +7,7 @@
  * `src/modules/shop/catalog.ts`. Obrázky jen těch záznamů, které obchod ukazuje.
  */
 import "server-only";
+import { agreementGatewayPaid } from "@/modules/tax/agreements";
 import { randomBytes, createHash } from "node:crypto";
 import QRCode from "qrcode";
 import type { PrismaClient } from "@/generated/prisma/client";
@@ -294,7 +295,10 @@ export async function shopRefreshPayment(org: string, token: string, client: Pri
  */
 export async function settleGatewayLog(ctx: Ctx, conn: RecordData, log: RecordData, client: PrismaClient = prisma): Promise<string> {
   if (log.status === "ok") {
-    await inTenant(ctx, (s) => markGatewayPaid(s.sys().api(), String(log.id)).catch(() => false), client);
+    await inTenant(ctx, async (s) => {
+      await markGatewayPaid(s.sys().api(), String(log.id)).catch(() => false);
+      await agreementGatewayPaid(s.sys().api(), String(log.id)).catch(() => false);
+    }, client);
     return "paid";
   }
   if (log.status !== "pending" || !log.externalId) return String(log.status);
@@ -316,6 +320,7 @@ export async function settleGatewayLog(ctx: Ctx, conn: RecordData, log: RecordDa
       if (fresh?.status !== "pending") return;
       await api.update("int.log", String(log.id), { status: paid ? "ok" : "error", message: paid ? "PAID" : st.message.slice(0, 240) });
       if (paid) await markGatewayPaid(api, String(log.id)).catch(() => false); // bez e-shopu (pokladna) nic
+      if (paid) await agreementGatewayPaid(api, String(log.id)).catch(() => false); // smlouva z portálu
     },
     client,
   );

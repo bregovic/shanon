@@ -7,7 +7,7 @@
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-import { PAPERS, flowGroups, valueAt, type PrintData, type PrintElement, type PrintLayout } from "@/core/print";
+import { PAPERS, flowGroups, textHeading, valueAt, type PrintData, type PrintElement, type PrintLayout } from "@/core/print";
 import { fillText, formatValue } from "@/lib/print-render";
 
 const MM = 72 / 25.4;
@@ -219,6 +219,8 @@ function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string)
   const table = layout.elements.find((e) => e.type === "table");
   if (flow) {
     drawFlow(doc, layout, data, locale, fs, ox, top);
+  } else if (!table && layout.elements.some((e) => e.style?.flow || e.style?.pageBreak)) {
+    drawFlowing(doc, layout, data, locale, fs, pageW, pageH);
   } else if (!table) {
     for (const el of layout.elements) drawElement(doc, el, data, locale, fs);
   } else {
@@ -244,6 +246,83 @@ function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string)
 }
 
 /**
+ * Sestava s tekoucími texty (`style.flow`): prvky v pořadí shora; tekoucí text pokračuje na dalších stránkách
+ * a vše pod ním se posune o jeho skutečnou výšku. Nadpis nezůstane sám na konci stránky, `pageBreak` = od nové stránky.
+ */
+function drawFlowing(doc: Doc, layout: PrintLayout, data: PrintData, locale: string, fs: number, pageW: number, pageH: number) {
+  const els = [...layout.elements].sort((a, b) => a.y - b.y);
+  const bottom = pageH - MARGIN;
+  let dy = 0;
+  const newPage = () => {
+    doc.addPage({ size: [pageW * MM, pageH * MM], margin: 0 });
+    return MARGIN;
+  };
+  for (let i = 0; i < els.length; i++) {
+    const el = els[i];
+    if (el.style?.pageBreak && el.y + dy > MARGIN + 1) dy = newPage() - el.y;
+    if (!el.style?.flow) {
+      drawElement(doc, el, data, locale, fs, dy);
+      continue;
+    }
+    const end = drawParagraphs(doc, el, data, locale, fs, (el.y + dy) * MM, bottom * MM, () => newPage() * MM) / MM;
+    // pevné prvky do dalšího tekoucího textu (podpisy) se drží pohromadě
+    const next = els.findIndex((e, j) => j > i && (e.style?.flow || e.style?.pageBreak));
+    const block = els.slice(i + 1, next < 0 ? undefined : next);
+    const elEnd = el.y + el.h;
+    const blockH = Math.max(0, ...block.map((e) => e.y + e.h - elEnd));
+    // prvky pod textem hned za jeho skutečným koncem; nevejdou-li se, od nové stránky
+    dy = end + 2 + blockH > bottom ? newPage() - elEnd : end + 2 - elEnd;
+  }
+}
+
+/** Odstavce tekoucího textu od `y0` (pt); dlouhý odstavec se rozdělí mezi stránky. Vrací y pod textem (pt). */
+function drawParagraphs(doc: Doc, el: PrintElement, data: PrintData, locale: string, fs: number, y0: number, bottom: number, newPage: () => number): number {
+  const size = el.style?.size ?? fs;
+  const x = el.x * MM;
+  const w = el.w * MM;
+  const ink = color(el.style?.color);
+  let y = y0;
+  const txt = fillText(el.text ?? "", data, locale).replace(/\r/g, "");
+  for (const raw of txt.split("\n")) {
+    const line = raw.trim();
+    if (!line) {
+      y += size * 0.5;
+      continue;
+    }
+    const kind = textHeading(line);
+    const fsz = kind === "h" ? size + 1.5 : size;
+    doc.font(kind ? "B" : "R").fontSize(fsz);
+    const opts = { width: w, align: kind ? "left" : "justify", lineGap: fsz * (LINE - 1.15) } as const;
+    // nadpis s aspoň třemi řádky textu pod sebou
+    if (kind === "h" && y + doc.heightOfString(line, opts) + size * 4 > bottom) y = newPage();
+    if (kind === "h" && y > y0 + 1) y += size * 0.6;
+    let rest = line;
+    while (rest) {
+      doc.font(kind ? "B" : "R").fontSize(fsz);
+      const h = doc.heightOfString(rest, opts);
+      if (y + h <= bottom) {
+        doc.fillColor(ink).text(rest, x, y, opts);
+        y += h;
+        break;
+      }
+      const words = rest.split(" ");
+      let lo = 0;
+      let hi = words.length;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (y + doc.heightOfString(words.slice(0, mid).join(" "), opts) <= bottom) lo = mid;
+        else hi = mid - 1;
+      }
+      if (lo > 0) doc.fillColor(ink).text(words.slice(0, lo).join(" "), x, y, { ...opts, align: "left" });
+      rest = words.slice(lo).join(" ");
+      y = newPage();
+    }
+    y += kind === "h" ? size * 0.35 : size * 0.3;
+  }
+  return y;
+}
+
+/**
  * Dlouhý text (obchodní podmínky) jako PDF A4 na tolik stran, kolik je potřeba: nadpis, odstavce, řádky
  * „1. NÁZEV“ / velkými písmeny tučně. Pro přílohu smlouvy z portálu – sestava smlouvy má na znění jen jednu stranu.
  */
@@ -261,8 +340,12 @@ export async function renderTextPdf(title: string, text: string): Promise<Buffer
       doc.moveDown(0.4);
       continue;
     }
-    const heading = /^\d+\.\s+\p{Lu}[\p{Lu}\s,.–-]{3,}$/u.test(line) || (line.length < 90 && line === line.toUpperCase() && /\p{Lu}{3}/u.test(line));
-    doc.font(heading ? "B" : "R").fontSize(heading ? 10.5 : 9).fillColor("#1f2a37").text(line, { align: heading ? "left" : "justify", paragraphGap: heading ? 3 : 2 });
+    const kind = textHeading(line);
+    const heading = kind === "h";
+    if (heading && doc.y > 80) doc.moveDown(0.5);
+    // nadpis nezůstane sám dole na stránce
+    if (heading && doc.y + 60 > doc.page.height - 56) doc.addPage();
+    doc.font(kind ? "B" : "R").fontSize(heading ? 10.5 : 9).fillColor("#1f2a37").text(line, 56, doc.y, { width: doc.page.width - 112, align: kind ? "left" : "justify", paragraphGap: heading ? 3 : 2 });
     if (heading) doc.moveDown(0.2);
   }
   doc.end();

@@ -45,9 +45,9 @@ Kontroly na portálu: povinná pole, platný e-mail, telefon aspoň 9 číslic, 
 ## Kam uložit
 
 - **Člen** (záznam v Adresáři): jméno, příjmení nebo celé jméno, e-mail, telefon, IČO, DIČ, poznámka. Formulář musí mít jméno a e-mail člena.
-- **Trvalá adresa** a **Kontaktní adresa**: ulice, obec, PSČ (trvalá i stát).
+- **Trvalá adresa** a **Kontaktní adresa**: ulice, obec, PSČ (trvalá i stát – výběr s názvy států, uloží se kód CZ, SK…; bez pole Stát = CZ).
 - **Firma (plátce)**: IČO s načtením z ARES, název, DIČ – ukládá se jen ke smlouvě (člen zůstane osobou).
-- **Smlouva**: začátek, konec, číslo členské karty, **počet karet**, popis, poznámka. Počet karet u tarifu s **Cena za kartu** (položka tarifu) násobí cenu smlouvy – firemní členství.
+- **Smlouva**: začátek (nevyplněný = členství od první platby, začátek i kalendář splátek se posunou na den platby), konec, číslo členské karty, **počet karet**, popis, poznámka. Počet karet u tarifu s **Cena za kartu** (položka tarifu) násobí cenu smlouvy – firemní členství.
 - **Jen do smlouvy**: cokoli dalšího (datum narození, číslo dokladu, forma platby, souhlasy).
 
 Podle Kam uložit prohlížeč zájemci sám nabídne uložené jméno, e-mail, telefon a adresu.
@@ -72,6 +72,11 @@ název, DIČ a u Člena i trvalou adresu. Z jedné adresy jde nejvýš 20 dotaz�
 - **Poslat smlouvu e-mailem** (u portálu): po uzavření dostane člen vyplněnou smlouvu a podmínky v PDF a v textu platební údaje.
 - Vzhled vyplněné smlouvy upravíte v **Tiskové sestavy → Smlouva**: jednotlivé odpovědi `{form.<klíč>}` (zaškrtnutí = ano / ne),
   všechny najednou `{doc.formText}`, dále `{doc.vs}`, `{doc.cardNumber}`, `{doc.tariff}`, `{partner.name}`, `{partner.address}`…
+
+## Platba
+
+Po uzavření smlouvy portál ukáže částku, účet, VS a QR kód (tlačítko **Stáhnout QR kód**); stejné údaje přijdou e-mailem. QR a účet se zobrazí jen, když má firma bankovní účet (Banka → Účty).
+S napojenou platební bránou (Integrace → Napojení, Comgate; na testu simulátor TEST-GATEWAY) a režimem smluv Kalendář je navíc tlačítko **Zaplatit kartou / Apple Pay / Google Pay** – po zaplacení se smlouva sama aktivuje a vystaví se faktura první splátky (úhrada brány se pak spáruje s výpisem).
 
 ## Tipy
 

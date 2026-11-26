@@ -9,12 +9,13 @@
 80;ulice;Ulice a číslo;text;ano;address.street;;;full;
 90;obec;Obec;text;ano;address.city;;;half;
 100;psc;PSČ;text;ano;address.zipCode;;;half;
+101;stat;Stát;select;ano;address.country;Česká republika|Slovensko|Německo|Rakousko|Polsko|Ukrajina|Maďarsko|Velká Británie|USA;;half;
 110;oddilSmlouva;Smlouva;heading;ne;form;;;full;
 120;druh;Kdo platí;select;ano;form;platím sám|platí firma;;half;
 130;ico;IČO firmy;text;ano;company.regNo;;Firmu načtete z ARES tlačítkem v poli.;half;druh=platí firma
 140;nazevFirmy;Název firmy;text;ano;company.name;;;half;druh=platí firma
 150;dicFirmy;DIČ firmy;text;ne;company.vatId;;;half;druh=platí firma
 145;pocetKaret;Počet karet;number;ano;agreement.quantity;;Kolik osob bude karty používat – u tarifu za kartu se podle toho počítá cena.;half;druh=platí firma
-160;zacatek;Začátek od;date;ano;agreement.startDate;;;half;
+160;zacatek;Začátek od;date;ne;agreement.startDate;;Nevyplníte-li, členství začne dnem připsání první platby.;half;
 170;poznamka;Poznámka;longtext;ne;agreement.notes;;;full;
 180;marketing;Souhlasím se zasíláním novinek a nabídek e-mailem.;checkbox;ne;form;;Souhlas můžete kdykoli odvolat.;full;

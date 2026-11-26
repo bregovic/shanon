@@ -12,6 +12,7 @@
  * řádky doplní účetní v deníku).
  */
 import { qrGlAccount } from "./qr-account";
+import { activateScheduleByPayment } from "@/modules/tax/agreements";
 import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type DownloadFile, type ObjectHandlers, type RecordData } from "@/core/module";
 import { transformByCode } from "@/core/transform";
@@ -193,6 +194,7 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
   const open = st.journalId ? await data.get("gl.journal", String(st.journalId)) : null;
   const acc = await data.get("bank.account", String(st.bankAccountId));
   const [jn] = await data.find("gl.journalName", { journalType: "bank" }, { take: 1 });
+  // banka = pevný protiúčet deníku (hlavička), na řádku vpravo; vlevo partner / účet → dimenze partnera z účtu řádku
   const j =
     open && open.status === "draft"
       ? open
@@ -200,41 +202,50 @@ export async function journalFromStatement(data: DataApi, st: RecordData, t: (r:
           journalNameId: jn?.id ?? null,
           date: st.date,
           description: `${acc?.code ?? ""} · ${st.statementNum}`.slice(0, 255),
+          offsetType: "bank",
+          offsetBankAccountId: st.bankAccountId,
         });
   for (const l of lines) {
     const amt = toCents(l.amount);
+    // první platba smlouvy (Kalendář): aktivace = faktura první splátky; platba se s ní spáruje VS jako s běžnou fakturou
+    if (l.matchKind === "customerAgreement" && l.agreementId) {
+      const t = await activateScheduleByPayment(data, String(l.agreementId));
+      Object.assign(l, { matchKind: "customer", customerTransId: t.id });
+      await data.update("bank.statementLine", String(l.id), { matchKind: "customer", customerTransId: t.id });
+    }
+    // částky z pohledu účtu řádku: příjem na banku = Dal partnera (MD banky v protiúčtu)
     const base: RecordData = {
       journalId: j.id,
       date: l.date,
-      accountType: "bank",
-      bankAccountId: st.bankAccountId,
+      offsetType: "bank",
+      offsetBankAccountId: st.bankAccountId,
       text: [l.vs ? `VS ${l.vs}` : null, l.message].filter(Boolean).join(" · ").slice(0, 255) || null,
       vs: l.vs ?? null,
-      debit: amt > zero ? fromCents(amt) : null,
-      credit: amt < zero ? fromCents(-amt) : null,
+      debit: amt < zero ? fromCents(-amt) : null,
+      credit: amt > zero ? fromCents(amt) : null,
     };
     if (l.matchKind === "customer" || l.matchKind === "customerAdvance") {
       const tr = l.customerTransId ? await data.get("ar.trans", String(l.customerTransId)) : null;
       const adv = l.customerAdvanceId ? await data.get("ar.advance", String(l.customerAdvanceId)) : null;
-      Object.assign(base, { offsetType: "customer", offsetCustomerId: tr?.customerId ?? adv?.customerId ?? null });
+      Object.assign(base, { accountType: "customer", customerId: tr?.customerId ?? adv?.customerId ?? null });
     } else if (l.matchKind === "customerAccount") {
-      Object.assign(base, { offsetType: "customer", offsetCustomerId: l.customerId ?? null });
+      Object.assign(base, { accountType: "customer", customerId: l.customerId ?? null });
     } else if (l.matchKind === "vendorAccount") {
-      Object.assign(base, { offsetType: "vendor", offsetVendorId: l.vendorId ?? null });
+      Object.assign(base, { accountType: "vendor", vendorId: l.vendorId ?? null });
     } else if (l.matchKind === "vendor" || l.matchKind === "vendorAdvance") {
       const tr = l.vendorTransId ? await data.get("ap.trans", String(l.vendorTransId)) : null;
       const adv = l.vendorAdvanceId ? await data.get("ap.advance", String(l.vendorAdvanceId)) : null;
-      Object.assign(base, { offsetType: "vendor", offsetVendorId: tr?.vendorId ?? adv?.vendorId ?? null });
+      Object.assign(base, { accountType: "vendor", vendorId: tr?.vendorId ?? adv?.vendorId ?? null });
     } else if (l.matchKind === "posReceipt" && l.posReceiptId) {
-      // QR platba účtenky: protiúčet = účet QR plateb pokladny (stav účtenky mění jen zaúčtování výpisu)
+      // QR platba účtenky: účet = účet QR plateb pokladny (stav účtenky mění jen zaúčtování výpisu)
       const r = await data.get("pos.receipt", String(l.posReceiptId));
       const reg = r?.registerId ? await data.get("pos.register", String(r.registerId)) : null;
-      Object.assign(base, { offsetType: "ledger", offsetAccountId: reg ? await qrGlAccount(data, reg) : null });
+      Object.assign(base, { accountType: "ledger", accountId: reg ? await qrGlAccount(data, reg) : null });
     } else if ((l.matchKind === "ledger" || l.matchKind === "rule") && l.offsetAccountId) {
-      Object.assign(base, { offsetType: "ledger", offsetAccountId: l.offsetAccountId });
+      Object.assign(base, { accountType: "ledger", accountId: l.offsetAccountId });
     } else {
-      // nespárované: protistranu doplní účetní v deníku
-      Object.assign(base, { offsetType: "ledger", offsetAccountId: null });
+      // nespárované: účet doplní účetní v deníku
+      Object.assign(base, { accountType: "ledger", accountId: null });
     }
     await data.create("gl.journalLine", base);
     await data.update("bank.statementLine", String(l.id), { journalId: j.id });

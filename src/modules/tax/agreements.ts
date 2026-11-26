@@ -102,6 +102,8 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
       /** počet karet / osob – u tarifu „za kartu“ je cena smlouvy cena tarifu × počet */
       quantity: { edt: Edts.Int, label: "@TAX:AgrQuantity", default: 1, help: "@TAX:AgrQuantityHelp" },
       startDate: { edt: Edts.TransDate, label: "@TAX:AgrStart", mandatory: true, default: "$today" },
+      /** začátek dnem první platby (portál bez zadaného počátku): aktivace posune začátek i kalendář */
+      startOnPayment: { edt: Edts.NoYes, label: "@TAX:AgrStartOnPayment", help: "@TAX:AgrStartOnPaymentHelp" },
       endDate: { edt: Edts.TransDate, label: "@TAX:AgrEnd", help: "@TAX:AgrEndHelp" },
       autoRenew: { edt: Edts.NoYes, label: "@TAX:AgrAutoRenew", default: true },
       status: { edt: enumEdt(AgreementStatus), mandatory: true, default: "draft", readOnly: true },
@@ -116,6 +118,8 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
       orderId: { edt: refEdt(`${m}.order`, L("Order")), readOnly: true },
       advanceId: { edt: refEdt(`${m}.advance`, L("Advance")), readOnly: true },
       blockedDate: { edt: Edts.TransDate, label: "@TAX:AgrBlockedDate", readOnly: true },
+      /** platba kartou bránou (portál): zahájení v protokolu napojení */
+      paymentLogId: { edt: refEdt("int.log", "@TAX:AgrPaymentLog"), readOnly: true, optionalRef: true },
       signedAt: { edt: Edts.DateTime, label: "@TAX:AgrSignedAt", readOnly: true },
       terms: { edt: Edts.Notes, label: "@TAX:AgrTerms", readOnly: true },
       /** odpovědi z formuláře portálu: JSON {klíč: hodnota} (tisk {form.<klíč>}) a čitelně „Popisek: hodnota“ */
@@ -128,8 +132,8 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
     list: ["agreementNum", partnerId, "itemId", "amount", "periodMonths", "startDate", "paidUntil", "dueDate", "status"],
     form: [
       { label: "@TAX:Header", fields: ["agreementNum", partnerId, "itemId", "description", "status", "vs", "cardNumber"] },
-      { label: "@TAX:AgrTerm", fields: ["quantity", "amount", "currencyId", "periodMonths", "startDate", "endDate", "autoRenew"] },
-      { label: "@TAX:AgrPayment", fields: ["paidUntil", "periodFrom", "periodTo", "dueDate", "orderId", "advanceId", "blockedDate"] },
+      { label: "@TAX:AgrTerm", fields: ["quantity", "amount", "currencyId", "periodMonths", "startDate", "startOnPayment", "endDate", "autoRenew"] },
+      { label: "@TAX:AgrPayment", fields: ["paidUntil", "periodFrom", "periodTo", "dueDate", "orderId", "advanceId", "blockedDate", "paymentLogId"] },
       { label: "@TAX:AgrSigned", fields: ["signedAt", "formText", "terms", "notes"] },
     ],
     numberSeq: { field: "agreementNum", seq },
@@ -494,6 +498,12 @@ async function issueScheduleLine(data: DataApi, docs: AgreementDocs, agr: Record
 /** Aktivace první platbou (banka) nebo ručně: faktura první splátky, smlouva aktivní. Vrací fakturu. */
 export async function activateSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
   if (agr.status === "ended") throw new UserError("@GL:Locked");
+  // začátek od první platby: dosud nevystavený kalendář se přestaví od dneška
+  if (agr.startOnPayment && !(await data.find(docs.agreementLine, { agreementId: agr.id, status: { in: ["invoiced", "paid"] } }, { take: 1 })).length) {
+    for (const ln of await data.find(docs.agreementLine, { agreementId: agr.id }, { take: 1000 })) await data.remove(docs.agreementLine, String(ln.id));
+    await data.update(docs.agreement, String(agr.id), { startDate: today, startOnPayment: false });
+    agr = (await data.get(docs.agreement, String(agr.id)))!;
+  }
   await ensureSchedule(data, docs, agr, today);
   const [first] = await data.find(docs.agreementLine, { agreementId: agr.id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
   if (!first) throw new UserError("@TAX:AgrBeyondEnd");
@@ -524,6 +534,22 @@ export async function activateScheduleByPayment(data: DataApi, agreementId: stri
   return t;
 }
 
+/**
+ * Zaplaceno kartou bránou (ověřený stav u brány, protokol napojení): smlouva čekající na první platbu se aktivuje,
+ * první splátka je zaplacená. Faktura v saldu čeká na výplatu brány na účet (spáruje se s výpisem). Opakovaně nic nemění.
+ */
+export async function agreementGatewayPaid(data: DataApi, logId: string): Promise<boolean> {
+  const docs = REGISTRY.customer;
+  if (!docs) return false;
+  const [agr] = await data.find(docs.agreement, { paymentLogId: logId }, { take: 1 }).catch(() => [] as RecordData[]);
+  if (!agr || agr.status !== "awaiting" || !(await agreementParams(data, docs)).schedule) return false;
+  const inv = await activateSchedule(data, docs, agr);
+  const [ln] = await data.find(docs.agreementLine, { agreementId: agr.id, invoiceId: inv.id }, { take: 1 });
+  if (ln) await data.update(docs.agreementLine, String(ln.id), { status: "paid" });
+  await refreshSchedule(data, docs, (await data.get(docs.agreement, String(agr.id)))!);
+  return true;
+}
+
 /** Stav smlouvy podle zaplacenosti faktur kalendáře (po úhradě i v dávce). */
 export async function refreshSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
   const prm = await agreementParams(data, docs);
@@ -533,7 +559,7 @@ export async function refreshSchedule(data: DataApi, docs: AgreementDocs, agr: R
   const closed = new Set(trans.filter((t) => t.closed).map((t) => String(t.invoiceId)));
   let paidUntil: string | null = null, overdue = false;
   for (const l of lines) {
-    const isPaid = l.invoiceId && closed.has(String(l.invoiceId));
+    const isPaid = l.status === "paid" || (l.invoiceId && closed.has(String(l.invoiceId)));
     if (isPaid) {
       if (l.status !== "paid") await data.update(docs.agreementLine, String(l.id), { status: "paid" });
       paidUntil = String(l.periodTo).slice(0, 10);

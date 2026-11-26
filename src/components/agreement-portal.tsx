@@ -63,6 +63,8 @@ const useStyles = makeStyles({
   trap: { position: "absolute", left: "-10000px", width: "1px", height: "1px", overflow: "hidden" },
   done: { display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", textAlign: "center" },
   pay: { display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 16px", alignItems: "baseline" },
+  qrBox: { display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" },
+  cardPay: { display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" },
   payWrap: { display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "center", justifyContent: "center" },
 });
 
@@ -133,6 +135,34 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
   const [qr, setQr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (_: unknown, d: { value: string }) => setF((x) => ({ ...x, [k]: d.value }));
 
+  // návrat z platební brány: ?zaplaceno=<ref> → stav smlouvy ověřený u brány
+  const payUrl = action.replace(/\/agreement$/, "/pay");
+  const [paid, setPaid] = useState<{ status: string; agreementNum: string } | null>(null);
+  const [paying, setPaying] = useState(false);
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("zaplaceno");
+    if (!ref) return;
+    void fetch(`${payUrl}?ref=${encodeURIComponent(ref)}`)
+      .then((r) => r.json())
+      .then((j: { ok: boolean; status: string; agreementNum: string }) => j.ok && setPaid(j))
+      .catch(() => undefined);
+  }, [payUrl]);
+  const payCard = async () => {
+    if (!done?.payRef) return;
+    setPaying(true);
+    try {
+      const back = `${window.location.pathname}?zaplaceno=${done.payRef}`;
+      const r = await fetch(payUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: done.payRef, back }) });
+      const j = (await r.json()) as { ok: boolean; url?: string; error?: string };
+      if (j.ok && j.url) window.location.href = j.url;
+      else setError(j.error ?? "Platba kartou teď nejde.");
+    } catch {
+      setError("Server neodpovídá. Zkuste to znovu.");
+    } finally {
+      setPaying(false);
+    }
+  };
+
   useEffect(() => {
     if (done?.payment?.qr) void QRCode.toDataURL(done.payment.qr, { margin: 1, width: 220 }).then(setQr).catch(() => setQr(null));
   }, [done]);
@@ -168,6 +198,25 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
     </div>
   );
 
+  if (paid) {
+    const ok = paid.status === "active";
+    return (
+      <main className={s.page} style={{ background: look.background }}>
+        <div className={s.wrap}>
+          {hero}
+          <div className={s.card} style={radius}>
+            <div className={s.done}>
+              <CheckmarkCircle48Filled primaryFill={ok ? tokens.colorPaletteGreenForeground1 : tokens.colorNeutralForeground3} />
+              <Text size={600} weight="semibold">{ok ? `Zaplaceno – smlouva ${paid.agreementNum} platí` : `Smlouva ${paid.agreementNum} čeká na platbu`}</Text>
+              <Text>{ok ? "Děkujeme. Potvrzení vám přijde e-mailem." : "Platba zatím nedorazila. Pokud jste platbu zrušili, zaplaťte prosím převodem podle údajů v e-mailu."}</Text>
+            </div>
+          </div>
+          {footer}
+        </div>
+      </main>
+    );
+  }
+
   if (done?.ok) {
     const p = done.payment;
     return (
@@ -178,7 +227,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
             <div className={s.done}>
               <CheckmarkCircle48Filled primaryFill={tokens.colorPaletteGreenForeground1} />
               <Text size={600} weight="semibold">Smlouva {done.agreementNum} je uzavřená</Text>
-              <Text>Začne platit, jakmile přijde platba. Pošlete prosím částku na účet níže.</Text>
+              <Text>{p ? "Začne platit, jakmile přijde platba. Zaplaťte prosím podle údajů níže." : "Začne platit, jakmile přijde platba. Platební údaje vám pošleme e-mailem."}</Text>
               {done.mailedTo && <Text>Vyplněnou smlouvu a obchodní podmínky jsme poslali na {done.mailedTo}.</Text>}
             </div>
             {p && (
@@ -206,9 +255,22 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
                   <Text>{date(p.dueDate)}</Text>
                 </div>
                 {qr && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qr} alt="QR platba" width={220} height={220} />
+                  <div className={s.qrBox}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qr} alt="QR platba" width={220} height={220} />
+                    <a href={qr} download={`QR-platba-${done.agreementNum}.png`}>
+                      <Button appearance="secondary" size="small">Stáhnout QR kód</Button>
+                    </a>
+                  </div>
                 )}
+              </div>
+            )}
+            {info.cardPay && done.payRef && (
+              <div className={s.cardPay}>
+                <Button appearance="primary" size="large" disabled={paying} onClick={() => void payCard()}>
+                  {paying ? <Spinner size="tiny" /> : "Zaplatit kartou / Apple Pay / Google Pay"}
+                </Button>
+                {error && <Text style={{ color: tokens.colorPaletteRedForeground1 }}>{error}</Text>}
               </div>
             )}
           </div>

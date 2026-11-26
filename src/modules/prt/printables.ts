@@ -6,7 +6,7 @@ import { devicePaperRoll, resolvePrintTarget } from "@/modules/int/print-rules";
 import { fromCents, percentOf, toCents, toScaled } from "@/core/money";
 import { vatPayer } from "@/modules/tax/orders";
 import type { DataApi, RecordData } from "@/core/module";
-import { czIban, spayd, type PrintField, type PrintLayout, type PrintableDef } from "@/core/print";
+import { czIban, spayd, textHeading, type PrintField, type PrintLayout, type PrintableDef } from "@/core/print";
 import { paymentQrText } from "@/core/transform";
 import { invoiceIsdoc } from "./isdoc";
 import { addressLine, orgOf } from "@/modules/org";
@@ -1068,6 +1068,13 @@ const dmyText = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse()
  * Smlouva: firma, člen (subjekt adresáře + trvalá adresa), tarif a období, VS a číslo karty, odpovědi formuláře
  * portálu jako {form.<klíč>} (zaškrtnutí = „ano“ / „ne“) a čitelně {doc.formText}, znění smlouvy {doc.terms}.
  */
+/** Znění smlouvy začíná nadpisem (vlastní první řádek znění, jinak „SMLUVNÍ PODMÍNKY“). */
+function termsWithHeading(t: string): string {
+  const first = t.trim().split("\n")[0]?.trim() ?? "";
+  if (!t.trim() || textHeading(first) === "h") return t.trim();
+  return `SMLUVNÍ PODMÍNKY\n${t.trim()}`;
+}
+
 async function agreementDataset(data: DataApi, companyId: string | null, id: string) {
   const agr = await data.get("ar.agreement", id);
   if (!agr) throw new Error("not found");
@@ -1106,8 +1113,10 @@ async function agreementDataset(data: DataApi, companyId: string | null, id: str
       quantity: String(agr.quantity ?? 1),
       signedAt: agr.signedAt ? String(agr.signedAt).slice(0, 10) : "",
       formText: agr.formText ?? "",
-      terms: agr.terms ?? "",
+      terms: termsWithHeading(String(agr.terms ?? "")),
     },
+    // QR platby první / další splátky (dokud smlouva čeká na platbu)
+    qr: company.iban && toCents(String(agr.amount ?? 0)) > BigInt(0) && agr.status === "awaiting" ? await paymentQr(data, { iban: company.iban, amount: String(agr.amount), currency: String(cur?.code ?? "CZK"), vs: String(agr.vs ?? ""), date: null, message: `Smlouva ${agr.agreementNum}` }) : "",
     partner: {
       number: cust?.accountNum ?? "",
       name: subj?.name ?? "",
@@ -1142,18 +1151,19 @@ function agreementLayout(): PrintLayout {
       T("custA", 110, 47, 82, 9, "{partner.address}", { size: 9, color: INK }),
       T("custC", 110, 56, 82, 12, "{partner.email}\n{partner.phone}", { size: 9, color: INK }),
       H("memH", 15, 76, 180, "ÚDAJE O ČLENSTVÍ"),
-      T("mem", 15, 81, 180, 24, "Tarif: {doc.tariff}\nOd {doc.startDate:date}, konec: {doc.endDate}\nČlenský poplatek: {doc.amount:money} {doc.currency} {doc.periodText}\nPočet karet: {doc.quantity}   Číslo členské karty: {doc.cardNumber}", { size: 9.5, color: INK }),
-      { id: "payBox", type: "rect", x: 15, y: 106, w: 180, h: 13, style: { fill: PANEL, color: PANEL } },
-      T("pay", 19, 108, 172, 10, "Platba převodem: účet {company.bankAccount}, variabilní symbol {doc.vs}", { size: 9.5, bold: true, color: INK }),
-      H("formH", 15, 124, 180, "ÚDAJE ČLENA"),
-      T("form", 15, 129, 180, 50, "{doc.formText}", { size: 9, color: INK }),
-      H("termsH", 15, 182, 180, "SMLUVNÍ PODMÍNKY"),
-      T("terms", 15, 187, 180, 78, "{doc.terms}", { size: 7.5, color: INK }),
-      T("place", 15, 268, 90, 5, "Uzavřeno dne {doc.signedAt:date}", { size: 9, color: INK }),
-      { id: "sig1", type: "line", x: 15, y: 285, w: 70, h: 0, style: { color: MUTED } },
-      { id: "sig2", type: "line", x: 125, y: 285, w: 70, h: 0, style: { color: MUTED } },
-      T("sig1t", 15, 286, 70, 4, "za Společnost", { size: 7.5, align: "center", color: MUTED }),
-      T("sig2t", 125, 286, 70, 4, "Člen", { size: 7.5, align: "center", color: MUTED }),
+      T("mem", 15, 81, 180, 24, "Tarif: {doc.tariff}\nOd {doc.startDate:date}, konec: {doc.endDate}\nČlenský poplatek: {doc.amount:money} {doc.currency} {doc.periodText}\nPočet karet: {doc.quantity}   Číslo členské karty: {doc.cardNumber}\nVariabilní symbol: {doc.vs}", { size: 9.5, color: INK }),
+      { id: "payBox", type: "rect", x: 15, y: 106, w: 180, h: 26, style: { fill: PANEL, color: PANEL }, showIf: "company.bankAccount" },
+      { ...T("pay", 19, 109, 140, 20, "PLATBA PŘEVODEM\nÚčet: {company.bankAccount}\nVariabilní symbol: {doc.vs}\nČástka: {doc.amount:money} {doc.currency} {doc.periodText}", { size: 9, color: INK }), showIf: "company.bankAccount" },
+      { id: "qr", type: "qr", x: 171, y: 107, w: 23, h: 23, field: "qr" },
+      H("formH", 15, 138, 180, "ÚDAJE ČLENA"),
+      { ...T("form", 15, 143, 180, 20, "{doc.formText}", { size: 9, color: INK }), style: { size: 9, color: INK, flow: true } },
+      T("place", 15, 172, 90, 5, "Uzavřeno dne {doc.signedAt:date}", { size: 9, color: INK }),
+      { id: "sig1", type: "line", x: 15, y: 192, w: 75, h: 0, style: { color: MUTED } },
+      { id: "sig2", type: "line", x: 120, y: 192, w: 75, h: 0, style: { color: MUTED } },
+      T("sig1t", 15, 193, 75, 16, "za {company.name}\n{company.address}\n{company.email}  {company.phone}", { size: 7.5, align: "center", color: MUTED }),
+      T("sig2t", 120, 193, 75, 8, "{partner.name}\nČlen", { size: 7.5, align: "center", color: MUTED }),
+      // znění od nové stránky; nadpis „SMLUVNÍ PODMÍNKY“ doplní dataset, když ho znění samo nemá
+      { ...T("terms", 15, 215, 180, 20, "{doc.terms}", { size: 8, color: INK }), style: { size: 8, color: INK, flow: true, pageBreak: true } },
     ],
   };
 }

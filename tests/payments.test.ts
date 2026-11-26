@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { createPrisma } from "@/server/db";
-import { downloadFile, getRecord, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
+import { deleteRecord, downloadFile, getRecord, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
 import { gpcHeader, gpcLine } from "@/modules/bank/gpc";
 import { importStatementsBulk } from "@/server/bank-import";
@@ -130,7 +130,7 @@ describe("hromadný import výpisů", () => {
     await runAction(T, "bank.statement", String(st1a.id), "match", client);
     const l1 = (await rows(T, "bank.statementLine", { statementId: st1a.id }))[0];
     expect([l1.matchKind, l1.customerId]).toEqual(["customerAccount", cust.id]);
-    expect((await rows(T, "bank.matchStep")).map((x) => x.method)).toEqual(["vsInvoice", "vsAdvance", "vsPosReceipt", "counterPartner", "rules"]);
+    expect((await rows(T, "bank.matchStep")).map((x) => x.method)).toEqual(["vsInvoice", "vsAdvance", "vsAgreement", "vsPosReceipt", "counterPartner", "rules"]);
     // předkontace: výdaj „Poplatek“ bez VS → účet poplatků (výchozí předkontace POPL)
     const sts0 = await rows(T, "bank.statement", { bankAccountId: bank.id });
     const st3 = sts0.find((x) => x.statementNum === "003")!;
@@ -141,7 +141,7 @@ describe("hromadný import výpisů", () => {
     // vybraný řádek → deník (akce řádku), opakovaně už ne
     await runAction(T, "bank.statementLine", String(fee.id), "createJournal", client);
     const feeJ = (await getRecord(T, "bank.statementLine", String(fee.id), client))!.journalId;
-    expect((await rows(T, "gl.journalLine", { journalId: feeJ })).map((l) => [l.credit, l.offsetType, l.offsetAccountId])).toEqual([["50.00", "ledger", popl.offsetAccountId]]);
+    expect((await rows(T, "gl.journalLine", { journalId: feeJ })).map((l) => [l.debit, l.accountType, l.accountId, l.offsetType, l.offsetBankAccountId])).toEqual([["50.00", "ledger", popl.offsetAccountId, "bank", bank.id]]);
     await expect(runAction(T, "bank.statementLine", String(fee.id), "createJournal", client)).rejects.toMatchObject({ label: "@BANK:LineInJournal" });
 
     // deník HK z obou výpisů najednou (hromadná akce = akce po záznamech)
@@ -152,8 +152,21 @@ describe("hromadný import výpisů", () => {
     const st1 = sts.find((s) => s.statementNum === "001")!;
     const j = (await getRecord(T, "bank.statement", String(st1.id), client))!.journalId;
     const jl = await rows(T, "gl.journalLine", { journalId: j });
-    expect(jl.map((l) => [l.accountType, l.bankAccountId, l.debit, l.offsetType, l.offsetCustomerId])).toEqual([["bank", bank.id, "1000.00", "customer", cust.id]]);
+    // partner vlevo (dimenze partnera z účtu řádku), banka = pevný protiúčet deníku
+    expect(jl.map((l) => [l.accountType, l.customerId, l.credit, l.offsetType, l.offsetBankAccountId])).toEqual([["customer", cust.id, "1000.00", "bank", bank.id]]);
+    expect((await getRecord(T, "gl.journal", String(j), client))!).toMatchObject({ offsetType: "bank", offsetBankAccountId: bank.id });
     await expect(runAction(T, "bank.statement", String(st1.id), "createJournal", client)).rejects.toMatchObject({ label: "@BANK:JournalExists" });
+    // odpojit deník → vytvořit znovu; smazat rozpracovaný deník → výpis bez vazby
+    await runAction(T, "bank.statement", String(st1.id), "unlinkJournal", client);
+    expect((await getRecord(T, "bank.statement", String(st1.id), client))!.journalId).toBeNull();
+    expect((await rows(T, "bank.statementLine", { statementId: st1.id })).map((l) => l.journalId)).toEqual([null]);
+    await runAction(T, "bank.statement", String(st1.id), "createJournal", client);
+    const j2 = (await getRecord(T, "bank.statement", String(st1.id), client))!.journalId;
+    expect(j2).not.toBe(j);
+    await deleteRecord(T, "gl.journal", String(j2), client);
+    expect((await getRecord(T, "bank.statement", String(st1.id), client))!.journalId).toBeNull();
+    expect((await rows(T, "bank.statementLine", { statementId: st1.id })).map((l) => l.journalId)).toEqual([null]);
+    await runAction(T, "bank.statement", String(st1.id), "createJournal", client);
 
     // smazání nahraného výpisu z protokolu importu: rozpracovaný deník i protokol pryč, výpis jde nahrát znovu
     const log3 = (await rows(T, "bank.importLog")).find((l) => l.statementId === st3.id)!;
@@ -165,8 +178,9 @@ describe("hromadný import výpisů", () => {
     const again = await importStatementsBulk(session, file(gpc("3", "900", [{ amount: "-50", vs: "", msg: "Poplatek" }])));
     expect(again[0].status).not.toBe("duplicate");
     // zaúčtovaný deník výpis drží
-    await runAction(T, "gl.journal", String(j), "post", client).catch(() => undefined);
-    if ((await getRecord(T, "gl.journal", String(j), client))!.status === "posted")
+    const jNow = (await getRecord(T, "bank.statement", String(st1.id), client))!.journalId;
+    await runAction(T, "gl.journal", String(jNow), "post", client).catch(() => undefined);
+    if ((await getRecord(T, "gl.journal", String(jNow), client))!.status === "posted")
       await expect(runAction(T, "bank.importLog", String((await rows(T, "bank.importLog")).find((l) => l.statementId === st1.id)!.id), "deleteStatement", client)).rejects.toMatchObject({ label: "@BANK:StatementJournalPosted" });
   });
 });

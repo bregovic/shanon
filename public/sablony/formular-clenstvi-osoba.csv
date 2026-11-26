@@ -9,7 +9,8 @@
 80;ulice;Ulice a číslo;text;ano;address.street;;;full;
 90;obec;Obec;text;ano;address.city;;;half;
 100;psc;PSČ;text;ano;address.zipCode;;;half;
+101;stat;Stát;select;ano;address.country;Česká republika|Slovensko|Německo|Rakousko|Polsko|Ukrajina|Maďarsko|Velká Británie|USA;;half;
 110;oddilSmlouva;Smlouva;heading;ne;form;;;full;
-120;zacatek;Začátek od;date;ano;agreement.startDate;;;half;
+120;zacatek;Začátek od;date;ne;agreement.startDate;;Nevyplníte-li, členství začne dnem připsání první platby.;half;
 130;poznamka;Poznámka;longtext;ne;agreement.notes;;;full;
 140;marketing;Souhlasím se zasíláním novinek a nabídek e-mailem.;checkbox;ne;form;;Souhlas můžete kdykoli odvolat.;full;

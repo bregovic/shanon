@@ -190,6 +190,19 @@ export async function autoMatch(data: DataApi, statementId: string): Promise<num
   return n;
 }
 
+/** Vazby výpisů na deník pryč (podle výpisu nebo deníku); zaúčtovaný deník se neodpojí. */
+async function unlinkStatementJournals(data: DataApi, by: { statementId?: string; journalId?: string }) {
+  const sts = by.statementId ? [await data.get("bank.statement", by.statementId)].filter((x): x is RecordData => !!x) : await data.find("bank.statement", { journalId: by.journalId }, { take: 100 });
+  const lines = by.statementId ? await data.find("bank.statementLine", { statementId: by.statementId }, { take: 5000 }) : await data.find("bank.statementLine", { journalId: by.journalId }, { take: 5000 });
+  const ids = new Set([...sts.map((s) => s.journalId), ...lines.map((l) => l.journalId)].filter(Boolean).map(String));
+  for (const id of ids) {
+    const j = await data.get("gl.journal", id);
+    if (j && j.status !== "draft") throw new UserError("@BANK:UnlinkJournalPosted", { journal: String(j.journalNum ?? "") });
+  }
+  for (const l of lines) if (l.journalId && (!by.journalId || String(l.journalId) === by.journalId)) await data.update("bank.statementLine", String(l.id), { journalId: null });
+  for (const s of sts) if (s.journalId) await data.update("bank.statement", String(s.id), { journalId: null });
+}
+
 /** Import GPC: kontrola součtů, kontrola účtu, výpis s řádky, automatické párování. */
 export async function importStatement(data: DataApi, account: RecordData, file: Buffer, fileName = ""): Promise<string[]> {
   let statements: GpcStatement[] = [];
@@ -406,6 +419,13 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
       },
     },
   },
+  /** Smazání rozpracovaného deníku vytvořeného z výpisu: výpis a jeho řádky zapomenou vazbu (deník jde vytvořit znovu). */
+  "gl.journal": {
+    async beforeDelete(ctx, j) {
+      if (j.status && j.status !== "draft") return;
+      await unlinkStatementJournals(ctx.data, { journalId: String(j.id) });
+    },
+  },
   "bank.statement": {
     /**
      * Smazání importovaného výpisu (nezaúčtovaného): rozpracovaný deník z výpisu se smaže s ním,
@@ -434,6 +454,10 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
       },
       async createJournal(ctx, st) {
         await journalFromStatement(ctx.data, st, ctx.t);
+      },
+      /** Odpojit deník: výpis i řádky bez vazby na deník (deník zůstane); zaúčtovaný deník ne */
+      async unlinkJournal(ctx, st) {
+        await unlinkStatementJournals(ctx.data, { statementId: String(st.id) });
       },
       async recheck(ctx, st) {
         await checkStatementChain(ctx.data, st, ctx.t);

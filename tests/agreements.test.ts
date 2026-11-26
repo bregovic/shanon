@@ -343,3 +343,59 @@ describe("smlouva v režimu Kalendář (bez zálohy)", () => {
     expect((await getRecord(T, "ar.agreement", String(c.id), client))!.quantity).toBe(5);
   }, 120_000);
 });
+
+describe("portál smluv – platba kartou, začátek od platby, PDF", () => {
+  it("bez počátku: začátek dnem platby; karta přes testovací bránu aktivuje; PDF smlouvy na více stran", async () => {
+    const { agreementPortalInfo, agreementPortalSubmit, agreementPortalPay, agreementPortalPaid } = await import("@/server/agreement-portal");
+    const { enableTestEnv } = await import("@/modules/int/test-env");
+    const { simDecide } = await import("@/server/gateway-sim");
+    const { printJob } = await import("@/server/print");
+    const { renderPdf } = await import("@/server/print-pdf");
+    const T = (await provisionTenant(client, { code: `t-agc-${run}`, name: "AGC", adminEmail: `agc-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "bank", "inv", "int"], company: { code: "M", name: "Gym" } })).ctx;
+    const [prm] = (await listRecords(T, "ar.parameters", {}, client)).rows;
+    await saveRecord(T, "ar.parameters", String(prm.id), { agreementMode: "schedule", agreementDueDays: 3 }, prm.version as number, client);
+    await inTenant(T, (s) => enableTestEnv(s.sys().api(), (x) => x, false), client);
+    const g = (await listRecords(T, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(T, "inv.unit", {}, client)).rows[0];
+    await saveRecord(T, "inv.item", null, { itemNum: "CLEN1", name: "Členství měsíční", groupId: g.id, unitId: u.id, salesPrice: "900", priceInclTax: true, agreementMonths: 1 }, undefined, client);
+    await saveRecord(T, "bank.account", null, { code: "KB", name: "Účet", accountNum: "123456789/0100", isDefault: true }, undefined, client).catch(() => null);
+    const terms = ["SMLUVNÍ PODMÍNKY", ...Array.from({ length: 12 }, (_, i) => `${i + 1}. ČLÁNEK ČÍSLO ${i + 1}\n${"Dlouhý odstavec podmínek, který se musí zalomit na více řádků i stránek. ".repeat(12)}`)].join("\n");
+    const fm = await saveRecord(T, "int.form", null, { code: "F", name: "F" }, undefined, client);
+    const fld = (sequence: number, key: string, label: string, kind: string, mapping: string, extra: Record<string, unknown> = {}) => saveRecord(T, "int.formField", null, { formId: fm.id, sequence, key, label, kind, mapping, ...extra }, undefined, client);
+    await fld(10, "jmeno", "Jméno", "text", "subject.firstName", { required: true });
+    await fld(20, "prijmeni", "Příjmení", "text", "subject.lastName", { required: true });
+    await fld(30, "email", "E-mail", "email", "subject.email", { required: true });
+    await fld(35, "ulice", "Ulice", "text", "address.street");
+    await fld(36, "obec", "Obec", "text", "address.city");
+    await fld(37, "psc", "PSČ", "text", "address.zipCode");
+    await fld(40, "stat", "Stát", "select", "address.country", { options: "Česká republika|Slovensko|Německo" });
+    await fld(50, "zacatek", "Počátek členství", "date", "agreement.startDate");
+    const p = await saveRecord(T, "int.portal", null, { name: "Členství", purpose: "agreement", title: "Členství", agreementTerms: terms, formId: fm.id, ipHourLimit: 50 }, undefined, client);
+    const info = (await agreementPortalInfo(T.tenantId, String(p.token), client))!;
+    expect(info.cardPay).toBe(true);
+    const r = (await agreementPortalSubmit(T.tenantId, String(p.token), { tariffId: info.tariffs[0].id, firstName: "", lastName: "", email: "", phone: "", street: "", city: "", zipCode: "", startDate: "", consent: true, answers: { jmeno: "Jana", prijmeni: "Nováková", email: "jana@example.test", stat: "Slovensko", zacatek: "", ulice: "Hlavná 1", obec: "Bratislava", psc: "81101" } }, "10.9.0.1", client))!;
+    expect(r.ok).toBe(true);
+    let agr = (await getRecord(T, "ar.agreement", r.agreementId!, client))!;
+    expect([agr.status, agr.startOnPayment]).toEqual(["awaiting", true]);
+    const subj = (await listRecords(T, "gab.subject", { filter: { email: "jana@example.test" } }, client)).rows[0];
+    expect((await listRecords(T, "gab.address", { filter: { subjectId: subj.id } }, client)).rows.map((a) => a.country)).toContain("SK");
+
+    // PDF: znění od nové stránky, nic se nepřekrývá (aspoň 3 strany)
+    const job = await printJob(T, "ar.agreement", r.agreementId!, null, client);
+    const pdf = await renderPdf(job.layout, job.data, { locale: "cs-CZ", title: job.title });
+    expect((pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBeGreaterThanOrEqual(3);
+
+    // karta: testovací brána → Zaplatit → smlouva aktivní, začátek = dnes, první splátka zaplacená
+    const url = (await agreementPortalPay(T.tenantId, String(p.token), r.payRef!, "http://localhost:3100", "http://localhost:3100/x?zaplaceno=1", client))!;
+    const m = /\/pay-sim\/[0-9a-f-]{36}\/([0-9a-f-]{36})$/.exec(url);
+    expect(m).toBeTruthy();
+    await simDecide(T.tenantId, m![1], true, client);
+    expect(await agreementPortalPaid(T.tenantId, String(p.token), r.payRef!, client)).toMatchObject({ status: "active" });
+    agr = (await getRecord(T, "ar.agreement", r.agreementId!, client))!;
+    expect([agr.status, agr.startDate, agr.startOnPayment]).toEqual(["active", iso(new Date()), false]);
+    const lines = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100, sort: "lineNum" }, client)).rows;
+    expect([lines[0].status, lines[0].periodFrom]).toEqual(["paid", iso(new Date())]);
+    // opakované ověření nic nezmění
+    expect(await agreementPortalPaid(T.tenantId, String(p.token), r.payRef!, client)).toMatchObject({ status: "active" });
+  }, 120_000);
+});

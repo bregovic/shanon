@@ -7,7 +7,7 @@
  * se posunou o skutečnou výšku tabulky.
  */
 import QRCode from "qrcode";
-import { PAPERS, flowGroups, valueAt, type PrintColumn, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
+import { PAPERS, flowGroups, textHeading, valueAt, type PrintColumn, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
 
 export function formatValue(v: unknown, f: ValueFormat | undefined, locale: string): string {
   if (v === null || v === undefined || v === "") return "";
@@ -186,6 +186,7 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
   const table = layout.elements.find((e) => e.type === "table");
   const page: React.CSSProperties = { width: `${paper.w}mm`, position: "relative", fontFamily: "Arial, Helvetica, sans-serif", color: "#000", background: "#fff" };
   const fs = layout.fontSize || 9;
+  if (!table && layout.elements.some((e) => e.style?.flow || e.style?.pageBreak)) return <FlowingDocument layout={layout} data={data} locale={locale} />;
   if (!table) {
     const h = paper.h || Math.max(20, ...layout.elements.map((e) => e.y + e.h)) + 2;
     return (
@@ -222,6 +223,59 @@ export function PrintDocument({ layout, data, locale = "cs-CZ" }: { layout: Prin
       </div>
     </div>
   );
+}
+
+/** Sestava s tekoucími texty (smlouva): pevné prvky po úsecích, tekoucí text odstavci, `pageBreak` = nová stránka (jako PDF). */
+function FlowingDocument({ layout, data, locale }: { layout: PrintLayout; data: PrintData; locale: string }) {
+  const paper = PAPERS[layout.paper] ?? PAPERS.a4;
+  const fs = layout.fontSize || 9;
+  const els = [...layout.elements].sort((a, b) => a.y - b.y);
+  const out: React.ReactNode[] = [];
+  let base = 0;
+  let fixed: PrintElement[] = [];
+  const flush = (end: number, key: string) => {
+    const h = Math.max(end, ...fixed.map((e) => e.y + e.h)) - base;
+    if (fixed.length || h > 0)
+      out.push(
+        <div key={key} style={{ position: "relative", height: `${Math.max(0, h)}mm`, breakInside: "avoid" }}>
+          {fixed.map((el) => (
+            <ElementView key={el.id} el={{ ...el, y: el.y - base }} data={data} locale={locale} fontSize={fs} />
+          ))}
+        </div>,
+      );
+    fixed = [];
+  };
+  for (const el of els) {
+    if (el.style?.pageBreak) {
+      flush(el.y, `s-${el.id}`);
+      out.push(<div key={`pb-${el.id}`} style={{ breakBefore: "page", height: "12mm" }} />);
+      base = el.y;
+    }
+    if (!el.style?.flow) {
+      fixed.push(el);
+      continue;
+    }
+    flush(el.y, `s-${el.id}`);
+    const size = el.style.size ?? fs;
+    const lines = fillText(el.text ?? "", data, locale).replace(/\r/g, "").split("\n");
+    out.push(
+      <div key={el.id} style={{ marginLeft: `${el.x}mm`, width: `${el.w}mm`, fontSize: pt(size), color: el.style.color, lineHeight: 1.25 }}>
+        {lines.map((raw, i) => {
+          const line = raw.trim();
+          if (!line) return <div key={i} style={{ height: pt(size * 0.5) }} />;
+          const kind = textHeading(line);
+          return (
+            <div key={i} style={{ fontWeight: kind ? 700 : 400, fontSize: kind === "h" ? pt(size + 1.5) : undefined, textAlign: kind ? "left" : "justify", marginTop: kind === "h" && i ? pt(size * 0.6) : undefined, marginBottom: pt(size * 0.3), breakAfter: kind ? "avoid" : undefined }}>
+              {line}
+            </div>
+          );
+        })}
+      </div>,
+    );
+    base = el.y + el.h - 2;
+  }
+  flush(base, "end");
+  return <div className="print-page" style={{ width: `${paper.w}mm`, position: "relative", fontFamily: "Arial, Helvetica, sans-serif", color: "#000", background: "#fff" }}>{out}</div>;
 }
 
 /**

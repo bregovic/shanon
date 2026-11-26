@@ -49,7 +49,11 @@ export interface PrintElement {
   /** prvek se vytiskne jen, když pole (cesta) má hodnotu — např. kód EET */
   showIf?: string;
   columns?: PrintColumn[];
-  style?: { size?: number; bold?: boolean; italic?: boolean; align?: "left" | "center" | "right"; color?: string; border?: boolean; fill?: string; /** tabulka: svislý okraj buňky v mm (výchozí 0,6) */ rowPad?: number };
+  style?: { size?: number; bold?: boolean; italic?: boolean; align?: "left" | "center" | "right"; color?: string; border?: boolean; fill?: string; /** tabulka: svislý okraj buňky v mm (výchozí 0,6) */ rowPad?: number;
+    /** text teče přes stránky (odstavce, nadpisy „1. NÁZEV“ tučně) a prvky pod ním se posunou – znění smlouvy */
+    flow?: boolean;
+    /** prvek začne na nové stránce (a s ním prvky pod ním) */
+    pageBreak?: boolean };
 }
 
 export interface PrintLayout {
@@ -251,4 +255,13 @@ export function spayd(p: { iban: string; amount: string | number; currency?: str
   if (p.date) parts.push(`DT:${p.date.replace(/-/g, "")}`);
   if (p.message) parts.push(`MSG:${clean(p.message)}`);
   return parts.join("*");
+}
+
+/** Nadpis v textu podmínek: „1. ÚVODNÍ USTANOVENÍ“, řádek velkými písmeny; podnadpis = krátký řádek s dvojtečkou. */
+export function textHeading(line: string): "h" | "sub" | null {
+  // „Údaj: hodnota“ (vyplněný formulář) nadpis není, i když je velkými písmeny (PSČ: 11000)
+  if (/:\s*\S/.test(line)) return null;
+  if (/^\d+\.\s+\p{Lu}[\p{Lu}\s,.–-]{3,}$/u.test(line) || (line.length < 90 && line === line.toUpperCase() && /\p{Lu}{3}/u.test(line))) return "h";
+  if (line.length < 70 && /:$/.test(line)) return "sub";
+  return null;
 }
