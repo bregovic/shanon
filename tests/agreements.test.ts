@@ -216,7 +216,7 @@ describe("smlouva v režimu Kalendář (bez zálohy)", () => {
     a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
     let inv = (await listRecords(T, "ar.invoice", { filter: { agreementId: agr.id } }, client)).rows;
     expect([a.status, a.paidUntil, inv.length, inv[0].status, inv[0].vs, inv[0].paidAmount]).toEqual(["active", periodEnd(start, 1), 1, "posted", a.vs, "1000.00"]);
-    let ls = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100 }, client)).rows;
+    const ls = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100 }, client)).rows;
     expect(ls.slice(0, 2).map((l) => l.status)).toEqual(["paid", "planned"]);
 
     // dávka: druhá splátka se vystaví před začátkem období, splatnost 3 dny
