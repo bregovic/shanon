@@ -17,7 +17,7 @@ import { printJob } from "./print";
 import { documentMailHtml } from "./mail-templates";
 import { fillMail, MAIL_DEFAULTS, MAIL_FIELDS, type MailDocKind } from "@/modules/org/mail-template";
 import { registry } from "@/registry";
-import { renderPdf } from "./print-pdf";
+import { renderPdf, renderTextPdf } from "./print-pdf";
 import { getT } from "./i18n";
 import { liveBlocked, usable } from "@/modules/int/live-guard";
 
@@ -238,4 +238,55 @@ export async function sendMail(ctx: Ctx, id: string, client?: PrismaClient): Pro
     if (e instanceof UserError) throw e;
     throw new UserError("@INT:MailFailed", { reason: reason ?? "" });
   }
+}
+
+/**
+ * Smlouva uzavřená na portálu: vyplněná smlouva (tisková sestava Smlouva) a obchodní podmínky (celé, vlastní PDF)
+ * členovi e-mailem, s platebními údaji v textu. Síť mimo transakci uzavření – selhání smlouvu neovlivní.
+ */
+export async function sendAgreementMail(ctx: Ctx, agreementId: string, pay: { amount: string; vs: string; account: string; dueDate: string } | null, client?: PrismaClient): Promise<SentMail> {
+  const prep = await inTenant(
+    ctx,
+    async (s) => {
+      const api = s.sys().api();
+      const t = s.sys().eventCtx("ar.agreement").t;
+      const agr = await api.get("ar.agreement", agreementId);
+      if (!agr) throw new UserError("@SYS:NotFound");
+      const cust = await api.get("ar.customer", String(agr.customerId));
+      const subj = cust?.subjectId ? await api.get("gab.subject", String(cust.subjectId)) : null;
+      const org = (await api.find("org.entity", {}, { take: 1 }).catch(() => []))[0];
+      const company = ctx.companyId ? await api.get("sys.company", ctx.companyId) : null;
+      const conn = mailConnections(await api.find("int.connection", { kind: "mail", active: true }, { take: 20 }))[0];
+      const params = {
+        num: String(agr.agreementNum ?? ""),
+        company: String(org?.tradeName || org?.legalName || company?.name || ""),
+        customer: String(subj?.name ?? ""),
+        amount: pay ? Number(pay.amount).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
+        vs: pay?.vs ?? String(agr.vs ?? ""),
+        account: pay?.account ?? "",
+        due: pay?.dueDate ? pay.dueDate.split("-").reverse().join(". ") : "",
+      };
+      const signature = conn?.signature ? fillMail(String(conn.signature), params) : fillMail(String(org?.mailSignature || MAIL_DEFAULTS.signature), params);
+      const body = `${t("@INT:MailAgreementBody", params)}${pay ? `
+
+${t("@INT:MailAgreementPay", params)}` : ""}
+
+${signature}`;
+      return { to: String(subj?.email ?? ""), subject: t("@INT:MailAgreementSubject", params), body, num: params.num, terms: String(agr.terms ?? ""), company: params.company, connectionId: conn?.id ?? null };
+    },
+    client,
+  );
+  if (!prep.to) throw new UserError("@INT:MailNoRecipient");
+  const job = await printJob(ctx, "ar.agreement", agreementId, null, client);
+  const pdf = await renderPdf(job.layout, job.data, { locale: "cs-CZ", title: job.title });
+  const terms = prep.terms.trim() ? await renderTextPdf(`Obchodní podmínky – ${prep.company}`, prep.terms) : null;
+  const mailId = await inTenant(
+    ctx,
+    async (s) => String((await s.sys().api().create("int.mail", { mailTo: prep.to, subject: prep.subject, body: prep.body, status: "draft", connectionId: prep.connectionId, reference: `Smlouva ${prep.num}`.slice(0, 250), sourceObject: "ar.agreement", sourceId: agreementId } as RecordData)).id),
+    client,
+  );
+  const safe = (x: string) => x.replace(/[^\w.-]+/g, "_");
+  await addFile(sysCtx(ctx), "int.mail", mailId, { name: `Smlouva_${safe(prep.num)}.pdf`, type: "application/pdf", data: pdf }, client);
+  if (terms) await addFile(sysCtx(ctx), "int.mail", mailId, { name: "Obchodni_podminky.pdf", type: "application/pdf", data: terms }, client);
+  return sendMail(ctx, mailId, client);
 }

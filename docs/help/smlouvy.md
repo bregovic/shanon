@@ -63,6 +63,10 @@ Co člen na portálu vyplní, nastavíte bez programování v [Integrace → For
 - **Pole formuláře:** klíč (technický název), popisek, **typ** (text, delší text, e-mail, telefon, datum, číslo, výběr z možností – jedna na řádek, zaškrtávátko, **souhlas** – musí zaškrtnout, nadpis oddílu, informační text), povinné, šířka (půl / celý řádek), nápověda.
 - **Kam uložit:** člen v Adresáři (jméno, příjmení / celé jméno, e-mail, telefon, IČO, DIČ, poznámka), trvalá a kontaktní adresa, smlouva (začátek, konec, číslo členské karty, popis, poznámka), nebo **jen do smlouvy**. Formulář musí mít jméno a e-mail člena.
 - Všechny odpovědi zůstanou u smlouvy (**Údaje z formuláře**).
+- **Zobrazit, když:** pole se ukáže jen podle jiné odpovědi – `druh=firemní` (výběr), `firma` (zaškrtnuté). Skryté pole se nekontroluje ani neukládá (třeba IČO jen u firemního členství).
+- Člen vyplňuje pohodlně: prohlížeč nabídne uložené jméno, e-mail, telefon a adresu (podle Kam uložit), chyby se ukážou hned u pole a rozepsaný formulář zůstane v prohlížeči, i když stránku zavře.
+- **Obchodní podmínky** (Znění smlouvy u portálu) se na portálu ukážou s nadpisy a odstavci v posuvném okně (Zobrazit celé) a jdou stáhnout jako PDF.
+- **Poslat smlouvu e-mailem** (u portálu, výchozí zapnuto): po uzavření dostane člen vyplněnou smlouvu (sestava Smlouva) a obchodní podmínky v PDF a platební údaje v textu. Odchází napojením pošty; na testovacím serveru dostane e-mail uživatel, ne člen.
 - **Tisková sestava Smlouva** (Tiskové sestavy → návrhář): logo, firma, člen, tarif, VS, číslo karty, znění smlouvy a údaje formuláře – jednotlivě `{form.<klíč>}` (např. `{form.datumNarozeni}`, zaškrtnutí = ano / ne) nebo všechny najednou `{doc.formText}`.
 
 ## Na co si dát pozor

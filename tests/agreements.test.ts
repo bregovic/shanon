@@ -195,7 +195,8 @@ describe("portál smluv", () => {
     expect([fi.form?.heading, fi.form?.fields.length, fi.form?.fields.find((x) => x.key === "druh")?.options, fi.form?.fields.find((x) => x.key === "vop")?.required]).toEqual(["Údaje člena", 14, ["individuální", "firemní"], true]);
     expect(JSON.stringify(fi.form)).not.toContain("subject."); // mapování na stránku nejde
     const ans = { jmeno: "Karel", prijmeni: "Silák", email: "Karel@Example.com", narozen: "1990-05-01", op: "123456789", ulice: "Dělnická 1", obec: "Praha", kulice: "Jiná 2", kobec: "Brno", druh: "individuální", karta: "K-77", marketing: false, vop: true };
-    const sub = (a: Record<string, unknown>) => agreementPortalSubmit(T.tenantId, String(p.token), { ...base, firstName: "", lastName: "", email: "", answers: a as Record<string, string | boolean> }, "10.0.0.5", client);
+    let ipN = 10;
+    const sub = (a: Record<string, unknown>) => agreementPortalSubmit(T.tenantId, String(p.token), { ...base, firstName: "", lastName: "", email: "", answers: a as Record<string, string | boolean> }, `10.0.1.${ipN++}`, client);
     expect(await sub({ ...ans, vop: false })).toMatchObject({ ok: false, error: expect.stringContaining("VOP") });
     expect(await sub({ ...ans, narozen: "" })).toMatchObject({ ok: false, error: expect.stringContaining("Datum narození") });
     expect(await sub({ ...ans, druh: "jiný" })).toMatchObject({ ok: false, error: expect.stringContaining("Druh členství") });
@@ -216,7 +217,27 @@ describe("portál smluv", () => {
     expect((pd.form as Record<string, string>).marketing).toBe("ne");
     expect((pd.doc as Record<string, string>).cardNumber).toBe("K-77");
     expect((pd.partner as Record<string, string>).contactAddress).toContain("Brno");
-  });
+
+    // „Zobrazit, když“: IČO jen u firemního členství – jinak se nekontroluje ani neukládá
+    await fld(15, "ico", "IČO firmy", "text", "subject.regNo", { required: true, showIf: "druh=firemní" });
+    expect((await agreementPortalInfo(T.tenantId, String(p.token), client))!.form!.fields.find((x) => x.key === "ico")).toMatchObject({ showIf: "druh=firemní" });
+    expect((await sub({ ...ans, email: "a1@example.com" }))!.ok).toBe(true);
+    expect(await sub({ ...ans, email: "a2@example.com", druh: "firemní" })).toMatchObject({ ok: false, error: expect.stringContaining("IČO") });
+    expect((await agreementPortalInfo(T.tenantId, String(p.token), client))!.form!.fields.find((x) => x.key === "email")!.auto).toBe("email");
+
+    // obchodní podmínky jako PDF a smlouva e-mailem (vyplněná smlouva + podmínky)
+    const { agreementTermsPdf, agreementPortalMail } = await import("@/server/agreement-portal");
+    const vop = await agreementTermsPdf(T.tenantId, String(p.token), client);
+    expect(vop?.subarray(0, 4).toString()).toBe("%PDF");
+    await saveRecord(T, "int.connection", null, { code: "TEST-MAIL", name: "Test", kind: "mail", driver: "mailTest", fromEmail: "test@shanon.local", active: true }, undefined, client);
+    const rm = (await sub({ ...ans, email: "a3@example.com" }))!;
+    expect(rm.ok && rm.agreementId).toBeTruthy();
+    expect(await agreementPortalMail(T.tenantId, String(p.token), rm, client)).toBeNull(); // testovací pošta = nikomu skutečnému
+    const [mail] = (await listRecords(T, "int.mail", { filter: { sourceId: rm.agreementId } }, client)).rows;
+    expect([mail.status, mail.mailTo, String(mail.subject)]).toEqual(["sent", "a3@example.com", expect.stringContaining(String(rm.agreementNum))]);
+    const files = await client.sysDocuRef.findMany({ where: { tenantId: T.tenantId, objectId: "int.mail", recordId: String(mail.id), kind: "file" } });
+    expect(files.map((f) => f.name).sort()).toEqual(["Obchodni_podminky.pdf", `Smlouva_${String(rm.agreementNum)}.pdf`]);
+  }, 120_000);
 });
 
 describe("smlouva v režimu Kalendář (bez zálohy)", () => {

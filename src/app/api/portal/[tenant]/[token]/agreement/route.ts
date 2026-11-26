@@ -2,7 +2,7 @@
  * Portál smluv — uzavření smlouvy (veřejné, bez přihlášení). Kontroly a limity:
  * `src/server/agreement-portal.ts`. Tady jen velikost těla a past na roboty.
  */
-import { agreementPortalSubmit } from "@/server/agreement-portal";
+import { agreementPortalMail, agreementPortalSubmit } from "@/server/agreement-portal";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +23,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ tenant:
   const res = await agreementPortalSubmit(
     tenant,
     token,
-    { tariffId: str("tariffId"), firstName: str("firstName"), lastName: str("lastName"), email: str("email"), phone: str("phone"), street: str("street"), city: str("city"), zipCode: str("zipCode"), startDate: str("startDate"), consent: b.consent === true },
+    { tariffId: str("tariffId"), firstName: str("firstName"), lastName: str("lastName"), email: str("email"), phone: str("phone"), street: str("street"), city: str("city"), zipCode: str("zipCode"), startDate: str("startDate"), consent: b.consent === true, answers: answersOf(b.answers) },
     ip,
   );
   if (!res) return Response.json({ ok: false, error: "Odkaz neplatí." }, { status: 404 });
-  return Response.json(res, { status: res.ok ? 200 : 400 });
+  // vyplněná smlouva a obchodní podmínky e-mailem (mimo transakci uzavření)
+  const mailedTo = res.ok ? await agreementPortalMail(tenant, token, res) : null;
+  const { agreementId: _id, ...out } = res;
+  void _id;
+  return Response.json({ ...out, mailedTo: mailedTo ?? undefined }, { status: res.ok ? 200 : 400 });
+}
+
+/** Odpovědi formuláře: jen jednoduché hodnoty, nejvýš 200 polí po 2 000 znacích. */
+function answersOf(v: unknown): Record<string, string | boolean> {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out: Record<string, string | boolean> = {};
+  for (const [k, x] of Object.entries(v as Record<string, unknown>).slice(0, 200)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(k)) continue;
+    if (typeof x === "boolean") out[k] = x;
+    else if (typeof x === "string" || typeof x === "number") out[k] = String(x).slice(0, 2000);
+  }
+  return out;
 }

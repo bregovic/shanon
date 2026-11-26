@@ -567,6 +567,7 @@ export const portal = defineObject({
     agreementGroupId: { edt: refEdt("ar.group", "@INT:PortalAgreementGroup"), optionalRef: true },
     /** formulář s údaji člena (Integrace → Formuláře) */
     formId: { edt: refEdt("int.form", "@INT:PortalForm"), help: "@INT:PortalFormHelp" },
+    mailAgreement: { edt: Edts.NoYes, label: "@INT:PortalMailAgreement", default: true, help: "@INT:PortalMailAgreementHelp" },
     /** tajná část odkazu (vygeneruje se; Nový odkaz zneplatní starý) */
     token: { edt: Str("IntPortalToken", "@INT:PortalToken", 64), readOnly: true },
     /** druhá část jednoduché adresy /<zkratka organizace>/<slug> (výchozí „doklady“) */
@@ -608,7 +609,7 @@ export const portal = defineObject({
     { label: "@SYS:General", fields: ["name", "active", "purpose", "slug", "publicUrl", "responsible"] },
     { label: "@INT:PortalPage", fields: ["title", "intro"] },
     { label: "@INT:PortalDesign", fields: ["logo", "logoBadge", "logoSize", "logoAlign", "accentColor", "accent2Color", "background", "backgroundImage", "corners", "showCompany", "footer"] },
-    { label: "@INT:PortalAgreement", fields: ["formId", "agreementTerms", "agreementGroupId"], visibleWhen: { field: "purpose", in: ["agreement"] } },
+    { label: "@INT:PortalAgreement", fields: ["formId", "agreementTerms", "agreementGroupId", "mailAgreement"], visibleWhen: { field: "purpose", in: ["agreement"] } },
     { label: "@INT:PortalKinds", fields: ["allowInvoice", "allowAdvance", "allowOrder", "allowOther", "requireRegNo", "autoExtract"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalApp", fields: ["appVendors", "appEmployees"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalLimits", fields: ["maxFileMb", "maxFiles", "ipHourLimit", "dailyLimit"] },
@@ -1156,6 +1157,9 @@ export default defineModule({
       MailReceiptBody: "Dobrý den,\n\nv příloze posíláme doklad o nákupu {num} na částku {amount} {currency}.\n\nDěkujeme za nákup\n{company}",
       MailInvoiceBody: "Dobrý den,\n\nv příloze posíláme fakturu {num} na částku {amount} {currency} se splatností {due}.\nFaktura obsahuje ISDOC pro načtení do účetnictví.\n\nS pozdravem\n{company}",
       MailAdvanceSubject: "Zálohová faktura {num} – {company}",
+      MailAgreementSubject: "Smlouva {num} – {company}",
+      MailAgreementBody: "Dobrý den,\n\nděkujeme za uzavření smlouvy {num}. V příloze je vyplněná smlouva a obchodní podmínky.",
+      MailAgreementPay: "Členství začne platit po přijetí platby: {amount} Kč na účet {account}, variabilní symbol {vs}, splatnost {due}.",
       MailAdvanceBody: "Dobrý den,\n\nv příloze posíláme zálohovou fakturu {num} na částku {amount} {currency} se splatností {due}.\n\nS pozdravem\n{company}",
       MailTaxDocSubject: "Daňový doklad k přijaté platbě {num} – {company}",
       MailTaxDocBody: "Dobrý den,\n\nv příloze posíláme daňový doklad k přijaté platbě zálohy {num}.\n\nS pozdravem\n{company}",
@@ -1821,6 +1825,9 @@ export default defineModule({
       MailReceiptBody: "Hello,\n\nplease find attached the receipt {num} for {amount} {currency}.\n\nThank you for your purchase\n{company}",
       MailInvoiceBody: "Hello,\n\nplease find attached invoice {num} for {amount} {currency}, due on {due}.\nThe invoice contains ISDOC for import into accounting.\n\nKind regards\n{company}",
       MailAdvanceSubject: "Advance invoice {num} – {company}",
+      MailAgreementSubject: "Agreement {num} – {company}",
+      MailAgreementBody: "Hello,\n\nthank you for signing agreement {num}. The completed agreement and the terms and conditions are attached.",
+      MailAgreementPay: "The membership starts once the payment arrives: {amount} CZK to account {account}, variable symbol {vs}, due {due}.",
       MailAdvanceBody: "Hello,\n\nplease find attached advance invoice {num} for {amount} {currency}, due on {due}.\n\nKind regards\n{company}",
       MailTaxDocSubject: "Tax document for received payment {num} – {company}",
       MailTaxDocBody: "Hello,\n\nplease find attached the tax document for the received advance payment {num}.\n\nKind regards\n{company}",

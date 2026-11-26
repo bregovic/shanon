@@ -10,6 +10,7 @@ import { CheckmarkCircle48Filled } from "@fluentui/react-icons";
 import QRCode from "qrcode";
 import type { AgreementPortalInfo, AgreementResult, PortalFormField } from "@/server/agreement-portal";
 import { PortalLogo, portalBackground } from "@/components/portal-theme";
+import { formFieldVisible } from "@/lib/form-visible";
 
 const useStyles = makeStyles({
   page: {
@@ -46,13 +47,16 @@ const useStyles = makeStyles({
   terms: {
     maxHeight: "260px",
     overflowY: "auto",
-    whiteSpace: "pre-wrap",
+    lineHeight: "1.5",
     padding: "12px 14px",
     borderRadius: "8px",
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground2,
     fontSize: tokens.fontSizeBase300,
   },
+  termsOpen: { maxHeight: "none" },
+  termsHead: { fontWeight: tokens.fontWeightSemibold, margin: "12px 0 4px" },
+  termsPara: { margin: "0 0 6px" },
   error: { color: tokens.colorPaletteRedForeground1 },
   trap: { position: "absolute", left: "-10000px", width: "1px", height: "1px", overflow: "hidden" },
   done: { display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", textAlign: "center" },
@@ -74,6 +78,34 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
   // formulář portálu (Integrace → Formuláře): odpovědi podle klíče pole
   const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
   const answer = (k: string, v: string | boolean) => setAnswers((x) => ({ ...x, [k]: v }));
+  // rozepsané údaje zůstanou v prohlížeči (zavřená stránka, telefon zhasne); po uzavření smlouvy se smažou
+  const draftKey = `portal-draft:${action}`;
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem(draftKey) ?? "null") as { f?: Record<string, string>; answers?: Record<string, string | boolean> } | null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- úložiště prohlížeče (vnější zdroj, až po hydrataci)
+      if (d?.answers) setAnswers(d.answers);
+      if (d?.f) setF((x) => ({ ...x, ...d.f, consent: false, website: "" }));
+    } catch {
+      /* soukromý režim apod. */
+    }
+    setLoaded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      const rest = { ...f } as Record<string, unknown>;
+      delete rest.consent;
+      delete rest.website;
+      localStorage.setItem(draftKey, JSON.stringify({ f: rest, answers }));
+    } catch {
+      /* bez úložiště */
+    }
+  }, [f, answers, loaded, draftKey]);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const touch = (k: string) => setTouched((x) => ({ ...x, [k]: true }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<AgreementResult | null>(null);
@@ -91,7 +123,14 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
       const r = await fetch(action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, answers }) });
       const j = (await r.json()) as AgreementResult;
       if (!j.ok) setError(j.error ?? "Odeslání se nepodařilo.");
-      else setDone(j);
+      else {
+        setDone(j);
+        try {
+          localStorage.removeItem(draftKey);
+        } catch {
+          /* bez úložiště */
+        }
+      }
     } catch {
       setError("Server neodpovídá. Zkuste to znovu.");
     } finally {
@@ -119,6 +158,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
               <CheckmarkCircle48Filled primaryFill={tokens.colorPaletteGreenForeground1} />
               <Text size={600} weight="semibold">Smlouva {done.agreementNum} je uzavřená</Text>
               <Text>Začne platit, jakmile přijde platba. Pošlete prosím částku na účet níže.</Text>
+              {done.mailedTo && <Text>Vyplněnou smlouvu a obchodní podmínky jsme poslali na {done.mailedTo}.</Text>}
             </div>
             {p && (
               <div className={s.payWrap}>
@@ -185,7 +225,9 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
                 <div className={s.step}>
                   <span className={s.stepHead}>2. {info.form.heading || "Vaše údaje"}</span>
                   {info.form.intro && <Text style={{ whiteSpace: "pre-wrap" }}>{info.form.intro}</Text>}
-                  <div className={s.grid2}>{info.form.fields.map((fl) => formField(fl, answers[fl.key], answer))}</div>
+                  <div className={s.grid2}>
+                    {info.form.fields.filter((fl) => formFieldVisible(fl.showIf, answers)).map((fl) => formField(fl, answers[fl.key], answer, touched[fl.key] ? fieldError(fl, answers[fl.key]) : null, () => touch(fl.key)))}
+                  </div>
                   <div className={s.trap} aria-hidden="true">
                     <Input tabIndex={-1} value={f.website} onChange={set("website")} autoComplete="off" />
                   </div>
@@ -227,7 +269,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
 
               <div className={s.step}>
                 <span className={s.stepHead}>3. Smlouva</span>
-                {info.terms && <div className={s.terms}>{info.terms}</div>}
+                {info.terms && <Terms text={info.terms} pdf={action.replace(/\/agreement$/, "/vop")} />}
                 <Checkbox
                   checked={f.consent}
                   onChange={(_, d) => setF((x) => ({ ...x, consent: !!d.checked }))}
@@ -251,7 +293,25 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
 const AUTO: Record<string, string> = { email: "email", phone: "tel" };
 
 /** Jedno pole formuláře portálu podle typu (text, datum, výběr, souhlas…); celý řádek = přes obě kolony. */
-function formField(fl: PortalFormField, value: string | boolean | undefined, answer: (k: string, v: string | boolean) => void) {
+/** Chyba u pole hned po opuštění (stejná pravidla jako na serveru). */
+function fieldError(fl: PortalFormField, value: string | boolean | undefined): string | null {
+  if (fl.kind === "heading" || fl.kind === "info") return null;
+  if (fl.kind === "checkbox" || fl.kind === "consent") return fl.required && value !== true ? "Potvrďte prosím." : null;
+  const v = typeof value === "string" ? value.trim() : "";
+  if (!v) return fl.required ? "Vyplňte prosím." : null;
+  if (fl.kind === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Zkontrolujte e-mail.";
+  if (fl.kind === "phone" && v.replace(/\D/g, "").length < 9) return "Telefon má mít aspoň 9 číslic.";
+  if (fl.kind === "number" && !/^-?\d+([.,]\d+)?$/.test(v)) return "Zadejte číslo.";
+  return null;
+}
+
+function formField(
+  fl: PortalFormField,
+  value: string | boolean | undefined,
+  answer: (k: string, v: string | boolean) => void,
+  error: string | null,
+  onBlur: () => void,
+) {
   const full = fl.width === "full" ? { gridColumn: "1 / -1" } : undefined;
   const str = typeof value === "string" ? value : "";
   if (fl.kind === "heading")
@@ -269,15 +329,16 @@ function formField(fl: PortalFormField, value: string | boolean | undefined, ans
   if (fl.kind === "checkbox" || fl.kind === "consent")
     return (
       <div key={fl.key} style={full}>
-        <Checkbox checked={value === true} onChange={(_, d) => answer(fl.key, !!d.checked)} label={fl.label + (fl.required ? " *" : "")} />
+        <Checkbox checked={value === true} onChange={(_, d) => (answer(fl.key, !!d.checked), onBlur())} label={fl.label + (fl.required ? " *" : "")} />
+        {error && <Text size={200} style={{ display: "block", marginLeft: 32, color: tokens.colorPaletteRedForeground1 }}>{error}</Text>}
         {fl.help && <Text size={200} style={{ display: "block", marginLeft: 32 }}>{fl.help}</Text>}
       </div>
     );
   const input =
     fl.kind === "longtext" ? (
-      <Textarea value={str} onChange={(_, d) => answer(fl.key, d.value)} resize="vertical" />
+      <Textarea value={str} onChange={(_, d) => answer(fl.key, d.value)} onBlur={onBlur} resize="vertical" />
     ) : fl.kind === "select" ? (
-      <Select value={str} onChange={(_, d) => answer(fl.key, d.value)}>
+      <Select value={str} onChange={(_, d) => (answer(fl.key, d.value), onBlur())}>
         <option value="">—</option>
         {fl.options.map((o) => (
           <option key={o} value={o}>
@@ -291,12 +352,49 @@ function formField(fl: PortalFormField, value: string | boolean | undefined, ans
         inputMode={fl.kind === "number" ? "decimal" : undefined}
         value={str}
         onChange={(_, d) => answer(fl.key, d.value)}
-        autoComplete={AUTO[fl.kind]}
+        onBlur={onBlur}
+        autoComplete={fl.auto || AUTO[fl.kind]}
       />
     );
   return (
-    <Field key={fl.key} label={fl.label} required={fl.required} hint={fl.help || undefined} style={full}>
+    <Field key={fl.key} label={fl.label} required={fl.required} hint={fl.help || undefined} validationMessage={error ?? undefined} style={full}>
       {input}
     </Field>
+  );
+}
+
+/**
+ * Obchodní podmínky: odstavce a nadpisy („1. ÚVODNÍ USTANOVENÍ“, řádky velkými písmeny), posuvné okno
+ * s Zobrazit celé, a ke stažení jako PDF.
+ */
+function Terms({ text, pdf }: { text: string; pdf: string }) {
+  const s = useStyles();
+  const [open, setOpen] = useState(false);
+  const blocks = text.replace(/\r/g, "").split("\n").map((l) => l.trim());
+  const isHead = (l: string) => /^\d+\.\s+\p{Lu}[\p{Lu}\s,.–-]{3,}$/u.test(l) || (l.length < 90 && l === l.toUpperCase() && /\p{Lu}{3}/u.test(l));
+  return (
+    <div>
+      <div className={`${s.terms} ${open ? s.termsOpen : ""}`}>
+        {blocks.map((l, i) =>
+          !l ? null : isHead(l) ? (
+            <div key={i} className={s.termsHead}>
+              {l}
+            </div>
+          ) : (
+            <p key={i} className={s.termsPara}>
+              {l}
+            </p>
+          ),
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
+        <Button appearance="subtle" size="small" onClick={() => setOpen((x) => !x)}>
+          {open ? "Sbalit" : "Zobrazit celé"}
+        </Button>
+        <Button appearance="subtle" size="small" as="a" href={pdf} target="_blank" rel="noopener">
+          Stáhnout PDF
+        </Button>
+      </div>
+    </div>
   );
 }

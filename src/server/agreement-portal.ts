@@ -18,6 +18,9 @@ import { prisma } from "./db";
 import { inTenant } from "./data";
 import { getT } from "./i18n";
 import { loadPortal, portalDesign, type PortalDesign } from "./supplier-portal";
+import { sendAgreementMail } from "./mail";
+import { renderTextPdf } from "./print-pdf";
+import { formFieldVisible } from "@/lib/form-visible";
 
 export interface AgreementTariff {
   id: string;
@@ -36,6 +39,10 @@ export interface PortalFormField {
   options: string[];
   help: string;
   width: "half" | "full";
+  /** zobrazit jen když (klíč=hodnota / klíč) */
+  showIf: string;
+  /** nápověda prohlížeči pro automatické vyplnění (given-name, email…) */
+  auto: string;
 }
 
 export interface AgreementPortalInfo {
@@ -68,12 +75,22 @@ export interface AgreementResult {
   ok: boolean;
   error?: string;
   agreementNum?: string;
+  /** jen pro server (e-mail se smlouvou), na stránku nejde */
+  agreementId?: string;
+  /** smlouva odešla členovi e-mailem (na tuto adresu) */
+  mailedTo?: string;
   payment?: { amount: string; currency: string; vs: string; dueDate: string; bankAccount: string; iban: string; qr: string; advanceNum: string };
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Api = Parameters<typeof requestAgreementPayment>[0];
+const AUTOFILL: Record<string, string> = {
+  "subject.firstName": "given-name", "subject.lastName": "family-name", "subject.name": "name", "subject.email": "email", "subject.phone": "tel",
+  "address.street": "street-address", "address.city": "address-level2", "address.zipCode": "postal-code", "address.country": "country",
+  "contact.street": "shipping street-address", "contact.city": "shipping address-level2", "contact.zipCode": "shipping postal-code",
+};
+
 const VALUE_KINDS = new Set(["text", "longtext", "email", "phone", "date", "number", "select", "checkbox", "consent"]);
 
 async function formFields(api: Api, formId: string) {
@@ -91,6 +108,8 @@ async function portalForm(api: Api, formId: string): Promise<AgreementPortalInfo
     required: !!x.required || x.kind === "consent",
     options: String(x.options ?? "").split("\n").map((o) => o.trim()).filter(Boolean),
     help: String(x.help ?? ""),
+    showIf: String(x.showIf ?? "").trim(),
+    auto: AUTOFILL[String(x.mapping ?? "")] ?? "",
     width: (x.width === "full" || x.kind === "longtext" || x.kind === "heading" || x.kind === "info" || x.kind === "consent" ? "full" : "half") as "half" | "full",
   }));
   return { heading: String(f.heading ?? ""), intro: String(f.intro ?? ""), fields };
@@ -123,6 +142,7 @@ async function formAnswers(api: Api, formId: string, answers: Record<string, unk
   for (const f of await formFields(api, formId)) {
     const kind = String(f.kind ?? "text");
     if (!VALUE_KINDS.has(kind)) continue;
+    if (!formFieldVisible(String(f.showIf ?? ""), answers)) continue; // skryté pole: nekontroluje se ani neukládá
     const key = String(f.key), label = String(f.label ?? key);
     const raw = answers[key];
     if (kind === "checkbox" || kind === "consent") {
@@ -288,6 +308,7 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
         await notify(api, { kind: "info", title: "@INT:NotifyAgreement", params: { name, tariff: tariff.name }, href: `/ar/agreement/${agr.id}`, key: `agr-${agr.id}` });
         return {
           ok: true,
+          agreementId: String(agr.id),
           agreementNum: String(a2.agreementNum ?? ""),
           payment: {
             amount,
@@ -307,6 +328,7 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
       await notify(api, { kind: "info", title: "@INT:NotifyAgreement", params: { name, tariff: tariff.name }, href: `/ar/agreement/${agr.id}`, key: `agr-${agr.id}` });
       return {
         ok: true,
+        agreementId: String(agr.id),
         agreementNum: String(agr.agreementNum ?? ""),
         payment: {
           amount: String(doc.due ?? advance.amount),
@@ -324,3 +346,26 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
   );
 }
 
+/**
+ * Po uzavření (mimo transakci): vyplněná smlouva a obchodní podmínky členovi e-mailem, když to portál chce
+ * (`mailAgreement`). Selhání pošty smlouvu neruší – člen jen e-mail nedostane (zůstane koncept v Poště).
+ */
+export async function agreementPortalMail(tenantId: string, token: string, res: AgreementResult, client: PrismaClient = prisma): Promise<string | null> {
+  if (!res.ok || !res.agreementId) return null;
+  const l = await loadPortal(tenantId, token, client);
+  if (!l || l.portal.mailAgreement === false) return null;
+  const pay = res.payment ? { amount: res.payment.amount, vs: res.payment.vs, account: res.payment.bankAccount || res.payment.iban, dueDate: res.payment.dueDate } : null;
+  try {
+    const sent = await sendAgreementMail(l.ctx, res.agreementId, pay, client);
+    return sent.test ? null : sent.to.join(", ");
+  } catch {
+    return null;
+  }
+}
+
+/** Obchodní podmínky portálu jako PDF ke stažení (celé, na víc stran). */
+export async function agreementTermsPdf(tenantId: string, token: string, client: PrismaClient = prisma): Promise<Buffer | null> {
+  const l = await loadPortal(tenantId, token, client);
+  if (!l || l.portal.purpose !== "agreement" || !String(l.portal.agreementTerms ?? "").trim()) return null;
+  return renderTextPdf(`Obchodní podmínky – ${l.companyName}`, String(l.portal.agreementTerms));
+}

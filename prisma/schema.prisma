@@ -4548,6 +4548,7 @@ model IntPortal {
   agreementTerms   String?  @map("agreement_terms")
   agreementGroupId String?  @map("agreement_group_id") @db.Uuid
   formId           String?  @map("form_id") @db.Uuid
+  mailAgreement    Boolean  @default(true) @map("mail_agreement")
   token            String?  @db.VarChar(64)
   slug             String?  @default("doklady") @db.VarChar(40)
   publicUrl        String?  @map("public_url") @db.VarChar(200)
@@ -4696,6 +4697,7 @@ model IntFormField {
   options   String?
   help      String?  @db.VarChar(255)
   width     String   @default("half") @db.VarChar(40)
+  showIf    String?  @map("show_if") @db.VarChar(255)
   ext       Json     @default("{}")
   version   Int      @default(1)
   createdAt DateTime @default(now()) @map("created_at")

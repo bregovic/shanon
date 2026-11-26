@@ -242,3 +242,29 @@ function drawJob(doc: Doc, layout: PrintLayout, data: PrintData, locale: string)
     for (const el of rest) drawElement(doc, el, data, locale, fs, base - bottom);
   }
 }
+
+/**
+ * Dlouhý text (obchodní podmínky) jako PDF A4 na tolik stran, kolik je potřeba: nadpis, odstavce, řádky
+ * „1. NÁZEV“ / velkými písmeny tučně. Pro přílohu smlouvy z portálu – sestava smlouvy má na znění jen jednu stranu.
+ */
+export async function renderTextPdf(title: string, text: string): Promise<Buffer> {
+  const doc = new PDFDocument({ size: "A4", margins: { top: 56, bottom: 56, left: 56, right: 56 }, info: { Title: title, Producer: "Shanon" } });
+  doc.registerFont("R", join(FONT_DIR, "DejaVuSans.ttf"));
+  doc.registerFont("B", join(FONT_DIR, "DejaVuSans-Bold.ttf"));
+  const chunks: Buffer[] = [];
+  doc.on("data", (c: Buffer) => chunks.push(c));
+  const done = new Promise<Buffer>((res) => doc.on("end", () => res(Buffer.concat(chunks))));
+  if (title) doc.font("B").fontSize(14).fillColor("#1f2a37").text(title).moveDown(0.6);
+  for (const raw of String(text).replace(/\r/g, "").split("\n")) {
+    const line = raw.trim();
+    if (!line) {
+      doc.moveDown(0.4);
+      continue;
+    }
+    const heading = /^\d+\.\s+\p{Lu}[\p{Lu}\s,.–-]{3,}$/u.test(line) || (line.length < 90 && line === line.toUpperCase() && /\p{Lu}{3}/u.test(line));
+    doc.font(heading ? "B" : "R").fontSize(heading ? 10.5 : 9).fillColor("#1f2a37").text(line, { align: heading ? "left" : "justify", paragraphGap: heading ? 3 : 2 });
+    if (heading) doc.moveDown(0.2);
+  }
+  doc.end();
+  return done;
+}
