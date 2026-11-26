@@ -1,0 +1,9 @@
+﻿sequence;key;label;kind;required;mapping;options;help;width;showIf
+10;jmeno;Jméno;text;ano;subject.firstName;;;half;
+20;prijmeni;Příjmení;text;ano;subject.lastName;;;half;
+30;email;E-mail;email;ano;subject.email;;;half;
+40;telefon;Telefon;phone;ano;subject.phone;;;half;
+50;termin;Termín;select;ano;form;pondělí 18:00|středa 18:00|sobota 10:00;Upravte podle nabídky.;half;
+60;uroven;Úroveň;select;ne;form;začátečník|pokročilý;;half;
+70;zdravi;Zdravotní omezení;longtext;ne;form;;Na co máme dát pozor.;full;
+80;souhlasPodminky;Souhlasím s podmínkami kurzu.;consent;ano;form;;;full;

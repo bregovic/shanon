@@ -1,7 +1,7 @@
 ---
 title: Smlouvy (členství, předplatné)
 module: ar
-objects: ar.agreement, int.form, int.formField, ap.agreement
+objects: ar.agreement, ap.agreement
 order: 25
 summary: Prodejní a nákupní smlouva na opakované období — výzva k platbě, aktivace po platbě, faktura a výnos samy, blokace po lhůtě; uzavření z veřejného portálu.
 ---
@@ -58,17 +58,7 @@ O nové smlouvě přijde upozornění ve zvonečku.
 
 ## Formulář smlouvy na portálu
 
-Co člen na portálu vyplní, nastavíte bez programování v [Integrace → Formuláře](/int/form) a formulář vyberete u portálu (pole **Formulář**).
-
-- **Pole formuláře:** klíč (technický název), popisek, **typ** (text, delší text, e-mail, telefon, datum, číslo, výběr z možností – jedna na řádek, zaškrtávátko, **souhlas** – musí zaškrtnout, nadpis oddílu, informační text), povinné, šířka (půl / celý řádek), nápověda.
-- **Kam uložit:** člen v Adresáři (jméno, příjmení / celé jméno, e-mail, telefon, IČO, DIČ, poznámka), trvalá a kontaktní adresa, smlouva (začátek, konec, číslo členské karty, popis, poznámka), nebo **jen do smlouvy**. Formulář musí mít jméno a e-mail člena.
-- Všechny odpovědi zůstanou u smlouvy (**Údaje z formuláře**).
-- **Zobrazit, když:** pole se ukáže jen podle jiné odpovědi – `druh=firemní` (výběr), `firma` (zaškrtnuté). Skryté pole se nekontroluje ani neukládá (třeba IČO jen u firemního členství).
-- Člen vyplňuje pohodlně: prohlížeč nabídne uložené jméno, e-mail, telefon a adresu (podle Kam uložit), chyby se ukážou hned u pole a rozepsaný formulář zůstane v prohlížeči, i když stránku zavře.
-- **ARES:** pole s Kam uložit = Člen – IČO má na portálu tlačítko **Načíst z ARES** – doplní pole mapovaná na celé jméno / název firmy, DIČ a trvalou adresu (ulice, obec, PSČ). Hodí se s Zobrazit když (`druh=firemní`).
-- **Obchodní podmínky** (Znění smlouvy u portálu) se na portálu ukážou s nadpisy a odstavci v posuvném okně (Zobrazit celé) a jdou stáhnout jako PDF.
-- **Poslat smlouvu e-mailem** (u portálu, výchozí zapnuto): po uzavření dostane člen vyplněnou smlouvu (sestava Smlouva) a obchodní podmínky v PDF a platební údaje v textu. Odchází napojením pošty; na testovacím serveru dostane e-mail uživatel, ne člen.
-- **Tisková sestava Smlouva** (Tiskové sestavy → návrhář): logo, firma, člen, tarif, VS, číslo karty, znění smlouvy a údaje formuláře – jednotlivě `{form.<klíč>}` (např. `{form.datumNarozeni}`, zaškrtnutí = ano / ne) nebo všechny najednou `{doc.formText}`.
+Co člen na portálu vyplní (pole, kam se uloží, podmíněná pole, ARES, znění smlouvy, PDF a e-mail) a šablony k importu: [Formulář smlouvy na portálu](/help/formulare-portalu).
 
 ## Na co si dát pozor
 

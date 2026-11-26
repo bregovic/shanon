@@ -1,0 +1,15 @@
+﻿sequence;key;label;kind;required;mapping;options;help;width;showIf
+10;oddilOsoba;Vaše údaje;heading;ne;form;;;full;
+20;jmeno;Jméno;text;ano;subject.firstName;;;half;
+30;prijmeni;Příjmení;text;ano;subject.lastName;;;half;
+40;datumNarozeni;Datum narození;date;ne;form;;;half;
+50;telefon;Telefon;phone;ano;subject.phone;;;half;
+60;email;E-mail;email;ano;subject.email;;Na tento e-mail pošleme vyplněnou smlouvu.;full;
+70;oddilAdresa;Adresa;heading;ne;form;;;full;
+80;ulice;Ulice a číslo;text;ano;address.street;;;full;
+90;obec;Obec;text;ano;address.city;;;half;
+100;psc;PSČ;text;ano;address.zipCode;;;half;
+110;oddilSmlouva;Smlouva;heading;ne;form;;;full;
+120;zacatek;Začátek od;date;ano;agreement.startDate;;;half;
+130;poznamka;Poznámka;longtext;ne;agreement.notes;;;full;
+140;marketing;Souhlasím se zasíláním novinek a nabídek e-mailem.;checkbox;ne;form;;Souhlas můžete kdykoli odvolat.;full;
