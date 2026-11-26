@@ -25,6 +25,7 @@ const useStyles = makeStyles({
     minHeight: "100vh",
     background: `linear-gradient(160deg, ${tokens.colorBrandBackground} 0%, ${tokens.colorBrandBackgroundPressed} 38%, ${tokens.colorNeutralBackground2} 38.1%)`,
     padding: "40px 16px 60px",
+    "@media (max-width: 600px)": { padding: "20px 10px 40px" },
     display: "flex",
     justifyContent: "center",
   },
@@ -37,6 +38,7 @@ const useStyles = makeStyles({
     borderRadius: "16px",
     boxShadow: tokens.shadow28,
     padding: "28px 28px 24px",
+    "@media (max-width: 600px)": { padding: "18px 14px" },
     display: "flex",
     flexDirection: "column",
     gap: "22px",
@@ -73,7 +75,8 @@ const useStyles = makeStyles({
     ":hover": { border: `1px solid ${tokens.colorBrandStroke1}` },
   },
   kindOn: { border: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2, boxShadow: tokens.shadow4 },
-  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" },
+  // pole nahoru: chyba pod jedním polem nerozhodí sousední v řádku; na telefonu jeden sloupec
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", alignItems: "start" },
   drop: {
     border: `2px dashed ${tokens.colorNeutralStroke1}`,
     borderRadius: "14px",

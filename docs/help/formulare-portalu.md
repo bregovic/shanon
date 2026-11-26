@@ -47,7 +47,7 @@ Kontroly na portálu: povinná pole, platný e-mail, telefon aspoň 9 číslic, 
 - **Člen** (záznam v Adresáři): jméno, příjmení nebo celé jméno, e-mail, telefon, IČO, DIČ, poznámka. Formulář musí mít jméno a e-mail člena.
 - **Trvalá adresa** a **Kontaktní adresa**: ulice, obec, PSČ (trvalá i stát).
 - **Firma (plátce)**: IČO s načtením z ARES, název, DIČ – ukládá se jen ke smlouvě (člen zůstane osobou).
-- **Smlouva**: začátek, konec, číslo členské karty, popis, poznámka.
+- **Smlouva**: začátek, konec, číslo členské karty, **počet karet**, popis, poznámka. Počet karet u tarifu s **Cena za kartu** (položka tarifu) násobí cenu smlouvy – firemní členství.
 - **Jen do smlouvy**: cokoli dalšího (datum narození, číslo dokladu, forma platby, souhlasy).
 
 Podle Kam uložit prohlížeč zájemci sám nabídne uložené jméno, e-mail, telefon a adresu.

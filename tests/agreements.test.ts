@@ -328,5 +328,18 @@ describe("smlouva v režimu Kalendář (bez zálohy)", () => {
     await runAction(T, "ar.agreement", String(b.id), "activate", client);
     const bb = (await getRecord(T, "ar.agreement", String(b.id), client))!;
     expect([bb.status, (await listRecords(T, "ar.invoice", { filter: { agreementId: b.id } }, client)).total]).toEqual(["active", 1]);
+
+    // tarif za kartu: cena smlouvy = cena × počet karet, řádek faktury 3 ks × 800
+    const firm = await saveRecord(T, "inv.item", null, { itemNum: "FIRMA1", name: "Firemní členství", groupId: g.id, unitId: u.id, salesPrice: "800", priceInclTax: true, agreementMonths: 1, agreementPerUnit: true }, undefined, client);
+    const c = await saveRecord(T, "ar.agreement", null, { customerId: cust.id, itemId: firm.id, startDate: start, quantity: 3 }, undefined, client);
+    expect([c.amount, c.quantity]).toEqual(["2400.00", 3]);
+    const cv = (await getRecord(T, "ar.agreement", String(c.id), client))!;
+    const c2 = await saveRecord(T, "ar.agreement", String(c.id), { quantity: 5 }, cv.version as number, client);
+    expect(c2.amount).toBe("4000.00");
+    await runAction(T, "ar.agreement", String(c.id), "activate", client);
+    const [ci] = (await listRecords(T, "ar.invoice", { filter: { agreementId: c.id } }, client)).rows;
+    const cl = (await listRecords(T, "ar.invoiceLine", { filter: { invoiceId: ci.id } }, client)).rows;
+    expect([ci.amountGross, cl[0].qty, cl[0].unitPrice]).toEqual(["4000.00", "5.0000", "800.00"]);
+    expect((await getRecord(T, "ar.agreement", String(c.id), client))!.quantity).toBe(5);
   }, 120_000);
 });

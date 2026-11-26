@@ -14,6 +14,7 @@
 130;ico;IČO firmy;text;ano;company.regNo;;Firmu načtete z ARES tlačítkem v poli.;half;druh=platí firma
 140;nazevFirmy;Název firmy;text;ano;company.name;;;half;druh=platí firma
 150;dicFirmy;DIČ firmy;text;ne;company.vatId;;;half;druh=platí firma
+145;pocetKaret;Počet karet;number;ano;agreement.quantity;;Kolik osob bude karty používat – u tarifu za kartu se podle toho počítá cena.;half;druh=platí firma
 160;zacatek;Začátek od;date;ano;agreement.startDate;;;half;
 170;poznamka;Poznámka;longtext;ne;agreement.notes;;;full;
 180;marketing;Souhlasím se zasíláním novinek a nabídek e-mailem.;checkbox;ne;form;;Souhlas můžete kdykoli odvolat.;full;

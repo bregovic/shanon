@@ -29,6 +29,8 @@ export interface AgreementTariff {
   price: string;
   months: number;
   description: string;
+  /** cena je za kartu (× počet karet) */
+  perUnit: boolean;
 }
 
 /** Pole formuláře pro veřejnou stránku (bez mapování – kam se ukládá, ví jen server). */
@@ -186,6 +188,7 @@ async function formAnswers(api: Api, formId: string, answers: Record<string, unk
   for (const k of ["regNo", "vatId", "notes"]) if (m(`subject.${k}`)) subjectExtra[k] = m(`subject.${k}`);
   const agreementExtra: RecordData = {};
   for (const k of ["endDate", "cardNumber", "description", "notes"]) if (m(`agreement.${k}`)) agreementExtra[k] = m(`agreement.${k}`);
+  if (m("agreement.quantity")) agreementExtra.quantity = Math.min(999, Math.max(1, Math.round(Number(m("agreement.quantity").replace(",", ".")) || 1)));
   return {
     name: name.slice(0, 120),
     email: m("subject.email"),
@@ -207,7 +210,7 @@ async function tariffsOf(api: Parameters<typeof requestAgreementPayment>[0]): Pr
   const items = await api.find("inv.item", { agreementMonths: { gt: 0 }, blocked: false }, { take: 50, orderBy: { agreementMonths: "asc" } });
   const pos = (v: unknown) => (v !== null && v !== undefined && v !== "" && Number(v) > 0 ? String(v) : null);
   return items
-    .map((it) => ({ id: String(it.id), name: String(it.name ?? ""), price: pos(it.priceGross) ?? pos(it.salesPrice) ?? "", months: Number(it.agreementMonths), description: String(it.description ?? "") }))
+    .map((it) => ({ id: String(it.id), name: String(it.name ?? ""), price: pos(it.priceGross) ?? pos(it.salesPrice) ?? "", months: Number(it.agreementMonths), description: String(it.description ?? ""), perUnit: !!it.agreementPerUnit }))
     .filter((t) => t.price);
 }
 

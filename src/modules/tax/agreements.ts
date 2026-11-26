@@ -15,7 +15,7 @@
  * smlouva Aktivní. Dávka pak vystavuje další splátky podle kalendáře (objednávka → faktura = pohledávka, VS smlouvy).
  * Neuhrazená faktura po splatnosti + lhůtě (parametry) = Blokovaná: další splátky se nevystavují, úhradou se odblokuje.
  */
-import { toCents } from "@/core/money";
+import { fromCents, toCents } from "@/core/money";
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -99,6 +99,8 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
       amount: { edt: Edts.Amount, label: "@TAX:AgrAmount", help: "@TAX:AgrAmountHelp" },
       currencyId: { edt: refEdt("sys.currency", "@SYS:Currency") },
       periodMonths: { edt: Edts.Int, label: "@TAX:AgrMonths", mandatory: true, default: 1 },
+      /** počet karet / osob – u tarifu „za kartu“ je cena smlouvy cena tarifu × počet */
+      quantity: { edt: Edts.Int, label: "@TAX:AgrQuantity", default: 1, help: "@TAX:AgrQuantityHelp" },
       startDate: { edt: Edts.TransDate, label: "@TAX:AgrStart", mandatory: true, default: "$today" },
       endDate: { edt: Edts.TransDate, label: "@TAX:AgrEnd", help: "@TAX:AgrEndHelp" },
       autoRenew: { edt: Edts.NoYes, label: "@TAX:AgrAutoRenew", default: true },
@@ -126,7 +128,7 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
     list: ["agreementNum", partnerId, "itemId", "amount", "periodMonths", "startDate", "paidUntil", "dueDate", "status"],
     form: [
       { label: "@TAX:Header", fields: ["agreementNum", partnerId, "itemId", "description", "status", "vs", "cardNumber"] },
-      { label: "@TAX:AgrTerm", fields: ["amount", "currencyId", "periodMonths", "startDate", "endDate", "autoRenew"] },
+      { label: "@TAX:AgrTerm", fields: ["quantity", "amount", "currencyId", "periodMonths", "startDate", "endDate", "autoRenew"] },
       { label: "@TAX:AgrPayment", fields: ["paidUntil", "periodFrom", "periodTo", "dueDate", "orderId", "advanceId", "blockedDate"] },
       { label: "@TAX:AgrSigned", fields: ["signedAt", "formText", "terms", "notes"] },
     ],
@@ -176,6 +178,13 @@ export function agreementLineObject(m: string, L: (k: string) => string) {
   });
 }
 
+/** Řádek objednávky: počet karet × cena za kartu, když částka jde dělit beze zbytku; jinak 1 × částka. */
+function lineQty(agr: RecordData, amount: unknown) {
+  const q = Math.max(1, Number(agr.quantity ?? 1) || 1);
+  const c = toCents(String(amount ?? "0"));
+  return q > 1 && c % BigInt(q) === BigInt(0) ? { qty: q, unitPrice: fromCents(c / BigInt(q)) } : { qty: 1, unitPrice: amount };
+}
+
 /** Parametry smluv (z parametrů modulu; bez nich výchozí hodnoty). */
 async function agreementParams(data: DataApi, docs: AgreementDocs) {
   const [p] = await data.find(docs.parameters, {}, { take: 1 }).catch(() => [] as RecordData[]);
@@ -215,8 +224,7 @@ export async function requestAgreementPayment(data: DataApi, docs: AgreementDocs
     orderId: order.id,
     itemId: agr.itemId ?? null,
     description: text.slice(0, 255),
-    qty: 1,
-    unitPrice: agr.amount,
+    ...lineQty(agr, agr.amount),
   });
   const o = (await data.get(docs.order, String(order.id)))!;
   if (toCents(o.amountGross) <= BigInt(0)) throw new UserError("@GL:NoLines");
@@ -311,8 +319,17 @@ export function agreementHandlers(docs: AgreementDocs): Record<string, ObjectHan
     [docs.agreement]: {
       async beforeSave(ctx: EventContext, d: RecordData, isNew: boolean): Promise<ValidationErrors | void> {
         // tarif: cena, délka období a popis z položky (jen nevyplněné)
+        const qty = Math.max(1, Math.round(Number(d.quantity ?? 1)) || 1);
+        d.quantity = qty;
+        const perUnit = d.itemId ? await ctx.data.get("inv.item", String(d.itemId)) : null;
+        if (perUnit?.agreementPerUnit) {
+          // tarif za kartu: cena smlouvy = cena tarifu × počet karet (přepočte se při každé změně)
+          const pos = (v: unknown) => (v !== null && v !== undefined && v !== "" && toCents(String(v)) > BigInt(0) ? String(v) : null);
+          const unit = (docs.sales ? pos(perUnit.priceGross) : pos(perUnit.purchasePrice)) ?? pos(perUnit.salesPrice);
+          if (unit) d.amount = fromCents(toCents(unit) * BigInt(qty));
+        }
         if (d.itemId && (isNew || !d.amount)) {
-          const it = await ctx.data.get("inv.item", String(d.itemId));
+          const it = perUnit ?? (await ctx.data.get("inv.item", String(d.itemId)));
           if (it) {
             if (!d.amount || !toCents(d.amount)) {
               // první nenulová cena: prodej s DPH, nákup bez DPH, jinak prodejní cena položky
@@ -461,7 +478,7 @@ async function issueScheduleLine(data: DataApi, docs: AgreementDocs, agr: Record
     description: text,
     agreementId: agr.id,
   });
-  await data.create(docs.orderLine, { orderId: order.id, itemId: agr.itemId ?? null, description: text, qty: 1, unitPrice: line.amount });
+  await data.create(docs.orderLine, { orderId: order.id, itemId: agr.itemId ?? null, description: text, ...lineQty(agr, line.amount) });
   const o = (await data.get(docs.order, String(order.id)))!;
   if (toCents(o.amountGross) <= BigInt(0)) throw new UserError("@GL:NoLines");
   await data.update(docs.order, String(o.id), { status: "confirmed" });

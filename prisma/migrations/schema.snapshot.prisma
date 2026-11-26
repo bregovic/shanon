@@ -2002,42 +2002,43 @@ model InvCategory {
 
 /// inv.item — generováno z definice objektu
 model InvItem {
-  id              String   @id @default(uuid(7)) @db.Uuid
-  tenantId        String   @map("tenant_id") @db.Uuid
-  companyId       String   @map("company_id") @db.Uuid
-  itemNum         String   @map("item_num") @db.VarChar(20)
-  name            String   @db.VarChar(120)
-  itemType        String   @default("item") @map("item_type") @db.VarChar(40)
-  groupId         String   @map("group_id") @db.Uuid
-  categoryId      String?  @map("category_id") @db.Uuid
-  unitId          String   @map("unit_id") @db.Uuid
-  ean             String?  @db.VarChar(14)
-  salesPrice      Decimal? @map("sales_price") @db.Decimal(18, 2)
-  currencyId      String?  @map("currency_id") @db.Uuid
-  priceInclTax    Boolean  @default(false) @map("price_incl_tax")
-  itemTaxGroupId  String?  @map("item_tax_group_id") @db.Uuid
-  taxCodeId       String?  @map("tax_code_id") @db.Uuid
-  priceNet        Decimal? @map("price_net") @db.Decimal(18, 2)
-  priceGross      Decimal? @map("price_gross") @db.Decimal(18, 2)
-  purchasePrice   Decimal? @map("purchase_price") @db.Decimal(18, 2)
-  marginPct       Decimal? @map("margin_pct") @db.Decimal(7, 4)
-  vendorId        String?  @map("vendor_id") @db.Uuid
-  brand           String?  @db.VarChar(60)
-  vendorItemName  String?  @map("vendor_item_name") @db.VarChar(255)
-  weighed         Boolean  @default(false)
-  agreementMonths Int?     @map("agreement_months")
-  description     String?
-  blocked         Boolean  @default(false)
-  image           String?  @db.VarChar(36)
-  eshop           Boolean  @default(false)
-  weighBufferPct  Decimal? @map("weigh_buffer_pct") @db.Decimal(7, 4)
-  shopCategoryId  String?  @map("shop_category_id") @db.Uuid
-  ext             Json     @default("{}")
-  version         Int      @default(1)
-  createdAt       DateTime @default(now()) @map("created_at")
-  createdBy       String?  @map("created_by") @db.Uuid
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy       String?  @map("updated_by") @db.Uuid
+  id               String   @id @default(uuid(7)) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  itemNum          String   @map("item_num") @db.VarChar(20)
+  name             String   @db.VarChar(120)
+  itemType         String   @default("item") @map("item_type") @db.VarChar(40)
+  groupId          String   @map("group_id") @db.Uuid
+  categoryId       String?  @map("category_id") @db.Uuid
+  unitId           String   @map("unit_id") @db.Uuid
+  ean              String?  @db.VarChar(14)
+  salesPrice       Decimal? @map("sales_price") @db.Decimal(18, 2)
+  currencyId       String?  @map("currency_id") @db.Uuid
+  priceInclTax     Boolean  @default(false) @map("price_incl_tax")
+  itemTaxGroupId   String?  @map("item_tax_group_id") @db.Uuid
+  taxCodeId        String?  @map("tax_code_id") @db.Uuid
+  priceNet         Decimal? @map("price_net") @db.Decimal(18, 2)
+  priceGross       Decimal? @map("price_gross") @db.Decimal(18, 2)
+  purchasePrice    Decimal? @map("purchase_price") @db.Decimal(18, 2)
+  marginPct        Decimal? @map("margin_pct") @db.Decimal(7, 4)
+  vendorId         String?  @map("vendor_id") @db.Uuid
+  brand            String?  @db.VarChar(60)
+  vendorItemName   String?  @map("vendor_item_name") @db.VarChar(255)
+  weighed          Boolean  @default(false)
+  agreementMonths  Int?     @map("agreement_months")
+  agreementPerUnit Boolean  @default(false) @map("agreement_per_unit")
+  description      String?
+  blocked          Boolean  @default(false)
+  image            String?  @db.VarChar(36)
+  eshop            Boolean  @default(false)
+  weighBufferPct   Decimal? @map("weigh_buffer_pct") @db.Decimal(7, 4)
+  shopCategoryId   String?  @map("shop_category_id") @db.Uuid
+  ext              Json     @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy        String?  @map("updated_by") @db.Uuid
 
   company             SysCompany       @relation("InvItem_company", fields: [companyId], references: [id], onDelete: Restrict)
   group               InvItemGroup     @relation("InvItem_group", fields: [groupId], references: [id], onDelete: Restrict)
@@ -2315,6 +2316,7 @@ model ArAgreement {
   amount       Decimal?  @db.Decimal(18, 2)
   currencyId   String?   @map("currency_id") @db.Uuid
   periodMonths Int       @default(1) @map("period_months")
+  quantity     Int?      @default(1)
   startDate    DateTime  @default(now()) @map("start_date") @db.Date
   endDate      DateTime? @map("end_date") @db.Date
   autoRenew    Boolean   @default(true) @map("auto_renew")
@@ -2925,6 +2927,7 @@ model ApAgreement {
   amount       Decimal?  @db.Decimal(18, 2)
   currencyId   String?   @map("currency_id") @db.Uuid
   periodMonths Int       @default(1) @map("period_months")
+  quantity     Int?      @default(1)
   startDate    DateTime  @default(now()) @map("start_date") @db.Date
   endDate      DateTime? @map("end_date") @db.Date
   autoRenew    Boolean   @default(true) @map("auto_renew")

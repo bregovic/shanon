@@ -17,6 +17,7 @@ const useStyles = makeStyles({
     minHeight: "100vh",
     background: `linear-gradient(160deg, ${tokens.colorBrandBackground} 0%, ${tokens.colorBrandBackgroundPressed} 38%, ${tokens.colorNeutralBackground2} 38.1%)`,
     padding: "40px 16px 60px",
+    "@media (max-width: 600px)": { padding: "20px 10px 40px" },
     display: "flex",
     justifyContent: "center",
   },
@@ -24,7 +25,7 @@ const useStyles = makeStyles({
   hero: { color: tokens.colorNeutralForegroundOnBrand, display: "flex", flexDirection: "column", gap: "6px", padding: "0 4px" },
   company: { fontSize: tokens.fontSizeBase300, opacity: 0.85, letterSpacing: "0.04em", textTransform: "uppercase" },
   title: { fontSize: "32px", lineHeight: "40px", fontWeight: tokens.fontWeightSemibold },
-  card: { backgroundColor: tokens.colorNeutralBackground1, borderRadius: "16px", boxShadow: tokens.shadow28, padding: "28px", display: "flex", flexDirection: "column", gap: "22px" },
+  card: { backgroundColor: tokens.colorNeutralBackground1, borderRadius: "16px", boxShadow: tokens.shadow28, padding: "28px", display: "flex", flexDirection: "column", gap: "22px", "@media (max-width: 600px)": { padding: "18px 14px", gap: "18px" } },
   step: { display: "flex", flexDirection: "column", gap: "10px" },
   stepHead: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase400 },
   tariffs: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" },
@@ -43,7 +44,8 @@ const useStyles = makeStyles({
   },
   tariffOn: { border: `2px solid ${tokens.colorBrandStroke1}`, backgroundColor: tokens.colorBrandBackground2 },
   price: { fontSize: "22px", fontWeight: tokens.fontWeightSemibold },
-  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" },
+  // pole nahoru: chyba pod jedním polem nerozhodí sousední v řádku; na telefonu jeden sloupec
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", alignItems: "start" },
   terms: {
     maxHeight: "260px",
     overflowY: "auto",
@@ -233,7 +235,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
                     <button key={t.id} type="button" role="radio" aria-checked={t.id === f.tariffId} className={`${s.tariff} ${t.id === f.tariffId ? s.tariffOn : ""}`} onClick={() => setF((x) => ({ ...x, tariffId: t.id }))}>
                       <Text weight="semibold">{t.name}</Text>
                       <span className={s.price}>{money(t.price)} Kč</span>
-                      <Text size={200}>za {months(t.months)}</Text>
+                      <Text size={200}>{t.perUnit ? "za kartu / " : "za "}{months(t.months)}</Text>
                       {t.description && <Text size={200}>{t.description}</Text>}
                     </button>
                   ))}
