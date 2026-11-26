@@ -49,6 +49,8 @@ export interface PortalFormField {
   width: "half" | "full";
   /** zobrazit jen když (klíč=hodnota / klíč) */
   showIf: string;
+  /** předvyplněná hodnota (text / možnost / true u zaškrtávátka) */
+  defaultValue: string | boolean;
   /** nápověda prohlížeči pro automatické vyplnění (given-name, email…) */
   auto: string;
   /** ARES: „lookup“ = pole IČO s tlačítkem Načíst z ARES, ostatní = co z ARES doplnit (name, vatId, street, city, zip) */
@@ -100,6 +102,13 @@ const today = () => new Date().toISOString().slice(0, 10);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Api = Parameters<typeof requestAgreementPayment>[0];
 
+/** Výchozí hodnota pole pro portál: zaškrtávátko ano/ne, datum „dnes“ = dnešní datum, jinak text. */
+function fieldDefault(kind: string, v: string): string | boolean {
+  if (kind === "checkbox" || kind === "consent") return /^(ano|yes|true|1)$/i.test(v);
+  if (kind === "date" && /^(dnes|today)$/i.test(v)) return new Date().toISOString().slice(0, 10);
+  return v;
+}
+
 /** Stát: kód ISO (CZ, SK…) nebo český / anglický název → kód; nic = CZ. */
 const COUNTRIES: Record<string, string> = {
   "česko": "CZ", "česká republika": "CZ", "czech republic": "CZ", "czechia": "CZ", "slovensko": "SK", "slovakia": "SK", "německo": "DE", "germany": "DE",
@@ -150,6 +159,7 @@ async function portalForm(api: Api, formId: string): Promise<AgreementPortalInfo
     options: String(x.options ?? "").split(/[\n|]/).map((o) => o.trim()).filter(Boolean),
     help: String(x.help ?? ""),
     showIf: String(x.showIf ?? "").trim(),
+    defaultValue: fieldDefault(String(x.kind ?? "text"), String(x.defaultValue ?? "").trim()),
     auto: AUTOFILL[String(x.mapping ?? "")] ?? "",
     ares: ARES_ROLE[String(x.mapping ?? "")] ?? "",
     width: (x.width === "full" || x.kind === "longtext" || x.kind === "heading" || x.kind === "info" || x.kind === "consent" ? "full" : "half") as "half" | "full",

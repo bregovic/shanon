@@ -37,6 +37,7 @@ Po odeslání vznikne v [Adresáři](/gab/subject) člen s adresou, [odběratel]
 | **Nápověda** | drobný text pod polem |
 | **Šířka** | polovina nebo celý řádek |
 | **Zobrazit, když** | podmíněné pole – viz níže |
+| **Výchozí hodnota** | předvyplněná hodnota: u výběru jedna z možností (`individuální`), u zaškrtávátka `ano`, u data `dnes` |
 
 Možnosti na jednom řádku: `individuální|firemní`.
 

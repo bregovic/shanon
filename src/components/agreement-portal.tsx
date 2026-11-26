@@ -80,7 +80,10 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({ tariffId: info.tariffs[0]?.id ?? "", firstName: "", lastName: "", email: "", phone: "", street: "", city: "", zipCode: "", startDate: today, consent: false, website: "" });
   // formulář portálu (Integrace → Formuláře): odpovědi podle klíče pole
-  const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
+  // výchozí hodnoty polí; rozepsaný formulář z prohlížeče je přepíše
+  const [answers, setAnswers] = useState<Record<string, string | boolean>>(() =>
+    Object.fromEntries((info.form?.fields ?? []).filter((x) => x.defaultValue !== "" && x.defaultValue !== false).map((x) => [x.key, x.defaultValue])),
+  );
   const answer = (k: string, v: string | boolean) => setAnswers((x) => ({ ...x, [k]: v }));
   // rozepsané údaje zůstanou v prohlížeči (zavřená stránka, telefon zhasne); po uzavření smlouvy se smažou
   const draftKey = `portal-draft:${action}`;
@@ -89,7 +92,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
     try {
       const d = JSON.parse(localStorage.getItem(draftKey) ?? "null") as { f?: Record<string, string>; answers?: Record<string, string | boolean> } | null;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- úložiště prohlížeče (vnější zdroj, až po hydrataci)
-      if (d?.answers) setAnswers(d.answers);
+      if (d?.answers) setAnswers((x) => ({ ...x, ...d.answers }));
       if (d?.f) setF((x) => ({ ...x, ...d.f, consent: false, website: "" }));
     } catch {
       /* soukromý režim apod. */

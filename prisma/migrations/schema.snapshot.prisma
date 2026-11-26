@@ -4697,26 +4697,27 @@ model IntForm {
 
 /// int.formField — generováno z definice objektu
 model IntFormField {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  formId    String   @map("form_id") @db.Uuid
-  sequence  Int?     @default(10)
-  key       String   @db.VarChar(40)
-  label     String   @db.VarChar(255)
-  kind      String   @default("text") @db.VarChar(40)
-  required  Boolean  @default(false)
-  mapping   String   @default("form") @db.VarChar(40)
-  options   String?
-  help      String?  @db.VarChar(255)
-  width     String   @default("half") @db.VarChar(40)
-  showIf    String?  @map("show_if") @db.VarChar(255)
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  formId       String   @map("form_id") @db.Uuid
+  sequence     Int?     @default(10)
+  key          String   @db.VarChar(40)
+  label        String   @db.VarChar(255)
+  kind         String   @default("text") @db.VarChar(40)
+  required     Boolean  @default(false)
+  mapping      String   @default("form") @db.VarChar(40)
+  options      String?
+  help         String?  @db.VarChar(255)
+  width        String   @default("half") @db.VarChar(40)
+  showIf       String?  @map("show_if") @db.VarChar(255)
+  defaultValue String?  @map("default_value") @db.VarChar(255)
+  ext          Json     @default("{}")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?  @map("updated_by") @db.Uuid
 
   company SysCompany @relation("IntFormField_company", fields: [companyId], references: [id], onDelete: Restrict)
   form    IntForm    @relation("IntFormField_form", fields: [formId], references: [id], onDelete: Restrict)

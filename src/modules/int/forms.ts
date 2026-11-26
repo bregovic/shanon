@@ -109,10 +109,12 @@ export const formField = defineObject({
     width: { edt: enumEdt(FormFieldWidth), mandatory: true, default: "half" },
     /** zobrazit jen když: „klíč=hodnota“ (výběr), „klíč“ (zaškrtnuté) */
     showIf: { edt: Edts.Description, label: "@INT:FormShowIf", help: "@INT:FormShowIfHelp" },
+    /** předvyplněná hodnota na portálu (výběr: jedna z možností, zaškrtávátko: ano) */
+    defaultValue: { edt: Edts.Description, label: "@INT:FormDefault", help: "@INT:FormDefaultHelp", aliases: ["default", "vychozi"] },
   },
   titleField: "label",
   list: ["sequence", "key", "label", "kind", "required", "mapping", "width"],
-  form: [{ label: "@SYS:General", fields: ["formId", "sequence", "key", "label", "kind", "required", "mapping", "options", "help", "width", "showIf"] }],
+  form: [{ label: "@SYS:General", fields: ["formId", "sequence", "key", "label", "kind", "required", "mapping", "options", "help", "width", "showIf", "defaultValue"] }],
   unique: [["formId", "key"]],
   defaultSort: { field: "sequence", dir: "asc" },
 });
@@ -172,6 +174,8 @@ export const FORM_CS = {
   FormOptionsHelp: "Pro Výběr z možností: jedna možnost na řádek (nebo oddělené znakem |).",
   FormHelp: "Nápověda pod polem",
   FormShowIf: "Zobrazit, když",
+  FormDefault: "Výchozí hodnota",
+  FormDefaultHelp: "Předvyplní se na portálu: u výběru jedna z možností, u zaškrtávátka „ano“, u data „dnes“.",
   FormShowIfHelp: "Prázdné = vždy. „druh=firemní“ = jen když pole druh má hodnotu firemní; „firma“ = jen když je zaškrtnuté pole firma. Skryté pole se nekontroluje ani neukládá.",
   PortalMailAgreement: "Poslat smlouvu e-mailem",
   PortalMailAgreementHelp: "Po uzavření dostane člen vyplněnou smlouvu (tisková sestava Smlouva) a obchodní podmínky v PDF.",
@@ -241,6 +245,8 @@ export const FORM_EN: typeof FORM_CS = {
   FormOptionsHelp: "For Choice: one option per line.",
   FormHelp: "Help under the field",
   FormShowIf: "Show when",
+  FormDefault: "Default value",
+  FormDefaultHelp: "Prefilled on the portal: one of the options for a choice, “yes” for a checkbox, “today” for a date.",
   FormShowIfHelp: "Empty = always. “type=company” = only when field type has value company; “company” = only when checkbox company is ticked. Hidden fields are neither checked nor saved.",
   PortalMailAgreement: "Send agreement by e-mail",
   PortalMailAgreementHelp: "After signing, the member receives the completed agreement (Agreement print template) and the terms as PDF.",
