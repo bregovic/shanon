@@ -116,6 +116,9 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
       blockedDate: { edt: Edts.TransDate, label: "@TAX:AgrBlockedDate", readOnly: true },
       signedAt: { edt: Edts.DateTime, label: "@TAX:AgrSignedAt", readOnly: true },
       terms: { edt: Edts.Notes, label: "@TAX:AgrTerms", readOnly: true },
+      /** odpovědi z formuláře portálu: JSON {klíč: hodnota} (tisk {form.<klíč>}) a čitelně „Popisek: hodnota“ */
+      formData: { edt: Edts.Notes, label: "@TAX:AgrFormData", readOnly: true },
+      formText: { edt: Edts.Notes, label: "@TAX:AgrFormText", readOnly: true },
       notes: { edt: Edts.Notes },
     },
     titleField: "agreementNum",
@@ -125,7 +128,7 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
       { label: "@TAX:Header", fields: ["agreementNum", partnerId, "itemId", "description", "status", "vs", "cardNumber"] },
       { label: "@TAX:AgrTerm", fields: ["amount", "currencyId", "periodMonths", "startDate", "endDate", "autoRenew"] },
       { label: "@TAX:AgrPayment", fields: ["paidUntil", "periodFrom", "periodTo", "dueDate", "orderId", "advanceId", "blockedDate"] },
-      { label: "@TAX:AgrSigned", fields: ["signedAt", "terms", "notes"] },
+      { label: "@TAX:AgrSigned", fields: ["signedAt", "formText", "terms", "notes"] },
     ],
     numberSeq: { field: "agreementNum", seq },
     lines: [{ object: `${m}.agreementLine`, field: "agreementId", label: "@TAX:AgrSchedule" }],

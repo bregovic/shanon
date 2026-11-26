@@ -63,12 +63,17 @@ export function PortalTheme({ design, children }: { design: PortalDesign; childr
 }
 
 /** Logo nad nadpisem (nenačte-li se, zmizí). */
-export function PortalLogo({ src, onPhoto }: { src: string | null; onPhoto?: boolean }) {
-  if (!src) return null;
-  // na fotce na světlém podkladu – tmavé logo by na ztmavené fotce zaniklo
-  const badge = onPhoto ? { background: "rgba(255, 255, 255, 0.92)", padding: "10px 14px", borderRadius: 12, boxShadow: "0 4px 18px rgba(0, 0, 0, 0.25)" } : {};
+export function PortalLogo({ design }: { design: PortalDesign }) {
+  if (!design.logo) return null;
+  // podklad jen když ho správce zvolí (průhledné logo na fotce může zanikat)
+  const badge =
+    design.logoBadge === "none"
+      ? {}
+      : { background: design.logoBadge === "dark" ? "rgba(17, 20, 28, 0.85)" : "rgba(255, 255, 255, 0.92)", padding: "10px 14px", borderRadius: 12, boxShadow: "0 4px 18px rgba(0, 0, 0, 0.25)" };
+  const size = { small: [40, 160], medium: [64, 240], large: [96, 340] }[design.logoSize];
+  const align = { left: "flex-start", center: "center", right: "flex-end" }[design.logoAlign];
   return (
     // eslint-disable-next-line @next/next/no-img-element -- obrázek z portálu (veřejná adresa s klíčem portálu)
-    <img src={src} alt="" style={{ maxHeight: onPhoto ? 64 : 56, maxWidth: 240, objectFit: "contain", alignSelf: "flex-start", marginBottom: 8, ...badge }} onError={(e) => e.currentTarget.remove()} />
+    <img src={design.logo} alt="" style={{ maxHeight: size[0], maxWidth: size[1], objectFit: "contain", alignSelf: align, marginBottom: 8, ...badge }} onError={(e) => e.currentTarget.remove()} />
   );
 }

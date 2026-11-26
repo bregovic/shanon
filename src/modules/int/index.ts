@@ -8,6 +8,7 @@
  */
 import { retireTestScale } from "./test-env";
 import { DevicePaper, PrintJobStatus, PrintRuleDoc, device, devicePrinter, printJob, printRule } from "./devices";
+import { FORM_CS, FORM_EN, FormFieldKind, FormFieldWidth, FormMapping, form, formField } from "./forms";
 import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
 import { defineObject } from "@/core/object";
@@ -504,6 +505,33 @@ export const PortalBackground = defineEnum({
     { value: "light", label: "@INT:PortalBgLight" },
   ],
 });
+export const PortalLogoBadge = defineEnum({
+  id: "IntPortalLogoBadge",
+  label: "@INT:PortalLogoBadge",
+  values: [
+    { value: "none", label: "@INT:PortalLogoBadgeNone" },
+    { value: "light", label: "@INT:PortalLogoBadgeLight" },
+    { value: "dark", label: "@INT:PortalLogoBadgeDark" },
+  ],
+});
+export const PortalLogoSize = defineEnum({
+  id: "IntPortalLogoSize",
+  label: "@INT:PortalLogoSize",
+  values: [
+    { value: "small", label: "@INT:PortalSizeSmall" },
+    { value: "medium", label: "@INT:PortalSizeMedium" },
+    { value: "large", label: "@INT:PortalSizeLarge" },
+  ],
+});
+export const PortalAlign = defineEnum({
+  id: "IntPortalAlign",
+  label: "@INT:PortalAlign",
+  values: [
+    { value: "left", label: "@INT:PortalAlignLeft" },
+    { value: "center", label: "@INT:PortalAlignCenter" },
+    { value: "right", label: "@INT:PortalAlignRight" },
+  ],
+});
 export const PortalCorners = defineEnum({
   id: "IntPortalCorners",
   label: "@INT:PortalCorners",
@@ -537,6 +565,8 @@ export const portal = defineObject({
     /** smlouva: znění, které zájemce potvrzuje (uloží se ke smlouvě), skupina nových odběratelů */
     agreementTerms: { edt: Edts.Notes, label: "@INT:PortalAgreementTerms", help: "@INT:PortalAgreementTermsHelp" },
     agreementGroupId: { edt: refEdt("ar.group", "@INT:PortalAgreementGroup"), optionalRef: true },
+    /** formulář s údaji člena (Integrace → Formuláře) */
+    formId: { edt: refEdt("int.form", "@INT:PortalForm"), help: "@INT:PortalFormHelp" },
     /** tajná část odkazu (vygeneruje se; Nový odkaz zneplatní starý) */
     token: { edt: Str("IntPortalToken", "@INT:PortalToken", 64), readOnly: true },
     /** druhá část jednoduché adresy /<zkratka organizace>/<slug> (výchozí „doklady“) */
@@ -557,6 +587,9 @@ export const portal = defineObject({
     appEmployees: { edt: Edts.NoYes, label: "@INT:AppEmployees", default: false, help: "@INT:AppEmployeesHelp" },
     /** vzhled veřejné stránky (src/components/portal-theme.tsx) */
     logo: { edt: PortalImage, label: "@INT:PortalLogo", image: true, readOnly: true, help: "@INT:PortalLogoHelp" },
+    logoBadge: { edt: enumEdt(PortalLogoBadge), mandatory: true, default: "none", help: "@INT:PortalLogoBadgeHelp" },
+    logoSize: { edt: enumEdt(PortalLogoSize), mandatory: true, default: "medium" },
+    logoAlign: { edt: enumEdt(PortalAlign), mandatory: true, default: "left" },
     accentColor: { edt: PortalColor, label: "@INT:PortalAccent", help: "@INT:PortalColorHelp" },
     accent2Color: { edt: PortalColor, label: "@INT:PortalAccent2", help: "@INT:PortalAccent2Help" },
     background: { edt: enumEdt(PortalBackground), mandatory: true, default: "gradient" },
@@ -574,8 +607,8 @@ export const portal = defineObject({
   form: [
     { label: "@SYS:General", fields: ["name", "active", "purpose", "slug", "publicUrl", "responsible"] },
     { label: "@INT:PortalPage", fields: ["title", "intro"] },
-    { label: "@INT:PortalDesign", fields: ["logo", "accentColor", "accent2Color", "background", "backgroundImage", "corners", "showCompany", "footer"] },
-    { label: "@INT:PortalAgreement", fields: ["agreementTerms", "agreementGroupId"], visibleWhen: { field: "purpose", in: ["agreement"] } },
+    { label: "@INT:PortalDesign", fields: ["logo", "logoBadge", "logoSize", "logoAlign", "accentColor", "accent2Color", "background", "backgroundImage", "corners", "showCompany", "footer"] },
+    { label: "@INT:PortalAgreement", fields: ["formId", "agreementTerms", "agreementGroupId"], visibleWhen: { field: "purpose", in: ["agreement"] } },
     { label: "@INT:PortalKinds", fields: ["allowInvoice", "allowAdvance", "allowOrder", "allowOther", "requireRegNo", "autoExtract"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalApp", fields: ["appVendors", "appEmployees"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalLimits", fields: ["maxFileMb", "maxFiles", "ipHourLimit", "dailyLimit"] },
@@ -690,20 +723,21 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [PortalPurpose, PortalBackground, PortalCorners, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper, PrintRuleDoc],
-  objects: [connection, log, portal, portalUpload, portalContact, document, documentLine, mail, device, devicePrinter, printRule, printJob],
+  enums: [PortalPurpose, PortalBackground, PortalCorners, PortalLogoBadge, PortalLogoSize, PortalAlign, FormFieldKind, FormMapping, FormFieldWidth, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper, PrintRuleDoc],
+  objects: [connection, log, portal, portalUpload, portalContact, form, formField, document, documentLine, mail, device, devicePrinter, printRule, printJob],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
   menu: [
     { label: "@INT:Module", items: [{ object: "int.connection" }, { object: "int.log" }] },
     { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }] },
-    { label: "@INT:Documents", items: [{ object: "int.document" }, { object: "int.portal" }, { object: "int.portalContact" }] },
+    { label: "@INT:Documents", items: [{ object: "int.document" }, { object: "int.portal" }, { object: "int.form" }, { object: "int.portalContact" }] },
     { label: "@INT:Mails", items: [{ object: "int.mail" }] },
     { label: "@INT:Documents", kind: "functions", items: [{ href: "/int/doc-import", label: "@INT:DocImport" }] },
     { label: "@INT:Testing", kind: "functions", items: [{ href: "/int/test-env", label: "@INT:TestEnv" }] },
   ],
   labels: {
     cs: {
+      ...FORM_CS,
       Device: "Zařízení",
       Devices: "Zařízení",
       DevicePaired: "Spárováno",
@@ -992,6 +1026,19 @@ export default defineModule({
       PortalPurposeDocs: "Nahrání dokladů",
       PortalPurposeAgreement: "Smlouva (členství, předplatné)",
       PortalDesign: "Vzhled stránky",
+      PortalLogoBadge: "Podklad loga",
+      PortalLogoBadgeHelp: "Žádný = logo přímo na pozadí (průhledné PNG). Světlý / tmavý podklad pomůže, když logo na fotce zaniká.",
+      PortalLogoBadgeNone: "Žádný",
+      PortalLogoBadgeLight: "Světlý",
+      PortalLogoBadgeDark: "Tmavý",
+      PortalLogoSize: "Velikost loga",
+      PortalSizeSmall: "Malé",
+      PortalSizeMedium: "Střední",
+      PortalSizeLarge: "Velké",
+      PortalAlign: "Zarovnání loga",
+      PortalAlignLeft: "Vlevo",
+      PortalAlignCenter: "Na střed",
+      PortalAlignRight: "Vpravo",
       PortalLogo: "Logo",
       PortalLogoHelp: "Doporučeno: PNG s průhledným pozadím, asi 600 × 200 px. Prázdné = logo organizace.",
       PortalColor: "Barva",
@@ -1355,6 +1402,7 @@ export default defineModule({
       TokenFileHeader: "Klíč k REST API Shanonu — uložte bezpečně, znovu se nezobrazí. Starý klíč tímto přestal platit.",
     },
     en: {
+      ...FORM_EN,
       Device: "Device",
       Devices: "Devices",
       DevicePaired: "Paired",
@@ -1643,6 +1691,19 @@ export default defineModule({
       PortalPurposeDocs: "Document upload",
       PortalPurposeAgreement: "Agreement (membership, subscription)",
       PortalDesign: "Page design",
+      PortalLogoBadge: "Logo background",
+      PortalLogoBadgeHelp: "None = logo straight on the background (transparent PNG). A light / dark badge helps when the logo disappears on a photo.",
+      PortalLogoBadgeNone: "None",
+      PortalLogoBadgeLight: "Light",
+      PortalLogoBadgeDark: "Dark",
+      PortalLogoSize: "Logo size",
+      PortalSizeSmall: "Small",
+      PortalSizeMedium: "Medium",
+      PortalSizeLarge: "Large",
+      PortalAlign: "Logo alignment",
+      PortalAlignLeft: "Left",
+      PortalAlignCenter: "Centre",
+      PortalAlignRight: "Right",
       PortalLogo: "Logo",
       PortalLogoHelp: "Recommended: PNG with a transparent background, about 600 × 200 px. Empty = organisation logo.",
       PortalColor: "Colour",

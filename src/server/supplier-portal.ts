@@ -31,6 +31,9 @@ export interface PortalDesign {
   accent2: string | null;
   background: "gradient" | "solid" | "photo" | "light";
   corners: "rounded" | "square";
+  logoBadge: "none" | "light" | "dark";
+  logoSize: "small" | "medium" | "large";
+  logoAlign: "left" | "center" | "right";
   showCompany: boolean;
   footer: string;
   logo: string | null;
@@ -117,6 +120,9 @@ export async function portalDesign(l: Loaded, tenant: string, token: string, cli
     accent2: HEX.test(String(p.accent2Color ?? "")) ? String(p.accent2Color) : null,
     background: bg === "photo" && !p.backgroundImage ? "gradient" : bg,
     corners: p.corners === "square" ? "square" : "rounded",
+    logoBadge: p.logoBadge === "light" || p.logoBadge === "dark" ? p.logoBadge : "none",
+    logoSize: p.logoSize === "small" || p.logoSize === "large" ? p.logoSize : "medium",
+    logoAlign: p.logoAlign === "center" || p.logoAlign === "right" ? p.logoAlign : "left",
     showCompany: p.showCompany !== false,
     footer: String(p.footer ?? ""),
     logo: logoRef ? `${base}/logo?v=${logoRef}` : null,

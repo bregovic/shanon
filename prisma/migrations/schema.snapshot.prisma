@@ -420,6 +420,8 @@ model SysCompany {
   intPortal_company                IntPortal[]                @relation("IntPortal_company")
   intPortalUpload_company          IntPortalUpload[]          @relation("IntPortalUpload_company")
   intPortalContact_company         IntPortalContact[]         @relation("IntPortalContact_company")
+  intForm_company                  IntForm[]                  @relation("IntForm_company")
+  intFormField_company             IntFormField[]             @relation("IntFormField_company")
   intDocument_company              IntDocument[]              @relation("IntDocument_company")
   intDocumentLine_company          IntDocumentLine[]          @relation("IntDocumentLine_company")
   intMail_company                  IntMail[]                  @relation("IntMail_company")
@@ -2328,6 +2330,8 @@ model ArAgreement {
   blockedDate  DateTime? @map("blocked_date") @db.Date
   signedAt     DateTime? @map("signed_at")
   terms        String?
+  formData     String?   @map("form_data")
+  formText     String?   @map("form_text")
   notes        String?
   ext          Json      @default("{}")
   version      Int       @default(1)
@@ -2936,6 +2940,8 @@ model ApAgreement {
   blockedDate  DateTime? @map("blocked_date") @db.Date
   signedAt     DateTime? @map("signed_at")
   terms        String?
+  formData     String?   @map("form_data")
+  formText     String?   @map("form_text")
   notes        String?
   ext          Json      @default("{}")
   version      Int       @default(1)
@@ -4541,6 +4547,7 @@ model IntPortal {
   purpose          String   @default("documents") @db.VarChar(40)
   agreementTerms   String?  @map("agreement_terms")
   agreementGroupId String?  @map("agreement_group_id") @db.Uuid
+  formId           String?  @map("form_id") @db.Uuid
   token            String?  @db.VarChar(64)
   slug             String?  @default("doklady") @db.VarChar(40)
   publicUrl        String?  @map("public_url") @db.VarChar(200)
@@ -4556,6 +4563,9 @@ model IntPortal {
   appVendors       Boolean  @default(true) @map("app_vendors")
   appEmployees     Boolean  @default(false) @map("app_employees")
   logo             String?  @db.VarChar(36)
+  logoBadge        String   @default("none") @map("logo_badge") @db.VarChar(40)
+  logoSize         String   @default("medium") @map("logo_size") @db.VarChar(40)
+  logoAlign        String   @default("left") @map("logo_align") @db.VarChar(40)
   accentColor      String?  @map("accent_color") @db.VarChar(7)
   accent2Color     String?  @map("accent2_color") @db.VarChar(7)
   background       String   @default("gradient") @db.VarChar(40)
@@ -4576,11 +4586,13 @@ model IntPortal {
 
   company                SysCompany        @relation("IntPortal_company", fields: [companyId], references: [id], onDelete: Restrict)
   agreementGroup         ArGroup?          @relation("IntPortal_agreementGroup", fields: [agreementGroupId], references: [id], onDelete: Restrict)
+  form                   IntForm?          @relation("IntPortal_form", fields: [formId], references: [id], onDelete: Restrict)
   intPortalUpload_portal IntPortalUpload[] @relation("IntPortalUpload_portal")
   intDocument_portal     IntDocument[]     @relation("IntDocument_portal")
 
   @@index([tenantId, companyId])
   @@index([agreementGroupId])
+  @@index([formId])
   @@map("int_portal")
 }
 
@@ -4642,6 +4654,62 @@ model IntPortalContact {
   @@index([tenantId, companyId])
   @@index([vendorId])
   @@map("int_portal_contact")
+}
+
+/// int.form — generováno z definice objektu
+model IntForm {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  code      String   @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  heading   String?  @db.VarChar(255)
+  intro     String?
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company           SysCompany     @relation("IntForm_company", fields: [companyId], references: [id], onDelete: Restrict)
+  intPortal_form    IntPortal[]    @relation("IntPortal_form")
+  intFormField_form IntFormField[] @relation("IntFormField_form")
+
+  @@unique([tenantId, companyId, code])
+  @@index([tenantId, companyId])
+  @@map("int_form")
+}
+
+/// int.formField — generováno z definice objektu
+model IntFormField {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  formId    String   @map("form_id") @db.Uuid
+  sequence  Int?     @default(10)
+  key       String   @db.VarChar(40)
+  label     String   @db.VarChar(255)
+  kind      String   @default("text") @db.VarChar(40)
+  required  Boolean  @default(false)
+  mapping   String   @default("form") @db.VarChar(40)
+  options   String?
+  help      String?  @db.VarChar(255)
+  width     String   @default("half") @db.VarChar(40)
+  ext       Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company SysCompany @relation("IntFormField_company", fields: [companyId], references: [id], onDelete: Restrict)
+  form    IntForm    @relation("IntFormField_form", fields: [formId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, companyId, formId, key])
+  @@index([tenantId, companyId])
+  @@index([formId])
+  @@map("int_form_field")
 }
 
 /// int.document — generováno z definice objektu
