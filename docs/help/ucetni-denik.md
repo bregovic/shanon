@@ -33,6 +33,18 @@ Každý modul má své deníky: [Obecné deníky](/gl/journal?filter.journalType
 - Text a druh účtu se přebírají z předchozího řádku. Záporná částka v MD se přesune do D (a naopak).
 - Pod mřížkou je vidět, které doklady nejsou vyrovnané a o kolik; řádky takového dokladu mají oranžový proužek.
 
+## Vyrovnání s otevřenými položkami
+
+Řádek, který hradí faktury (nebo dobropisy) odběratele či dodavatele, vyrovnáte tlačítkem **Vyrovnat** nad mřížkou (pro vybraný řádek):
+
+- Dialog ukáže otevřené položky **partnera řádku**; vypnutím *Jen partner řádku* hledáte u všech – podle druhu (odběratelé / dodavatelé), **VS**, **částky**, data a čísla dokladu nebo jména partnera.
+- Zaškrtněte doklady a u každého částku **Uhradit** (předvyplní se zbytek řádku, nejvýš zbytek dokladu) – jde uhradit i část.
+- Řádek bez partnera ho po výběru převezme (na stranu účtu), prázdný VS se doplní z jediného dokladu a prázdná částka součtem.
+- Sloupec **Vyrovnání** ukazuje *Nevyrovnáno / Částečně / Vyrovnáno*. Změna partnera řádku vyrovnání zruší; **Zrušit vyrovnání** v dialogu také.
+- Zaúčtování uhradí přesně vybrané doklady a částky; řádek bez vyrovnání se dál páruje jednoznačným VS. Ověřit hlídá, že položka patří partnerovi řádku, je otevřená a částky nepřesahují zbytek dokladu ani řádek.
+
+Deník z bankovního výpisu má banku jako pevný protiúčet (vpravo), vlevo partner nebo účet – dimenze partnera se tak doplní z účtu řádku. U výpisu jde deník **Odpojit** (vytvořit znovu); smazání rozpracovaného deníku výpis uvolní sám.
+
 ## Výchozí dimenze a protiúčet
 
 - **Dimenze účtu** se doplní samy: z účtu hlavní knihy, u odběratele a dodavatele z jeho karty, u banky a pokladny z jejich účtu hlavní knihy. Co účet nemá, doplní deník.

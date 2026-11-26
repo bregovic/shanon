@@ -1071,7 +1071,8 @@ const dmyText = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse()
 /** Znění smlouvy začíná nadpisem (vlastní první řádek znění, jinak „SMLUVNÍ PODMÍNKY“). */
 function termsWithHeading(t: string): string {
   const first = t.trim().split("\n")[0]?.trim() ?? "";
-  if (!t.trim() || textHeading(first) === "h") return t.trim();
+  const k = textHeading(first);
+  if (!t.trim() || k === "h" || k === "title") return t.trim();
   return `SMLUVNÍ PODMÍNKY\n${t.trim()}`;
 }
 
@@ -1163,7 +1164,81 @@ function agreementLayout(): PrintLayout {
       T("sig1t", 15, 193, 75, 16, "za {company.name}\n{company.address}\n{company.email}  {company.phone}", { size: 7.5, align: "center", color: MUTED }),
       T("sig2t", 120, 193, 75, 8, "{partner.name}\nČlen", { size: 7.5, align: "center", color: MUTED }),
       // znění od nové stránky; nadpis „SMLUVNÍ PODMÍNKY“ doplní dataset, když ho znění samo nemá
-      { ...T("terms", 15, 215, 180, 20, "{doc.terms}", { size: 8, color: INK }), style: { size: 8, color: INK, flow: true, pageBreak: true } },
+      { ...T("terms", 15, 215, 180, 20, "{doc.terms}", { size: 9, color: INK }), style: { size: 9, color: INK, flow: true, pageBreak: true } },
+    ],
+  };
+}
+
+/** Smlouva v1 (11/2026, pevné rozvržení bez toku textu) — neupravené šablony se převedou. */
+function agreementLayoutV1(): PrintLayout {
+  const H = (id: string, x: number, y: number, w: number, text: string, color = MUTED) => T(id, x, y, w, 5, text, { size: 7, bold: true, color });
+  return {
+    paper: "a4",
+    fontSize: 9,
+    elements: [
+      { id: "band", type: "rect", x: 0, y: 0, w: 210, h: 3, style: { fill: ACCENT, color: ACCENT } },
+      { id: "logo", type: "image", x: 15, y: 11, w: 55, h: 20, field: "company.logo" },
+      T("title", 105, 12, 90, 5, "{doc.title}", { size: 8, bold: true, align: "right", color: MUTED }),
+      T("num", 105, 17, 90, 10, "{doc.number}", { size: 18, bold: true, align: "right", color: INK }),
+      H("supH", 15, 37, 85, "SPOLEČNOST"),
+      T("supN", 15, 42, 85, 5, "{company.name}", { size: 10, bold: true, color: INK }),
+      T("supA", 15, 47, 85, 9, "{company.address}", { size: 9, color: INK }),
+      T("supV", 15, 56, 85, 9, "IČO {company.regNo}\n{company.email}  {company.phone}", { size: 9, color: INK }),
+      { id: "custBox", type: "rect", x: 106, y: 35, w: 89, h: 35, style: { fill: PANEL, color: PANEL } },
+      H("custH", 110, 37, 82, "ČLEN"),
+      T("custN", 110, 42, 82, 5, "{partner.name}", { size: 10, bold: true, color: INK }),
+      T("custA", 110, 47, 82, 9, "{partner.address}", { size: 9, color: INK }),
+      T("custC", 110, 56, 82, 12, "{partner.email}\n{partner.phone}", { size: 9, color: INK }),
+      H("memH", 15, 76, 180, "ÚDAJE O ČLENSTVÍ"),
+      T("mem", 15, 81, 180, 24, "Tarif: {doc.tariff}\nOd {doc.startDate:date}, konec: {doc.endDate}\nČlenský poplatek: {doc.amount:money} {doc.currency} {doc.periodText}\nČíslo členské karty: {doc.cardNumber}", { size: 9.5, color: INK }),
+      { id: "payBox", type: "rect", x: 15, y: 106, w: 180, h: 13, style: { fill: PANEL, color: PANEL } },
+      T("pay", 19, 108, 172, 10, "Platba převodem: účet {company.bankAccount}, variabilní symbol {doc.vs}", { size: 9.5, bold: true, color: INK }),
+      H("formH", 15, 124, 180, "ÚDAJE ČLENA"),
+      T("form", 15, 129, 180, 50, "{doc.formText}", { size: 9, color: INK }),
+      H("termsH", 15, 182, 180, "SMLUVNÍ PODMÍNKY"),
+      T("terms", 15, 187, 180, 78, "{doc.terms}", { size: 7.5, color: INK }),
+      T("place", 15, 268, 90, 5, "Uzavřeno dne {doc.signedAt:date}", { size: 9, color: INK }),
+      { id: "sig1", type: "line", x: 15, y: 285, w: 70, h: 0, style: { color: MUTED } },
+      { id: "sig2", type: "line", x: 125, y: 285, w: 70, h: 0, style: { color: MUTED } },
+      T("sig1t", 15, 286, 70, 4, "za Společnost", { size: 7.5, align: "center", color: MUTED }),
+      T("sig2t", 125, 286, 70, 4, "Člen", { size: 7.5, align: "center", color: MUTED }),
+    ],
+  };
+}
+
+/** Smlouva v2 (11/2026, pevné rozvržení bez toku textu) — neupravené šablony se převedou. */
+function agreementLayoutV2(): PrintLayout {
+  const H = (id: string, x: number, y: number, w: number, text: string, color = MUTED) => T(id, x, y, w, 5, text, { size: 7, bold: true, color });
+  return {
+    paper: "a4",
+    fontSize: 9,
+    elements: [
+      { id: "band", type: "rect", x: 0, y: 0, w: 210, h: 3, style: { fill: ACCENT, color: ACCENT } },
+      { id: "logo", type: "image", x: 15, y: 11, w: 55, h: 20, field: "company.logo" },
+      T("title", 105, 12, 90, 5, "{doc.title}", { size: 8, bold: true, align: "right", color: MUTED }),
+      T("num", 105, 17, 90, 10, "{doc.number}", { size: 18, bold: true, align: "right", color: INK }),
+      H("supH", 15, 37, 85, "SPOLEČNOST"),
+      T("supN", 15, 42, 85, 5, "{company.name}", { size: 10, bold: true, color: INK }),
+      T("supA", 15, 47, 85, 9, "{company.address}", { size: 9, color: INK }),
+      T("supV", 15, 56, 85, 9, "IČO {company.regNo}\n{company.email}  {company.phone}", { size: 9, color: INK }),
+      { id: "custBox", type: "rect", x: 106, y: 35, w: 89, h: 35, style: { fill: PANEL, color: PANEL } },
+      H("custH", 110, 37, 82, "ČLEN"),
+      T("custN", 110, 42, 82, 5, "{partner.name}", { size: 10, bold: true, color: INK }),
+      T("custA", 110, 47, 82, 9, "{partner.address}", { size: 9, color: INK }),
+      T("custC", 110, 56, 82, 12, "{partner.email}\n{partner.phone}", { size: 9, color: INK }),
+      H("memH", 15, 76, 180, "ÚDAJE O ČLENSTVÍ"),
+      T("mem", 15, 81, 180, 24, "Tarif: {doc.tariff}\nOd {doc.startDate:date}, konec: {doc.endDate}\nČlenský poplatek: {doc.amount:money} {doc.currency} {doc.periodText}\nPočet karet: {doc.quantity}   Číslo členské karty: {doc.cardNumber}", { size: 9.5, color: INK }),
+      { id: "payBox", type: "rect", x: 15, y: 106, w: 180, h: 13, style: { fill: PANEL, color: PANEL } },
+      T("pay", 19, 108, 172, 10, "Platba převodem: účet {company.bankAccount}, variabilní symbol {doc.vs}", { size: 9.5, bold: true, color: INK }),
+      H("formH", 15, 124, 180, "ÚDAJE ČLENA"),
+      T("form", 15, 129, 180, 50, "{doc.formText}", { size: 9, color: INK }),
+      H("termsH", 15, 182, 180, "SMLUVNÍ PODMÍNKY"),
+      T("terms", 15, 187, 180, 78, "{doc.terms}", { size: 7.5, color: INK }),
+      T("place", 15, 268, 90, 5, "Uzavřeno dne {doc.signedAt:date}", { size: 9, color: INK }),
+      { id: "sig1", type: "line", x: 15, y: 285, w: 70, h: 0, style: { color: MUTED } },
+      { id: "sig2", type: "line", x: 125, y: 285, w: 70, h: 0, style: { color: MUTED } },
+      T("sig1t", 15, 286, 70, 4, "za Společnost", { size: 7.5, align: "center", color: MUTED }),
+      T("sig2t", 125, 286, 70, 4, "Člen", { size: 7.5, align: "center", color: MUTED }),
     ],
   };
 }
@@ -1196,6 +1271,7 @@ export const agreementPrintable: PrintableDef = {
   lineFields: [],
   dataset: agreementDataset,
   defaultLayout: agreementLayout,
+  legacyLayouts: [agreementLayoutV1(), agreementLayoutV2()],
 };
 
 // ---------------------------------------------------------------------------

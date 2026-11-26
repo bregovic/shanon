@@ -345,6 +345,7 @@ model SysCompany {
   glJournalName_company            GlJournalName[]            @relation("GlJournalName_company")
   glJournal_company                GlJournal[]                @relation("GlJournal_company")
   glJournalLine_company            GlJournalLine[]            @relation("GlJournalLine_company")
+  glJournalSettlement_company      GlJournalSettlement[]      @relation("GlJournalSettlement_company")
   taxCode_company                  TaxCode[]                  @relation("TaxCode_company")
   taxGroup_company                 TaxGroup[]                 @relation("TaxGroup_company")
   taxItemGroup_company             TaxItemGroup[]             @relation("TaxItemGroup_company")
@@ -1479,17 +1480,18 @@ model GlJournal {
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
   updatedBy           String?  @map("updated_by") @db.Uuid
 
-  company                   SysCompany          @relation("GlJournal_company", fields: [companyId], references: [id], onDelete: Restrict)
-  journalName               GlJournalName?      @relation("GlJournal_journalName", fields: [journalNameId], references: [id], onDelete: Restrict)
-  voucher                   GlVoucher?          @relation("GlJournal_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
-  offsetAccount             GlAccount?          @relation("GlJournal_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
-  offsetCustomer            ArCustomer?         @relation("GlJournal_offsetCustomer", fields: [offsetCustomerId], references: [id], onDelete: Restrict)
-  offsetVendor              ApVendor?           @relation("GlJournal_offsetVendor", fields: [offsetVendorId], references: [id], onDelete: Restrict)
-  offsetBankAccount         BankAccount?        @relation("GlJournal_offsetBankAccount", fields: [offsetBankAccountId], references: [id], onDelete: Restrict)
-  offsetCashDesk            CashDesk?           @relation("GlJournal_offsetCashDesk", fields: [offsetCashDeskId], references: [id], onDelete: Restrict)
-  glJournalLine_journal     GlJournalLine[]     @relation("GlJournalLine_journal")
-  bankStatement_journal     BankStatement[]     @relation("BankStatement_journal")
-  bankStatementLine_journal BankStatementLine[] @relation("BankStatementLine_journal")
+  company                     SysCompany            @relation("GlJournal_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journalName                 GlJournalName?        @relation("GlJournal_journalName", fields: [journalNameId], references: [id], onDelete: Restrict)
+  voucher                     GlVoucher?            @relation("GlJournal_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  offsetAccount               GlAccount?            @relation("GlJournal_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
+  offsetCustomer              ArCustomer?           @relation("GlJournal_offsetCustomer", fields: [offsetCustomerId], references: [id], onDelete: Restrict)
+  offsetVendor                ApVendor?             @relation("GlJournal_offsetVendor", fields: [offsetVendorId], references: [id], onDelete: Restrict)
+  offsetBankAccount           BankAccount?          @relation("GlJournal_offsetBankAccount", fields: [offsetBankAccountId], references: [id], onDelete: Restrict)
+  offsetCashDesk              CashDesk?             @relation("GlJournal_offsetCashDesk", fields: [offsetCashDeskId], references: [id], onDelete: Restrict)
+  glJournalLine_journal       GlJournalLine[]       @relation("GlJournalLine_journal")
+  glJournalSettlement_journal GlJournalSettlement[] @relation("GlJournalSettlement_journal")
+  bankStatement_journal       BankStatement[]       @relation("BankStatement_journal")
+  bankStatementLine_journal   BankStatementLine[]   @relation("BankStatementLine_journal")
 
   @@index([tenantId, companyId])
   @@index([journalNameId])
@@ -1527,6 +1529,7 @@ model GlJournalLine {
   offsetBankAccountId String?   @map("offset_bank_account_id") @db.Uuid
   offsetCashDeskId    String?   @map("offset_cash_desk_id") @db.Uuid
   vs                  String?   @db.VarChar(10)
+  settleStatus        String?   @default("none") @map("settle_status") @db.VarChar(40)
   dim1                String?   @db.VarChar(20)
   dim2                String?   @db.VarChar(20)
   dim3                String?   @db.VarChar(20)
@@ -1553,22 +1556,23 @@ model GlJournalLine {
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy           String?   @map("updated_by") @db.Uuid
 
-  company           SysCompany    @relation("GlJournalLine_company", fields: [companyId], references: [id], onDelete: Restrict)
-  journal           GlJournal     @relation("GlJournalLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
-  account           GlAccount?    @relation("GlJournalLine_account", fields: [accountId], references: [id], onDelete: Restrict)
-  customer          ArCustomer?   @relation("GlJournalLine_customer", fields: [customerId], references: [id], onDelete: Restrict)
-  vendor            ApVendor?     @relation("GlJournalLine_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
-  bankAccount       BankAccount?  @relation("GlJournalLine_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
-  cashDesk          CashDesk?     @relation("GlJournalLine_cashDesk", fields: [cashDeskId], references: [id], onDelete: Restrict)
-  offsetAccount     GlAccount?    @relation("GlJournalLine_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
-  offsetCustomer    ArCustomer?   @relation("GlJournalLine_offsetCustomer", fields: [offsetCustomerId], references: [id], onDelete: Restrict)
-  offsetVendor      ApVendor?     @relation("GlJournalLine_offsetVendor", fields: [offsetVendorId], references: [id], onDelete: Restrict)
-  offsetBankAccount BankAccount?  @relation("GlJournalLine_offsetBankAccount", fields: [offsetBankAccountId], references: [id], onDelete: Restrict)
-  offsetCashDesk    CashDesk?     @relation("GlJournalLine_offsetCashDesk", fields: [offsetCashDeskId], references: [id], onDelete: Restrict)
-  currency          SysCurrency?  @relation("GlJournalLine_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  taxCode           TaxCode?      @relation("GlJournalLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  taxGroup          TaxGroup?     @relation("GlJournalLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
-  itemTaxGroup      TaxItemGroup? @relation("GlJournalLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  company                         SysCompany            @relation("GlJournalLine_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journal                         GlJournal             @relation("GlJournalLine_journal", fields: [journalId], references: [id], onDelete: Restrict)
+  account                         GlAccount?            @relation("GlJournalLine_account", fields: [accountId], references: [id], onDelete: Restrict)
+  customer                        ArCustomer?           @relation("GlJournalLine_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  vendor                          ApVendor?             @relation("GlJournalLine_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  bankAccount                     BankAccount?          @relation("GlJournalLine_bankAccount", fields: [bankAccountId], references: [id], onDelete: Restrict)
+  cashDesk                        CashDesk?             @relation("GlJournalLine_cashDesk", fields: [cashDeskId], references: [id], onDelete: Restrict)
+  offsetAccount                   GlAccount?            @relation("GlJournalLine_offsetAccount", fields: [offsetAccountId], references: [id], onDelete: Restrict)
+  offsetCustomer                  ArCustomer?           @relation("GlJournalLine_offsetCustomer", fields: [offsetCustomerId], references: [id], onDelete: Restrict)
+  offsetVendor                    ApVendor?             @relation("GlJournalLine_offsetVendor", fields: [offsetVendorId], references: [id], onDelete: Restrict)
+  offsetBankAccount               BankAccount?          @relation("GlJournalLine_offsetBankAccount", fields: [offsetBankAccountId], references: [id], onDelete: Restrict)
+  offsetCashDesk                  CashDesk?             @relation("GlJournalLine_offsetCashDesk", fields: [offsetCashDeskId], references: [id], onDelete: Restrict)
+  currency                        SysCurrency?          @relation("GlJournalLine_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxCode                         TaxCode?              @relation("GlJournalLine_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  taxGroup                        TaxGroup?             @relation("GlJournalLine_taxGroup", fields: [taxGroupId], references: [id], onDelete: Restrict)
+  itemTaxGroup                    TaxItemGroup?         @relation("GlJournalLine_itemTaxGroup", fields: [itemTaxGroupId], references: [id], onDelete: Restrict)
+  glJournalSettlement_journalLine GlJournalSettlement[] @relation("GlJournalSettlement_journalLine")
 
   @@index([tenantId, companyId])
   @@index([journalId])
@@ -1587,6 +1591,40 @@ model GlJournalLine {
   @@index([taxGroupId])
   @@index([itemTaxGroupId])
   @@map("gl_journal_line")
+}
+
+/// gl.journalSettlement — generováno z definice objektu
+model GlJournalSettlement {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  journalId       String   @map("journal_id") @db.Uuid
+  journalLineId   String   @map("journal_line_id") @db.Uuid
+  partnerType     String   @map("partner_type") @db.VarChar(40)
+  customerTransId String?  @map("customer_trans_id") @db.Uuid
+  vendorTransId   String?  @map("vendor_trans_id") @db.Uuid
+  amount          Decimal  @db.Decimal(18, 2)
+  ext             Json     @default("{}")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  company       SysCompany    @relation("GlJournalSettlement_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journal       GlJournal     @relation("GlJournalSettlement_journal", fields: [journalId], references: [id], onDelete: Restrict)
+  journalLine   GlJournalLine @relation("GlJournalSettlement_journalLine", fields: [journalLineId], references: [id], onDelete: Restrict)
+  customerTrans ArTrans?      @relation("GlJournalSettlement_customerTrans", fields: [customerTransId], references: [id], onDelete: Restrict)
+  vendorTrans   ApTrans?      @relation("GlJournalSettlement_vendorTrans", fields: [vendorTransId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([journalId])
+  @@index([journalLineId])
+  @@index([customerTransId])
+  @@index([vendorTransId])
+  @@index([tenantId, companyId, journalId])
+  @@index([tenantId, companyId, journalLineId])
+  @@map("gl_journal_settlement")
 }
 
 /// tax.taxCode — generováno z definice objektu
@@ -2702,14 +2740,15 @@ model ArTrans {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy   String?   @map("updated_by") @db.Uuid
 
-  company                         SysCompany          @relation("ArTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
-  customer                        ArCustomer          @relation("ArTrans_customer", fields: [customerId], references: [id], onDelete: Restrict)
-  invoice                         ArInvoice?          @relation("ArTrans_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
-  advance                         ArAdvance?          @relation("ArTrans_advance", fields: [advanceId], references: [id], onDelete: Restrict)
-  voucher                         GlVoucher?          @relation("ArTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
-  currency                        SysCurrency?        @relation("ArTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  account                         GlAccount?          @relation("ArTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
-  bankStatementLine_customerTrans BankStatementLine[] @relation("BankStatementLine_customerTrans")
+  company                           SysCompany            @relation("ArTrans_company", fields: [companyId], references: [id], onDelete: Restrict)
+  customer                          ArCustomer            @relation("ArTrans_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  invoice                           ArInvoice?            @relation("ArTrans_invoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  advance                           ArAdvance?            @relation("ArTrans_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  voucher                           GlVoucher?            @relation("ArTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
+  currency                          SysCurrency?          @relation("ArTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  account                           GlAccount?            @relation("ArTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
+  glJournalSettlement_customerTrans GlJournalSettlement[] @relation("GlJournalSettlement_customerTrans")
+  bankStatementLine_customerTrans   BankStatementLine[]   @relation("BankStatementLine_customerTrans")
 
   @@index([tenantId, companyId])
   @@index([customerId])
@@ -3318,6 +3357,7 @@ model ApTrans {
   voucher                          GlVoucher?             @relation("ApTrans_voucher", fields: [voucherId], references: [id], onDelete: Restrict)
   currency                         SysCurrency?           @relation("ApTrans_currency", fields: [currencyId], references: [id], onDelete: Restrict)
   account                          GlAccount?             @relation("ApTrans_account", fields: [accountId], references: [id], onDelete: Restrict)
+  glJournalSettlement_vendorTrans  GlJournalSettlement[]  @relation("GlJournalSettlement_vendorTrans")
   bankStatementLine_vendorTrans    BankStatementLine[]    @relation("BankStatementLine_vendorTrans")
   bankPaymentOrderLine_vendorTrans BankPaymentOrderLine[] @relation("BankPaymentOrderLine_vendorTrans")
 

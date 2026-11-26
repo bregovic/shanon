@@ -7,12 +7,12 @@
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-import { PAPERS, flowGroups, textHeading, valueAt, type PrintData, type PrintElement, type PrintLayout } from "@/core/print";
+import { PAPERS, flowGroups, textBlocks, valueAt, type PrintData, type PrintElement, type PrintLayout } from "@/core/print";
 import { fillText, formatValue } from "@/lib/print-render";
 
 const MM = 72 / 25.4;
 const FONT_DIR = join(process.cwd(), "node_modules", "dejavu-fonts-ttf", "ttf");
-const MARGIN = 12; // mm nahoře a dole na pokračovacích stránkách
+const MARGIN = 15; // mm nahoře a dole na pokračovacích stránkách (tiskárny netisknou ~5 mm u okraje)
 const LINE = 1.25;
 
 type Doc = InstanceType<typeof PDFDocument>;
@@ -275,33 +275,54 @@ function drawFlowing(doc: Doc, layout: PrintLayout, data: PrintData, locale: str
   }
 }
 
-/** Odstavce tekoucího textu od `y0` (pt); dlouhý odstavec se rozdělí mezi stránky. Vrací y pod textem (pt). */
+/** Odstavce tekoucího textu prvku sestavy od `y0` (pt) – stejná sazba jako samostatné podmínky (`drawRichText`). */
 function drawParagraphs(doc: Doc, el: PrintElement, data: PrintData, locale: string, fs: number, y0: number, bottom: number, newPage: () => number): number {
-  const size = el.style?.size ?? fs;
-  const x = el.x * MM;
-  const w = el.w * MM;
-  const ink = color(el.style?.color);
-  let y = y0;
-  const txt = fillText(el.text ?? "", data, locale).replace(/\r/g, "");
-  for (const raw of txt.split("\n")) {
-    const line = raw.trim();
-    if (!line) {
-      y += size * 0.5;
-      continue;
-    }
-    const kind = textHeading(line);
-    const fsz = kind === "h" ? size + 1.5 : size;
-    doc.font(kind ? "B" : "R").fontSize(fsz);
-    const opts = { width: w, align: kind ? "left" : "justify", lineGap: fsz * (LINE - 1.15) } as const;
+  return drawRichText(doc, fillText(el.text ?? "", data, locale), { x: el.x * MM, w: el.w * MM, size: el.style?.size ?? fs, color: color(el.style?.color), y0, bottom, newPage });
+}
+
+/**
+ * Sazba textu podmínek (`textBlocks`): nadpisy podle úrovně (nezůstanou samy dole na stránce), bod s předsazeným
+ * číslem, odstavec uvnitř bodu odsazený, mezery mezi body, do bloku (řádky s adresou webu vlevo); odstavec se
+ * dělí mezi stránky tak, aby na žádné nezůstal jediný řádek. Vrací y pod textem (pt).
+ */
+export function drawRichText(doc: Doc, text: string, o: { x: number; w: number; size: number; color?: string; y0: number; bottom: number; newPage: () => number }): number {
+  const { x, w, size } = o;
+  const ink = o.color ?? "#1f2a37";
+  const indent = size * 3.2;
+  let y = o.y0;
+  const top = o.y0;
+  const lineH = (f: number) => {
+    doc.font("R").fontSize(f);
+    return doc.heightOfString("Xg", { width: w });
+  };
+  for (const [bi, b] of textBlocks(text).entries()) {
+    const head = b.kind === "title" || b.kind === "h" || b.kind === "sub";
+    const fsz = b.kind === "title" ? size + 3 : b.kind === "h" ? size + 1.5 : size;
+    const before = b.kind === "title" ? size * 1.4 : b.kind === "h" ? size * 1.0 : b.kind === "sub" ? size * 0.6 : b.kind === "point" || b.gap ? size * 0.4 : b.kind === "bullet" ? size * 0.1 : size * 0.25;
+    if (bi > 0 && y > top + 1) y += before;
+    const tx = b.kind === "point" || b.kind === "cont" ? x + indent : b.kind === "bullet" ? x + indent + size * 1.2 : x;
+    const tw = w - (tx - x);
+    const font = head ? "B" : "R";
+    const opts = { width: tw, align: head || /https?:\/\/|www\./.test(b.text) ? "left" : "justify", lineGap: fsz * (LINE - 1.15) } as const;
+    doc.font(font).fontSize(fsz);
+    const lh = lineH(fsz);
     // nadpis s aspoň třemi řádky textu pod sebou
-    if (kind === "h" && y + doc.heightOfString(line, opts) + size * 4 > bottom) y = newPage();
-    if (kind === "h" && y > y0 + 1) y += size * 0.6;
-    let rest = line;
+    if (head && y + doc.heightOfString(b.text, opts) + lh * 3 > o.bottom) y = o.newPage();
+    // na konci stránky aspoň dva řádky odstavce, jinak celý na další
+    const full = doc.heightOfString(b.text, opts);
+    if (!head && y + full > o.bottom && y + lh * 2 > o.bottom) y = o.newPage();
+    const mark = (yy: number) => {
+      if (b.kind === "point") doc.font("R").fontSize(fsz).fillColor(ink).text(b.num ?? "", x, yy, { width: indent - 2, lineBreak: false });
+      if (b.kind === "bullet") doc.font("R").fontSize(fsz).fillColor(ink).text("–", x + indent, yy, { width: size, lineBreak: false });
+    };
+    let rest = b.text;
+    let first = true;
     while (rest) {
-      doc.font(kind ? "B" : "R").fontSize(fsz);
+      doc.font(font).fontSize(fsz);
       const h = doc.heightOfString(rest, opts);
-      if (y + h <= bottom) {
-        doc.fillColor(ink).text(rest, x, y, opts);
+      if (y + h <= o.bottom) {
+        if (first) mark(y);
+        doc.font(font).fontSize(fsz).fillColor(ink).text(rest, tx, y, opts);
         y += h;
         break;
       }
@@ -310,14 +331,19 @@ function drawParagraphs(doc: Doc, el: PrintElement, data: PrintData, locale: str
       let hi = words.length;
       while (lo < hi) {
         const mid = Math.ceil((lo + hi) / 2);
-        if (y + doc.heightOfString(words.slice(0, mid).join(" "), opts) <= bottom) lo = mid;
+        if (y + doc.heightOfString(words.slice(0, mid).join(" "), opts) <= o.bottom) lo = mid;
         else hi = mid - 1;
       }
-      if (lo > 0) doc.fillColor(ink).text(words.slice(0, lo).join(" "), x, y, { ...opts, align: "left" });
+      // na další stránku aspoň dva řádky (bez „vdovy“)
+      while (lo > 0 && doc.heightOfString(words.slice(lo).join(" "), opts) < lh * 1.9) lo = Math.max(0, lo - 4);
+      if (lo > 0) {
+        if (first) mark(y);
+        doc.font(font).fontSize(fsz).fillColor(ink).text(words.slice(0, lo).join(" "), tx, y, { ...opts, align: "justify" });
+        first = false;
+      }
       rest = words.slice(lo).join(" ");
-      y = newPage();
+      y = o.newPage();
     }
-    y += kind === "h" ? size * 0.35 : size * 0.3;
   }
   return y;
 }
@@ -333,21 +359,14 @@ export async function renderTextPdf(title: string, text: string): Promise<Buffer
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
   const done = new Promise<Buffer>((res) => doc.on("end", () => res(Buffer.concat(chunks))));
-  if (title) doc.font("B").fontSize(14).fillColor("#1f2a37").text(title).moveDown(0.6);
-  for (const raw of String(text).replace(/\r/g, "").split("\n")) {
-    const line = raw.trim();
-    if (!line) {
-      doc.moveDown(0.4);
-      continue;
-    }
-    const kind = textHeading(line);
-    const heading = kind === "h";
-    if (heading && doc.y > 80) doc.moveDown(0.5);
-    // nadpis nezůstane sám dole na stránce
-    if (heading && doc.y + 60 > doc.page.height - 56) doc.addPage();
-    doc.font(kind ? "B" : "R").fontSize(heading ? 10.5 : 9).fillColor("#1f2a37").text(line, 56, doc.y, { width: doc.page.width - 112, align: kind ? "left" : "justify", paragraphGap: heading ? 3 : 2 });
-    if (heading) doc.moveDown(0.2);
+  const W = doc.page.width;
+  const H = doc.page.height;
+  let y = 56;
+  if (title) {
+    doc.font("B").fontSize(14).fillColor("#1f2a37").text(title, 56, y, { width: W - 112 });
+    y = doc.y + 10;
   }
+  drawRichText(doc, text, { x: 56, w: W - 112, size: 9, y0: y, bottom: H - 56, newPage: () => (doc.addPage(), 56) });
   doc.end();
   return done;
 }

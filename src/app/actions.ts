@@ -1,5 +1,7 @@
 "use server";
 
+import { settleSave, settleView, type SettleView } from "@/server/journal-settle";
+import type { SettleCriteria } from "@/modules/gl/settlement";
 import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
@@ -1470,6 +1472,27 @@ export async function stationSetupAction(stationId?: string | null): Promise<Act
   try {
     if (!s.ctx.modules.has("int") || !can(s.ctx.perms, "int.device", "write")) throw new UserError("@SYS:NoAccess");
     return { ok: true, data: await stationSetup(s.ctx, stationId && /^[0-9a-f-]{36}$/.test(stationId) ? stationId : null) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Deník → Vyrovnat: otevřené položky salda k řádku (podle kritérií). */
+export async function settleViewAction(lineId: string, criteria: SettleCriteria): Promise<ActionResult<SettleView>> {
+  const s = await requireSession();
+  try {
+    return { ok: true, data: await settleView(s.ctx, lineId, criteria ?? {}, s.lang) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Deník → Vyrovnat → Uložit: vybrané položky a částky (prázdný seznam = zrušit vyrovnání). */
+export async function settleSaveAction(lineId: string, items: { kind: "customer" | "vendor"; transId: string; amount: string }[]): Promise<ActionResult<null>> {
+  const s = await requireSession();
+  try {
+    await settleSave(s.ctx, lineId, Array.isArray(items) ? items.slice(0, 200) : []);
+    return { ok: true, data: null };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

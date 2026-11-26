@@ -7,7 +7,7 @@
  * se posunou o skutečnou výšku tabulky.
  */
 import QRCode from "qrcode";
-import { PAPERS, flowGroups, textHeading, valueAt, type PrintColumn, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
+import { PAPERS, flowGroups, textBlocks, valueAt, type PrintColumn, type PrintData, type PrintElement, type PrintLayout, type ValueFormat } from "@/core/print";
 
 export function formatValue(v: unknown, f: ValueFormat | undefined, locale: string): string {
   if (v === null || v === undefined || v === "") return "";
@@ -257,16 +257,22 @@ function FlowingDocument({ layout, data, locale }: { layout: PrintLayout; data: 
     }
     flush(el.y, `s-${el.id}`);
     const size = el.style.size ?? fs;
-    const lines = fillText(el.text ?? "", data, locale).replace(/\r/g, "").split("\n");
+    const blocks = textBlocks(fillText(el.text ?? "", data, locale));
+    const ind = size * 3.2;
     out.push(
       <div key={el.id} style={{ marginLeft: `${el.x}mm`, width: `${el.w}mm`, fontSize: pt(size), color: el.style.color, lineHeight: 1.25 }}>
-        {lines.map((raw, i) => {
-          const line = raw.trim();
-          if (!line) return <div key={i} style={{ height: pt(size * 0.5) }} />;
-          const kind = textHeading(line);
+        {blocks.map((b, i) => {
+          const head = b.kind === "title" || b.kind === "h" || b.kind === "sub";
+          const left = b.kind === "point" || b.kind === "cont" ? ind : b.kind === "bullet" ? ind + size * 1.2 : 0;
+          const gap = !i ? 0 : b.kind === "title" ? size * 1.4 : b.kind === "h" ? size : b.kind === "sub" ? size * 0.6 : b.kind === "point" || b.gap ? size * 0.4 : size * 0.25;
           return (
-            <div key={i} style={{ fontWeight: kind ? 700 : 400, fontSize: kind === "h" ? pt(size + 1.5) : undefined, textAlign: kind ? "left" : "justify", marginTop: kind === "h" && i ? pt(size * 0.6) : undefined, marginBottom: pt(size * 0.3), breakAfter: kind ? "avoid" : undefined }}>
-              {line}
+            <div
+              key={i}
+              style={{ position: "relative", paddingLeft: pt(left), marginTop: pt(gap), fontWeight: head ? 700 : 400, fontSize: b.kind === "title" ? pt(size + 3) : b.kind === "h" ? pt(size + 1.5) : undefined, textAlign: head || /https?:\/\//.test(b.text) ? "left" : "justify", breakAfter: head ? "avoid" : undefined, breakInside: "avoid" }}
+            >
+              {b.kind === "point" && <span style={{ position: "absolute", left: 0 }}>{b.num}</span>}
+              {b.kind === "bullet" && <span style={{ position: "absolute", left: pt(ind) }}>–</span>}
+              {b.text}
             </div>
           );
         })}

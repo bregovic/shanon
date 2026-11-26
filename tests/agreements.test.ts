@@ -125,7 +125,12 @@ describe("prodejní smlouva", () => {
     await deleteRecord(T, "ar.order", String(bb.orderId), client); // s ní i nezaplacená záloha
     expect(await getRecord(T, "ar.advance", advId, client)).toBeNull();
     await runAction(T, "ar.agreement", String(b.id), "requestPayment", client);
-    await deleteRecord(T, "ar.agreement", String(b.id), client); // i s objednávkou a zálohou
+    // smlouva s objednávkou / zálohou: nejdřív smazat je (stornovaná objednávka jde smazat), pak smlouvu
+    await expect(deleteRecord(T, "ar.agreement", String(b.id), client)).rejects.toMatchObject({ label: "@TAX:AgrDeleteDocsFirst" });
+    bb = (await getRecord(T, "ar.agreement", String(b.id), client))!;
+    await runAction(T, "ar.order", String(bb.orderId), "cancel", client).catch(() => undefined);
+    await deleteRecord(T, "ar.order", String(bb.orderId), client);
+    await deleteRecord(T, "ar.agreement", String(b.id), client);
     expect(await getRecord(T, "ar.agreement", String(b.id), client)).toBeNull();
     expect((await listRecords(T, "ar.order", { filter: { agreementId: b.id } }, client)).total).toBe(0);
     // smlouva s fakturami ani zaplacená záloha smazat nejde

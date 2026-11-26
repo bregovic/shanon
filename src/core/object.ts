@@ -136,6 +136,8 @@ export interface ObjectDef {
     field: string;
     label: LabelRef;
     owned?: boolean;
+    /** tlačítko Vyrovnat u vybraného řádku (deník: otevřené položky salda, `gl/settlement.ts`) */
+    settle?: boolean;
     /** přehled (`owned: false`), ze kterého jde vybrané záznamy smazat (výpisy u bankovního účtu); pravidla mazání má objekt řádků */
     deletable?: boolean;
     copy?: boolean;

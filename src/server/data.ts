@@ -204,7 +204,7 @@ function serialize(def: ObjectDef, row: RecordData): RecordData {
 /** prosté hodnoty → Prisma */
 const RANGE_OPS = ["gt", "gte", "lt", "lte"] as const;
 
-function toDb(def: ObjectDef, data: RecordData): RecordData {
+function toDb(def: ObjectDef, data: RecordData, where = false): RecordData {
   const out: RecordData = {};
   for (const [name, f] of Object.entries(def.fields)) {
     if (!(name in data)) continue;
@@ -218,6 +218,13 @@ function toDb(def: ObjectDef, data: RecordData): RecordData {
       if (Array.isArray(list)) r.in = list.map(conv);
       out[name] = r;
     } else out[name] = conv(v);
+  }
+  // id: jeden záznam nebo { in: [...] } (DataApi.find) – dřív se tiše vynechalo a find vrátil vše
+  if (where && "id" in data && !("id" in def.fields)) {
+    const v = data.id;
+    const list = v !== null && typeof v === "object" && !Array.isArray(v) ? (v as RecordData).in : undefined;
+    if (Array.isArray(list)) out.id = { in: list.map(String) };
+    else if (typeof v === "string") out.id = v;
   }
   return out;
 }
@@ -443,7 +450,7 @@ export class Session {
 
   private async findRaw(def: ObjectDef, where: RecordData, take: number, orderBy?: Record<string, "asc" | "desc">): Promise<RecordData[]> {
     const rows = await delegate(this.tx, def).findMany({
-      where: { ...toDb(def, where), ...scopeWhere(this.ctx, def) },
+      where: { ...toDb(def, where, true), ...scopeWhere(this.ctx, def) },
       // řazení podle polí objektu i podle času založení / změny
       orderBy: [...Object.entries(orderBy ?? {}).filter(([f]) => f in def.fields || f === "createdAt" || f === "updatedAt").map(([f, d]) => ({ [f]: d })), { createdAt: "asc" }, { id: "asc" }],
       take,

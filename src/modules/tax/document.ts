@@ -42,6 +42,8 @@ export interface InvoiceConfig {
   side: 1 | -1;
   /** stavy hlavičky, ve kterých se řádky nemění (výchozí: zaúčtováno) */
   lockedStatuses?: string[];
+  /** stavy, ve kterých nejdou mazat řádky (výchozí = lockedStatuses); stornovaná objednávka jde smazat celá */
+  deleteLockedStatuses?: string[];
   /** parametry pomocné knihy (kontrola čísla faktury, výchozí účtovací profily) */
   parameters?: string;
   /** řádky účtovacích profilů (účet salda podle partnera / skupiny / všech) */
@@ -350,7 +352,7 @@ export function documentLineHandlers(cfg: InvoiceConfig): Record<string, ObjectH
         await recalcHeader(ctx.data, cfg, String(data[cfg.lineHeaderField]));
       },
       beforeDelete: async (ctx, data) => {
-        await assertDraft(ctx.data, cfg, data[cfg.lineHeaderField]);
+        await assertDraft(ctx.data, cfg.deleteLockedStatuses ? { ...cfg, lockedStatuses: cfg.deleteLockedStatuses } : cfg, data[cfg.lineHeaderField]);
       },
       async afterDelete(ctx, data) {
         await recalcHeader(ctx.data, cfg, String(data[cfg.lineHeaderField]));

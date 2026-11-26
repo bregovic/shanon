@@ -13,6 +13,7 @@ import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { allocateVoucher, checkText, convertLines, postVoucher, resolveJournalName, type PostingLine } from "./posting";
 import { dimsOf, offsetDimsOf } from "./dimensions";
+import { applySettlements, checkSettlements, linePartner, settlementsOf } from "./settlement";
 
 const zero = BigInt(0);
 
@@ -97,8 +98,11 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
   const errors: { ref: string; params?: Record<string, string>; prefix?: string }[] = [];
   if (!lines.length) errors.push({ ref: "@GL:JournalEmpty" });
   const legsByLine: Leg[][] = [];
+  // vyrovnání řádků s otevřenými položkami salda (dialog Vyrovnat) – jednou za deník
+  const settles = await settlementsOf(data, String(journal.id));
   for (const [i, l] of lines.entries()) {
     const n = Number(l.lineNum ?? i + 1);
+    errors.push(...(await checkSettlements(data, l, settles.get(String(l.id)) ?? [], n)));
     const debit = toCents(l.debit ?? 0);
     const credit = toCents(l.credit ?? 0);
     if (debit !== zero && credit !== zero) errors.push({ ref: "@GL:LineBothSides", params: { line: String(n) } });
@@ -250,7 +254,7 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
     if (diff !== zero) errors.push({ ref: "@GL:NotBalanced", params: { diff: fromCents(diff) }, prefix: label });
     if (new Set(g.legs.map((x) => dateOf(x.line))).size > 1) errors.push({ ref: "@GL:VoucherDates", params: { voucher: label } });
   }
-  return { jn, groups, errors, lines };
+  return { jn, groups, errors, lines, settles };
 }
 
 function postingLines(g: Group): PostingLine[] {
@@ -346,7 +350,7 @@ export async function runJournal(ctx: EventContext, journal: RecordData, dryRun:
     for (const l of new Map(g.legs.map((x) => [String(x.line.id), x.line])).values())
       if (l.voucherNum !== voucher.voucherNum) await data.update("gl.journalLine", String(l.id), { voucherNum: voucher.voucherNum });
     // saldo odběratelů a dodavatelů
-    for (const [i, x] of g.legs.entries()) if (x.partner) await partnerTrans(data, x, lines[i], voucher);
+    for (const [i, x] of g.legs.entries()) if (x.partner) await partnerTrans(data, x, lines[i], voucher, plan.settles.get(String(x.line.id)) ?? []);
     // daňové transakce (modul DPH): partner dokladu pro KH
     const partnerLeg = g.legs.find((x) => x.partner);
     const subject = partnerLeg?.partner?.rec.subjectId ? await data.get("gab.subject", String(partnerLeg.partner.rec.subjectId)) : null;
@@ -376,7 +380,7 @@ function translateParams(ctx: EventContext, p?: Record<string, string>) {
  * Zápis do salda: odběratel MD = pohledávka (faktura), D = úhrada; dodavatel
  * D = závazek, MD = úhrada. Úhrada s VS se spáruje s otevřenou fakturou partnera.
  */
-async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher: RecordData) {
+async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher: RecordData, settles: RecordData[]) {
   const p = x.partner!;
   const obj = p.kind === "customer" ? "ar.trans" : "ap.trans";
   const field = p.kind === "customer" ? "customerId" : "vendorId";
@@ -385,7 +389,11 @@ async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher:
   const cur = posted.amountCur ? toCents(posted.amountCur) * sign : acc;
   const vs = (x.line.vs as string) || null;
   const isPayment = acc < zero;
-  if (isPayment && vs) {
+  // vyrovnání z dialogu: přesně vybrané doklady a částky (jen strana řádku s partnerem vyrovnání)
+  const lp = linePartner(x.line);
+  const own = settles.length && lp && lp.kind === p.kind && lp.id === String(p.rec.id) ? settles : [];
+  if (own.length) await applySettlements(data, p.kind, own);
+  else if (isPayment && vs) {
     const [inv] = (await data.find(obj, { [field]: p.rec.id, kind: "invoice", vs, closed: false }, { take: 1 })) as RecordData[];
     if (inv) {
       const paid = toCents(inv.paidAmount ?? 0) - cur;
@@ -404,8 +412,9 @@ async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher:
     currencyId: posted.currencyId ?? null,
     amount: fromCents(acc),
     amountCur: fromCents(cur),
-    paidAmount: "0",
-    closed: isPayment,
+    // vrácení / zápočet vyrovnaný v dialogu je spotřebovaný celý
+    paidAmount: own.length && !isPayment ? fromCents(cur) : "0",
+    closed: isPayment || own.length > 0,
   });
 }
 

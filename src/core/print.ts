@@ -257,11 +257,61 @@ export function spayd(p: { iban: string; amount: string | number; currency?: str
   return parts.join("*");
 }
 
-/** Nadpis v textu podmínek: „1. ÚVODNÍ USTANOVENÍ“, řádek velkými písmeny; podnadpis = krátký řádek s dvojtečkou. */
-export function textHeading(line: string): "h" | "sub" | null {
+/**
+ * Rozbor textu podmínek na bloky pro sazbu (PDF smlouvy, samostatné podmínky, náhled):
+ * title = nadpis části (velkými písmeny bez čísla), h = kapitola „1. NÁZEV“, sub = mezititulek (krátký řádek
+ * s dvojtečkou nebo bez tečky před bodem), point = bod „1.1.“ (číslo předsazené), cont = odstavec uvnitř bodu,
+ * bullet = odrážka, p = odstavec. Pevné mezery: „čl. 2.10“, „č. 480/2004 Sb.“, „500 Kč“ se nezalomí.
+ */
+export type TextBlock = { kind: "title" | "h" | "sub" | "point" | "cont" | "bullet" | "p"; text: string; num?: string; gap: boolean };
+
+const NBSP = "\u00a0";
+export function nbsp(t: string): string {
+  return t
+    .replace(/(?<!\p{L})(čl|č|odst|písm|bod|Sb|tj|např|resp)\.\s+(?=[\d\p{L}(])/giu, (m, w) => `${w}.${NBSP}`)
+    .replace(/(\d)\s+(Kč|EUR|€|%|Sb\.|let|dní|dnů|měsíc\w*)/gu, `$1${NBSP}$2`)
+    .replace(/\s+([-–])\s+(?=\d)/g, `${NBSP}$1 `);
+}
+
+export function textHeading(line: string): "title" | "h" | "sub" | null {
   // „Údaj: hodnota“ (vyplněný formulář) nadpis není, i když je velkými písmeny (PSČ: 11000)
   if (/:\s*\S/.test(line)) return null;
-  if (/^\d+\.\s+\p{Lu}[\p{Lu}\s,.–-]{3,}$/u.test(line) || (line.length < 90 && line === line.toUpperCase() && /\p{Lu}{3}/u.test(line))) return "h";
+  if (/^\d+\.\s+\p{Lu}[\p{Lu}\s,.–-]{3,}$/u.test(line)) return "h";
+  if (line.length < 90 && line === line.toUpperCase() && /\p{Lu}{3}/u.test(line)) return /^\d/.test(line) ? "h" : "title";
   if (line.length < 70 && /:$/.test(line)) return "sub";
   return null;
+}
+
+export function textBlocks(text: string): TextBlock[] {
+  const raw = String(text ?? "").replace(/\r/g, "").split("\n").map((l) => l.trim());
+  const out: TextBlock[] = [];
+  let gap = false;
+  let inPoint = false;
+  for (let i = 0; i < raw.length; i++) {
+    const line = raw[i];
+    if (!line) {
+      gap = true;
+      continue;
+    }
+    const next = raw.slice(i + 1).find((x) => x) ?? "";
+    let kind: TextBlock["kind"] | null = textHeading(line);
+    // mezititulek bez dvojtečky: krátký řádek bez koncové tečky, za ním bod
+    if (!kind && line.length < 60 && !/[.;,:!?]$/.test(line) && /^\p{Lu}/u.test(line) && /^\d+\.\d+/.test(next)) kind = "sub";
+    if (kind) {
+      inPoint = false;
+      out.push({ kind, text: nbsp(line), gap });
+      gap = false;
+      continue;
+    }
+    const m = /^(\d+(?:\.\d+)+\.?)\s+(.+)$/.exec(line);
+    // vložený výčet „…v případě: - vážných…“ → odrážky
+    const parts = (m ? m[2] : line).split(/\s+-\s+(?=\p{Ll})/u);
+    if (m) {
+      inPoint = true;
+      out.push({ kind: "point", num: m[1], text: nbsp(parts[0]), gap });
+    } else out.push({ kind: inPoint ? "cont" : "p", text: nbsp(parts[0]), gap });
+    for (const b of parts.slice(1)) out.push({ kind: "bullet", text: nbsp(b), gap: false });
+    gap = false;
+  }
+  return out;
 }

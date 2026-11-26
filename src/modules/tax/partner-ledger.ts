@@ -574,7 +574,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     side: sp.side,
     advance: { object: advance.id, groupAccountField: "advanceAccountId", defaultAccount: sp.advanceAccount },
   };
-  const orderCfg: InvoiceConfig = { ...cfg, header: order.id, line: orderLine.id, lineHeaderField: "orderId", lockedStatuses: ["invoiced", "cancelled"] };
+  const orderCfg: InvoiceConfig = { ...cfg, header: order.id, line: orderLine.id, lineHeaderField: "orderId", lockedStatuses: ["invoiced", "cancelled"], deleteLockedStatuses: ["invoiced"] };
   const docs = { cfg, order: order.id, orderLine: orderLine.id, invoiceLine: invoiceLine.id, advance: advance.id, vsSource: sp.externalNum ? "externalNum" : "advanceNum" };
   const inv = invoiceHandlers(cfg);
   const agrDocs: AgreementDocs = { ...docs, agreement: agreement.id, agreementLine: agreementLine.id, parameters: params.id, partnerField: partnerId, sales: sp.side === 1 };

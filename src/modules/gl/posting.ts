@@ -6,6 +6,7 @@
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type ValidationErrors, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { convertCents, rateFor } from "@/modules/sys/currency";
+import { clearSettlements, lineAmount, linePartner, settleStatusOf } from "./settlement";
 import { activeDimensions, defaultDimsOf, dimsOf, LINE_REF_FIELDS, requirementsFor, resolveDims, type Dims } from "./dimensions";
 
 export interface PostingLine {
@@ -452,8 +453,24 @@ export const glHandlers: Record<string, ObjectHandlers> = {
         Object.assign(data, await resolveDims(ctx.data, acc, dimsOf(data), { manual: true }));
       }
       if (data.offsetType === "ledger" && data.offsetAccountId) await assertPostable(ctx.data, String(data.offsetAccountId), true);
+      // vyrovnání: jiný partner = vyrovnání pryč; stav podle částky řádku
+      if (!isNew && data.id) {
+        const before = await ctx.data.get("gl.journalLine", String(data.id));
+        const a = before ? linePartner(before) : null;
+        const b = linePartner(data);
+        if (a && (!b || a.kind !== b.kind || a.id !== b.id)) {
+          await clearSettlements(ctx.data, String(data.id));
+          data.settleStatus = "none";
+        } else if (a) {
+          const list = await ctx.data.find("gl.journalSettlement", { journalLineId: data.id }, { take: 500 });
+          if (list.length) data.settleStatus = settleStatusOf(lineAmount(data), list.reduce((x, y) => x + toCents(String(y.amount ?? 0)), BigInt(0)));
+        }
+      }
     },
-    beforeDelete: (ctx, data) => assertJournalOpen(ctx.data, data.journalId),
+    async beforeDelete(ctx, data) {
+      await assertJournalOpen(ctx.data, data.journalId);
+      await clearSettlements(ctx.data, String(data.id));
+    },
   },
 };
 

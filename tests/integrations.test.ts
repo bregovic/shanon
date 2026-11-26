@@ -908,7 +908,7 @@ describe("tiskové sestavy", () => {
     const { fillText } = await import("@/lib/print-render");
     const P = (await provisionTenant(client, { code: `t-prt-${run}`, name: "Prt", adminEmail: `prt-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "pos", "org"], company: { code: "P", name: "Tisk s.r.o." } })).ctx;
     const tpls = (await listRecords(P, "prt.template", {}, client)).rows.map((r) => [r.docType, r.paper, r.isDefault]);
-    expect(tpls.sort()).toEqual([["ar.advance", "a4", true], ["ar.invoice", "a4", true], ["pos.receipt", "receipt80", true], ["tax.return", "a4", true]]);
+    expect(tpls.sort()).toEqual([["ar.advance", "a4", true], ["ar.agreement", "a4", true], ["ar.invoice", "a4", true], ["pos.receipt", "receipt80", true], ["tax.return", "a4", true]]);
     // bankovní účet firmy → QR platba na faktuře
     const [org] = (await listRecords(P, "org.entity", {}, client)).rows;
     await saveRecord(P, "org.entity", String(org.id), { bankAccount: "19-2000145399/0800" }, undefined, client);

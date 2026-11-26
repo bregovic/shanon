@@ -203,7 +203,7 @@ async function formAnswers(api: Api, formId: string, answers: Record<string, unk
       const v = raw === true || raw === "true";
       if ((kind === "consent" || f.required) && !v) return t("@INT:PortalFormConsentMissing", { label });
       data[key] = v;
-      lines.push(`${label}: ${v ? "ano" : "ne"}`);
+      lines.push(`${/[.?!]$/.test(label) ? `${label} –` : `${label}:`} ${v ? "ano" : "ne"}`);
       continue;
     }
     let v = String(raw ?? "").trim().slice(0, kind === "longtext" ? 2000 : 300);

@@ -420,12 +420,12 @@ export function agreementDeleteHooks(docs: AgreementDocs) {
     },
     async agreement(ctx: EventContext, d: RecordData) {
       if ((await ctx.data.find(docs.cfg.header, { agreementId: d.id }, { take: 1 })).length) return "@TAX:AgrHasInvoices";
+      // zálohy a objednávky smlouvy se mažou zvlášť (zaplacenou zálohu nejdřív odpárovat) – pak smlouva
       const advs = await ctx.data.find(docs.advance, { agreementId: d.id }, { take: 200 });
-      if (advs.some(paid)) return "@TAX:AgrHasInvoices";
-      await ctx.data.update(docs.agreement, String(d.id), { orderId: null, advanceId: null });
+      const orders = await ctx.data.find(docs.order, { agreementId: d.id }, { take: 200 });
+      if (advs.length || orders.length)
+        throw new UserError("@TAX:AgrDeleteDocsFirst", { docs: [...advs.map((a) => String(a.advanceNum ?? "")), ...orders.map((o) => String(o.orderNum ?? ""))].filter(Boolean).join(", ") });
       for (const ln of await ctx.data.find(docs.agreementLine, { agreementId: d.id }, { take: 1000 })) await ctx.data.remove(docs.agreementLine, String(ln.id));
-      for (const a of advs) await ctx.data.remove(docs.advance, String(a.id));
-      for (const o of await ctx.data.find(docs.order, { agreementId: d.id }, { take: 200 })) await ctx.data.remove(docs.order, String(o.id));
     },
   };
 }

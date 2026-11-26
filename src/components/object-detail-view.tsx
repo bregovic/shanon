@@ -49,6 +49,7 @@ import { DocuRefButton } from "./docuref-panel";
 import { HistoryButton } from "./history-panel";
 import { ImportButton } from "./import-dialog";
 import { InlineLines } from "./inline-lines";
+import { SettleDialog } from "./settle-dialog";
 import { ActionBar, Crumbs, PageContent, Spacer } from "./page";
 import { RecordDrawer } from "./record-drawer";
 import { RecordForm, type FormGroup, type Values } from "./record-form";
@@ -70,6 +71,8 @@ export interface LineSpec {
   editable: boolean;
   /** jen Smazat (přehled samostatných záznamů, `lines[].deletable`) */
   deletable?: boolean;
+  /** tlačítko Vyrovnat u vybraného řádku (`lines[].settle`) a jeho popisek */
+  settle?: string;
   /** řádky jsou samostatné doklady — dvojklik otevře jejich stránku */
   overview: boolean;
   /** úprava přímo v mřížce (deník) */
@@ -148,6 +151,19 @@ const useStyles = makeStyles({
   linesHead: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" },
   linesTitle: { fontSize: tokens.fontSizeBase500, fontWeight: tokens.fontWeightSemibold, marginRight: "auto" },
 });
+
+/** Vyrovnat: dialog otevřených položek salda k vybranému řádku deníku. */
+function SettleButton({ label, lineId, lang, onSaved }: { label: string; lineId: string | null; lang: string; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button appearance="subtle" disabled={!lineId} onClick={() => setOpen(true)}>
+        {label}
+      </Button>
+      <SettleDialog lineId={lineId} open={open} lang={lang} onClose={() => setOpen(false)} onSaved={() => (setOpen(false), onSaved())} />
+    </>
+  );
+}
 
 function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: string; lang: string; labels: UiLabels }) {
   const s = useStyles();
@@ -249,6 +265,7 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
               />
             </>
           }
+          rowActions={spec.settle ? ({ lineId, reload }) => <SettleButton label={spec.settle!} lineId={lineId} lang={lang} onSaved={() => (reload(), router.refresh())} /> : undefined}
           objectId={spec.objectId}
           parentField={spec.field}
           parentId={parentId}

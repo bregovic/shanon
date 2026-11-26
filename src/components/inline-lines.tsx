@@ -120,6 +120,7 @@ export function InlineLines({
   details,
   dims,
   toolbar,
+  rowActions,
 }: {
   objectId: string;
   parentField: string;
@@ -157,6 +158,8 @@ export function InlineLines({
   dims?: LineDims;
   /** tlačítka vpravo v liště záložek (import, export) */
   toolbar?: React.ReactNode;
+  /** tlačítka k vybranému uloženému řádku (Vyrovnat); `reload` načte řádky znovu */
+  rowActions?: (p: { lineId: string | null; reload: () => void }) => React.ReactNode;
 }) {
   const s = useStyles();
   const nf = useMemo(() => new Intl.NumberFormat(lang === "en" ? "en-GB" : "cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), [lang]);
@@ -538,6 +541,7 @@ export function InlineLines({
         )}
       </TabList>
       <span style={{ flex: 1 }} />
+      {rowActions?.({ lineId: current?.id ?? null, reload: () => void reload() })}
       {toolbar}
     </div>
   );
