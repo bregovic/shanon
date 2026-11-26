@@ -279,7 +279,11 @@ export const receipt = defineObject({
   numberSeq: { field: "receiptNum", seq: "POSRCPT" },
   defaultSort: { field: "receiptNum", dir: "desc" },
   // dodatečně poslat účtenku e-mailem (koncept s PDF v Odeslané poště, příjemce z odběratele nebo ručně)
-  actions: [{ id: "email", label: "@INT:SendByEmail", outside: true, module: "int", group: "print" }],
+  actions: [
+    { id: "email", label: "@INT:SendByEmail", outside: true, module: "int", group: "print" },
+    // ISDOC pro import do účetnictví (i hromadně ze seznamu v ZIP)
+    { id: "isdoc", label: "@TAX:Isdoc", download: true, bulk: true, module: "prt", group: "print" },
+  ],
   // párování QR plateb z výpisu podle VS
   indexes: [["vs"], ["clientId"]],
   lines: [{ object: "pos.receiptLine", field: "receiptId", label: "@TAX:Lines" }],
@@ -465,6 +469,7 @@ export default defineModule({
       Totals: "Souhrn",
       CloseShift: "Uzávěrka",
       Receipt: "Účtenka",
+      EndConsumer: "Konečný spotřebitel",
       Customer: "Odběratel",
       Buyer: "Odběratel bez evidence",
       BuyerHint: "Jen na účtenku, nikam se neukládá do adresáře. Stačí třeba jméno.",
@@ -737,6 +742,7 @@ export default defineModule({
       Totals: "Summary",
       CloseShift: "Close shift",
       Receipt: "Receipt",
+      EndConsumer: "End consumer",
       Customer: "Customer",
       Buyer: "Customer not on file",
       BuyerHint: "Printed on the receipt only, not saved to the address book. A name is enough.",

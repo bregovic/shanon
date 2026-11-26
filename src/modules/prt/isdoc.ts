@@ -27,84 +27,115 @@ function party(p: { regNo?: unknown; name?: unknown; street?: unknown; houseNo?:
     </Party>`;
 }
 
-/** ISDOC vydané faktury (dataset z účetnictví; částky v měně faktury). */
-export async function invoiceIsdoc(data: DataApi, companyId: string | null, invoiceId: string): Promise<{ name: string; xml: string }> {
-  const inv = await data.get("ar.invoice", invoiceId);
-  if (!inv) throw new UserError("@SYS:NotFound");
+type Party = Parameters<typeof party>[0];
+interface IsdocLine {
+  qty: number;
+  unit: string;
+  net: bigint;
+  tax: bigint;
+  rate: string;
+  description: string;
+}
+
+/** Dodavatel (organizace firmy) a jeho bankovní spojení pro ISDOC. */
+async function supplierOf(data: DataApi, companyId: string | null) {
   const [org] = (await data.find("org.entity", {}, { take: 1 }).catch(() => [])) as RecordData[];
   const company = companyId ? await data.get("sys.company", companyId) : null;
-  const cust = await data.get("ar.customer", String(inv.customerId));
-  const subj = cust ? await data.get("gab.subject", String(cust.subjectId)) : null;
-  const [addr] = subj ? ((await data.find("gab.address", { subjectId: subj.id }, { take: 1 })) as RecordData[]) : [];
-  const cur = inv.currencyId ? await data.get("sys.currency", String(inv.currencyId)) : null;
-  const currency = String(cur?.code ?? "CZK");
-  const lines = await data.find("ar.invoiceLine", { invoiceId }, { take: 5000 });
-  const vatPayer = org ? org.vatPayer !== false : true;
+  const street = [org?.street, [org?.houseNo, org?.orientNo].filter(Boolean).join("/")].filter(Boolean).join(" ");
+  const account = (org?.bankAccount as string) ?? "";
+  return {
+    org,
+    vatPayer: org ? org.vatPayer !== false : true,
+    party: { regNo: org?.regNo ?? company?.regNo, name: org?.legalName ?? company?.name, street: org?.street ? street : "", houseNo: "", city: org?.city, zip: org?.zipCode, country: org?.country, vatId: org?.vatId ?? company?.vatId } as Party,
+    account: /^(?:(\d{1,6})-)?(\d{2,10})\/(\d{4})$/.exec(account.replace(/\s/g, "")),
+    iban: (org?.iban as string) || czIban(account) || "",
+    bic: (org?.bic as string) ?? "",
+  };
+}
+
+/** Kódy sazeb a měrné jednotky řádků jednou za doklad (ne dotaz za řádek). */
+async function lineRefs(data: DataApi, lines: RecordData[]) {
+  const ids = (f: string) => [...new Set(lines.map((l) => String(l[f] ?? "")).filter(Boolean))];
+  const codes = new Map((ids("taxCodeId").length ? await data.find("tax.taxCode", { id: { in: ids("taxCodeId") } }, { take: 500 }) : []).map((x) => [String(x.id), x]));
+  const units = new Map((ids("unitId").length ? await data.find("inv.unit", { id: { in: ids("unitId") } }, { take: 500 }) : []).map((x) => [String(x.id), x]));
+  return { codes, units };
+}
+
+/**
+ * Dokument ISDOC 6.0.2 (faktura / zjednodušený daňový doklad): řádky, rekapitulace DPH podle sazeb, úhrada.
+ * `payment.code`: 42 = převodem na účet, 10 = hotově, 48 = kartou; `paid` = už uhrazeno (zálohy, účtenka).
+ */
+function isdocXml(o: {
+  num: string;
+  issueDate: string;
+  taxDate: string;
+  note: string;
+  currency: string;
+  vatPayer: boolean;
+  supplier: Party;
+  customer: Party;
+  lines: IsdocLine[];
+  paid: bigint;
+  /** zaplaceno už při vystavení (účtenka): PaidAmount = celá částka, k úhradě 0 */
+  paidOnIssue?: boolean;
+  rounding?: bigint;
+  payment: { code: number; dueDate: string; vs: string; account: RegExpExecArray | null; iban: string; bic: string };
+}): string {
   const rates = new Map<string, { base: bigint; tax: bigint }>();
-  const lineXml: string[] = [];
-  let n = 0;
-  for (const l of lines) {
-    const code = l.taxCodeId ? await data.get("tax.taxCode", String(l.taxCodeId)) : null;
-    const unit = l.unitId ? await data.get("inv.unit", String(l.unitId)) : null;
-    const rate = String(Number(code?.rate ?? 0));
-    const net = toCents(l.amountNet ?? 0);
-    const tax = toCents(l.taxAmount ?? 0);
-    const r = rates.get(rate) ?? { base: BigInt(0), tax: BigInt(0) };
-    r.base += net;
-    r.tax += tax;
-    rates.set(rate, r);
-    const qty = Number(l.qty ?? 1);
-    const unitNet = qty ? Number(fromCents(net)) / qty : 0;
-    const unitGross = qty ? Number(fromCents(net + tax)) / qty : 0;
-    lineXml.push(`<InvoiceLine>
-      ${el("ID", ++n)}
-      ${el("InvoicedQuantity", qty, ` unitCode="${esc(unit?.code ?? "ks")}"`)}
-      ${el("LineExtensionAmount", amt(net))}
-      ${el("LineExtensionAmountTaxInclusive", amt(net + tax))}
-      ${el("LineExtensionTaxAmount", amt(tax))}
+  const lineXml = o.lines.map((l, k) => {
+    const r = rates.get(l.rate) ?? { base: BigInt(0), tax: BigInt(0) };
+    r.base += l.net;
+    r.tax += l.tax;
+    rates.set(l.rate, r);
+    const unitNet = l.qty ? Number(fromCents(l.net)) / l.qty : 0;
+    const unitGross = l.qty ? Number(fromCents(l.net + l.tax)) / l.qty : 0;
+    return `<InvoiceLine>
+      ${el("ID", k + 1)}
+      ${el("InvoicedQuantity", l.qty, ` unitCode="${esc(l.unit || "ks")}"`)}
+      ${el("LineExtensionAmount", amt(l.net))}
+      ${el("LineExtensionAmountTaxInclusive", amt(l.net + l.tax))}
+      ${el("LineExtensionTaxAmount", amt(l.tax))}
       ${el("UnitPrice", unitNet.toFixed(2))}
       ${el("UnitPriceTaxInclusive", unitGross.toFixed(2))}
-      <ClassifiedTaxCategory>${el("Percent", rate)}${el("VATCalculationMethod", 0)}${el("VATApplicable", vatPayer)}</ClassifiedTaxCategory>
-      <Item>${el("Description", l.description ?? "")}</Item>
-    </InvoiceLine>`);
-  }
+      <ClassifiedTaxCategory>${el("Percent", l.rate)}${el("VATCalculationMethod", 0)}${el("VATApplicable", o.vatPayer)}</ClassifiedTaxCategory>
+      <Item>${el("Description", l.description)}</Item>
+    </InvoiceLine>`;
+  });
   const net = [...rates.values()].reduce((s, r) => s + r.base, BigInt(0));
   const tax = [...rates.values()].reduce((s, r) => s + r.tax, BigInt(0));
-  const paid = toCents(inv.paidAmount ?? 0);
-  const payable = net + tax - paid;
+  const rounding = o.rounding ?? BigInt(0);
+  const total = net + tax + rounding;
+  const payable = o.paidOnIssue ? BigInt(0) : total - o.paid;
   const subtotals = [...rates]
     .map(
       ([rate, r]) => `<TaxSubTotal>
       ${el("TaxableAmount", amt(r.base))}${el("TaxAmount", amt(r.tax))}${el("TaxInclusiveAmount", amt(r.base + r.tax))}
       ${el("AlreadyClaimedTaxableAmount", "0.00")}${el("AlreadyClaimedTaxAmount", "0.00")}${el("AlreadyClaimedTaxInclusiveAmount", "0.00")}
       ${el("DifferenceTaxableAmount", amt(r.base))}${el("DifferenceTaxAmount", amt(r.tax))}${el("DifferenceTaxInclusiveAmount", amt(r.base + r.tax))}
-      <TaxCategory>${el("Percent", rate)}${el("VATApplicable", vatPayer)}</TaxCategory>
+      <TaxCategory>${el("Percent", rate)}${el("VATApplicable", o.vatPayer)}</TaxCategory>
     </TaxSubTotal>`,
     )
     .join("\n    ");
-  const account = (org?.bankAccount as string) ?? "";
-  const m = /^(?:(\d{1,6})-)?(\d{2,10})\/(\d{4})$/.exec(account.replace(/\s/g, ""));
-  const iban = (org?.iban as string) || czIban(account) || "";
-  const street = [org?.street, [org?.houseNo, org?.orientNo].filter(Boolean).join("/")].filter(Boolean).join(" ");
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  const m = o.payment.account;
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="${NS}" version="6.0.2">
   ${el("DocumentType", 1)}
-  ${el("ID", inv.invoiceNum)}
+  ${el("ID", o.num)}
   ${el("UUID", randomUUID().toUpperCase())}
   ${el("IssuingSystem", "Shanon")}
-  ${el("IssueDate", inv.invoiceDate)}
-  ${el("TaxPointDate", inv.taxDate ?? inv.invoiceDate)}
-  ${el("VATApplicable", vatPayer)}
+  ${el("IssueDate", o.issueDate)}
+  ${el("TaxPointDate", o.taxDate)}
+  ${el("VATApplicable", o.vatPayer)}
   ${el("ElectronicPossibilityAgreementReference", "")}
-  ${el("Note", inv.description ?? "")}
-  ${el("LocalCurrencyCode", currency)}
+  ${el("Note", o.note)}
+  ${el("LocalCurrencyCode", o.currency)}
   ${el("CurrRate", 1)}
   ${el("RefCurrRate", 1)}
   <AccountingSupplierParty>
-    ${party({ regNo: org?.regNo ?? company?.regNo, name: org?.legalName ?? company?.name, street: org?.street ? street : "", houseNo: "", city: org?.city, zip: org?.zipCode, country: org?.country, vatId: org?.vatId ?? company?.vatId })}
+    ${party(o.supplier)}
   </AccountingSupplierParty>
   <AccountingCustomerParty>
-    ${party({ regNo: subj?.regNo, name: subj?.name, street: addr?.street, city: addr?.city, zip: addr?.zipCode, country: addr?.country ?? subj?.country, vatId: subj?.vatId })}
+    ${party(o.customer)}
   </AccountingCustomerParty>
   <InvoiceLines>
     ${lineXml.join("\n    ")}
@@ -117,18 +148,99 @@ export async function invoiceIsdoc(data: DataApi, companyId: string | null, invo
     ${el("TaxExclusiveAmount", amt(net))}${el("TaxInclusiveAmount", amt(net + tax))}
     ${el("AlreadyClaimedTaxExclusiveAmount", "0.00")}${el("AlreadyClaimedTaxInclusiveAmount", "0.00")}
     ${el("DifferenceTaxExclusiveAmount", amt(net))}${el("DifferenceTaxInclusiveAmount", amt(net + tax))}
-    ${el("PayableRoundingAmount", "0.00")}${el("PaidDepositsAmount", amt(paid))}${el("PayableAmount", amt(payable))}
+    ${el("PayableRoundingAmount", amt(rounding))}${el("PaidDepositsAmount", amt(o.paidOnIssue ? BigInt(0) : o.paid))}${el("PayableAmount", amt(payable))}
   </LegalMonetaryTotal>
   <PaymentMeans>
     <Payment>
-      ${el("PaidAmount", amt(payable))}
-      ${el("PaymentMeansCode", 42)}
-      <Details>${el("PaymentDueDate", inv.dueDate ?? inv.invoiceDate)}${el("ID", m ? `${m[1] ? `${m[1]}-` : ""}${m[2]}` : "")}${el("BankCode", m?.[3] ?? "")}${el("Name", "")}${el("IBAN", iban)}${el("BIC", org?.bic ?? "")}${el("VariableSymbol", inv.vs ?? "")}</Details>
+      ${el("PaidAmount", amt(o.paidOnIssue ? total : payable))}
+      ${el("PaymentMeansCode", o.payment.code)}
+      <Details>${el("PaymentDueDate", o.payment.dueDate)}${el("ID", m ? `${m[1] ? `${m[1]}-` : ""}${m[2]}` : "")}${el("BankCode", m?.[3] ?? "")}${el("Name", "")}${el("IBAN", o.payment.iban)}${el("BIC", o.payment.bic)}${el("VariableSymbol", o.payment.vs)}</Details>
     </Payment>
   </PaymentMeans>
 </Invoice>
 `;
-  return { name: `${String(inv.invoiceNum).replace(/[^\w.-]+/g, "_")}.isdoc`, xml };
+}
+
+const fileName = (num: unknown) => `${String(num).replace(/[^\w.-]+/g, "_")}.isdoc`;
+
+/** ISDOC vydané faktury (dataset z účetnictví; částky v měně faktury). */
+export async function invoiceIsdoc(data: DataApi, companyId: string | null, invoiceId: string): Promise<{ name: string; xml: string }> {
+  const inv = await data.get("ar.invoice", invoiceId);
+  if (!inv) throw new UserError("@SYS:NotFound");
+  const sup = await supplierOf(data, companyId);
+  const cust = await data.get("ar.customer", String(inv.customerId));
+  const subj = cust ? await data.get("gab.subject", String(cust.subjectId)) : null;
+  const [addr] = subj ? ((await data.find("gab.address", { subjectId: subj.id }, { take: 1 })) as RecordData[]) : [];
+  const cur = inv.currencyId ? await data.get("sys.currency", String(inv.currencyId)) : null;
+  const lines = await data.find("ar.invoiceLine", { invoiceId }, { take: 5000 });
+  const { codes, units } = await lineRefs(data, lines);
+  const xml = isdocXml({
+    num: String(inv.invoiceNum),
+    issueDate: String(inv.invoiceDate),
+    taxDate: String(inv.taxDate ?? inv.invoiceDate),
+    note: String(inv.description ?? ""),
+    currency: String(cur?.code ?? "CZK"),
+    vatPayer: sup.vatPayer,
+    supplier: sup.party,
+    customer: { regNo: subj?.regNo, name: subj?.name, street: addr?.street, city: addr?.city, zip: addr?.zipCode, country: addr?.country ?? subj?.country, vatId: subj?.vatId },
+    lines: lines.map((l) => ({
+      qty: Number(l.qty ?? 1),
+      unit: String(units.get(String(l.unitId ?? ""))?.code ?? "ks"),
+      net: toCents(l.amountNet ?? 0),
+      tax: toCents(l.taxAmount ?? 0),
+      rate: String(Number(codes.get(String(l.taxCodeId ?? ""))?.rate ?? 0)),
+      description: String(l.description ?? ""),
+    })),
+    paid: toCents(inv.paidAmount ?? 0),
+    payment: { code: 42, dueDate: String(inv.dueDate ?? inv.invoiceDate), vs: String(inv.vs ?? ""), account: sup.account, iban: sup.iban, bic: sup.bic },
+  });
+  return { name: fileName(inv.invoiceNum), xml };
+}
+
+/**
+ * ISDOC účtenky z pokladny (zjednodušený daňový doklad / s odběratelem faktura) pro import do účetnictví.
+ * Odběratel: z účtenky (odběratel, jinak jméno a adresa kupujícího), bez něj „Konečný spotřebitel“.
+ * Účtenka je zaplacená při vystavení (hotově / kartou), QR platba převodem až výpisem.
+ */
+export async function receiptIsdoc(data: DataApi, companyId: string | null, receiptId: string, t: (l: string) => string): Promise<{ name: string; xml: string }> {
+  const r = await data.get("pos.receipt", receiptId);
+  if (!r) throw new UserError("@SYS:NotFound");
+  const sup = await supplierOf(data, companyId);
+  const cust = r.customerId ? await data.get("ar.customer", String(r.customerId)).catch(() => null) : null;
+  const subj = cust ? await data.get("gab.subject", String(cust.subjectId)) : null;
+  const [addr] = subj ? ((await data.find("gab.address", { subjectId: subj.id }, { take: 1 })) as RecordData[]) : [];
+  const lines = await data.find("pos.receiptLine", { receiptId }, { take: 5000 });
+  const { codes, units } = await lineRefs(data, lines);
+  const customer: Party = subj
+    ? { regNo: subj.regNo, name: subj.name, street: addr?.street, city: addr?.city, zip: addr?.zipCode, country: addr?.country ?? subj.country, vatId: subj.vatId }
+    : r.buyerName
+      ? { name: r.buyerName, street: r.buyerStreet, city: r.buyerCity, zip: r.buyerZip, country: "CZ" }
+      : { name: t("@POS:EndConsumer"), country: "CZ" };
+  const date = String(r.date instanceof Date ? r.date.toISOString() : r.date).slice(0, 10);
+  const qr = r.paymentMethod === "qr";
+  const xml = isdocXml({
+    num: String(r.receiptNum),
+    issueDate: date,
+    taxDate: date,
+    note: t("@POS:Receipt"),
+    currency: "CZK",
+    vatPayer: sup.vatPayer,
+    supplier: sup.party,
+    customer,
+    lines: lines.map((l) => ({
+      qty: Number(l.qty ?? 1),
+      unit: String(units.get(String(l.unitId ?? ""))?.code ?? "ks"),
+      net: toCents(l.amountNet ?? 0),
+      tax: toCents(l.taxAmount ?? 0),
+      rate: String(Number(codes.get(String(l.taxCodeId ?? ""))?.rate ?? 0)),
+      description: String(l.description ?? ""),
+    })),
+    paid: BigInt(0),
+    paidOnIssue: !qr || r.payStatus === "paid",
+    rounding: toCents(r.rounding ?? 0),
+    payment: { code: qr ? 42 : r.paymentMethod === "card" ? 48 : 10, dueDate: date, vs: String(r.vs ?? ""), account: qr ? sup.account : null, iban: qr ? sup.iban : "", bic: qr ? sup.bic : "" },
+  });
+  return { name: fileName(r.receiptNum), xml };
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +393,14 @@ export function isdocFromFile(name: string, data: Buffer): string | null {
 
 /** Stažení ISDOC vydané faktury (tlačítko ISDOC). */
 export const isdocHandlers: Record<string, import("@/core/module").ObjectHandlers> = {
+  "pos.receipt": {
+    downloads: {
+      async isdoc(ctx, r) {
+        const x = await receiptIsdoc(ctx.data, ctx.companyId, String(r.id), ctx.t);
+        return { name: x.name, mime: "application/xml; charset=utf-8", data: x.xml };
+      },
+    },
+  },
   "ar.invoice": {
     downloads: {
       async isdoc(ctx, inv) {

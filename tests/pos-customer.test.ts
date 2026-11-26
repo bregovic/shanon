@@ -41,8 +41,20 @@ describe("pokladna se známým odběratelem", () => {
     expect(pr.customer).toMatchObject({ name: "Restaurace U Lípy s.r.o.", regNo: "87654321", vatId: "CZ87654321", address: "Lipová 3, 60200 Brno", email: "ucetni@lipa.test" });
     const d = receiptData(pr);
     expect([d.doc.title, d.customer.ids]).toEqual(["Faktura – daňový doklad", "IČO 87654321   DIČ CZ87654321"]);
+    // ISDOC účtenky s odběratelem: odběratel s IČO/DIČ, zaplaceno kartou
+    const { downloadFile } = await import("@/server/data");
+    const x1 = String((await downloadFile(P, "pos.receipt", String(r.id), "isdoc", client)).data);
+    expect(x1).toContain("<Name>Restaurace U Lípy s.r.o.</Name>");
+    expect(x1).toContain("<CompanyID>CZ87654321</CompanyID>");
+    expect(x1).toContain("<PaymentMeansCode>48</PaymentMeansCode>");
+    expect(x1).toContain("<PayableAmount>0.00</PayableAmount>");
+    expect(x1).toContain("<PaidAmount>12100.00</PaidAmount>");
     // malá účtenka bez odběratele dál souhrnně
-    await api((a) => sell(a, { registerId: regId, payment: "cash", lines: [{ itemId: ids.item, qty: "1" }] }));
+    const r2 = await api((a) => sell(a, { registerId: regId, payment: "cash", lines: [{ itemId: ids.item, qty: "1" }] }));
+    const x2 = String((await downloadFile(P, "pos.receipt", String(r2.id), "isdoc", client)).data);
+    expect(x2).toContain("<Name>Konečný spotřebitel</Name>");
+    expect(x2).toContain("<PaymentMeansCode>10</PaymentMeansCode>");
+    expect(x2).toMatch(/<TaxSubTotal>[\s\S]*<Percent>21<\/Percent>/);
     const [shift] = (await listRecords(P, "pos.shift", { filter: { status: "open" } }, client)).rows;
     await runAction(P, "pos.shift", String(shift.id), "close", client);
     const closed = (await getRecord(P, "pos.shift", String(shift.id), client))!;
