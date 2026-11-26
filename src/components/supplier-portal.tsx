@@ -18,6 +18,7 @@ import {
   ShieldCheckmark16Regular,
 } from "@fluentui/react-icons";
 import type { PortalInfo, PortalKind, PortalResult } from "@/server/supplier-portal";
+import { PortalLogo, portalBackground } from "@/components/portal-theme";
 
 const useStyles = makeStyles({
   page: {
@@ -108,6 +109,8 @@ const fmtSize = (b: number) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1
 
 export function SupplierPortal({ action, info }: { action: string; info: PortalInfo }) {
   const s = useStyles();
+  const look = portalBackground(info.design);
+  const radius = info.design.corners === "square" ? { borderRadius: 4 } : undefined;
   const input = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<PortalKind | null>(info.kinds.length === 1 ? info.kinds[0].value : null);
   const [regNo, setRegNo] = useState("");
@@ -157,17 +160,18 @@ export function SupplierPortal({ action, info }: { action: string; info: PortalI
   }
 
   return (
-    <main className={s.page}>
+    <main className={s.page} style={{ background: look.background }}>
       <div className={s.wrap}>
-        <header className={s.hero}>
-          <span className={s.company}>{info.companyName}</span>
+        <header className={s.hero} style={{ color: look.heroColor }}>
+          <PortalLogo src={info.design.logo} />
+          {info.design.showCompany && <span className={s.company}>{info.companyName}</span>}
           <h1 className={s.title} style={{ margin: 0 }}>
             {info.title}
           </h1>
           <Text style={{ color: "inherit", opacity: 0.9 }}>{info.intro || "Pošlete nám fakturu, zálohovou fakturu nebo objednávku. Doklad zpracujeme a ozveme se, kdyby něco chybělo."}</Text>
         </header>
 
-        <section className={s.card}>
+        <section className={s.card} style={radius}>
           {result ? (
             <div className={s.done}>
               <CheckmarkCircle48Filled className={s.ok} />
@@ -290,6 +294,7 @@ export function SupplierPortal({ action, info }: { action: string; info: PortalI
         <div className={s.foot}>
           <ShieldCheckmark16Regular /> Soubory se přenášejí šifrovaně a zpracuje je jen {info.companyName.replace(/\.$/, "")}.
         </div>
+        {info.design.footer && <Text className={s.muted} style={{ whiteSpace: "pre-wrap", textAlign: "center" }}>{info.design.footer}</Text>}
       </div>
     </main>
   );

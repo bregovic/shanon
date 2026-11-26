@@ -16,7 +16,7 @@ import { advancePrintable } from "@/modules/prt/printables";
 import { prisma } from "./db";
 import { inTenant } from "./data";
 import { getT } from "./i18n";
-import { loadPortal } from "./supplier-portal";
+import { loadPortal, portalDesign, type PortalDesign } from "./supplier-portal";
 
 export interface AgreementTariff {
   id: string;
@@ -27,6 +27,7 @@ export interface AgreementTariff {
 }
 
 export interface AgreementPortalInfo {
+  design: PortalDesign;
   companyName: string;
   title: string;
   intro: string;
@@ -72,6 +73,7 @@ export async function agreementPortalInfo(tenantId: string, token: string, clien
   if (!l || l.portal.purpose !== "agreement" || !l.ctx.modules.has("ar")) return null;
   const tariffs = await inTenant(l.ctx, (s) => tariffsOf(s.sys().api()), client);
   return {
+    design: await portalDesign(l, tenantId, token, client),
     companyName: l.companyName,
     title: String(l.portal.title ?? "") || l.companyName,
     intro: String(l.portal.intro ?? ""),

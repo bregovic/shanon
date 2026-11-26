@@ -16,7 +16,7 @@ import { sniffPortalFile, PORTAL_CAPS } from "@/modules/int/portal";
 import { prisma, withTenant } from "./db";
 import { companyModules } from "./modules";
 import { inTenant, type Ctx } from "./data";
-import { addFile } from "./docuref";
+import { addFile, readFile } from "./docuref";
 import { getT } from "./i18n";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,7 +25,20 @@ const TOKEN = /^[A-Za-z0-9_-]{20,64}$/;
 export type PortalKind = "invoice" | "advance" | "order" | "other";
 const TARGET: Record<PortalKind, string> = { invoice: "apInvoice", advance: "apAdvance", order: "apOrder", other: "auto" };
 
+/** Vzhled veřejné stránky portálu (barvy, pozadí, logo) – společný pro doklady i smlouvy. */
+export interface PortalDesign {
+  accent: string | null;
+  accent2: string | null;
+  background: "gradient" | "solid" | "photo" | "light";
+  corners: "rounded" | "square";
+  showCompany: boolean;
+  footer: string;
+  logo: string | null;
+  backgroundImage: string | null;
+}
+
 export interface PortalInfo {
+  design: PortalDesign;
   companyName: string;
   title: string;
   intro: string;
@@ -35,7 +48,7 @@ export interface PortalInfo {
   maxFiles: number;
 }
 
-interface Loaded {
+export interface Loaded {
   ctx: Ctx;
   portal: RecordData;
   companyName: string;
@@ -90,6 +103,48 @@ export async function loadPortal(tenantIdOrEntity: string, tokenOrPath: string, 
   return portal ? { ctx, portal, companyName: found.company.name } : null;
 }
 
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/** Vzhled z nastavení portálu; obrázky přes /api/portal/<adresa>/img/… (jen logo a pozadí portálu, ne jiné soubory). */
+export async function portalDesign(l: Loaded, tenant: string, token: string, client: PrismaClient = prisma): Promise<PortalDesign> {
+  const p = l.portal;
+  const bgs = ["gradient", "solid", "photo", "light"] as const;
+  const bg = (bgs as readonly string[]).includes(String(p.background)) ? (p.background as PortalDesign["background"]) : "gradient";
+  const logoRef = (p.logo as string) || (await entityLogo(l, client));
+  const base = `/api/portal/${encodeURIComponent(tenant)}/${encodeURIComponent(token)}/img`;
+  return {
+    accent: HEX.test(String(p.accentColor ?? "")) ? String(p.accentColor) : null,
+    accent2: HEX.test(String(p.accent2Color ?? "")) ? String(p.accent2Color) : null,
+    background: bg === "photo" && !p.backgroundImage ? "gradient" : bg,
+    corners: p.corners === "square" ? "square" : "rounded",
+    showCompany: p.showCompany !== false,
+    footer: String(p.footer ?? ""),
+    logo: logoRef ? `${base}/logo?v=${logoRef}` : null,
+    backgroundImage: bg === "photo" && p.backgroundImage ? `${base}/bg?v=${p.backgroundImage}` : null,
+  };
+}
+
+async function entityLogo(l: Loaded, client: PrismaClient): Promise<string | null> {
+  const ents = await inTenant(l.ctx, (s) => s.sys().api().find("org.entity", {}, { take: 1 }), client).catch(() => []);
+  return ((ents[0]?.logo as string) || null) ?? null;
+}
+
+/** Logo / fotka pozadí portálu pro veřejnou stránku (jen obrázky, ne SVG). */
+export async function portalImage(tenant: string, token: string, kind: string, client: PrismaClient = prisma): Promise<{ data: Buffer; mime: string } | null> {
+  const l = await loadPortal(tenant, token, client);
+  if (!l) return null;
+  const ref = kind === "logo" ? (l.portal.logo as string) || (await entityLogo(l, client)) : kind === "bg" ? ((l.portal.backgroundImage as string) ?? null) : null;
+  if (!ref) return null;
+  try {
+    const f = await readFile(l.ctx, ref, client);
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(f.mime)) return null;
+    return { data: f.data, mime: f.mime };
+  } catch (e) {
+    if (e instanceof UserError) return null;
+    throw e;
+  }
+}
+
 const kindsOf = (p: RecordData): PortalKind[] =>
   (["invoice", "advance", "order", "other"] as const).filter((k) => p[`allow${k[0].toUpperCase()}${k.slice(1)}`] !== false);
 
@@ -100,6 +155,7 @@ export async function portalInfo(tenantId: string, token: string, client: Prisma
   const t = await getT("cs", l.ctx.tenantId);
   const labels: Record<PortalKind, string> = { invoice: t("@AP:Invoice"), advance: t("@AP:Advance"), order: t("@AP:Order"), other: t("@INT:OtherDoc") };
   return {
+    design: await portalDesign(l, tenantId, token, client),
     companyName: l.companyName,
     title: String(l.portal.title ?? "") || l.companyName,
     intro: String(l.portal.intro ?? ""),

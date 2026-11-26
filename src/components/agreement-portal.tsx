@@ -9,6 +9,7 @@ import { Button, Checkbox, Field, Input, makeStyles, Spinner, Text, tokens } fro
 import { CheckmarkCircle48Filled } from "@fluentui/react-icons";
 import QRCode from "qrcode";
 import type { AgreementPortalInfo, AgreementResult } from "@/server/agreement-portal";
+import { PortalLogo, portalBackground } from "@/components/portal-theme";
 
 const useStyles = makeStyles({
   page: {
@@ -65,6 +66,9 @@ const date = (s: string) => (s ? s.split("-").reverse().map((x) => String(Number
 
 export function AgreementPortal({ action, info }: { action: string; info: AgreementPortalInfo }) {
   const s = useStyles();
+  const look = portalBackground(info.design);
+  const radius = info.design.corners === "square" ? { borderRadius: 4 } : undefined;
+  const footer = info.design.footer ? <Text style={{ whiteSpace: "pre-wrap", textAlign: "center", color: tokens.colorNeutralForeground3 }}>{info.design.footer}</Text> : null;
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({ tariffId: info.tariffs[0]?.id ?? "", firstName: "", lastName: "", email: "", phone: "", street: "", city: "", zipCode: "", startDate: today, consent: false, website: "" });
   const [busy, setBusy] = useState(false);
@@ -93,8 +97,9 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
   };
 
   const hero = (
-    <div className={s.hero}>
-      <span className={s.company}>{info.companyName}</span>
+    <div className={s.hero} style={{ color: look.heroColor }}>
+      <PortalLogo src={info.design.logo} />
+      {info.design.showCompany && <span className={s.company}>{info.companyName}</span>}
       <span className={s.title}>{info.title}</span>
       {info.intro && <Text style={{ whiteSpace: "pre-wrap" }}>{info.intro}</Text>}
     </div>
@@ -103,10 +108,10 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
   if (done?.ok) {
     const p = done.payment;
     return (
-      <main className={s.page}>
+      <main className={s.page} style={{ background: look.background }}>
         <div className={s.wrap}>
           {hero}
-          <div className={s.card}>
+          <div className={s.card} style={radius}>
             <div className={s.done}>
               <CheckmarkCircle48Filled primaryFill={tokens.colorPaletteGreenForeground1} />
               <Text size={600} weight="semibold">Smlouva {done.agreementNum} je uzavřená</Text>
@@ -143,6 +148,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
               </div>
             )}
           </div>
+          {footer}
         </div>
       </main>
     );
@@ -150,10 +156,10 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
 
   const chosen = info.tariffs.find((t) => t.id === f.tariffId);
   return (
-    <main className={s.page}>
+    <main className={s.page} style={{ background: look.background }}>
       <div className={s.wrap}>
         {hero}
-        <div className={s.card}>
+        <div className={s.card} style={radius}>
           {!info.tariffs.length ? (
             <Text>Přihlášky zatím nejsou otevřené.</Text>
           ) : (
@@ -222,6 +228,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
             </>
           )}
         </div>
+        {footer}
       </div>
     </main>
   );

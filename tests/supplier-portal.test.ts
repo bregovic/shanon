@@ -36,6 +36,13 @@ describe("dodavatelský portál", () => {
     const info = await portalInfo(T.tenantId, String(p.token), client);
     expect([info?.companyName, info?.title, info?.kinds.map((k) => k.value)]).toEqual(["Odběratel s.r.o.", "Pošlete nám faktury", ["invoice", "advance", "order", "other"]]);
     expect(await portalInfo(T.tenantId, "neplatny-klic-0123456789", client)).toBeNull();
+    // vzhled: výchozí = barvy Shanonu, přechod, bez loga; nastavené barvy a pozadí se propíšou, Fotka bez fotky = přechod
+    expect(info?.design).toMatchObject({ accent: null, background: "gradient", corners: "rounded", showCompany: true, logo: null, backgroundImage: null });
+    await expect(saveRecord(T, "int.portal", String(p.id), { accentColor: "modrá" }, p.version as number, client)).rejects.toThrow();
+    const pd = await saveRecord(T, "int.portal", String(p.id), { accentColor: "#C3392B", accent2Color: "#6a1717", background: "photo", corners: "square", showCompany: false, footer: "Účtárna: 123 456 789" }, p.version as number, client);
+    const d = (await portalInfo(T.tenantId, String(p.token), client))!.design;
+    expect(d).toMatchObject({ accent: "#c3392b", accent2: "#6a1717", background: "gradient", corners: "square", showCompany: false, footer: "Účtárna: 123 456 789" });
+    Object.assign(p, pd);
 
     const base = { kind: "invoice", regNo: "27082440", name: "Dodavatel a.s.", email: "fakturace@dodavatel.test", note: "Faktura za říjen" };
     // 1) přijato: PDF → doklad ke zpracování s odesílatelem a přílohou; spustitelný soubor odmítnut

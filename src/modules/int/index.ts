@@ -493,6 +493,28 @@ export const document = defineObject({
  * zalistování vždy schvaluje člověk. Odkaz nese tajný klíč; limity chrání před zahlcením.
  */
 /** K čemu portál slouží: nahrání dokladů dodavateli, nebo uzavření smlouvy (členství, předplatné). */
+/** Vzhled veřejné stránky portálu: pozadí. */
+export const PortalBackground = defineEnum({
+  id: "IntPortalBackground",
+  label: "@INT:PortalBackground",
+  values: [
+    { value: "gradient", label: "@INT:PortalBgGradient" },
+    { value: "solid", label: "@INT:PortalBgSolid" },
+    { value: "photo", label: "@INT:PortalBgPhoto" },
+    { value: "light", label: "@INT:PortalBgLight" },
+  ],
+});
+export const PortalCorners = defineEnum({
+  id: "IntPortalCorners",
+  label: "@INT:PortalCorners",
+  values: [
+    { value: "rounded", label: "@INT:PortalCornersRounded" },
+    { value: "square", label: "@INT:PortalCornersSquare" },
+  ],
+});
+const PortalColor = defineEdt({ id: "IntPortalColor", kind: "string", label: "@INT:PortalColor", maxLength: 7, pattern: /^#[0-9a-fA-F]{6}$/, patternMessage: "@INT:PortalColorHelp", transform: "lower" });
+const PortalImage = defineEdt({ id: "IntPortalImage", kind: "string", label: "@SYS:Image", maxLength: 36 });
+
 export const PortalPurpose = defineEnum({
   id: "IntPortalPurpose",
   label: "@INT:PortalPurpose",
@@ -533,6 +555,15 @@ export const portal = defineObject({
     /** aplikace Portál: přihlášení dodavatelé (e-maily z Kontaktů portálu) a zaměstnanci (účtenky) */
     appVendors: { edt: Edts.NoYes, label: "@INT:AppVendors", default: true, help: "@INT:AppVendorsHelp" },
     appEmployees: { edt: Edts.NoYes, label: "@INT:AppEmployees", default: false, help: "@INT:AppEmployeesHelp" },
+    /** vzhled veřejné stránky (src/components/portal-theme.tsx) */
+    logo: { edt: PortalImage, label: "@INT:PortalLogo", image: true, readOnly: true, help: "@INT:PortalLogoHelp" },
+    accentColor: { edt: PortalColor, label: "@INT:PortalAccent", help: "@INT:PortalColorHelp" },
+    accent2Color: { edt: PortalColor, label: "@INT:PortalAccent2", help: "@INT:PortalAccent2Help" },
+    background: { edt: enumEdt(PortalBackground), mandatory: true, default: "gradient" },
+    backgroundImage: { edt: PortalImage, label: "@INT:PortalBgImage", image: true, readOnly: true, help: "@INT:PortalBgImageHelp" },
+    corners: { edt: enumEdt(PortalCorners), mandatory: true, default: "rounded" },
+    showCompany: { edt: Edts.NoYes, label: "@INT:PortalShowCompany", default: true },
+    footer: { edt: Edts.Notes, label: "@INT:PortalFooter", help: "@INT:PortalFooterHelp" },
     maxFileMb: { edt: Edts.Int, label: "@INT:MaxFileMb", default: 10 },
     maxFiles: { edt: Edts.Int, label: "@INT:MaxFiles", default: 5 },
     ipHourLimit: { edt: Edts.Int, label: "@INT:IpHourLimit", default: 10 },
@@ -543,6 +574,7 @@ export const portal = defineObject({
   form: [
     { label: "@SYS:General", fields: ["name", "active", "purpose", "slug", "publicUrl", "responsible"] },
     { label: "@INT:PortalPage", fields: ["title", "intro"] },
+    { label: "@INT:PortalDesign", fields: ["logo", "accentColor", "accent2Color", "background", "backgroundImage", "corners", "showCompany", "footer"] },
     { label: "@INT:PortalAgreement", fields: ["agreementTerms", "agreementGroupId"], visibleWhen: { field: "purpose", in: ["agreement"] } },
     { label: "@INT:PortalKinds", fields: ["allowInvoice", "allowAdvance", "allowOrder", "allowOther", "requireRegNo", "autoExtract"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalApp", fields: ["appVendors", "appEmployees"], visibleWhen: { field: "purpose", in: ["documents"] } },
@@ -658,7 +690,7 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [PortalPurpose, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper, PrintRuleDoc],
+  enums: [PortalPurpose, PortalBackground, PortalCorners, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper, PrintRuleDoc],
   objects: [connection, log, portal, portalUpload, portalContact, document, documentLine, mail, device, devicePrinter, printRule, printJob],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
@@ -959,6 +991,27 @@ export default defineModule({
       PortalPurpose: "Účel portálu",
       PortalPurposeDocs: "Nahrání dokladů",
       PortalPurposeAgreement: "Smlouva (členství, předplatné)",
+      PortalDesign: "Vzhled stránky",
+      PortalLogo: "Logo",
+      PortalLogoHelp: "Doporučeno: PNG s průhledným pozadím, asi 600 × 200 px. Prázdné = logo organizace.",
+      PortalColor: "Barva",
+      PortalAccent: "Hlavní barva",
+      PortalColorHelp: "Barva ve tvaru #RRGGBB (třeba #0e3f8e). Tlačítka, výběr a pruh nahoře. Prázdné = barvy Shanonu.",
+      PortalAccent2: "Druhá barva",
+      PortalAccent2Help: "Konec barevného přechodu nahoře. Prázdné = tmavší odstín hlavní barvy.",
+      PortalBackground: "Pozadí",
+      PortalBgGradient: "Barevný přechod",
+      PortalBgSolid: "Jedna barva",
+      PortalBgPhoto: "Fotka",
+      PortalBgLight: "Světlé (bez barvy)",
+      PortalBgImage: "Fotka na pozadí",
+      PortalBgImageHelp: "Pro pozadí Fotka. Doporučeno: na šířku aspoň 1920 × 1080 px (JPG); ztmaví se, aby byl text čitelný.",
+      PortalCorners: "Rohy",
+      PortalCornersRounded: "Zaoblené",
+      PortalCornersSquare: "Hranaté",
+      PortalShowCompany: "Ukázat název firmy",
+      PortalFooter: "Patička",
+      PortalFooterHelp: "Text pod formulářem – třeba kontakt na účtárnu.",
       PortalAgreement: "Smlouva",
       PortalAgreementTerms: "Znění smlouvy",
       PortalAgreementTermsHelp: "Text, který zájemce na portálu čte a potvrzuje. Uloží se ke smlouvě. Tarify = položky s vyplněnou délkou období.",
@@ -1589,6 +1642,27 @@ export default defineModule({
       PortalPurpose: "Portal purpose",
       PortalPurposeDocs: "Document upload",
       PortalPurposeAgreement: "Agreement (membership, subscription)",
+      PortalDesign: "Page design",
+      PortalLogo: "Logo",
+      PortalLogoHelp: "Recommended: PNG with a transparent background, about 600 × 200 px. Empty = organisation logo.",
+      PortalColor: "Colour",
+      PortalAccent: "Main colour",
+      PortalColorHelp: "Colour as #RRGGBB (e.g. #0e3f8e). Buttons, selection and the top band. Empty = Shanon colours.",
+      PortalAccent2: "Second colour",
+      PortalAccent2Help: "End of the top gradient. Empty = darker shade of the main colour.",
+      PortalBackground: "Background",
+      PortalBgGradient: "Colour gradient",
+      PortalBgSolid: "Single colour",
+      PortalBgPhoto: "Photo",
+      PortalBgLight: "Light (no colour)",
+      PortalBgImage: "Background photo",
+      PortalBgImageHelp: "For the Photo background. Recommended: landscape, at least 1920 × 1080 px (JPG); it is darkened so the text stays readable.",
+      PortalCorners: "Corners",
+      PortalCornersRounded: "Rounded",
+      PortalCornersSquare: "Square",
+      PortalShowCompany: "Show company name",
+      PortalFooter: "Footer",
+      PortalFooterHelp: "Text under the form – e.g. contact to the accounts department.",
       PortalAgreement: "Agreement",
       PortalAgreementTerms: "Agreement terms",
       PortalAgreementTermsHelp: "Text the applicant reads and confirms on the portal. Stored with the agreement. Tariffs = items with a period length.",
