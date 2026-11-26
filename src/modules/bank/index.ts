@@ -67,6 +67,7 @@ export const MatchKind = defineEnum({
     { value: "vendorAccount", label: "@BANK:MatchVendorAccount", color: "warning" },
     { value: "rule", label: "@BANK:MatchRule", color: "informative" },
     { value: "posReceipt", label: "@BANK:MatchPosReceipt", color: "success" },
+    { value: "customerAgreement", label: "@BANK:MatchCustomerAgreement", color: "success" },
   ],
 });
 
@@ -292,6 +293,8 @@ export const statementLine = defineObject({
     vendorId: { edt: refEdt("ap.vendor", "@BANK:Vendor") },
     /** účtenka pokladny placená QR platbou (VS = číslice čísla účtenky) */
     posReceiptId: { edt: refEdt("pos.receipt", "@BANK:PosReceipt"), optionalRef: true },
+    /** první platba smlouvy v režimu Kalendář (zaúčtováním se smlouva aktivuje a vznikne faktura) */
+    agreementId: { edt: refEdt("ar.agreement", "@BANK:Agreement"), optionalRef: true },
     /** předkontace, podle které se řádek spároval (poplatky, úroky…) */
     postingRuleId: { edt: refEdt("bank.postingRule", "@BANK:PostingRule"), readOnly: true },
     /** deník hlavní knihy, do kterého řádek přešel */
@@ -358,6 +361,7 @@ export const MatchMethod = defineEnum({
     { value: "vsInvoice", label: "@BANK:MmVsInvoice" },
     { value: "vsAdvance", label: "@BANK:MmVsAdvance" },
     { value: "vsPosReceipt", label: "@BANK:MmVsPosReceipt" },
+    { value: "vsAgreement", label: "@BANK:MmVsAgreement" },
     { value: "counterPartner", label: "@BANK:MmCounterPartner" },
     { value: "rules", label: "@BANK:MmRules" },
   ],
@@ -563,15 +567,15 @@ async function ruleSetup(data: DataApi) {
 
 /** Výchozí pořadí párování (jen když firma žádné nemá). */
 async function stepSetup(data: DataApi) {
-  if ((await data.find("bank.matchStep", {}, { take: 1 })).length) return;
   const have = await data.find("bank.matchStep", {}, { take: 50 });
   if (!have.length) {
-    for (const [sequence, method] of [[10, "vsInvoice"], [20, "vsAdvance"], [25, "vsPosReceipt"], [30, "counterPartner"], [40, "rules"]] as const)
-      await data.create("bank.matchStep", { sequence, method, requireAmount: false, active: true });
+    for (const [sequence, method, requireAmount] of [[10, "vsInvoice", false], [20, "vsAdvance", false], [22, "vsAgreement", true], [25, "vsPosReceipt", true], [30, "counterPartner", false], [40, "rules", false]] as const)
+      await data.create("bank.matchStep", { sequence, method, requireAmount, active: true });
     return;
   }
-  // QR platby z pokladny (přibyly 19. 11. 2026): doplnit krok firmám, které pořadí už mají
+  // kroky přidané později doplnit firmám, které pořadí už mají (QR platby z pokladny 19. 11., první platba smlouvy 26. 11. 2026)
   if (!have.some((x) => x.method === "vsPosReceipt")) await data.create("bank.matchStep", { sequence: 25, method: "vsPosReceipt", requireAmount: true, active: true });
+  if (!have.some((x) => x.method === "vsAgreement")) await data.create("bank.matchStep", { sequence: 22, method: "vsAgreement", requireAmount: true, active: true });
 }
 
 async function bankSetup(data: DataApi) {
@@ -749,6 +753,9 @@ export default defineModule({
       MatchLedger: "Účet",
       MatchRule: "Předkontace",
       MatchPosReceipt: "Účtenka (QR platba)",
+      MatchCustomerAgreement: "První platba smlouvy",
+      MmVsAgreement: "VS smlouvy – první platba (aktivace)",
+      Agreement: "Smlouva",
       PosReceipt: "Účtenka (QR platba)",
       MmVsPosReceipt: "VS a částka → účtenka placená QR platbou",
       PosReceiptClosed: "Účtenka {doc} nečeká na QR platbu.",
@@ -937,6 +944,9 @@ export default defineModule({
       MatchLedger: "Account",
       MatchRule: "Posting rule",
       MatchPosReceipt: "Receipt (QR payment)",
+      MatchCustomerAgreement: "First agreement payment",
+      MmVsAgreement: "Agreement VS – first payment (activation)",
+      Agreement: "Agreement",
       PosReceipt: "Receipt (QR payment)",
       MmVsPosReceipt: "VS and amount → receipt paid by QR payment",
       PosReceiptClosed: "Receipt {doc} is not awaiting a QR payment.",

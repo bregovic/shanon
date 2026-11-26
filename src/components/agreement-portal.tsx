@@ -98,7 +98,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
 
   const hero = (
     <div className={s.hero} style={{ color: look.heroColor }}>
-      <PortalLogo src={info.design.logo} />
+      <PortalLogo src={info.design.logo} onPhoto={info.design.background === "photo"} />
       {info.design.showCompany && <span className={s.company}>{info.companyName}</span>}
       <span className={s.title}>{info.title}</span>
       {info.intro && <Text style={{ whiteSpace: "pre-wrap" }}>{info.intro}</Text>}

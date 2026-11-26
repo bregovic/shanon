@@ -8,9 +8,15 @@
  *           → nezaplacená výzva po lhůtě (parametry) = Blokovaná; zaplacením se smlouva zase aktivuje.
  *
  * Objednávka, záloha a faktura jsou ty běžné — smlouva jen řídí, kdy vzniknou (`agreementId`).
+ *
+ * Režim „Kalendář“ (parametr `agreementMode = schedule`, např. fitness): bez zálohy. Výzva = kalendář splátek
+ * (`<m>.agreementLine`, měsíční / roční podle `periodMonths`) a VS smlouvy (číslice čísla smlouvy). První platba
+ * s VS smlouvy (banka, krok „VS smlouvy“) nebo ruční Aktivovat → objednávka + zaúčtovaná faktura první splátky,
+ * smlouva Aktivní. Dávka pak vystavuje další splátky podle kalendáře (objednávka → faktura = pohledávka, VS smlouvy).
+ * Neuhrazená faktura po splatnosti + lhůtě (parametry) = Blokovaná: další splátky se nevystavují, úhradou se odblokuje.
  */
 import { toCents } from "@/core/money";
-import { Edts, defineEnum, enumEdt, refEdt } from "@/core/edt";
+import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { accountingCurrencyId } from "@/modules/gl/posting";
@@ -29,7 +35,28 @@ export const AgreementStatus = defineEnum({
   ],
 });
 
+export const AgreementLineStatus = defineEnum({
+  id: "AgreementLineStatus",
+  label: "@TAX:AgrLineStatus",
+  values: [
+    { value: "planned", label: "@TAX:AgrLinePlanned" },
+    { value: "invoiced", label: "@TAX:AgrLineInvoiced", color: "warning" },
+    { value: "paid", label: "@TAX:AgrLinePaid", color: "success" },
+    { value: "cancelled", label: "@TAX:AgrLineCancelled" },
+  ],
+});
+
+export const AgreementMode = defineEnum({
+  id: "AgreementMode",
+  label: "@TAX:AgrMode",
+  values: [
+    { value: "advance", label: "@TAX:AgrModeAdvance" },
+    { value: "schedule", label: "@TAX:AgrModeSchedule" },
+  ],
+});
+
 export interface AgreementDocs extends OrderDocs {
+  agreementLine: string;
   agreement: string;
   parameters: string;
   partnerField: string;
@@ -80,6 +107,10 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
       periodFrom: { edt: Edts.TransDate, label: "@TAX:AgrPeriodFrom", readOnly: true },
       periodTo: { edt: Edts.TransDate, label: "@TAX:AgrPeriodTo", readOnly: true },
       dueDate: { edt: Edts.TransDate, label: "@TAX:DueDate", readOnly: true },
+      /** VS plateb (číslice čísla smlouvy) – platby i faktury kalendáře */
+      vs: { edt: defineEdt({ id: "AgrVs", kind: "string", label: "@TAX:Vs", maxLength: 10 }), readOnly: true },
+      /** číslo členské karty (fitness, klub) */
+      cardNumber: { edt: defineEdt({ id: "AgrCardNumber", kind: "string", label: "@TAX:AgrCardNumber", maxLength: 40, transform: "trim" }) },
       orderId: { edt: refEdt(`${m}.order`, L("Order")), readOnly: true },
       advanceId: { edt: refEdt(`${m}.advance`, L("Advance")), readOnly: true },
       blockedDate: { edt: Edts.TransDate, label: "@TAX:AgrBlockedDate", readOnly: true },
@@ -91,12 +122,13 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
     titleRef: partnerId,
     list: ["agreementNum", partnerId, "itemId", "amount", "periodMonths", "startDate", "paidUntil", "dueDate", "status"],
     form: [
-      { label: "@TAX:Header", fields: ["agreementNum", partnerId, "itemId", "description", "status"] },
+      { label: "@TAX:Header", fields: ["agreementNum", partnerId, "itemId", "description", "status", "vs", "cardNumber"] },
       { label: "@TAX:AgrTerm", fields: ["amount", "currencyId", "periodMonths", "startDate", "endDate", "autoRenew"] },
       { label: "@TAX:AgrPayment", fields: ["paidUntil", "periodFrom", "periodTo", "dueDate", "orderId", "advanceId", "blockedDate"] },
       { label: "@TAX:AgrSigned", fields: ["signedAt", "terms", "notes"] },
     ],
     numberSeq: { field: "agreementNum", seq },
+    lines: [{ object: `${m}.agreementLine`, field: "agreementId", label: "@TAX:AgrSchedule" }],
     defaultSort: { field: "startDate", dir: "desc" },
     indexes: [["status"]],
     related: [
@@ -106,9 +138,38 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
     ],
     actions: [
       { id: "requestPayment", label: "@TAX:AgrRequestPayment" },
+      { id: "activate", label: "@TAX:AgrActivate" },
       { id: "end", label: "@TAX:AgrEndAction" },
     ],
     lockedWhen: { field: "status", equals: "ended" },
+  });
+}
+
+/** Kalendář splátek smlouvy (režim Kalendář): co se kdy vystaví a jestli je zaplaceno. */
+export function agreementLineObject(m: string, L: (k: string) => string) {
+  return defineObject({
+    id: `${m}.agreementLine`,
+    table: `${m}_agreement_line`,
+    label: "@TAX:AgrScheduleLine",
+    labelPlural: "@TAX:AgrSchedule",
+    scope: "company",
+    systemOnly: true,
+    fields: {
+      agreementId: { edt: refEdt(`${m}.agreement`, L("Agreement")), mandatory: true },
+      lineNum: { edt: Edts.Int, label: "@TAX:AgrLineNum", mandatory: true },
+      periodFrom: { edt: Edts.TransDate, label: "@TAX:AgrPeriodFrom", mandatory: true },
+      periodTo: { edt: Edts.TransDate, label: "@TAX:AgrPeriodTo", mandatory: true },
+      amount: { edt: Edts.Amount, label: "@TAX:AgrAmount", mandatory: true },
+      status: { edt: enumEdt(AgreementLineStatus), mandatory: true, default: "planned" },
+      orderId: { edt: refEdt(`${m}.order`, L("Order")) },
+      invoiceId: { edt: refEdt(`${m}.invoice`, L("Invoice")) },
+      dueDate: { edt: Edts.TransDate, label: "@TAX:DueDate" },
+    },
+    titleField: "lineNum",
+    list: ["lineNum", "periodFrom", "periodTo", "amount", "status", "invoiceId", "dueDate"],
+    form: [{ label: "@SYS:General", fields: ["agreementId", "lineNum", "periodFrom", "periodTo", "amount", "status", "orderId", "invoiceId", "dueDate"] }],
+    defaultSort: { field: "lineNum", dir: "asc" },
+    indexes: [["agreementId", "status"]],
   });
 }
 
@@ -116,7 +177,7 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
 async function agreementParams(data: DataApi, docs: AgreementDocs) {
   const [p] = await data.find(docs.parameters, {}, { take: 1 }).catch(() => [] as RecordData[]);
   const num = (v: unknown, d: number) => (v === null || v === undefined || v === "" ? d : Math.max(0, Number(v)));
-  return { dueDays: num(p?.agreementDueDays, 7), blockDays: num(p?.agreementBlockDays, 14), renewDays: num(p?.agreementRenewDays, 14) };
+  return { dueDays: num(p?.agreementDueDays, 7), blockDays: num(p?.agreementBlockDays, 14), renewDays: num(p?.agreementRenewDays, 14), schedule: p?.agreementMode === "schedule" };
 }
 
 /**
@@ -125,6 +186,10 @@ async function agreementParams(data: DataApi, docs: AgreementDocs) {
  */
 export async function requestAgreementPayment(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
   if (agr.status === "ended") throw new UserError("@GL:Locked");
+  if ((await agreementParams(data, docs)).schedule) {
+    await requestSchedulePayment(data, docs, agr, today);
+    return { order: null as unknown as RecordData, advance: null as unknown as RecordData };
+  }
   const pf = docs.partnerField;
   if (agr.advanceId) {
     const pending = await data.get(docs.advance, String(agr.advanceId));
@@ -208,6 +273,7 @@ export function agreementState(agr: RecordData, pending: RecordData | null, toda
 /** Dávka: další výzva před koncem zaplaceného období, blokace po lhůtě, konec smlouvy. */
 export async function runAgreements(data: DataApi, docs: AgreementDocs, today = iso(new Date())) {
   const prm = await agreementParams(data, docs);
+  if (prm.schedule) return runSchedules(data, docs, today, prm);
   let issued = 0, blocked = 0;
   for (const status of ["active", "awaiting", "blocked"]) {
     for (const agr of await data.find(docs.agreement, { status }, { take: 1000 })) {
@@ -263,12 +329,26 @@ export function agreementHandlers(docs: AgreementDocs): Record<string, ObjectHan
           d.currencyId = p?.currencyId ?? (await accountingCurrencyId(ctx.data, ctx.companyId));
         }
       },
+      async afterSave(ctx: EventContext, d: RecordData) {
+        // VS = číslice čísla smlouvy (SM2600012 → 2600012), jednou provždy
+        if (!d.vs && d.agreementNum) {
+          const vs = String(d.agreementNum).replace(/\D/g, "").slice(-10);
+          if (vs) await ctx.data.update(docs.agreement, String(d.id), { vs });
+        }
+      },
       actions: {
         async requestPayment(ctx: EventContext, agr: RecordData) {
           await requestAgreementPayment(ctx.data, docs, agr);
         },
+        /** zaplaceno na místě (karta, hotovost): první splátka se vyfakturuje, smlouva je aktivní */
+        async activate(ctx: EventContext, agr: RecordData) {
+          if (!(await agreementParams(ctx.data, docs)).schedule) throw new UserError("@TAX:AgrActivateMode");
+          await activateSchedule(ctx.data, docs, agr);
+        },
         async end(ctx: EventContext, agr: RecordData) {
           const today = iso(new Date());
+          // kalendář: nevystavené splátky se zruší
+          for (const ln of await ctx.data.find(docs.agreementLine, { agreementId: agr.id, status: "planned" }, { take: 500 })) await ctx.data.update(docs.agreementLine, String(ln.id), { status: "cancelled" });
           if (agr.advanceId) {
             const pend = await ctx.data.get(docs.advance, String(agr.advanceId));
             // nezaplacená výzva se zruší i s objednávkou
@@ -309,6 +389,8 @@ export function agreementDeleteHooks(docs: AgreementDocs) {
     async order(ctx: EventContext, d: RecordData) {
       const advs = await ctx.data.find(docs.advance, { orderId: d.id }, { take: 50 });
       if (advs.some(paid)) return "@TAX:AdvancePaidNoDelete";
+      // splátka kalendáře zase čeká na vystavení
+      for (const ln of await ctx.data.find(docs.agreementLine, { orderId: d.id }, { take: 10 })) await ctx.data.update(docs.agreementLine, String(ln.id), { status: "planned", orderId: null, invoiceId: null, dueDate: null });
       await forget(ctx.data, "orderId", String(d.id));
       for (const a of advs) await ctx.data.remove(docs.advance, String(a.id));
     },
@@ -317,14 +399,180 @@ export function agreementDeleteHooks(docs: AgreementDocs) {
       const advs = await ctx.data.find(docs.advance, { agreementId: d.id }, { take: 200 });
       if (advs.some(paid)) return "@TAX:AgrHasInvoices";
       await ctx.data.update(docs.agreement, String(d.id), { orderId: null, advanceId: null });
+      for (const ln of await ctx.data.find(docs.agreementLine, { agreementId: d.id }, { take: 1000 })) await ctx.data.remove(docs.agreementLine, String(ln.id));
       for (const a of advs) await ctx.data.remove(docs.advance, String(a.id));
       for (const o of await ctx.data.find(docs.order, { agreementId: d.id }, { take: 200 })) await ctx.data.remove(docs.order, String(o.id));
     },
   };
 }
 
+/* ---------------------------------------------------------------------------
+ * Režim Kalendář
+ * ------------------------------------------------------------------------- */
+
+const dmy = (s: string) => s.split("-").reverse().join(". ").replace(/\b0(\d)\./g, "$1.");
+
+/** Doplní kalendář splátek: do konce smlouvy, bez konce na rok dopředu od poslední splátky. */
+export async function ensureSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
+  const lines = await data.find(docs.agreementLine, { agreementId: agr.id }, { take: 1000, orderBy: { lineNum: "asc" } });
+  const months = Math.max(1, Number(agr.periodMonths ?? 1));
+  const end = agr.endDate ? String(agr.endDate).slice(0, 10) : null;
+  const last = lines[lines.length - 1];
+  let from = last ? addDays(String(last.periodTo).slice(0, 10), 1) : String(agr.startDate ?? today).slice(0, 10);
+  const horizon = end ?? periodEnd(today < from ? from : today, 12);
+  let n = last ? Number(last.lineNum) : 0;
+  // nejvýš 120 splátek najednou (měsíčně na 10 let)
+  while (from <= horizon && n < (last ? Number(last.lineNum) : 0) + 120) {
+    if (!agr.autoRenew && end && from > end) break;
+    const to = periodEnd(from, months);
+    await data.create(docs.agreementLine, { agreementId: agr.id, lineNum: ++n, periodFrom: from, periodTo: end && to > end ? end : to, amount: agr.amount, status: "planned" });
+    from = addDays(to, 1);
+    if (!end && n - (last ? Number(last.lineNum) : 0) >= Math.ceil(12 / months)) break;
+  }
+}
+
+/** Výzva v režimu Kalendář: kalendář splátek a čekání na první platbu (bez zálohy). */
+async function requestSchedulePayment(data: DataApi, docs: AgreementDocs, agr: RecordData, today: string) {
+  if (agr.status === "active") throw new UserError("@TAX:AgrAlreadyActive");
+  const prm = await agreementParams(data, docs);
+  await ensureSchedule(data, docs, agr, today);
+  const [first] = await data.find(docs.agreementLine, { agreementId: agr.id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
+  await data.update(docs.agreement, String(agr.id), {
+    status: "awaiting",
+    periodFrom: first?.periodFrom ?? null,
+    periodTo: first?.periodTo ?? null,
+    dueDate: addDays(today, prm.dueDays),
+  });
+}
+
+/** Vystaví splátku kalendáře: objednávka → zaúčtovaná faktura (VS smlouvy, splatnost z parametrů). */
+async function issueScheduleLine(data: DataApi, docs: AgreementDocs, agr: RecordData, line: RecordData, today: string) {
+  const prm = await agreementParams(data, docs);
+  const pf = docs.partnerField;
+  const from = String(line.periodFrom).slice(0, 10), to = String(line.periodTo).slice(0, 10);
+  const text = `${agr.description || agr.agreementNum} · ${dmy(from)} – ${dmy(to)}`.slice(0, 255);
+  const order = await data.create(docs.order, {
+    [pf]: agr[pf],
+    currencyId: agr.currencyId ?? null,
+    ...(docs.sales ? { pricesInclTax: true } : {}),
+    description: text,
+    agreementId: agr.id,
+  });
+  await data.create(docs.orderLine, { orderId: order.id, itemId: agr.itemId ?? null, description: text, qty: 1, unitPrice: line.amount });
+  const o = (await data.get(docs.order, String(order.id)))!;
+  if (toCents(o.amountGross) <= BigInt(0)) throw new UserError("@GL:NoLines");
+  await data.update(docs.order, String(o.id), { status: "confirmed" });
+  const inv = await invoiceFromOrder(data, docs, o);
+  const due = addDays(today, prm.dueDays);
+  await data.update(docs.cfg.header, String(inv.id), { vs: agr.vs ?? null, dueDate: due, agreementId: agr.id });
+  await postInvoice(data, data.companyId ?? null, docs.cfg, (await data.get(docs.cfg.header, String(inv.id)))!);
+  await data.update(docs.agreementLine, String(line.id), { status: "invoiced", orderId: o.id, invoiceId: inv.id, dueDate: due });
+  await data.update(docs.agreement, String(agr.id), { orderId: o.id, periodFrom: from, periodTo: to, dueDate: due });
+  return (await data.get(docs.cfg.header, String(inv.id)))!;
+}
+
+/** Aktivace první platbou (banka) nebo ručně: faktura první splátky, smlouva aktivní. Vrací fakturu. */
+export async function activateSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
+  if (agr.status === "ended") throw new UserError("@GL:Locked");
+  await ensureSchedule(data, docs, agr, today);
+  const [first] = await data.find(docs.agreementLine, { agreementId: agr.id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
+  if (!first) throw new UserError("@TAX:AgrBeyondEnd");
+  const inv = await issueScheduleLine(data, docs, agr, first, today);
+  await data.update(docs.agreement, String(agr.id), { status: "active", blockedDate: null });
+  return inv;
+}
+
+/** První splátka smlouvy čekající na aktivaci (pro párování první platby podle VS). */
+export async function awaitingScheduleByVs(data: DataApi, vs: string): Promise<{ agreement: RecordData; amount: string } | null> {
+  const docs = REGISTRY.customer;
+  if (!docs || !(await agreementParams(data, docs)).schedule) return null;
+  const list = await data.find(docs.agreement, { vs, status: "awaiting" }, { take: 2 });
+  if (list.length !== 1) return null;
+  const [first] = await data.find(docs.agreementLine, { agreementId: list[0].id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
+  if (!first || (await data.find(docs.agreementLine, { agreementId: list[0].id, status: { in: ["invoiced", "paid"] } }, { take: 1 })).length) return null;
+  return { agreement: list[0], amount: String(first.amount) };
+}
+
+/** Banka: první platba podle VS smlouvy → aktivace (faktura), vrací položku salda faktury pro úhradu. */
+export async function activateScheduleByPayment(data: DataApi, agreementId: string): Promise<RecordData> {
+  const docs = REGISTRY.customer!;
+  const agr = await data.get(docs.agreement, agreementId);
+  if (!agr) throw new UserError("@SYS:NotFound");
+  const inv = await activateSchedule(data, docs, agr);
+  const [t] = await data.find(docs.cfg.partnerTrans, { invoiceId: inv.id, kind: "invoice" }, { take: 1 });
+  if (!t) throw new UserError("@SYS:NotFound");
+  return t;
+}
+
+/** Stav smlouvy podle zaplacenosti faktur kalendáře (po úhradě i v dávce). */
+export async function refreshSchedule(data: DataApi, docs: AgreementDocs, agr: RecordData, today = iso(new Date())) {
+  const prm = await agreementParams(data, docs);
+  const lines = await data.find(docs.agreementLine, { agreementId: agr.id, status: { in: ["invoiced", "paid"] } }, { take: 1000, orderBy: { lineNum: "asc" } });
+  const invIds = lines.filter((l) => l.invoiceId).map((l) => String(l.invoiceId));
+  const trans = invIds.length ? await data.find(docs.cfg.partnerTrans, { invoiceId: { in: invIds }, kind: "invoice" }, { take: 1000 }) : [];
+  const closed = new Set(trans.filter((t) => t.closed).map((t) => String(t.invoiceId)));
+  let paidUntil: string | null = null, overdue = false;
+  for (const l of lines) {
+    const isPaid = l.invoiceId && closed.has(String(l.invoiceId));
+    if (isPaid) {
+      if (l.status !== "paid") await data.update(docs.agreementLine, String(l.id), { status: "paid" });
+      paidUntil = String(l.periodTo).slice(0, 10);
+    } else if (l.dueDate && addDays(String(l.dueDate).slice(0, 10), prm.blockDays) < today) overdue = true;
+  }
+  if (agr.status === "ended" || agr.status === "draft") return String(agr.status);
+  const end = agr.endDate ? String(agr.endDate).slice(0, 10) : null;
+  const planned = await data.find(docs.agreementLine, { agreementId: agr.id, status: "planned" }, { take: 1 });
+  let next = String(agr.status);
+  if (overdue) next = "blocked";
+  else if (lines.length) next = end && paidUntil && paidUntil >= end && today > end && !planned.length ? "ended" : "active";
+  const patch: RecordData = {};
+  if (next !== agr.status) Object.assign(patch, { status: next, blockedDate: next === "blocked" ? today : null });
+  if (paidUntil !== (agr.paidUntil ? String(agr.paidUntil).slice(0, 10) : null)) patch.paidUntil = paidUntil;
+  if (Object.keys(patch).length) await data.update(docs.agreement, String(agr.id), patch);
+  return next;
+}
+
+/** Úhrada faktury (banka): faktura smlouvy v režimu Kalendář → přepočet stavu (odblokování, zaplaceno do). */
+export async function agreementInvoicePaid(data: DataApi, kind: "customer" | "vendor", invoiceId: string) {
+  const docs = REGISTRY[kind];
+  if (!docs) return;
+  const inv = await data.get(docs.cfg.header, invoiceId);
+  if (!inv?.agreementId) return;
+  const agr = await data.get(docs.agreement, String(inv.agreementId));
+  if (agr && (await agreementParams(data, docs)).schedule) await refreshSchedule(data, docs, agr);
+}
+
+/** Dávka v režimu Kalendář: stav podle úhrad, další splátky jen u aktivních (blokovaná nedostane nic). */
+async function runSchedules(data: DataApi, docs: AgreementDocs, today: string, prm: Awaited<ReturnType<typeof agreementParams>>) {
+  let issued = 0, blocked = 0;
+  for (const status of ["active", "blocked"]) {
+    for (const agr of await data.find(docs.agreement, { status }, { take: 1000 })) {
+      const before = String(agr.status);
+      const now = await refreshSchedule(data, docs, agr, today);
+      if (now === "blocked") {
+        if (before !== "blocked") blocked++;
+        continue;
+      }
+      if (now !== "active") continue;
+      const fresh = (await data.get(docs.agreement, String(agr.id)))!;
+      await ensureSchedule(data, docs, fresh, today);
+      for (const ln of await data.find(docs.agreementLine, { agreementId: agr.id, status: "planned" }, { take: 24, orderBy: { lineNum: "asc" } })) {
+        if (addDays(String(ln.periodFrom).slice(0, 10), -prm.renewDays) > today) break;
+        try {
+          await issueScheduleLine(data, docs, (await data.get(docs.agreement, String(agr.id)))!, ln, today);
+          issued++;
+        } catch {
+          break; // tarif bez ceny apod. — smlouva zůstane, jak je
+        }
+      }
+    }
+  }
+  return { issued, blocked };
+}
+
 /** Pole parametrů modulu pro smlouvy. */
 export const agreementParamFields = {
+  agreementMode: { edt: enumEdt(AgreementMode), mandatory: true, default: "advance", help: "@TAX:AgrModeHelp" },
   agreementDueDays: { edt: Edts.Int, label: "@TAX:AgrDueDays", default: 7 },
   agreementBlockDays: { edt: Edts.Int, label: "@TAX:AgrBlockDays", default: 14, help: "@TAX:AgrBlockDaysHelp" },
   agreementRenewDays: { edt: Edts.Int, label: "@TAX:AgrRenewDays", default: 14, help: "@TAX:AgrRenewDaysHelp" },

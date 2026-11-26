@@ -12,7 +12,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { notify } from "@/modules/sys/notify";
 import { ar } from "@/modules/ar";
 import { requestAgreementPayment } from "@/modules/tax/agreements";
-import { advancePrintable } from "@/modules/prt/printables";
+import { advancePrintable, companyData, paymentQr } from "@/modules/prt/printables";
 import { prisma } from "./db";
 import { inTenant } from "./data";
 import { getT } from "./i18n";
@@ -140,6 +140,31 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
         notes: `${t("@INT:Portal")}: ${p.name}`,
       });
       const { advance } = await requestAgreementPayment(api, ar.agreementDocs, (await api.get("ar.agreement", String(agr.id)))!);
+      // režim Kalendář: bez zálohy – platí se první splátka s VS smlouvy (aktivuje smlouvu)
+      if (!advance) {
+        const a2 = (await api.get("ar.agreement", String(agr.id)))!;
+        const [first] = await api.find("ar.agreementLine", { agreementId: agr.id, status: "planned" }, { take: 1, orderBy: { lineNum: "asc" } });
+        const co = await companyData(api, l.ctx.companyId, (a2.currencyId as string) ?? null);
+        const amount = String(first?.amount ?? a2.amount ?? "0");
+        const vs = String(a2.vs ?? "");
+        const dueDate = String(a2.dueDate ?? "").slice(0, 10);
+        await log("accepted", null);
+        await notify(api, { kind: "info", title: "@INT:NotifyAgreement", params: { name, tariff: tariff.name }, href: `/ar/agreement/${agr.id}`, key: `agr-${agr.id}` });
+        return {
+          ok: true,
+          agreementNum: String(a2.agreementNum ?? ""),
+          payment: {
+            amount,
+            currency: "CZK",
+            vs,
+            dueDate,
+            bankAccount: co.bankAccount,
+            iban: co.iban,
+            qr: co.iban ? await paymentQr(api, { iban: co.iban, amount, currency: "CZK", vs, date: dueDate || null, message: `Smlouva ${a2.agreementNum}` }) : "",
+            advanceNum: "",
+          },
+        };
+      }
       const pd = await advancePrintable.dataset(api, l.ctx.companyId, String(advance.id));
       const doc = pd.doc as Record<string, unknown>, co = pd.company as Record<string, unknown>;
       await log("accepted", null);

@@ -33,6 +33,18 @@ Smlouva s tarifem si cenu, délku období a popis doplní sama.
 Lhůty se nastavují v [Parametrech odběratelů](/ar/parameters) (u dodavatelů v jejich parametrech), sekce *Smlouvy*:
 splatnost výzvy, blokovat po splatnosti, výzva před koncem období.
 
+## Placení podle kalendáře (bez zálohy)
+
+V [parametrech odběratelů](/ar/parameters) zvolte **Placení smluv → Kalendář – faktury po aktivaci první platbou** (třeba fitness, kluby).
+
+1. Smlouva dostane **VS** = číslice čísla smlouvy (SM2600012 → 2600012) a můžete vyplnit **číslo členské karty**.
+2. **Vyzvat k platbě** vytvoří **kalendář splátek** (měsíčně nebo ročně podle délky období tarifu; do konce smlouvy, bez konce na rok dopředu). Objednávka ani záloha nevzniká.
+3. **První platba** s VS smlouvy a částkou první splátky (krok párování výpisu *VS smlouvy*) smlouvu **aktivuje**: vznikne objednávka a zaúčtovaná faktura první splátky a platba se na ni spáruje. Platbu kartou nebo hotově na recepci potvrďte tlačítkem **Aktivovat (zaplaceno)**.
+4. Denní dávka pak podle kalendáře vystavuje další splátky (objednávka → faktura = pohledávka, VS smlouvy, splatnost z parametrů). Platby s VS smlouvy se párují na nejstarší neuhrazenou fakturu smlouvy.
+5. Faktura neuhrazená po **splatnosti + lhůtě k blokaci** (parametry, např. splatnost 3 dny a lhůta 0) smlouvu **zablokuje** – další splátky se nevystavují. Úhradou se smlouva zase aktivuje.
+
+Nezaúčtovanou smlouvu, objednávku i nezaplacenou zálohu jde smazat (smaže se i to, co k nim patří); smlouvu s fakturami nebo zaplacenou zálohou ukončete tlačítkem **Ukončit**.
+
 ## Uzavření smlouvy z portálu
 
 1. [Integrace → Portály](/int/portal) → **Nový**, **Účel portálu** = *Smlouva (členství, předplatné)*.

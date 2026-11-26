@@ -18,7 +18,7 @@ import { accountingCurrencyId, convertLines, postVoucher, type PostingLine } fro
 import { checkStatement, decodeGpc, parseGpc } from "./gpc";
 import type { GpcStatement } from "./gpc";
 import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
-import { agreementAdvancePaid } from "@/modules/tax/agreements";
+import { activateScheduleByPayment, agreementAdvancePaid, agreementInvoicePaid, awaitingScheduleByVs } from "@/modules/tax/agreements";
 import { checkStatementChain, journalFromStatement } from "./payments";
 
 const zero = BigInt(0);
@@ -55,7 +55,7 @@ export async function recalcStatement(data: DataApi, statementId: string) {
 const remaining = (t: RecordData) => toCents(t.amountCur ?? t.amount) - toCents(t.paidAmount);
 
 /** Výchozí pořadí, když firma kroky nemá (starší firmy před nasazením nastavení). */
-const DEFAULT_STEPS = [{ method: "vsInvoice", requireAmount: false }, { method: "vsAdvance", requireAmount: false }, { method: "vsPosReceipt", requireAmount: true }, { method: "counterPartner", requireAmount: false }, { method: "rules", requireAmount: false }];
+const DEFAULT_STEPS = [{ method: "vsInvoice", requireAmount: false }, { method: "vsAdvance", requireAmount: false }, { method: "vsAgreement", requireAmount: true }, { method: "vsPosReceipt", requireAmount: true }, { method: "counterPartner", requireAmount: false }, { method: "rules", requireAmount: false }];
 
 /** Účet QR plateb pokladny účtenky (analytika bankovního účtu pro QR) — proti němu jde úhrada z výpisu. */
 async function posReceiptAccount(data: DataApi, receiptId: string): Promise<string> {
@@ -122,6 +122,12 @@ export async function autoMatch(data: DataApi, statementId: string): Promise<num
           (t) => vsOf(t) === line.vs && remaining(t) > zero,
         );
         if (step.requireAmount) cands = cands.filter((t) => remaining(t) === (incoming ? amount : -amount));
+        // faktury jedné smlouvy (kalendář splátek) mají stejný VS → nejstarší neuhrazená; jinak víc dokladů = ručně
+        if (cands.length > 1 && incoming) {
+          const invs = await safe(() => data.find("ar.invoice", { id: { in: cands.map((t) => String(t.invoiceId ?? "")) } }, { take: 100 }), [] as RecordData[]);
+          const agr = new Set(invs.map((x) => String(x.agreementId ?? "")));
+          if (invs.length === cands.length && agr.size === 1 && !agr.has("")) cands = [...cands].sort((a, b) => String(a.dueDate ?? a.date).localeCompare(String(b.dueDate ?? b.date))).slice(0, 1);
+        }
         if (cands.length > 1) return "stop"; // víc dokladů se stejným VS → ručně
         if (!cands.length) return "next";
         return set({ [incoming ? "customerTransId" : "vendorTransId"]: cands[0].id, matchKind: incoming ? "customer" : "vendor" });
@@ -132,6 +138,14 @@ export async function autoMatch(data: DataApi, statementId: string): Promise<num
         if (advs.length > 1) return "stop";
         if (!advs.length) return "next";
         return set({ [incoming ? "customerAdvanceId" : "vendorAdvanceId"]: advs[0].id, matchKind: incoming ? "customerAdvance" : "vendorAdvance" });
+      }
+      case "vsAgreement": {
+        // první platba smlouvy (režim Kalendář): VS smlouvy, smlouva čeká na aktivaci, částka = první splátka
+        if (!line.vs || !incoming) return "next";
+        const w = await safe(() => awaitingScheduleByVs(data, String(line.vs)), null);
+        if (!w) return "next";
+        if (step.requireAmount && toCents(w.amount) !== amount) return "next";
+        return set({ agreementId: w.agreement.id, customerId: w.agreement.customerId, matchKind: "customerAgreement" });
       }
       case "vsPosReceipt": {
         // účtenka z pokladny placená QR platbou: stejný VS a přesně částka účtenky (jen příjem)
@@ -257,6 +271,12 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
   const posting: PostingLine[] = [];
   for (const l of lines) {
     const text = [l.vs ? `VS ${l.vs}` : null, l.message].filter(Boolean).join(" · ") || null;
+    // první platba smlouvy: aktivace = faktura první splátky, platba pak jde na ni jako na běžnou fakturu
+    if (l.matchKind === "customerAgreement") {
+      const t = await activateScheduleByPayment(data, String(l.agreementId));
+      Object.assign(l, { matchKind: "customer", customerTransId: t.id });
+      await data.update("bank.statementLine", String(l.id), { matchKind: "customer", customerTransId: t.id });
+    }
     let other: string;
     if (l.matchKind === "customer") other = await summaryAccount(data, (await data.get("ar.trans", String(l.customerTransId)))!, "customer");
     else if (l.matchKind === "vendor") other = await summaryAccount(data, (await data.get("ap.trans", String(l.vendorTransId)))!, "vendor");
@@ -279,6 +299,7 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
   });
 
   // úhrady do salda: položka „Úhrada“ + navýšení Uhrazeno u faktury
+  const pendingAgreements: ["customer" | "vendor", string][] = [];
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     // QR platba účtenky z pokladny: účtenka je zaplacená
@@ -335,6 +356,8 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
       closed: newPaid >= toCents(inv.amountCur ?? inv.amount),
     });
     if (inv.invoiceId) await data.update(isCust ? "ar.invoice" : "ap.invoice", String(inv.invoiceId), { paidAmount: fromCents(newPaid) });
+    // faktura smlouvy (kalendář): zaplaceno do, odblokování
+    if (inv.invoiceId) pendingAgreements.push([isCust ? "customer" : "vendor", String(inv.invoiceId)]);
     await data.create(obj, {
       [partnerField]: inv[partnerField],
       kind: "payment",
@@ -350,6 +373,7 @@ export async function postStatement(data: DataApi, companyId: string | null, st:
       closed: true,
     });
   }
+  for (const [kind, invoiceId] of pendingAgreements) await agreementInvoicePaid(data, kind, invoiceId);
   await data.update("bank.statement", String(st.id), { status: "posted", voucherId: voucher.id });
 }
 
@@ -469,6 +493,8 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
             ? "customerAdvance"
             : data.vendorAdvanceId
               ? "vendorAdvance"
+              : data.agreementId
+                ? "customerAgreement"
               : data.customerId
                 ? "customerAccount"
                 : data.vendorId

@@ -77,7 +77,7 @@ async function paymentAccount(data: DataApi, org: RecordData | null, currencyId?
   return { bankAccount: "", iban: "", swift: "" };
 }
 
-async function companyData(data: DataApi, companyId: string | null, currencyId?: string | null, bankAccountId?: string | null) {
+export async function companyData(data: DataApi, companyId: string | null, currencyId?: string | null, bankAccountId?: string | null) {
   const org = (await orgOf(data)) as RecordData | null;
   const company = companyId ? await data.get("sys.company", companyId) : null;
   // účet zvolený na dokladu má přednost
@@ -110,7 +110,7 @@ async function companyData(data: DataApi, companyId: string | null, currencyId?:
  * zapnutá transformace určí formát (SPAYD); vypnutá = žádný QR. Bez evidence
  * transformací (starší tenant) platí SPAYD.
  */
-async function paymentQr(data: DataApi, p: Parameters<typeof spayd>[0]): Promise<string> {
+export async function paymentQr(data: DataApi, p: Parameters<typeof spayd>[0]): Promise<string> {
   let list: RecordData[] = [];
   try {
     list = await data.find("sys.transformation", { purpose: "paymentQr" }, { take: 10 });

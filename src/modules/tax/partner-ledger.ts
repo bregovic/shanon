@@ -10,7 +10,7 @@ import { defineObject, type ObjectDef } from "@/core/object";
 import { DIM_NAMES, DupCheck, JournalStatus, dimFields } from "@/modules/gl";
 import { documentLineHandlers, invoiceHandlers, type InvoiceConfig } from "./document";
 import { orderHandlers, releaseOrder, vatPayer } from "./orders";
-import { AgreementStatus, agreementDeleteHooks, agreementHandlers, agreementObject, agreementParamFields, runAgreements, type AgreementDocs } from "./agreements";
+import { AgreementLineStatus, AgreementMode, AgreementStatus, agreementDeleteHooks, agreementHandlers, agreementLineObject, agreementObject, agreementParamFields, runAgreements, type AgreementDocs } from "./agreements";
 import { postingAccount } from "@/modules/gl/setup";
 import { fillFromAres } from "@/modules/gab/ares";
 import { createFromRegistry } from "@/modules/gab/registry-lookup";
@@ -515,6 +515,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   });
 
   const agreement = agreementObject(m, L, partnerId, id(sp.partner), sp.agreementSeq);
+  const agreementLine = agreementLineObject(m, L);
 
   const trans = defineObject({
     id: id("trans"),
@@ -576,7 +577,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
   const orderCfg: InvoiceConfig = { ...cfg, header: order.id, line: orderLine.id, lineHeaderField: "orderId", lockedStatuses: ["invoiced", "cancelled"] };
   const docs = { cfg, order: order.id, orderLine: orderLine.id, invoiceLine: invoiceLine.id, advance: advance.id, vsSource: sp.externalNum ? "externalNum" : "advanceNum" };
   const inv = invoiceHandlers(cfg);
-  const agrDocs: AgreementDocs = { ...docs, agreement: agreement.id, parameters: params.id, partnerField: partnerId, sales: sp.side === 1 };
+  const agrDocs: AgreementDocs = { ...docs, agreement: agreement.id, agreementLine: agreementLine.id, parameters: params.id, partnerField: partnerId, sales: sp.side === 1 };
   const agrDel = agreementDeleteHooks(agrDocs);
 
   return {
@@ -584,8 +585,8 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     cfg,
     /** smlouvy (dávka, portál) */
     agreementDocs: agrDocs,
-    enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ApPaymentState, ProfileAccountCode, AgreementStatus],
-    objects: [params, group, profile, profileLine, partner, agreement, order, orderLine, invoice, invoiceLine, advance, trans],
+    enums: [TransKind, OrderStatus, AdvanceStatus, InvoiceDocType, ApPaymentState, ProfileAccountCode, AgreementStatus, AgreementLineStatus, AgreementMode],
+    objects: [params, group, profile, profileLine, partner, agreement, agreementLine, order, orderLine, invoice, invoiceLine, advance, trans],
     /** smlouvy: výzvy k platbě na další období a blokace po lhůtě (denně) */
     jobs: [
       {

@@ -163,7 +163,7 @@ export function SupplierPortal({ action, info }: { action: string; info: PortalI
     <main className={s.page} style={{ background: look.background }}>
       <div className={s.wrap}>
         <header className={s.hero} style={{ color: look.heroColor }}>
-          <PortalLogo src={info.design.logo} />
+          <PortalLogo src={info.design.logo} onPhoto={info.design.background === "photo"} />
           {info.design.showCompany && <span className={s.company}>{info.companyName}</span>}
           <h1 className={s.title} style={{ margin: 0 }}>
             {info.title}

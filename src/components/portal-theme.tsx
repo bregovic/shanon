@@ -63,10 +63,12 @@ export function PortalTheme({ design, children }: { design: PortalDesign; childr
 }
 
 /** Logo nad nadpisem (nenačte-li se, zmizí). */
-export function PortalLogo({ src }: { src: string | null }) {
+export function PortalLogo({ src, onPhoto }: { src: string | null; onPhoto?: boolean }) {
   if (!src) return null;
+  // na fotce na světlém podkladu – tmavé logo by na ztmavené fotce zaniklo
+  const badge = onPhoto ? { background: "rgba(255, 255, 255, 0.92)", padding: "10px 14px", borderRadius: 12, boxShadow: "0 4px 18px rgba(0, 0, 0, 0.25)" } : {};
   return (
     // eslint-disable-next-line @next/next/no-img-element -- obrázek z portálu (veřejná adresa s klíčem portálu)
-    <img src={src} alt="" style={{ maxHeight: 56, maxWidth: 220, objectFit: "contain", alignSelf: "flex-start", marginBottom: 6 }} onError={(e) => e.currentTarget.remove()} />
+    <img src={src} alt="" style={{ maxHeight: onPhoto ? 64 : 56, maxWidth: 240, objectFit: "contain", alignSelf: "flex-start", marginBottom: 8, ...badge }} onError={(e) => e.currentTarget.remove()} />
   );
 }

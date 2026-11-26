@@ -173,3 +173,77 @@ describe("portál smluv", () => {
     expect(await agreementPortalSubmit(T.tenantId, String(docs.token), base, "10.0.0.4", client)).toBeNull();
   });
 });
+
+describe("smlouva v režimu Kalendář (bez zálohy)", () => {
+  it("výzva = kalendář a VS → první platba aktivuje + faktura → další splátka → blokace → úhrada odblokuje", async () => {
+    const T = (await provisionTenant(client, { code: `t-sch-${run}`, name: "SCH", adminEmail: `sch-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "bank", "inv"], company: { code: "M", name: "Gym" } })).ctx;
+    const acc = async (num: string) => String((await listRecords(T, "gl.account", { filter: { accountNum: num } }, client)).rows[0].id);
+    const [prm] = (await listRecords(T, "ar.parameters", {}, client)).rows;
+    await saveRecord(T, "ar.parameters", String(prm.id), { agreementMode: "schedule", agreementDueDays: 3, agreementBlockDays: 0 }, prm.version as number, client);
+    const g = (await listRecords(T, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(T, "inv.unit", {}, client)).rows[0];
+    const tariff = await saveRecord(T, "inv.item", null, { itemNum: "CLEN1", name: "Členství měsíční", groupId: g.id, unitId: u.id, salesPrice: "1000", priceInclTax: true, agreementMonths: 1 }, undefined, client);
+    const subj = await saveRecord(T, "gab.subject", null, { name: "Petr Silný" }, undefined, client);
+    const [grp] = (await listRecords(T, "ar.group", {}, client)).rows;
+    const cust = await saveRecord(T, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const start = plus(0);
+    const agr = await saveRecord(T, "ar.agreement", null, { customerId: cust.id, itemId: tariff.id, startDate: start, cardNumber: "K-0042" }, undefined, client);
+    let a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
+    expect(a.vs).toBe(String(a.agreementNum).replace(/\D/g, ""));
+    expect(a.cardNumber).toBe("K-0042");
+
+    // výzva: kalendář na rok (12 měsíčních splátek), žádná objednávka ani záloha
+    await runAction(T, "ar.agreement", String(agr.id), "requestPayment", client);
+    a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
+    const lines = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100 }, client)).rows;
+    expect([a.status, lines.length, lines[0].periodFrom, lines[0].periodTo, lines[0].amount]).toEqual(["awaiting", 12, start, periodEnd(start, 1), "1000.00"]);
+    expect((await listRecords(T, "ar.order", { filter: { agreementId: agr.id } }, client)).total).toBe(0);
+    expect((await listRecords(T, "ar.advance", { filter: { agreementId: agr.id } }, client)).total).toBe(0);
+
+    // první platba s VS smlouvy → aktivní, faktura první splátky zaplacená
+    const bank = await saveRecord(T, "bank.account", null, { code: "KB", name: "Účet", accountNum: "123456789/0100", glAccountId: await acc("221000") }, undefined, client);
+    const pay = async (n: number, amount: string, post = true) => {
+      const st = await saveRecord(T, "bank.statement", null, { bankAccountId: bank.id, statementNum: String(n), date: iso(new Date()), openingBalance: "0" }, undefined, client);
+      const ln = await saveRecord(T, "bank.statementLine", null, { statementId: st.id, lineNum: 1, date: iso(new Date()), amount, vs: a.vs }, undefined, client);
+      await runAction(T, "bank.statement", String(st.id), "match", client);
+      const matched = (await getRecord(T, "bank.statementLine", String(ln.id), client))!;
+      if (post) await runAction(T, "bank.statement", String(st.id), "post", client);
+      return matched;
+    };
+    expect((await pay(1, "999", false)).matchKind).not.toBe("customerAgreement"); // jiná částka = ručně
+    const m = await pay(2, "1000");
+    expect(m.matchKind).toBe("customerAgreement");
+    a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
+    let inv = (await listRecords(T, "ar.invoice", { filter: { agreementId: agr.id } }, client)).rows;
+    expect([a.status, a.paidUntil, inv.length, inv[0].status, inv[0].vs, inv[0].paidAmount]).toEqual(["active", periodEnd(start, 1), 1, "posted", a.vs, "1000.00"]);
+    let ls = (await listRecords(T, "ar.agreementLine", { filter: { agreementId: agr.id }, pageSize: 100 }, client)).rows;
+    expect(ls.slice(0, 2).map((l) => l.status)).toEqual(["paid", "planned"]);
+
+    // dávka: druhá splátka se vystaví před začátkem období, splatnost 3 dny
+    const job = async (today: string) => inTenant(T, (s) => runAgreements(s.sys().api(), regDocs(), today), client);
+    const from2 = String(ls[1].periodFrom).slice(0, 10);
+    expect(await job(from2)).toEqual({ issued: 1, blocked: 0 });
+    inv = (await listRecords(T, "ar.invoice", { filter: { agreementId: agr.id }, sort: "invoiceNum" }, client)).rows;
+    const inv2 = inv.find((x) => x.paidAmount !== "1000.00")!;
+    const due2 = iso(new Date(new Date(`${from2}T00:00:00Z`).getTime() + 3 * 86400000));
+    expect([inv.length, String(inv2.dueDate).slice(0, 10), inv2.vs]).toEqual([2, due2, a.vs]);
+    // po splatnosti nezaplaceno → blokovaná, další splátky se nevystavují
+    const late = iso(new Date(new Date(`${due2}T00:00:00Z`).getTime() + 86400000));
+    expect(await job(late)).toEqual({ issued: 0, blocked: 1 });
+    const later = String(ls[3].periodFrom).slice(0, 10);
+    expect(await job(later)).toEqual({ issued: 0, blocked: 0 });
+    expect((await listRecords(T, "ar.invoice", { filter: { agreementId: agr.id } }, client)).total).toBe(2);
+    expect((await getRecord(T, "ar.agreement", String(agr.id), client))!.status).toBe("blocked");
+    // úhrada faktury (VS smlouvy) → odblokováno, zaplaceno do konce 2. splátky
+    const m2 = await pay(3, "1000");
+    expect(m2.matchKind).toBe("customer");
+    a = (await getRecord(T, "ar.agreement", String(agr.id), client))!;
+    expect([a.status, a.paidUntil]).toEqual(["active", String(ls[1].periodTo).slice(0, 10)]);
+
+    // ruční aktivace (zaplaceno na recepci): faktura první splátky, smlouva aktivní
+    const b = await saveRecord(T, "ar.agreement", null, { customerId: cust.id, itemId: tariff.id, startDate: start }, undefined, client);
+    await runAction(T, "ar.agreement", String(b.id), "activate", client);
+    const bb = (await getRecord(T, "ar.agreement", String(b.id), client))!;
+    expect([bb.status, (await listRecords(T, "ar.invoice", { filter: { agreementId: b.id } }, client)).total]).toEqual(["active", 1]);
+  }, 120_000);
+});
