@@ -144,6 +144,11 @@ describe("hromadný import výpisů", () => {
     expect((await rows(T, "gl.journalLine", { journalId: feeJ })).map((l) => [l.debit, l.accountType, l.accountId, l.offsetType, l.offsetBankAccountId])).toEqual([["50.00", "ledger", popl.offsetAccountId, "bank", bank.id]]);
     await expect(runAction(T, "bank.statementLine", String(fee.id), "createJournal", client)).rejects.toMatchObject({ label: "@BANK:LineInJournal" });
 
+    // náhled zápisů výpisu před deníkem: banka MD / odběratel D, nic se neuloží
+    const { previewPosting } = await import("@/server/posting-preview");
+    const pv = await previewPosting(T, "bank.statement", String(st1a.id), client);
+    expect(pv.vouchers[0].lines.map((l) => [l.debit, l.credit])).toEqual([["1000.00", null], [null, "1000.00"]]);
+    expect((await getRecord(T, "bank.statement", String(st1a.id), client))!.status).toBe("draft");
     // deník HK z obou výpisů najednou (hromadná akce = akce po záznamech)
     const sts = await rows(T, "bank.statement", { bankAccountId: bank.id });
     for (const st of sts.filter((x) => x.statementNum !== "003")) await runAction(T, "bank.statement", String(st.id), "createJournal", client);

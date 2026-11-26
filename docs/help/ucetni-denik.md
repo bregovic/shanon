@@ -43,6 +43,8 @@ Každý modul má své deníky: [Obecné deníky](/gl/journal?filter.journalType
 - Sloupec **Vyrovnání** ukazuje *Nevyrovnáno / Částečně / Vyrovnáno*. Změna partnera řádku vyrovnání zruší; **Zrušit vyrovnání** v dialogu také.
 - Zaúčtování uhradí přesně vybrané doklady a částky; řádek bez vyrovnání se dál páruje jednoznačným VS. Ověřit hlídá, že položka patří partnerovi řádku, je otevřená a částky nepřesahují zbytek dokladu ani řádek.
 
+Před vytvořením deníku ukáže výpis **Zobrazit ▾ Náhled dokladu** účetní zápisy nanečisto (banka proti partnerům a účtům, nic se neuloží); nespárovaný řádek náhled ohlásí.
+
 Deník z bankovního výpisu má banku jako pevný protiúčet (vpravo), vlevo partner nebo účet – dimenze partnera se tak doplní z účtu řádku. U výpisu jde deník **Odpojit** (vytvořit znovu); smazání rozpracovaného deníku výpis uvolní sám.
 
 ## Výchozí dimenze a protiúčet

@@ -267,6 +267,8 @@ export const statement = defineObject({
     { id: "recheck", label: "@BANK:Recheck", bulk: true },
   ],
   lockedWhen: { field: "status", equals: "posted" },
+  // Zobrazit ▾ Náhled dokladu: účetní zápisy výpisu nanečisto (stejné jako deník z výpisu / Zaúčtovat), nic se neuloží
+  postingPreview: "post",
 });
 
 export const statementLine = defineObject({
