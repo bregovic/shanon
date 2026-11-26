@@ -156,6 +156,9 @@ export function lookupWhere(f: FieldMeta, values: Values): Record<string, string
   return Object.keys(w).length ? w : undefined;
 }
 
+/** pole jen ke čtení: vzhled zamčeného, ale text jde vybrat a kopírovat */
+const roStyle: React.CSSProperties = { backgroundColor: tokens.colorNeutralBackgroundDisabled, color: tokens.colorNeutralForeground2 };
+
 function FieldInput({
   f,
   where,
@@ -204,15 +207,15 @@ function FieldInput({
       break;
     }
     case "text":
-      control = <Textarea value={v} disabled={disabled} resize="vertical" rows={3} onChange={(_, d) => onChange(f.name, d.value)} />;
+      control = <Textarea value={v} readOnly={disabled} style={disabled ? roStyle : undefined} resize="vertical" rows={3} onChange={(_, d) => !disabled && onChange(f.name, d.value)} />;
       break;
     case "date":
-      control = <DateInput value={v} disabled={disabled} onChange={(iso) => onChange(f.name, iso ?? "")} />;
+      control = disabled ? <Input value={v ? displayValue(f, { [f.name]: v }, "cs") : ""} readOnly style={roStyle} /> : <DateInput value={v} disabled={false} onChange={(iso) => onChange(f.name, iso ?? "")} />;
       break;
     case "datetime": {
       const local = v ? new Date(new Date(v).getTime() - new Date(v).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
       control = (
-        <Input type="datetime-local" value={local} disabled={disabled} onChange={(_, d) => onChange(f.name, d.value ? new Date(d.value).toISOString() : "")} />
+        disabled ? <Input value={v ? displayValue(f, { [f.name]: v }, "cs") : ""} readOnly style={roStyle} /> : <Input type="datetime-local" value={local} onChange={(_, d) => onChange(f.name, d.value ? new Date(d.value).toISOString() : "")} />
       );
       break;
     }
@@ -241,7 +244,9 @@ function FieldInput({
           autoComplete={f.secret ? "new-password" : undefined}
           // zamčené číslo zobrazit česky (12 450,00), editované nechat surové
           value={disabled && v && (f.kind === "decimal" || f.kind === "int") ? displayValue(f, { [f.name]: v }, "cs") : v}
-          disabled={disabled}
+          // jen ke čtení (ne disabled): text jde označit a zkopírovat; tajný údaj zůstane skrytý
+          readOnly={disabled}
+          style={disabled ? roStyle : undefined}
           maxLength={f.maxLength}
           inputMode={f.kind === "decimal" || f.kind === "int" ? "decimal" : undefined}
           input={{ style: { textAlign: f.align } }}

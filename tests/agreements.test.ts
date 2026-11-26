@@ -338,6 +338,11 @@ describe("smlouva v režimu Kalendář (bez zálohy)", () => {
     const firm = await saveRecord(T, "inv.item", null, { itemNum: "FIRMA1", name: "Firemní členství", groupId: g.id, unitId: u.id, salesPrice: "800", priceInclTax: true, agreementMonths: 1, agreementPerUnit: true }, undefined, client);
     const c = await saveRecord(T, "ar.agreement", null, { customerId: cust.id, itemId: firm.id, startDate: start, quantity: 3 }, undefined, client);
     expect([c.amount, c.quantity]).toEqual(["2400.00", 3]);
+    // VS jde přepsat, ale jen jedinečný
+    const cvs = (await getRecord(T, "ar.agreement", String(c.id), client))!;
+    await saveRecord(T, "ar.agreement", String(c.id), { vs: "777123" }, cvs.version as number, client);
+    expect((await getRecord(T, "ar.agreement", String(c.id), client))!.vs).toBe("777123");
+    await expect(saveRecord(T, "ar.agreement", String(agr.id), { vs: "777123" }, (await getRecord(T, "ar.agreement", String(agr.id), client))!.version as number, client)).rejects.toBeTruthy();
     const cv = (await getRecord(T, "ar.agreement", String(c.id), client))!;
     const c2 = await saveRecord(T, "ar.agreement", String(c.id), { quantity: 5 }, cv.version as number, client);
     expect(c2.amount).toBe("4000.00");

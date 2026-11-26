@@ -112,7 +112,8 @@ export function agreementObject(m: string, L: (k: string) => string, partnerId: 
       periodTo: { edt: Edts.TransDate, label: "@TAX:AgrPeriodTo", readOnly: true },
       dueDate: { edt: Edts.TransDate, label: "@TAX:DueDate", readOnly: true },
       /** VS plateb (číslice čísla smlouvy) – platby i faktury kalendáře */
-      vs: { edt: defineEdt({ id: "AgrVs", kind: "string", label: "@TAX:Vs", maxLength: 10 }), readOnly: true },
+      /** VS z čísla smlouvy, jde přepsat (jen číslice); páruje platby smlouvy */
+      vs: { edt: defineEdt({ id: "AgrVs", kind: "string", label: "@TAX:Vs", maxLength: 10, pattern: /^\d{0,10}$/ }), help: "@TAX:AgrVsHelp" },
       /** číslo členské karty (fitness, klub) */
       cardNumber: { edt: defineEdt({ id: "AgrCardNumber", kind: "string", label: "@TAX:AgrCardNumber", maxLength: 40, transform: "trim" }) },
       orderId: { edt: refEdt(`${m}.order`, L("Order")), readOnly: true },
@@ -346,6 +347,11 @@ export function agreementHandlers(docs: AgreementDocs): Record<string, ObjectHan
         }
         if (d.periodMonths === null || d.periodMonths === undefined || d.periodMonths === "") d.periodMonths = 1;
         if (Number(d.periodMonths) < 1) return { periodMonths: "@SYS:InvalidValue" };
+        // ručně změněný VS: jedinečný mezi smlouvami (páruje platby)
+        if (d.vs) {
+          d.vs = String(d.vs).replace(/\s/g, "");
+          if ((await ctx.data.find(docs.agreement, { vs: d.vs }, { take: 2 })).some((x) => x.id !== d.id)) return { vs: "@TAX:AgrVsTaken" };
+        }
         if (d.endDate && d.startDate && String(d.endDate) < String(d.startDate)) return { endDate: "@SYS:InvalidValue" };
         if (!d.amount || toCents(d.amount) <= BigInt(0)) return { amount: "@SYS:Required" };
         if (isNew && !d.currencyId && d[pf]) {
