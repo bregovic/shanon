@@ -9,6 +9,11 @@ import { wakeStation } from "@/server/station-wake";
 
 export const deviceHandlers: Record<string, ObjectHandlers> = {
   "int.device": {
+    /** smazání zařízení: jeho úlohy a pravidla „z tohoto počítače“ pryč (tiskárny se smažou s ním – viz tiskárna) */
+    async beforeDelete(ctx, dev) {
+      for (const j of await ctx.data.find("int.printJob", { deviceId: dev.id }, { take: 5000 })) await ctx.data.remove("int.printJob", String(j.id));
+      for (const r of await ctx.data.find("int.printRule", { fromDeviceId: dev.id }, { take: 500 })) await ctx.data.remove("int.printRule", String(r.id));
+    },
     actions: {
       /**
        * instalace pro Windows: nový párovací kód (3 dny, jednou; předchozí nespotřebovaný přestane platit) →
@@ -36,6 +41,16 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
     },
   },
   "int.devicePrinter": {
+    /** smazání tiskárny (i se zařízením): její úlohy a pravidla pryč, pokladna ji přestane používat */
+    async beforeDelete(ctx, pr) {
+      for (const j of await ctx.data.find("int.printJob", { printerId: pr.id }, { take: 5000 })) await ctx.data.remove("int.printJob", String(j.id));
+      for (const r of await ctx.data.find("int.printRule", { printerId: pr.id }, { take: 500 })) await ctx.data.remove("int.printRule", String(r.id));
+      try {
+        for (const g of await ctx.data.find("pos.register", { stationPrinterId: pr.id }, { take: 100 })) await ctx.data.update("pos.register", String(g.id), { stationPrinterId: null });
+      } catch {
+        /* pokladna vypnutá */
+      }
+    },
     beforeSave(_ctx, d) {
       if (!d.label && d.printerName) d.label = String(d.printerName).slice(0, 120);
       const n = Number(d.copies ?? 1);

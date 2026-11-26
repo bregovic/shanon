@@ -833,7 +833,7 @@ export class Session {
     const def = getObject(objectId);
     assertAccess(this.ctx, def, "delete", this.system);
     // systémové záznamy (rezervace…) maže jen logika modulu, uživatel ne
-    if (def.systemOnly && !this.system) throw new UserError("@SYS:InvalidValue");
+    if (def.systemOnly && !this.system && !def.userDelete) throw new UserError("@SYS:InvalidValue");
     const existing = await this.sys().get(objectId, id);
     if (!existing) throw new UserError("@SYS:NotFound");
     if (def.lockedWhen && existing[def.lockedWhen.field] === def.lockedWhen.equals) throw new UserError("@SYS:Locked");

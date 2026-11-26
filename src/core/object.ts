@@ -117,6 +117,8 @@ export interface ObjectDef {
   systemOnly?: boolean;
   /** systémový záznam smí uživatel opravit (pole, která nejsou readOnly) — nezaloží ani nesmaže (daňové transakce) */
   userCorrect?: boolean;
+  /** systémový záznam, který uživatel s právem mazat smí smazat (tiskové úlohy) */
+  userDelete?: boolean;
   /** parametry modulu: nová firma je při zapnutí modulu převezme ze Společných dat (DAT), `src/server/dat.ts` */
   datTemplate?: boolean;
   /**

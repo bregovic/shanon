@@ -188,6 +188,8 @@ export const printJob = defineObject({
   form: [{ label: "@SYS:General", fields: ["reference", "deviceId", "printerId", "copies", "status", "sentAt", "doneAt", "message"] }],
   indexes: [["deviceId", "status"]],
   defaultSort: { field: "createdAt", dir: "desc" },
+  // staré a zaseknuté úlohy jde smazat (i hromadně)
+  userDelete: true,
   // čekající / odeslanou úlohu jde zrušit (i hromadně ze seznamu); stanice ji pak nevytiskne
   actions: [{ id: "cancel", label: "@INT:PJCancel", bulk: true }],
 });

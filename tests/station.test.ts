@@ -195,6 +195,16 @@ describe("tisková stanice", () => {
     const opts = (await refOptions(P, "int.devicePrinter", "", client)).map((o) => o.title);
     expect(opts.some((t) => t.includes("EPSON TM-T20III"))).toBe(true);
     expect(opts.some((t) => /Snagit|PDF|HP LaserJet/.test(t))).toBe(false);
+    // tiskovou úlohu i celé zařízení (s tiskárnami, pravidly a úlohami) jde smazat
+    const { deleteRecord } = await import("@/server/data");
+    await queueStationPrint(P, "pos.receipt", [rc]);
+    const [j2] = (await listRecords(P, "int.printJob", { filter: { deviceId: paired.deviceId, status: "queued" } }, client)).rows;
+    await deleteRecord(P, "int.printJob", String(j2.id), client);
+    expect(await getRecord(P, "int.printJob", String(j2.id), client)).toBeNull();
+    await queueStationPrint(P, "pos.receipt", [rc]);
+    await deleteRecord(P, "int.device", paired.deviceId, client);
+    expect(await getRecord(P, "int.device", paired.deviceId, client)).toBeNull();
+    expect((await listRecords(P, "int.printRule", { filter: { fromDeviceId: paired.deviceId } }, client)).total).toBe(0);
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

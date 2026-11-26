@@ -169,7 +169,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
       recordTitle={recordTitle}
       readOnly={readOnly}
       canAttach={mayWrite}
-      canDelete={!isNew && !readOnly && can(s.ctx.perms, def.id, "delete")}
+      canDelete={!isNew && (!readOnly || (!!def.userDelete && !locked)) && can(s.ctx.perms, def.id, "delete")}
       showDelete={!isNew && !def.systemOnly && can(s.ctx.perms, def.id, "delete")}
       canDuplicate={!isNew && !def.systemOnly && mayWrite}
       mustChange={dup && "values" in dup && dup.mustChange.length ? { fields: Object.fromEntries(dup.mustChange.map((f) => [f, String(dup.values[f] ?? "")])), text: t("@SYS:ChangeKeyOnCopy") } : undefined}

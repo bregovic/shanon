@@ -68,7 +68,7 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       defaults={defaults}
       canCreate={!def.systemOnly && can(s.ctx.perms, def.id, "write")}
       canWrite={can(s.ctx.perms, def.id, "write")}
-      canDelete={!def.systemOnly && can(s.ctx.perms, def.id, "delete")}
+      canDelete={(!def.systemOnly || !!def.userDelete) && can(s.ctx.perms, def.id, "delete")}
       openInPage={openInPage || !!def.systemOnly}
       initial={{ rows: initial.rows, total: initial.total, totals: initial.totals }}
       focusId={focus}
