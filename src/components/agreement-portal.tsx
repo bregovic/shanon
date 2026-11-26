@@ -5,10 +5,10 @@
  * Po odeslání platební údaje (účet, VS, částka, QR). Bez přihlášení; kontroly a limity hlídá server.
  */
 import { useEffect, useState } from "react";
-import { Button, Checkbox, Field, Input, makeStyles, Spinner, Text, tokens } from "@fluentui/react-components";
+import { Button, Checkbox, Field, Input, makeStyles, Select, Spinner, Text, Textarea, tokens } from "@fluentui/react-components";
 import { CheckmarkCircle48Filled } from "@fluentui/react-icons";
 import QRCode from "qrcode";
-import type { AgreementPortalInfo, AgreementResult } from "@/server/agreement-portal";
+import type { AgreementPortalInfo, AgreementResult, PortalFormField } from "@/server/agreement-portal";
 import { PortalLogo, portalBackground } from "@/components/portal-theme";
 
 const useStyles = makeStyles({
@@ -71,6 +71,9 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
   const footer = info.design.footer ? <Text style={{ whiteSpace: "pre-wrap", textAlign: "center", color: tokens.colorNeutralForeground3 }}>{info.design.footer}</Text> : null;
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({ tariffId: info.tariffs[0]?.id ?? "", firstName: "", lastName: "", email: "", phone: "", street: "", city: "", zipCode: "", startDate: today, consent: false, website: "" });
+  // formulář portálu (Integrace → Formuláře): odpovědi podle klíče pole
+  const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
+  const answer = (k: string, v: string | boolean) => setAnswers((x) => ({ ...x, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<AgreementResult | null>(null);
@@ -85,7 +88,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
+      const r = await fetch(action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, answers }) });
       const j = (await r.json()) as AgreementResult;
       if (!j.ok) setError(j.error ?? "Odeslání se nepodařilo.");
       else setDone(j);
@@ -178,6 +181,16 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
                 </div>
               </div>
 
+              {info.form ? (
+                <div className={s.step}>
+                  <span className={s.stepHead}>2. {info.form.heading || "Vaše údaje"}</span>
+                  {info.form.intro && <Text style={{ whiteSpace: "pre-wrap" }}>{info.form.intro}</Text>}
+                  <div className={s.grid2}>{info.form.fields.map((fl) => formField(fl, answers[fl.key], answer))}</div>
+                  <div className={s.trap} aria-hidden="true">
+                    <Input tabIndex={-1} value={f.website} onChange={set("website")} autoComplete="off" />
+                  </div>
+                </div>
+              ) : (
               <div className={s.step}>
                 <span className={s.stepHead}>2. Vaše údaje</span>
                 <div className={s.grid2}>
@@ -210,6 +223,7 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
                   <Input tabIndex={-1} value={f.website} onChange={set("website")} autoComplete="off" />
                 </div>
               </div>
+              )}
 
               <div className={s.step}>
                 <span className={s.stepHead}>3. Smlouva</span>
@@ -231,5 +245,58 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
         {footer}
       </div>
     </main>
+  );
+}
+
+const AUTO: Record<string, string> = { email: "email", phone: "tel" };
+
+/** Jedno pole formuláře portálu podle typu (text, datum, výběr, souhlas…); celý řádek = přes obě kolony. */
+function formField(fl: PortalFormField, value: string | boolean | undefined, answer: (k: string, v: string | boolean) => void) {
+  const full = fl.width === "full" ? { gridColumn: "1 / -1" } : undefined;
+  const str = typeof value === "string" ? value : "";
+  if (fl.kind === "heading")
+    return (
+      <Text key={fl.key} weight="semibold" size={400} style={{ ...full, marginTop: 8 }}>
+        {fl.label}
+      </Text>
+    );
+  if (fl.kind === "info")
+    return (
+      <Text key={fl.key} style={{ ...full, whiteSpace: "pre-wrap" }}>
+        {fl.label}
+      </Text>
+    );
+  if (fl.kind === "checkbox" || fl.kind === "consent")
+    return (
+      <div key={fl.key} style={full}>
+        <Checkbox checked={value === true} onChange={(_, d) => answer(fl.key, !!d.checked)} label={fl.label + (fl.required ? " *" : "")} />
+        {fl.help && <Text size={200} style={{ display: "block", marginLeft: 32 }}>{fl.help}</Text>}
+      </div>
+    );
+  const input =
+    fl.kind === "longtext" ? (
+      <Textarea value={str} onChange={(_, d) => answer(fl.key, d.value)} resize="vertical" />
+    ) : fl.kind === "select" ? (
+      <Select value={str} onChange={(_, d) => answer(fl.key, d.value)}>
+        <option value="">—</option>
+        {fl.options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </Select>
+    ) : (
+      <Input
+        type={fl.kind === "date" ? "date" : fl.kind === "email" ? "email" : fl.kind === "phone" ? "tel" : "text"}
+        inputMode={fl.kind === "number" ? "decimal" : undefined}
+        value={str}
+        onChange={(_, d) => answer(fl.key, d.value)}
+        autoComplete={AUTO[fl.kind]}
+      />
+    );
+  return (
+    <Field key={fl.key} label={fl.label} required={fl.required} hint={fl.help || undefined} style={full}>
+      {input}
+    </Field>
   );
 }

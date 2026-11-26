@@ -22,7 +22,7 @@ import { invHandlers } from "@/modules/inv/handlers";
 import pos from "@/modules/pos";
 import cash from "@/modules/cash";
 import prt, { PrintDocType, prtHandlers } from "@/modules/prt";
-import { advancePrintable, invoicePrintable, receiptPrintable, vatPaymentPrintable } from "@/modules/prt/printables";
+import { advancePrintable, agreementPrintable, invoicePrintable, receiptPrintable, vatPaymentPrintable } from "@/modules/prt/printables";
 import { isdocHandlers } from "@/modules/prt/isdoc";
 import { cashHandlers } from "@/modules/cash/handlers";
 import { posHandlers } from "@/modules/pos/sale";
@@ -60,7 +60,7 @@ sys.jobs = rateJobs;
 gl.jobs = dimensionJobs;
 int.jobs = intJobs;
 // tisknutelné doklady (definice v Tiskových sestavách, data z modulu dokladu)
-ar.printables = [invoicePrintable, advancePrintable];
+ar.printables = [invoicePrintable, advancePrintable, agreementPrintable];
 pos.printables = [receiptPrintable];
 tax.printables = [vatPaymentPrintable];
 PrintDocType.values = modules.flatMap((m) => (m.printables ?? []).map((p) => ({ value: p.id, label: p.label })));

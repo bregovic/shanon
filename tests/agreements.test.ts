@@ -171,6 +171,51 @@ describe("portál smluv", () => {
     // portál na doklady smlouvu neuzavře
     const docs = await saveRecord(T, "int.portal", null, { name: "Doklady", slug: "faktury" }, undefined, client);
     expect(await agreementPortalSubmit(T.tenantId, String(docs.token), base, "10.0.0.4", client)).toBeNull();
+
+    // formulář portálu: pole, typ, povinnost a kam se uloží
+    const fm = await saveRecord(T, "int.form", null, { code: "CLEN", name: "Přihláška", heading: "Údaje člena" }, undefined, client);
+    const fld = (sequence: number, key: string, label: string, kind: string, mapping = "form", extra: Record<string, unknown> = {}) =>
+      saveRecord(T, "int.formField", null, { formId: fm.id, sequence, key, label, kind, mapping, ...extra }, undefined, client);
+    await fld(1, "jmeno", "Jméno", "text", "subject.firstName", { required: true });
+    await fld(2, "prijmeni", "Příjmení", "text", "subject.lastName", { required: true });
+    await fld(3, "email", "E-mail", "email", "subject.email", { required: true });
+    await fld(4, "narozen", "Datum narození", "date", "form", { required: true });
+    await fld(5, "op", "Číslo OP/pasu", "text");
+    await fld(6, "ulice", "Ulice", "text", "address.street");
+    await fld(7, "obec", "Obec", "text", "address.city");
+    await fld(8, "kulice", "Kontaktní ulice", "text", "contact.street");
+    await fld(9, "kobec", "Kontaktní obec", "text", "contact.city");
+    await fld(10, "druh", "Druh členství", "select", "form", { options: "individuální\nfiremní", required: true });
+    await fld(11, "karta", "Číslo karty", "text", "agreement.cardNumber");
+    await fld(12, "oddil", "Souhlasy", "heading");
+    await fld(13, "marketing", "Souhlasím se zasíláním obchodních sdělení", "checkbox");
+    await fld(14, "vop", "Seznámil jsem se s VOP", "consent");
+    await saveRecord(T, "int.portal", String(p.id), { formId: fm.id }, p.version as number, client);
+    const fi = (await agreementPortalInfo(T.tenantId, String(p.token), client))!;
+    expect([fi.form?.heading, fi.form?.fields.length, fi.form?.fields.find((x) => x.key === "druh")?.options, fi.form?.fields.find((x) => x.key === "vop")?.required]).toEqual(["Údaje člena", 14, ["individuální", "firemní"], true]);
+    expect(JSON.stringify(fi.form)).not.toContain("subject."); // mapování na stránku nejde
+    const ans = { jmeno: "Karel", prijmeni: "Silák", email: "Karel@Example.com", narozen: "1990-05-01", op: "123456789", ulice: "Dělnická 1", obec: "Praha", kulice: "Jiná 2", kobec: "Brno", druh: "individuální", karta: "K-77", marketing: false, vop: true };
+    const sub = (a: Record<string, unknown>) => agreementPortalSubmit(T.tenantId, String(p.token), { ...base, firstName: "", lastName: "", email: "", answers: a as Record<string, string | boolean> }, "10.0.0.5", client);
+    expect(await sub({ ...ans, vop: false })).toMatchObject({ ok: false, error: expect.stringContaining("VOP") });
+    expect(await sub({ ...ans, narozen: "" })).toMatchObject({ ok: false, error: expect.stringContaining("Datum narození") });
+    expect(await sub({ ...ans, druh: "jiný" })).toMatchObject({ ok: false, error: expect.stringContaining("Druh členství") });
+    const rf = (await sub(ans))!;
+    expect(rf.ok).toBe(true);
+    const fa = (await listRecords(T, "ar.agreement", { filter: { agreementNum: rf.agreementNum } }, client)).rows[0];
+    expect(fa.cardNumber).toBe("K-77");
+    expect(JSON.parse(String(fa.formData))).toMatchObject({ narozen: "1990-05-01", op: "123456789", druh: "individuální", marketing: false, vop: true });
+    expect(String(fa.formText)).toContain("Datum narození: 01. 05. 1990");
+    const fs = (await getRecord(T, "gab.subject", String((await getRecord(T, "ar.customer", String(fa.customerId), client))!.subjectId), client))!;
+    expect([fs.name, fs.email]).toEqual(["Karel Silák", "karel@example.com"]);
+    const adr = (await listRecords(T, "gab.address", { filter: { subjectId: fs.id } }, client)).rows.map((a) => [a.kind, a.city]).sort();
+    expect(adr).toEqual([["delivery", "Brno"], ["registered", "Praha"]]);
+    // tisková sestava smlouvy: údaje formuláře jako {form.<klíč>}
+    const { agreementPrintable } = await import("@/modules/prt/printables");
+    const pd = await inTenant(T, (s) => agreementPrintable.dataset(s.sys().api(), T.companyId, String(fa.id)), client);
+    expect((pd.form as Record<string, string>).op).toBe("123456789");
+    expect((pd.form as Record<string, string>).marketing).toBe("ne");
+    expect((pd.doc as Record<string, string>).cardNumber).toBe("K-77");
+    expect((pd.partner as Record<string, string>).contactAddress).toContain("Brno");
   });
 });
 

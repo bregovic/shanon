@@ -1058,6 +1058,135 @@ export const advancePrintable: PrintableDef = {
 };
 
 // ---------------------------------------------------------------------------
+// Smlouva (prodejní smlouva – členství, předplatné)
+// ---------------------------------------------------------------------------
+
+const PERIOD_TEXT: Record<number, string> = { 1: "měsíčně", 3: "čtvrtletně", 6: "pololetně", 12: "ročně" };
+const dmyText = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse().join(". ").replace(/\b0(\d)\./g, "$1.") : "");
+
+/**
+ * Smlouva: firma, člen (subjekt adresáře + trvalá adresa), tarif a období, VS a číslo karty, odpovědi formuláře
+ * portálu jako {form.<klíč>} (zaškrtnutí = „ano“ / „ne“) a čitelně {doc.formText}, znění smlouvy {doc.terms}.
+ */
+async function agreementDataset(data: DataApi, companyId: string | null, id: string) {
+  const agr = await data.get("ar.agreement", id);
+  if (!agr) throw new Error("not found");
+  const company = await companyData(data, companyId, (agr.currencyId as string) ?? null);
+  const cust = await data.get("ar.customer", String(agr.customerId));
+  const subj = cust ? await data.get("gab.subject", String(cust.subjectId)) : null;
+  const addrs = subj ? await data.find("gab.address", { subjectId: subj.id }, { take: 5 }) : [];
+  const fmt = (a?: RecordData) => (a ? [a.street, [a.zipCode, a.city].filter(Boolean).join(" "), a.country && a.country !== "CZ" ? a.country : null].filter(Boolean).join(", ") : "");
+  const reg = addrs.find((a) => a.kind === "registered") ?? addrs[0];
+  const contact = addrs.find((a) => a.kind === "delivery");
+  const item = agr.itemId ? await data.get("inv.item", String(agr.itemId)).catch(() => null) : null;
+  const cur = agr.currencyId ? await data.get("sys.currency", String(agr.currencyId)) : null;
+  const months = Number(agr.periodMonths ?? 1);
+  let form: Record<string, string> = {};
+  try {
+    const raw = JSON.parse(String(agr.formData ?? "{}")) as Record<string, unknown>;
+    form = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, v === true ? "ano" : v === false ? "ne" : String(v ?? "")]));
+  } catch {
+    form = {};
+  }
+  return {
+    company,
+    doc: {
+      title: "SMLOUVA",
+      number: agr.agreementNum,
+      agreementNum: agr.agreementNum,
+      tariff: item?.name ?? agr.description ?? "",
+      description: agr.description ?? "",
+      startDate: agr.startDate,
+      endDate: agr.endDate ? dmyText(agr.endDate) : "na dobu neurčitou",
+      amount: agr.amount,
+      currency: String(cur?.code ?? "CZK"),
+      periodText: PERIOD_TEXT[months] ?? `za ${months} měs.`,
+      vs: agr.vs ?? "",
+      cardNumber: agr.cardNumber ?? "",
+      signedAt: agr.signedAt ? String(agr.signedAt).slice(0, 10) : "",
+      formText: agr.formText ?? "",
+      terms: agr.terms ?? "",
+    },
+    partner: {
+      number: cust?.accountNum ?? "",
+      name: subj?.name ?? "",
+      email: subj?.email ?? "",
+      phone: subj?.phone ?? "",
+      regNo: subj?.regNo ?? "",
+      address: fmt(reg),
+      contactAddress: fmt(contact),
+    },
+    form,
+    lines: [],
+  };
+}
+
+function agreementLayout(): PrintLayout {
+  const H = (id: string, x: number, y: number, w: number, text: string, color = MUTED) => T(id, x, y, w, 5, text, { size: 7, bold: true, color });
+  return {
+    paper: "a4",
+    fontSize: 9,
+    elements: [
+      { id: "band", type: "rect", x: 0, y: 0, w: 210, h: 3, style: { fill: ACCENT, color: ACCENT } },
+      { id: "logo", type: "image", x: 15, y: 11, w: 55, h: 20, field: "company.logo" },
+      T("title", 105, 12, 90, 5, "{doc.title}", { size: 8, bold: true, align: "right", color: MUTED }),
+      T("num", 105, 17, 90, 10, "{doc.number}", { size: 18, bold: true, align: "right", color: INK }),
+      H("supH", 15, 37, 85, "SPOLEČNOST"),
+      T("supN", 15, 42, 85, 5, "{company.name}", { size: 10, bold: true, color: INK }),
+      T("supA", 15, 47, 85, 9, "{company.address}", { size: 9, color: INK }),
+      T("supV", 15, 56, 85, 9, "IČO {company.regNo}\n{company.email}  {company.phone}", { size: 9, color: INK }),
+      { id: "custBox", type: "rect", x: 106, y: 35, w: 89, h: 35, style: { fill: PANEL, color: PANEL } },
+      H("custH", 110, 37, 82, "ČLEN"),
+      T("custN", 110, 42, 82, 5, "{partner.name}", { size: 10, bold: true, color: INK }),
+      T("custA", 110, 47, 82, 9, "{partner.address}", { size: 9, color: INK }),
+      T("custC", 110, 56, 82, 12, "{partner.email}\n{partner.phone}", { size: 9, color: INK }),
+      H("memH", 15, 76, 180, "ÚDAJE O ČLENSTVÍ"),
+      T("mem", 15, 81, 180, 24, "Tarif: {doc.tariff}\nOd {doc.startDate:date}, konec: {doc.endDate}\nČlenský poplatek: {doc.amount:money} {doc.currency} {doc.periodText}\nČíslo členské karty: {doc.cardNumber}", { size: 9.5, color: INK }),
+      { id: "payBox", type: "rect", x: 15, y: 106, w: 180, h: 13, style: { fill: PANEL, color: PANEL } },
+      T("pay", 19, 108, 172, 10, "Platba převodem: účet {company.bankAccount}, variabilní symbol {doc.vs}", { size: 9.5, bold: true, color: INK }),
+      H("formH", 15, 124, 180, "ÚDAJE ČLENA"),
+      T("form", 15, 129, 180, 50, "{doc.formText}", { size: 9, color: INK }),
+      H("termsH", 15, 182, 180, "SMLUVNÍ PODMÍNKY"),
+      T("terms", 15, 187, 180, 78, "{doc.terms}", { size: 7.5, color: INK }),
+      T("place", 15, 268, 90, 5, "Uzavřeno dne {doc.signedAt:date}", { size: 9, color: INK }),
+      { id: "sig1", type: "line", x: 15, y: 285, w: 70, h: 0, style: { color: MUTED } },
+      { id: "sig2", type: "line", x: 125, y: 285, w: 70, h: 0, style: { color: MUTED } },
+      T("sig1t", 15, 286, 70, 4, "za Společnost", { size: 7.5, align: "center", color: MUTED }),
+      T("sig2t", 125, 286, 70, 4, "Člen", { size: 7.5, align: "center", color: MUTED }),
+    ],
+  };
+}
+
+export const agreementPrintable: PrintableDef = {
+  id: "ar.agreement",
+  label: "@PRT:DocAgreement",
+  defaultPaper: "a4",
+  numberField: "agreementNum",
+  fields: [
+    ...COMPANY_FIELDS,
+    { path: "doc.agreementNum", label: "@PRT:AgreementNum" },
+    { path: "doc.tariff", label: "@PRT:AgrTariff" },
+    { path: "doc.startDate", label: "@PRT:AgrStart", format: "date" },
+    { path: "doc.endDate", label: "@PRT:AgrEnd" },
+    { path: "doc.amount", label: "@PRT:AgrAmount", format: "money" },
+    { path: "doc.periodText", label: "@PRT:AgrPeriod" },
+    { path: "doc.vs", label: "@PRT:Vs" },
+    { path: "doc.cardNumber", label: "@PRT:AgrCard" },
+    { path: "doc.signedAt", label: "@PRT:AgrSigned", format: "date" },
+    { path: "doc.formText", label: "@PRT:AgrFormText" },
+    { path: "doc.terms", label: "@PRT:AgrTerms" },
+    { path: "partner.name", label: "@PRT:MemberName" },
+    { path: "partner.email", label: "@PRT:MemberEmail" },
+    { path: "partner.phone", label: "@PRT:MemberPhone" },
+    { path: "partner.address", label: "@PRT:MemberAddress" },
+    { path: "partner.contactAddress", label: "@PRT:MemberContact" },
+  ],
+  lineFields: [],
+  dataset: agreementDataset,
+  defaultLayout: agreementLayout,
+};
+
+// ---------------------------------------------------------------------------
 // Účtenka (zjednodušený daňový doklad)
 // ---------------------------------------------------------------------------
 

@@ -165,6 +165,10 @@ export const FORM_CS = {
   FwHalf: "Polovina řádku",
   FwFull: "Celý řádek",
   PortalForm: "Formulář",
+  PortalFormRequired: "Vyplňte: {label}.",
+  PortalFormInvalid: "Zkontrolujte: {label}.",
+  PortalFormConsentMissing: "Potvrďte: {label}.",
+  PortalFormNoName: "Formulář nemá jméno a e-mail člena – v nastavení formuláře u polí zvolte Kam uložit: Člen – jméno / příjmení (nebo celé jméno) a Člen – e-mail.",
   PortalFormHelp: "Údaje, které člen vyplní (Integrace → Formuláře). Prázdné = základní údaje (jméno, kontakt, adresa).",
 };
 
@@ -222,5 +226,9 @@ export const FORM_EN: typeof FORM_CS = {
   FwHalf: "Half row",
   FwFull: "Full row",
   PortalForm: "Form",
+  PortalFormRequired: "Please fill in: {label}.",
+  PortalFormInvalid: "Please check: {label}.",
+  PortalFormConsentMissing: "Please confirm: {label}.",
+  PortalFormNoName: "The form has no member name and e-mail – in the form settings map fields to Member – first / last name (or full name) and Member – e-mail.",
   PortalFormHelp: "What the member fills in (Integration → Forms). Empty = basic details (name, contact, address).",
 };

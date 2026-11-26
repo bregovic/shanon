@@ -1,7 +1,7 @@
 ---
 title: Smlouvy (členství, předplatné)
 module: ar
-objects: ar.agreement, ap.agreement
+objects: ar.agreement, int.form, int.formField, ap.agreement
 order: 25
 summary: Prodejní a nákupní smlouva na opakované období — výzva k platbě, aktivace po platbě, faktura a výnos samy, blokace po lhůtě; uzavření z veřejného portálu.
 ---
@@ -55,6 +55,15 @@ Zájemce vybere tarif, vyplní jméno, e-mail, telefon, adresu a začátek a pot
 v adresáři (osoba), odběratel, prodejní smlouva s potvrzeným zněním a výzva k platbě; zájemce hned uvidí číslo účtu,
 variabilní symbol, částku a QR kód k zaplacení. Stejná osoba (jméno a e-mail) se podruhé nezakládá.
 O nové smlouvě přijde upozornění ve zvonečku.
+
+## Formulář smlouvy na portálu
+
+Co člen na portálu vyplní, nastavíte bez programování v [Integrace → Formuláře](/int/form) a formulář vyberete u portálu (pole **Formulář**).
+
+- **Pole formuláře:** klíč (technický název), popisek, **typ** (text, delší text, e-mail, telefon, datum, číslo, výběr z možností – jedna na řádek, zaškrtávátko, **souhlas** – musí zaškrtnout, nadpis oddílu, informační text), povinné, šířka (půl / celý řádek), nápověda.
+- **Kam uložit:** člen v Adresáři (jméno, příjmení / celé jméno, e-mail, telefon, IČO, DIČ, poznámka), trvalá a kontaktní adresa, smlouva (začátek, konec, číslo členské karty, popis, poznámka), nebo **jen do smlouvy**. Formulář musí mít jméno a e-mail člena.
+- Všechny odpovědi zůstanou u smlouvy (**Údaje z formuláře**).
+- **Tisková sestava Smlouva** (Tiskové sestavy → návrhář): logo, firma, člen, tarif, VS, číslo karty, znění smlouvy a údaje formuláře – jednotlivě `{form.<klíč>}` (např. `{form.datumNarozeni}`, zaškrtnutí = ano / ne) nebo všechny najednou `{doc.formText}`.
 
 ## Na co si dát pozor
 

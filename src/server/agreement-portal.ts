@@ -9,6 +9,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
+import type { RecordData } from "@/core/module";
 import { notify } from "@/modules/sys/notify";
 import { ar } from "@/modules/ar";
 import { requestAgreementPayment } from "@/modules/tax/agreements";
@@ -26,7 +27,19 @@ export interface AgreementTariff {
   description: string;
 }
 
+/** Pole formuláře pro veřejnou stránku (bez mapování – kam se ukládá, ví jen server). */
+export interface PortalFormField {
+  key: string;
+  label: string;
+  kind: string;
+  required: boolean;
+  options: string[];
+  help: string;
+  width: "half" | "full";
+}
+
 export interface AgreementPortalInfo {
+  form: { heading: string; intro: string; fields: PortalFormField[] } | null;
   design: PortalDesign;
   companyName: string;
   title: string;
@@ -47,6 +60,8 @@ export interface AgreementInput {
   zipCode: string;
   startDate: string;
   consent: boolean;
+  /** odpovědi formuláře portálu {klíč: hodnota} */
+  answers?: Record<string, string | boolean>;
 }
 
 export interface AgreementResult {
@@ -58,6 +73,106 @@ export interface AgreementResult {
 
 const today = () => new Date().toISOString().slice(0, 10);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type Api = Parameters<typeof requestAgreementPayment>[0];
+const VALUE_KINDS = new Set(["text", "longtext", "email", "phone", "date", "number", "select", "checkbox", "consent"]);
+
+async function formFields(api: Api, formId: string) {
+  return api.find("int.formField", { formId }, { take: 200, orderBy: { sequence: "asc" } });
+}
+
+/** Formulář portálu pro stránku (bez mapování). */
+async function portalForm(api: Api, formId: string): Promise<AgreementPortalInfo["form"]> {
+  const f = await api.get("int.form", formId);
+  if (!f) return null;
+  const fields = (await formFields(api, formId)).map((x) => ({
+    key: String(x.key),
+    label: String(x.label ?? ""),
+    kind: String(x.kind ?? "text"),
+    required: !!x.required || x.kind === "consent",
+    options: String(x.options ?? "").split("\n").map((o) => o.trim()).filter(Boolean),
+    help: String(x.help ?? ""),
+    width: (x.width === "full" || x.kind === "longtext" || x.kind === "heading" || x.kind === "info" || x.kind === "consent" ? "full" : "half") as "half" | "full",
+  }));
+  return { heading: String(f.heading ?? ""), intro: String(f.intro ?? ""), fields };
+}
+
+interface FormPerson {
+  name: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  zip: string;
+  country: string;
+  start: string;
+  subjectExtra: RecordData;
+  contact: { street: string; city: string; zip: string } | null;
+  agreementExtra: RecordData;
+  formData: string;
+  formText: string;
+}
+
+/**
+ * Odpovědi formuláře: kontrola podle typu a povinnosti, rozepsání podle „Kam uložit“ (člen, adresy, smlouva)
+ * a všechny odpovědi do smlouvy (JSON + čitelný text). Chyba = text pro zájemce.
+ */
+async function formAnswers(api: Api, formId: string, answers: Record<string, unknown>, t: (k: string, p?: Record<string, string>) => string): Promise<FormPerson | string> {
+  const data: Record<string, string | boolean> = {};
+  const lines: string[] = [];
+  const mapped: Record<string, string> = {};
+  for (const f of await formFields(api, formId)) {
+    const kind = String(f.kind ?? "text");
+    if (!VALUE_KINDS.has(kind)) continue;
+    const key = String(f.key), label = String(f.label ?? key);
+    const raw = answers[key];
+    if (kind === "checkbox" || kind === "consent") {
+      const v = raw === true || raw === "true";
+      if ((kind === "consent" || f.required) && !v) return t("@INT:PortalFormConsentMissing", { label });
+      data[key] = v;
+      lines.push(`${label}: ${v ? "ano" : "ne"}`);
+      continue;
+    }
+    let v = String(raw ?? "").trim().slice(0, kind === "longtext" ? 2000 : 300);
+    if (!v) {
+      if (f.required) return t("@INT:PortalFormRequired", { label });
+      data[key] = "";
+      continue;
+    }
+    const opts = String(f.options ?? "").split("\n").map((o) => o.trim()).filter(Boolean);
+    const bad =
+      (kind === "email" && !EMAIL.test(v)) ||
+      (kind === "phone" && v.replace(/\D/g, "").length < 9) ||
+      (kind === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(v)) ||
+      (kind === "number" && !/^-?\d+([.,]\d+)?$/.test(v)) ||
+      (kind === "select" && opts.length > 0 && !opts.includes(v));
+    if (bad) return t("@INT:PortalFormInvalid", { label });
+    if (kind === "email") v = v.toLowerCase();
+    data[key] = v;
+    lines.push(`${label}: ${kind === "date" ? v.split("-").reverse().join(". ") : v}`);
+    if (f.mapping && f.mapping !== "form") mapped[String(f.mapping)] = v;
+  }
+  const m = (k: string) => mapped[k] ?? "";
+  const name = m("subject.name") || [m("subject.firstName"), m("subject.lastName")].filter(Boolean).join(" ");
+  const subjectExtra: RecordData = {};
+  for (const k of ["regNo", "vatId", "notes"]) if (m(`subject.${k}`)) subjectExtra[k] = m(`subject.${k}`);
+  const agreementExtra: RecordData = {};
+  for (const k of ["endDate", "cardNumber", "description", "notes"]) if (m(`agreement.${k}`)) agreementExtra[k] = m(`agreement.${k}`);
+  return {
+    name: name.slice(0, 120),
+    email: m("subject.email"),
+    phone: m("subject.phone"),
+    street: m("address.street"),
+    city: m("address.city"),
+    zip: m("address.zipCode").replace(/\s/g, ""),
+    country: (m("address.country") || "CZ").toUpperCase().slice(0, 2),
+    start: m("agreement.startDate") || new Date().toISOString().slice(0, 10),
+    subjectExtra,
+    contact: m("contact.city") ? { street: m("contact.street"), city: m("contact.city"), zip: m("contact.zipCode").replace(/\s/g, "") } : null,
+    agreementExtra,
+    formData: JSON.stringify(data),
+    formText: lines.join("\n"),
+  };
+}
 
 async function tariffsOf(api: Parameters<typeof requestAgreementPayment>[0]): Promise<AgreementTariff[]> {
   const items = await api.find("inv.item", { agreementMonths: { gt: 0 }, blocked: false }, { take: 50, orderBy: { agreementMonths: "asc" } });
@@ -71,8 +186,13 @@ async function tariffsOf(api: Parameters<typeof requestAgreementPayment>[0]): Pr
 export async function agreementPortalInfo(tenantId: string, token: string, client: PrismaClient = prisma): Promise<AgreementPortalInfo | null> {
   const l = await loadPortal(tenantId, token, client);
   if (!l || l.portal.purpose !== "agreement" || !l.ctx.modules.has("ar")) return null;
-  const tariffs = await inTenant(l.ctx, (s) => tariffsOf(s.sys().api()), client);
+  const { tariffs, form } = await inTenant(
+    l.ctx,
+    async (s) => ({ tariffs: await tariffsOf(s.sys().api()), form: l.portal.formId ? await portalForm(s.sys().api(), String(l.portal.formId)) : null }),
+    client,
+  );
   return {
+    form,
     design: await portalDesign(l, tenantId, token, client),
     companyName: l.companyName,
     title: String(l.portal.title ?? "") || l.companyName,
@@ -92,11 +212,15 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
   const ipHash = createHash("sha256").update(`${l.ctx.tenantId}|${ip}`).digest("hex").slice(0, 32);
   const clip = (v: string, n: number) => String(v ?? "").trim().slice(0, n);
   const first = clip(input.firstName, 60), last = clip(input.lastName, 60);
-  const name = `${first} ${last}`.trim();
-  const email = clip(input.email, 254).toLowerCase();
-  const phone = clip(input.phone, 30);
-  const street = clip(input.street, 120), city = clip(input.city, 80), zip = clip(input.zipCode, 10).replace(/\s/g, "");
-  const start = /^\d{4}-\d{2}-\d{2}$/.test(input.startDate) ? input.startDate : today();
+  let name = `${first} ${last}`.trim();
+  let email = clip(input.email, 254).toLowerCase();
+  let phone = clip(input.phone, 30);
+  let street = clip(input.street, 120), city = clip(input.city, 80), zip = clip(input.zipCode, 10).replace(/\s/g, "");
+  let country = "CZ";
+  let start = /^\d{4}-\d{2}-\d{2}$/.test(input.startDate) ? input.startDate : today();
+  let subjectExtra: RecordData = {}, agreementExtra: RecordData = {};
+  let contact: FormPerson["contact"] = null;
+  let formData: string | null = null, formText: string | null = null;
 
   return inTenant(
     l.ctx,
@@ -116,17 +240,26 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
       if (!tariffs.length) return reject(t("@INT:PortalAgrNoTariff"));
       const tariff = tariffs.find((x) => x.id === input.tariffId);
       if (!tariff) return reject(t("@INT:PortalAgrTariff"));
-      if (!first || !last) return reject(t("@INT:PortalAgrName"));
-      if (!EMAIL.test(email)) return reject(t("@INT:PortalAgrEmail"));
-      if (phone.replace(/\D/g, "").length < 9) return reject(t("@INT:PortalAgrPhone"));
-      if (!street || !city || !/^\d{5}$/.test(zip)) return reject(t("@INT:PortalAgrAddress"));
+      if (p.formId) {
+        // formulář portálu: pole a mapování podle nastavení (Integrace → Formuláře)
+        const r = await formAnswers(api, String(p.formId), input.answers ?? {}, t);
+        if (typeof r === "string") return reject(r);
+        ({ name, email, phone, street, city, zip, country, start, subjectExtra, contact, agreementExtra, formData, formText } = r);
+        if (!name || !EMAIL.test(email)) return reject(t("@INT:PortalFormNoName"));
+      } else {
+        if (!first || !last) return reject(t("@INT:PortalAgrName"));
+        if (!EMAIL.test(email)) return reject(t("@INT:PortalAgrEmail"));
+        if (phone.replace(/\D/g, "").length < 9) return reject(t("@INT:PortalAgrPhone"));
+        if (!street || !city || !/^\d{5}$/.test(zip)) return reject(t("@INT:PortalAgrAddress"));
+      }
       if (start < today()) return reject(t("@INT:PortalAgrStart"));
       if (!input.consent) return reject(t("@INT:PortalAgrConsent"));
 
       // člen: stejná osoba (jméno + e-mail) se nezakládá znovu, jinak nový subjekt s adresou
       const same = (await api.find("gab.subject", { email, type: "person" }, { take: 20 })).find((x) => String(x.name).toLowerCase() === name.toLowerCase());
-      const subject = same ?? (await api.create("gab.subject", { name, type: "person", email, phone, country: "CZ" }));
-      if (!same) await api.create("gab.address", { subjectId: subject.id, kind: "registered", street, city, zipCode: zip, country: "CZ" });
+      const subject = same ?? (await api.create("gab.subject", { name, type: "person", email, phone: phone || null, country, ...subjectExtra }));
+      if (!same && city) await api.create("gab.address", { subjectId: subject.id, kind: "registered", street: street || null, city, zipCode: zip || null, country });
+      if (!same && contact) await api.create("gab.address", { subjectId: subject.id, kind: "delivery", street: contact.street || null, city: contact.city, zipCode: contact.zip || null, country });
       const [have] = await api.find("ar.customer", { subjectId: subject.id }, { take: 1 });
       const customer = have ?? (await api.create("ar.customer", { subjectId: subject.id, groupId: p.agreementGroupId ?? null }));
 
@@ -137,7 +270,10 @@ export async function agreementPortalSubmit(tenantId: string, token: string, inp
         startDate: start,
         signedAt: new Date().toISOString(),
         terms,
-        notes: `${t("@INT:Portal")}: ${p.name}`,
+        ...agreementExtra,
+        notes: [agreementExtra.notes, `${t("@INT:Portal")}: ${p.name}`].filter(Boolean).join("\n"),
+        formData,
+        formText,
       });
       const { advance } = await requestAgreementPayment(api, ar.agreementDocs, (await api.get("ar.agreement", String(agr.id)))!);
       // režim Kalendář: bez zálohy – platí se první splátka s VS smlouvy (aktivuje smlouvu)
