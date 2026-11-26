@@ -40,6 +40,7 @@ import {
 } from "@fluentui/react-icons";
 import NextLink from "next/link";
 import { listAction } from "@/app/actions";
+import { useDragGuard } from "@/lib/use-drag-guard";
 import { displayValue, type FieldMeta } from "@/lib/meta";
 
 type BadgeColor = "danger" | "warning" | "success" | "informative" | "brand" | "important" | "subtle";
@@ -205,6 +206,8 @@ function ColumnMenu({
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(current);
   const inputRef = useRef<HTMLInputElement>(null);
+  // výběr textu v poli filtru tažením myši mimo okénko menu nezavře
+  const guard = useDragGuard();
   const sorted = view.sort === col.name;
   const apply = (v: string) => {
     onFilter(v);
@@ -216,6 +219,7 @@ function ColumnMenu({
       <Menu
         open={open}
         onOpenChange={(_, d) => {
+          if (!guard.allow(d)) return;
           setOpen(d.open);
           if (d.open) {
             setTemp(current);
@@ -231,7 +235,7 @@ function ColumnMenu({
             {current && <Filter24Regular className={s.active} fontSize={16} />}
           </div>
         </MenuTrigger>
-        <MenuPopover>
+        <MenuPopover {...guard.surface}>
           <MenuList>
             <MenuItem icon={<ArrowSortUp24Regular />} onClick={() => onSort("asc")}>
               {labels.sortAsc}

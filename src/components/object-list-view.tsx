@@ -73,6 +73,8 @@ export interface ObjectListProps {
   bulkActions?: { id: string; label: string; icon?: ActionIconName; input?: { name: string; label: string; kind: "date" } }[];
   /** hromadný tisk vybraných dokladů (tisknutelný objekt): adresa `/print/<objekt>/batch` */
   printHref?: string;
+  /** hromadné stažení souborů vybraných (ZIP): `/api/download/<objekt>/bulk/<akce>?ids=` */
+  bulkDownloads?: { id: string; label: string }[];
   /** Tisk rovnou do tiskárny, bez náhledu (účtenka — `PrintableDef.directPrint`) */
   printDirect?: boolean;
   /** texty tiskového dialogu */
@@ -249,6 +251,16 @@ export function ObjectListView(p: ObjectListProps) {
         )}
         {(p.bulkActions ?? []).map((a) => (
           <Button key={a.id} icon={actionIcon(a)} disabled={!selected.length || bulkBusy} onClick={() => (a.input ? setAsk({ id: a.id, label: a.label, input: a.input, value: null }) : void bulk(a.id))}>
+            {a.label}
+          </Button>
+        ))}
+        {(p.bulkDownloads ?? []).map((a) => (
+          <Button
+            key={a.id}
+            icon={<ArrowDownload24Regular />}
+            disabled={!selected.length || selected.length > 100}
+            onClick={() => (window.location.href = `/api/download/${p.objectId}/bulk/${a.id}?ids=${selected.map((x) => String(x.id)).join(",")}`)}
+          >
             {a.label}
           </Button>
         ))}

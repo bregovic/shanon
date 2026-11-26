@@ -342,7 +342,7 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
       { id: "unpost", label: "@TAX:Unpost", when: { field: "status", equals: "posted" }, adminOnly: true, group: "more" as const, confirm: { field: "invoiceNum", text: "@TAX:UnpostConfirm" } },
       ...(sp.side === 1
         ? [
-            { id: "isdoc", label: "@TAX:Isdoc", download: true, module: "prt", group: "print" as const },
+            { id: "isdoc", label: "@TAX:Isdoc", download: true, bulk: true, module: "prt", group: "print" as const },
             { id: "email", label: "@INT:SendByEmail", outside: true, module: "int", when: { field: "status", equals: "posted" }, group: "print" as const },
           ]
         : []),

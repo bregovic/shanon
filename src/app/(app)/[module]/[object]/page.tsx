@@ -80,9 +80,11 @@ export default async function ObjectListPage({ params, searchParams }: { params:
       helpLabel={t("@SYS:HelpOpen")}
       bulkActions={
         can(s.ctx.perms, def.id, "write")
-          ? (def.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon, input: a.input ? { name: a.input.name, label: t(a.input.label), kind: a.input.kind } : undefined }))
+          ? (def.actions ?? []).filter((a) => a.bulk && !a.download && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon, input: a.input ? { name: a.input.name, label: t(a.input.label), kind: a.input.kind } : undefined }))
           : []
       }
+      // hromadné stažení souborů vybraných záznamů v ZIP (ISDOC faktur…) – stačí právo číst
+      bulkDownloads={(def.actions ?? []).filter((a) => a.bulk && a.download && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label) }))}
       printDirect={directPrintObjectIds().has(def.id)}
       printHref={s.ctx.modules.has("prt") && printableObjectIds().has(def.id) ? `/print/${def.id}/batch` : undefined}
       printLabel={t("@PRT:Print")}

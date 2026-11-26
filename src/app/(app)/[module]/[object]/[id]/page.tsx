@@ -111,7 +111,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               // řádek s akcemi (Osamostatnit…) se otevírá na své stránce
               openInPage: !!ld.actions?.some((a) => !a.bulk),
               // hromadné akce nad vybranými řádky (deník z vybraných řádků výpisu…)
-              bulkActions: can(s.ctx.perms, ld.id, "write") ? (ld.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon })) : [],
+              bulkActions: can(s.ctx.perms, ld.id, "write") ? (ld.actions ?? []).filter((a) => a.bulk && !a.download && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon })) : [],
               sortField: ld.defaultSort?.field,
               editable: (l.owned !== false || (!!l.via && !!key)) && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               deletable: !!l.deletable && can(s.ctx.perms, ld.id, "delete"),
