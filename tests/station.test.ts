@@ -202,6 +202,9 @@ describe("tisková stanice", () => {
     await deleteRecord(P, "int.printJob", String(j2.id), client);
     expect(await getRecord(P, "int.printJob", String(j2.id), client)).toBeNull();
     await queueStationPrint(P, "pos.receipt", [rc]);
+    // běžící stanici smazat nejde – nejdřív odpojit
+    await expect(deleteRecord(P, "int.device", paired.deviceId, client)).rejects.toMatchObject({ label: "@INT:DeviceDeleteOnline" });
+    await runAction(P, "int.device", paired.deviceId, "unpair", client);
     await deleteRecord(P, "int.device", paired.deviceId, client);
     expect(await getRecord(P, "int.device", paired.deviceId, client)).toBeNull();
     expect((await listRecords(P, "int.printRule", { filter: { fromDeviceId: paired.deviceId } }, client)).total).toBe(0);

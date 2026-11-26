@@ -11,6 +11,9 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
   "int.device": {
     /** smazání zařízení: jeho úlohy a pravidla „z tohoto počítače“ pryč (tiskárny se smažou s ním – viz tiskárna) */
     async beforeDelete(ctx, dev) {
+      // běžící stanice (ozvala se před chvílí): smazání by ji odpojilo – nejdřív Odpojit, pak smazat
+      const seen = dev.lastSeenAt ? new Date(String(dev.lastSeenAt)).getTime() : 0;
+      if (dev.paired && Date.now() - seen < 5 * 60_000) return "@INT:DeviceDeleteOnline";
       for (const j of await ctx.data.find("int.printJob", { deviceId: dev.id }, { take: 5000 })) await ctx.data.remove("int.printJob", String(j.id));
       for (const r of await ctx.data.find("int.printRule", { fromDeviceId: dev.id }, { take: 500 })) await ctx.data.remove("int.printRule", String(r.id));
     },

@@ -92,7 +92,7 @@ export const device = defineObject({
   defaultSort: { field: "code", dir: "asc" },
   lines: [
     { object: "int.devicePrinter", field: "deviceId", label: "@INT:DevicePrinters", inline: true },
-    { object: "int.printJob", field: "deviceId", label: "@INT:PrintJobs", owned: false },
+    { object: "int.printJob", field: "deviceId", label: "@INT:PrintJobs", owned: false, deletable: true },
   ],
   actions: [
     { id: "installer", label: "@INT:DeviceInstaller", when: { field: "active", equals: true } },
