@@ -7,6 +7,10 @@ import { Fragment } from "react";
 
 const useStyles = makeStyles({
   bar: {
+    // ukotvená pod hlavičkou aplikace (56 px, app-shell): Uložit a drobečky zůstanou vidět i u dlouhého formuláře
+    position: "sticky",
+    top: "56px",
+    zIndex: 90,
     display: "flex",
     alignItems: "center",
     gap: "8px",
