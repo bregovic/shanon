@@ -506,16 +506,21 @@ export const notificationRead = defineObject({
   unique: [["notificationId", "userId"]],
 });
 
-/** Výchozí role organizace: Pokladník (jen pokladna) a Pracovník (jen nahrání dokladů) — jen chybějící kódy. */
-const DEFAULT_ROLES: { code: string; name: string; homeHref: string; perms: [string, "read" | "write" | "delete"][] }[] = [
+/**
+ * Výchozí role organizace (jen chybějící kódy): Pokladník (jen pokladna), Pracovník (jen nahrání dokladů),
+ * Auditor (jen čtení účetnictví: hlavní kniha, pokladní kniha, banka, odběratelé, dodavatelé, DPH a adresář –
+ * zobrazit, tisknout, exportovat; nic nezakládá, neupravuje, nemaže ani neúčtuje).
+ */
+const DEFAULT_ROLES: { code: string; name: string; homeHref?: string; perms: [string, "read" | "write" | "delete"][] }[] = [
   { code: "POKLADNIK", name: "Pokladník", homeHref: "/kasa", perms: [["pos", "write"]] },
   { code: "PRACOVNIK", name: "Pracovník", homeHref: "/int/doc-import", perms: [["int.document", "write"]] },
+  { code: "AUDITOR", name: "Auditor (jen čtení účetnictví)", perms: [["gl", "read"], ["cash", "read"], ["bank", "read"], ["ar", "read"], ["ap", "read"], ["tax", "read"], ["gab", "read"]] },
 ];
 
 async function sysSetup(data: DataApi) {
   for (const r of DEFAULT_ROLES) {
     if ((await data.find("sys.role", { code: r.code }, { take: 1 })).length) continue;
-    const role = await data.create("sys.role", { code: r.code, name: r.name, homeHref: r.homeHref });
+    const role = await data.create("sys.role", { code: r.code, name: r.name, homeHref: r.homeHref ?? null });
     for (const [target, level] of r.perms) await data.create("sys.rolePermission", { roleId: role.id, target, level });
   }
   // transformace (formáty) z registru — jen chybějící
