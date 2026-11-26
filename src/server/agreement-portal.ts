@@ -90,6 +90,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Api = Parameters<typeof requestAgreementPayment>[0];
 const ARES_ROLE: Record<string, string> = {
   "subject.regNo": "lookup", "subject.name": "name", "subject.vatId": "vatId", "address.street": "street", "address.city": "city", "address.zipCode": "zip",
+  // firma jako plátce (firemní členství): jen do smlouvy, ale s ARES
+  "company.regNo": "lookup", "company.name": "name", "company.vatId": "vatId",
 };
 const AUTOFILL: Record<string, string> = {
   "subject.firstName": "given-name", "subject.lastName": "family-name", "subject.name": "name", "subject.email": "email", "subject.phone": "tel",
@@ -112,7 +114,7 @@ async function portalForm(api: Api, formId: string): Promise<AgreementPortalInfo
     label: String(x.label ?? ""),
     kind: String(x.kind ?? "text"),
     required: !!x.required || x.kind === "consent",
-    options: String(x.options ?? "").split("\n").map((o) => o.trim()).filter(Boolean),
+    options: String(x.options ?? "").split(/[\n|]/).map((o) => o.trim()).filter(Boolean),
     help: String(x.help ?? ""),
     showIf: String(x.showIf ?? "").trim(),
     auto: AUTOFILL[String(x.mapping ?? "")] ?? "",
@@ -165,7 +167,7 @@ async function formAnswers(api: Api, formId: string, answers: Record<string, unk
       data[key] = "";
       continue;
     }
-    const opts = String(f.options ?? "").split("\n").map((o) => o.trim()).filter(Boolean);
+    const opts = String(f.options ?? "").split(/[\n|]/).map((o) => o.trim()).filter(Boolean);
     const bad =
       (kind === "email" && !EMAIL.test(v)) ||
       (kind === "phone" && v.replace(/\D/g, "").length < 9) ||
@@ -387,7 +389,7 @@ const aresHits = new Map<string, number[]>();
 export async function agreementPortalAres(tenantId: string, token: string, ico: string, ip: string, client: PrismaClient = prisma) {
   const l = await loadPortal(tenantId, token, client);
   if (!l || l.portal.purpose !== "agreement" || !l.portal.formId) return null;
-  const has = await inTenant(l.ctx, async (s) => (await formFields(s.sys().api(), String(l.portal.formId))).some((f) => f.mapping === "subject.regNo"), client);
+  const has = await inTenant(l.ctx, async (s) => (await formFields(s.sys().api(), String(l.portal.formId))).some((f) => f.mapping === "subject.regNo" || f.mapping === "company.regNo"), client);
   if (!has) return null;
   const clean = String(ico ?? "").replace(/\s/g, "");
   if (!/^\d{6,8}$/.test(clean)) return { ok: false as const, error: "IČO má 8 číslic." };
