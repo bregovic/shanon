@@ -2,7 +2,7 @@
  * Smlouvy (předplatné na období): tarif z položky → výzva k platbě (objednávka + záloha s VS)
  * → úhrada bankou → aktivní do konce období + zaúčtovaná faktura → dávka: další výzva, blokace po lhůtě.
  */
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { createPrisma } from "@/server/db";
 import { deleteRecord, getRecord, inTenant, listRecords, runAction, saveRecord, type Ctx } from "@/server/data";
 import { provisionTenant } from "@/server/provision";
@@ -224,6 +224,23 @@ describe("portál smluv", () => {
     expect((await sub({ ...ans, email: "a1@example.com" }))!.ok).toBe(true);
     expect(await sub({ ...ans, email: "a2@example.com", druh: "firemní" })).toMatchObject({ ok: false, error: expect.stringContaining("IČO") });
     expect((await agreementPortalInfo(T.tenantId, String(p.token), client))!.form!.fields.find((x) => x.key === "email")!.auto).toBe("email");
+
+    // ARES u firemního člena: pole IČO = tlačítko, pole název / sídlo se doplní
+    await fld(16, "firma", "Název firmy", "text", "subject.name", { showIf: "druh=firemní" });
+    await fld(17, "dic", "DIČ", "text", "subject.vatId", { showIf: "druh=firemní" });
+    const fi2 = (await agreementPortalInfo(T.tenantId, String(p.token), client))!.form!.fields;
+    expect([fi2.find((x) => x.key === "ico")!.ares, fi2.find((x) => x.key === "firma")!.ares, fi2.find((x) => x.key === "obec")!.ares]).toEqual(["lookup", "name", "city"]);
+    vi.stubGlobal("fetch", async (url: string) => {
+      const u = String(url);
+      if (u.includes("ekonomicke-subjekty/27082440")) return new Response(JSON.stringify({ ico: "27082440", obchodniJmeno: "Alza.cz a.s.", dic: "CZ27082440", pravniForma: "121", sidlo: { kodStatu: "CZ", nazevObce: "Praha", nazevUlice: "Jankovcova", cisloDomovni: 1522, cisloOrientacni: 53, psc: 17000 } }), { status: 200 });
+      return new Response("{}", { status: 404 });
+    });
+    const { agreementPortalAres } = await import("@/server/agreement-portal");
+    const ar1 = await agreementPortalAres(T.tenantId, String(p.token), "27082440", "10.9.9.9", client);
+    expect(ar1).toMatchObject({ ok: true, name: "Alza.cz a.s.", vatId: "CZ27082440", city: "Praha" });
+    expect(await agreementPortalAres(T.tenantId, String(p.token), "12", "10.9.9.9", client)).toMatchObject({ ok: false });
+    expect(await agreementPortalAres(T.tenantId, String(docs.token), "27082440", "10.9.9.9", client)).toBeNull(); // jen portál smluv s polem IČO
+    vi.unstubAllGlobals();
 
     // obchodní podmínky jako PDF a smlouva e-mailem (vyplněná smlouva + podmínky)
     const { agreementTermsPdf, agreementPortalMail } = await import("@/server/agreement-portal");

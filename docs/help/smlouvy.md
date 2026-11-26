@@ -65,6 +65,7 @@ Co člen na portálu vyplní, nastavíte bez programování v [Integrace → For
 - Všechny odpovědi zůstanou u smlouvy (**Údaje z formuláře**).
 - **Zobrazit, když:** pole se ukáže jen podle jiné odpovědi – `druh=firemní` (výběr), `firma` (zaškrtnuté). Skryté pole se nekontroluje ani neukládá (třeba IČO jen u firemního členství).
 - Člen vyplňuje pohodlně: prohlížeč nabídne uložené jméno, e-mail, telefon a adresu (podle Kam uložit), chyby se ukážou hned u pole a rozepsaný formulář zůstane v prohlížeči, i když stránku zavře.
+- **ARES:** pole s Kam uložit = Člen – IČO má na portálu tlačítko **Načíst z ARES** – doplní pole mapovaná na celé jméno / název firmy, DIČ a trvalou adresu (ulice, obec, PSČ). Hodí se s Zobrazit když (`druh=firemní`).
 - **Obchodní podmínky** (Znění smlouvy u portálu) se na portálu ukážou s nadpisy a odstavci v posuvném okně (Zobrazit celé) a jdou stáhnout jako PDF.
 - **Poslat smlouvu e-mailem** (u portálu, výchozí zapnuto): po uzavření dostane člen vyplněnou smlouvu (sestava Smlouva) a obchodní podmínky v PDF a platební údaje v textu. Odchází napojením pošty; na testovacím serveru dostane e-mail uživatel, ne člen.
 - **Tisková sestava Smlouva** (Tiskové sestavy → návrhář): logo, firma, člen, tarif, VS, číslo karty, znění smlouvy a údaje formuláře – jednotlivě `{form.<klíč>}` (např. `{form.datumNarozeni}`, zaškrtnutí = ano / ne) nebo všechny najednou `{doc.formText}`.

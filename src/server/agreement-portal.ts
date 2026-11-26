@@ -21,6 +21,7 @@ import { loadPortal, portalDesign, type PortalDesign } from "./supplier-portal";
 import { sendAgreementMail } from "./mail";
 import { renderTextPdf } from "./print-pdf";
 import { formFieldVisible } from "@/lib/form-visible";
+import { aresByIco } from "@/modules/gab/ares";
 
 export interface AgreementTariff {
   id: string;
@@ -43,6 +44,8 @@ export interface PortalFormField {
   showIf: string;
   /** nápověda prohlížeči pro automatické vyplnění (given-name, email…) */
   auto: string;
+  /** ARES: „lookup“ = pole IČO s tlačítkem Načíst z ARES, ostatní = co z ARES doplnit (name, vatId, street, city, zip) */
+  ares: string;
 }
 
 export interface AgreementPortalInfo {
@@ -85,6 +88,9 @@ export interface AgreementResult {
 const today = () => new Date().toISOString().slice(0, 10);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Api = Parameters<typeof requestAgreementPayment>[0];
+const ARES_ROLE: Record<string, string> = {
+  "subject.regNo": "lookup", "subject.name": "name", "subject.vatId": "vatId", "address.street": "street", "address.city": "city", "address.zipCode": "zip",
+};
 const AUTOFILL: Record<string, string> = {
   "subject.firstName": "given-name", "subject.lastName": "family-name", "subject.name": "name", "subject.email": "email", "subject.phone": "tel",
   "address.street": "street-address", "address.city": "address-level2", "address.zipCode": "postal-code", "address.country": "country",
@@ -110,6 +116,7 @@ async function portalForm(api: Api, formId: string): Promise<AgreementPortalInfo
     help: String(x.help ?? ""),
     showIf: String(x.showIf ?? "").trim(),
     auto: AUTOFILL[String(x.mapping ?? "")] ?? "",
+    ares: ARES_ROLE[String(x.mapping ?? "")] ?? "",
     width: (x.width === "full" || x.kind === "longtext" || x.kind === "heading" || x.kind === "info" || x.kind === "consent" ? "full" : "half") as "half" | "full",
   }));
   return { heading: String(f.heading ?? ""), intro: String(f.intro ?? ""), fields };
@@ -368,4 +375,28 @@ export async function agreementTermsPdf(tenantId: string, token: string, client:
   const l = await loadPortal(tenantId, token, client);
   if (!l || l.portal.purpose !== "agreement" || !String(l.portal.agreementTerms ?? "").trim()) return null;
   return renderTextPdf(`Obchodní podmínky – ${l.companyName}`, String(l.portal.agreementTerms));
+}
+
+/** Dotazy na ARES z portálu: nejvýš 20 za hodinu z jedné adresy (v paměti serveru – stačí proti zneužití). */
+const aresHits = new Map<string, number[]>();
+
+/**
+ * ARES pro formulář portálu (firemní člen): jen portál smluv, jehož formulář má pole „Člen – IČO“. Vrací název,
+ * DIČ a sídlo; síť mimo transakci.
+ */
+export async function agreementPortalAres(tenantId: string, token: string, ico: string, ip: string, client: PrismaClient = prisma) {
+  const l = await loadPortal(tenantId, token, client);
+  if (!l || l.portal.purpose !== "agreement" || !l.portal.formId) return null;
+  const has = await inTenant(l.ctx, async (s) => (await formFields(s.sys().api(), String(l.portal.formId))).some((f) => f.mapping === "subject.regNo"), client);
+  if (!has) return null;
+  const clean = String(ico ?? "").replace(/\s/g, "");
+  if (!/^\d{6,8}$/.test(clean)) return { ok: false as const, error: "IČO má 8 číslic." };
+  const key = createHash("sha256").update(`${l.ctx.tenantId}|${ip}`).digest("hex").slice(0, 32);
+  const now = Date.now();
+  const hits = (aresHits.get(key) ?? []).filter((t) => t > now - 3600_000);
+  if (hits.length >= 20) return { ok: false as const, error: "Příliš mnoho dotazů. Zkuste to později, nebo údaje vyplňte ručně." };
+  aresHits.set(key, [...hits, now]);
+  const r = await aresByIco(clean.padStart(8, "0")).catch(() => null);
+  if (!r) return { ok: false as const, error: "Firmu s tímto IČO jsme v ARES nenašli." };
+  return { ok: true as const, ico: r.ico, name: r.name, vatId: r.vatId ?? "", street: r.street ?? "", city: r.city ?? "", zip: r.zipCode ?? "", closed: r.closed };
 }

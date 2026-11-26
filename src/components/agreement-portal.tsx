@@ -105,6 +105,25 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
     }
   }, [f, answers, loaded, draftKey]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  // ARES: podle IČO doplnit pole mapovaná na název, DIČ a sídlo (jen co z ARES přijde)
+  const [aresMsg, setAresMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const loadAres = async (icoKey: string) => {
+    setAresMsg(null);
+    try {
+      const r = await fetch(`${action.replace(/\/agreement$/, "/ares")}?ico=${encodeURIComponent(String(answers[icoKey] ?? ""))}`);
+      const j = (await r.json()) as { ok: boolean; error?: string; name?: string; vatId?: string; street?: string; city?: string; zip?: string; closed?: boolean };
+      if (!j.ok) return setAresMsg({ ok: false, text: j.error ?? "ARES teď neodpovídá – vyplňte údaje ručně." });
+      const vals: Record<string, string> = { name: j.name ?? "", vatId: j.vatId ?? "", street: j.street ?? "", city: j.city ?? "", zip: j.zip ?? "" };
+      setAnswers((x) => {
+        const next = { ...x };
+        for (const fl of info.form?.fields ?? []) if (fl.ares && fl.ares !== "lookup" && vals[fl.ares]) next[fl.key] = vals[fl.ares];
+        return next;
+      });
+      setAresMsg({ ok: !j.closed, text: j.closed ? `${j.name} – firma je podle ARES zaniklá.` : `Načteno z ARES: ${j.name}` });
+    } catch {
+      setAresMsg({ ok: false, text: "ARES teď neodpovídá – vyplňte údaje ručně." });
+    }
+  };
   const touch = (k: string) => setTouched((x) => ({ ...x, [k]: true }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -226,7 +245,10 @@ export function AgreementPortal({ action, info }: { action: string; info: Agreem
                   <span className={s.stepHead}>2. {info.form.heading || "Vaše údaje"}</span>
                   {info.form.intro && <Text style={{ whiteSpace: "pre-wrap" }}>{info.form.intro}</Text>}
                   <div className={s.grid2}>
-                    {info.form.fields.filter((fl) => formFieldVisible(fl.showIf, answers)).map((fl) => formField(fl, answers[fl.key], answer, touched[fl.key] ? fieldError(fl, answers[fl.key]) : null, () => touch(fl.key)))}
+                    {info.form.fields.filter((fl) => formFieldVisible(fl.showIf, answers)).map((fl) =>
+                      formField(fl, answers[fl.key], answer, touched[fl.key] ? fieldError(fl, answers[fl.key]) : null, () => touch(fl.key), fl.ares === "lookup" ? () => loadAres(fl.key) : undefined),
+                    )}
+                    {aresMsg && <Text size={200} style={{ gridColumn: "1 / -1", color: aresMsg.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>{aresMsg.text}</Text>}
                   </div>
                   <div className={s.trap} aria-hidden="true">
                     <Input tabIndex={-1} value={f.website} onChange={set("website")} autoComplete="off" />
@@ -311,6 +333,7 @@ function formField(
   answer: (k: string, v: string | boolean) => void,
   error: string | null,
   onBlur: () => void,
+  onAres?: () => void,
 ) {
   const full = fl.width === "full" ? { gridColumn: "1 / -1" } : undefined;
   const str = typeof value === "string" ? value : "";
@@ -354,6 +377,13 @@ function formField(
         onChange={(_, d) => answer(fl.key, d.value)}
         onBlur={onBlur}
         autoComplete={fl.auto || AUTO[fl.kind]}
+        contentAfter={
+          onAres ? (
+            <Button appearance="transparent" size="small" onClick={onAres} disabled={str.replace(/\s/g, "").length < 6}>
+              Načíst z ARES
+            </Button>
+          ) : undefined
+        }
       />
     );
   return (
