@@ -136,6 +136,8 @@ export interface ObjectDef {
     field: string;
     label: LabelRef;
     owned?: boolean;
+    /** přehled (`owned: false`), ze kterého jde vybrané záznamy smazat (výpisy u bankovního účtu); pravidla mazání má objekt řádků */
+    deletable?: boolean;
     copy?: boolean;
     inline?: boolean;
     /** nový řádek v mřížce: pole řádku ← pole hlavičky (datum řádku = datum deníku) */

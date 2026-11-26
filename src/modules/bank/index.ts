@@ -219,7 +219,7 @@ export const account = defineObject({
   defaultSort: { field: "code", dir: "asc" },
   lines: [
     { object: "bank.accountMethod", field: "bankAccountId", label: "@BANK:PaymentMethods" },
-    { object: "bank.statement", field: "bankAccountId", label: "@BANK:Statements", owned: false },
+    { object: "bank.statement", field: "bankAccountId", label: "@BANK:Statements", owned: false, deletable: true },
   ],
   actions: [{ id: "import", label: "@BANK:Import", upload: ".gpc,.txt,.abo,.csv" }],
 });

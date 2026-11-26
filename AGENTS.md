@@ -83,7 +83,7 @@ Architektura: `docs/ARCHITEKTURA.md`. Číst před každou větší změnou.
 - Údaje konkrétních firem (IČO, DIČ, adresy) nepatří do repa (je veřejné) —
   nastavují se přes UI nebo `scripts/company-profile.ts` se souborem zvenku.
 - Řádky, které záznamu nepatří (faktury odběratele, výpisy účtu), mají v `lines`
-  `owned: false` — se záznamem se nemažou a dvojklik otevře jejich vlastní stránku.
+  `owned: false` — se záznamem se nemažou a dvojklik otevře jejich vlastní stránku. `deletable: true` = z přehledu jdou vybrané smazat (výpisy u bankovního účtu; pravidla mazání má objekt řádků).
 - Akce se souborem (importy): `actions: [{ id, label, upload: ".gpc,.txt" }]`,
   obsluha dostane `file` jako třetí parametr. Soubor do 5 MB (`serverActions.bodySizeLimit`).
 - Akce, které vrací soubor (XML pro úřad, PDF): `actions: [{ id, label, download: true }]`

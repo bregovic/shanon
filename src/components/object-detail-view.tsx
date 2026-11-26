@@ -68,6 +68,8 @@ export interface LineSpec {
   groups: FormGroup[];
   defaults: Values;
   editable: boolean;
+  /** jen Smazat (přehled samostatných záznamů, `lines[].deletable`) */
+  deletable?: boolean;
   /** řádky jsou samostatné doklady — dvojklik otevře jejich stránku */
   overview: boolean;
   /** úprava přímo v mřížce (deník) */
@@ -192,14 +194,18 @@ function Lines({ spec, parentId, lang, labels }: { spec: LineSpec; parentId: str
             {a.label}
           </Button>
         ))}
-        {spec.editable && !spec.inline && (
+        {(spec.editable || spec.deletable) && !spec.inline && (
           <>
-            <Button icon={<Add24Regular />} onClick={() => open(null)}>
-              {labels.actions.new}
-            </Button>
-            <Button icon={<Edit24Regular />} disabled={selected.length !== 1} onClick={() => open(selected[0])}>
-              {labels.actions.edit}
-            </Button>
+            {spec.editable && (
+              <>
+                <Button icon={<Add24Regular />} onClick={() => open(null)}>
+                  {labels.actions.new}
+                </Button>
+                <Button icon={<Edit24Regular />} disabled={selected.length !== 1} onClick={() => open(selected[0])}>
+                  {labels.actions.edit}
+                </Button>
+              </>
+            )}
             <Button icon={<Delete24Regular />} disabled={selected.length === 0} onClick={() => setConfirmLines(true)}>
               {labels.actions.delete}
             </Button>
