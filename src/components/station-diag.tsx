@@ -10,6 +10,7 @@ import { Button, Spinner, Text, makeStyles, tokens } from "@fluentui/react-compo
 import { stationDiagnosticsAction, stationRefreshAction, stationTestPageAction } from "@/app/actions";
 import type { StationDiagnostics } from "@/server/station";
 import { stationId } from "@/lib/station-print";
+import { findUsbPrinter, listUsbPrinters, usbSupported, usbTestPrint, type UsbPrinterInfo } from "@/lib/escpos";
 
 const useStyles = makeStyles({
   box: { display: "flex", flexDirection: "column", gap: "4px", padding: "10px 12px", borderRadius: tokens.borderRadiusMedium, background: tokens.colorNeutralBackground2, width: "100%", boxSizing: "border-box" },
@@ -43,6 +44,32 @@ export function StationDiag({ deviceId, auto = true }: { deviceId?: string; auto
     setMsg(T.StationDiagRefreshing ?? "");
     await stationRefreshAction(id).catch(() => null);
     setTimeout(() => void load().then(() => setMsg("")), 4000);
+  };
+  // bez instalace: USB tiskárny připojené k tomuto počítači (WebUSB v Chrome / Edge)
+  const [usbList, setUsbList] = useState<{ info: UsbPrinterInfo; dev: Parameters<typeof usbTestPrint>[0] }[] | null>(null);
+  const [usbMsg, setUsbMsg] = useState("");
+  const usbOk = typeof navigator !== "undefined" && usbSupported();
+  useEffect(() => {
+    // dříve povolené USB tiskárny (bez dotazu)
+    if (!deviceId && typeof navigator !== "undefined" && usbSupported()) void listUsbPrinters().then(setUsbList);
+  }, [deviceId]);
+  const loadUsb = async (ask: boolean) => {
+    setUsbMsg("");
+    try {
+      if (ask) await findUsbPrinter();
+    } catch {
+      /* zrušený výběr */
+    }
+    setUsbList(await listUsbPrinters());
+  };
+  const usbTest = async (x: { info: UsbPrinterInfo; dev: Parameters<typeof usbTestPrint>[0] }) => {
+    try {
+      await usbTestPrint(x.dev, "Shanon – test USB");
+      setUsbMsg(T.StationDiagUsbPrinted ?? "");
+    } catch (e) {
+      // na Windows tiskárnu obvykle drží ovladač – tiskne se přes stanici
+      setUsbMsg(`${T.StationDiagUsbBusy ?? ""} (${(e as Error).message})`);
+    }
   };
   const test = async (printerId: string) => {
     const r = await stationTestPageAction(printerId).catch(() => null);
@@ -101,6 +128,7 @@ export function StationDiag({ deviceId, auto = true }: { deviceId?: string; auto
           )}
         </>
       )}
+      {!d.device && d.source !== "device" && <Text size={200}>{T.StationDiagNoAgent}</Text>}
       <Text size={200}>
         {T.StationDiagReceipt}: {d.receipt ?? T.StationDiagBrowserPrint}
       </Text>
@@ -108,6 +136,35 @@ export function StationDiag({ deviceId, auto = true }: { deviceId?: string; auto
         {T.StationDiagDocs}: {d.documents ?? T.StationDiagBrowserPrint}
       </Text>
       {msg && <Text size={200}>{msg}</Text>}
+      {d.source !== "device" && (
+        <div className={s.list}>
+          <Text weight="semibold">{T.StationDiagUsb}</Text>
+          {!usbOk ? (
+            <Text size={200}>{T.StationDiagUsbNone}</Text>
+          ) : (
+            <>
+              <Text size={200}>{T.StationDiagUsbHint}</Text>
+              <div className={s.row}>
+                <Button size="small" onClick={() => void loadUsb(true)}>
+                  {T.StationDiagUsbFind}
+                </Button>
+              </div>
+              {usbList && usbList.length === 0 && <Text size={200}>{T.StationDiagUsbEmpty}</Text>}
+              {usbList?.map((x) => (
+                <div key={x.info.key} className={s.row}>
+                  <Text size={200}>
+                    <b>{x.info.vendor}</b> {x.info.product} · USB {x.info.ids}
+                  </Text>
+                  <Button size="small" appearance="subtle" onClick={() => void usbTest(x)}>
+                    {T.StationDiagUsbTest}
+                  </Button>
+                </div>
+              ))}
+              {usbMsg && <Text size={200}>{usbMsg}</Text>}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

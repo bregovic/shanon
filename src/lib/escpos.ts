@@ -266,3 +266,41 @@ export async function writeToUsb(dev: UsbDeviceLike, data: Uint8Array) {
     await dev.close().catch(() => undefined);
   }
 }
+
+/** Výrobci účtenkových / štítkových tiskáren (USB vendor id) – pro vyhledání a popis v diagnostice. */
+const POS_VENDORS: Record<number, string> = {
+  0x04b8: "Epson", 0x0519: "Star Micronics", 0x1d90: "Citizen", 0x2730: "Citizen", 0x1504: "Bixolon", 0x0416: "Xprinter / Winbond",
+  0x0483: "Xprinter (STM)", 0x1fc9: "Xprinter (NXP)", 0x28e9: "Gprinter", 0x0dd4: "Custom", 0x154f: "SNBC", 0x0fe6: "ICS (POS-58)",
+  0x6868: "POS-80", 0x0525: "Netchip (POS)", 0x03f0: "HP", 0x04a9: "Canon", 0x04f9: "Brother", 0x0a5f: "Zebra",
+};
+
+export interface UsbPrinterInfo {
+  key: string;
+  vendor: string;
+  product: string;
+  ids: string;
+}
+
+const describe = (d: UsbDeviceLike, i: number): UsbPrinterInfo => ({
+  key: `${d.vendorId}:${d.productId}:${i}`,
+  vendor: POS_VENDORS[d.vendorId] ?? `0x${d.vendorId.toString(16).padStart(4, "0")}`,
+  product: d.productName || "",
+  ids: `${d.vendorId.toString(16).padStart(4, "0")}:${d.productId.toString(16).padStart(4, "0")}`,
+});
+
+/** Už povolené USB tiskárny (bez dotazu). */
+export async function listUsbPrinters(): Promise<{ info: UsbPrinterInfo; dev: UsbDeviceLike }[]> {
+  const list = (await usb()?.getDevices().catch(() => [])) ?? [];
+  return list.map((dev, i) => ({ info: describe(dev, i), dev }));
+}
+
+/** Vyhledat USB tiskárnu (prohlížeč nabídne seznam připojených – výrobci POS tiskáren a třída tiskárna). */
+export async function findUsbPrinter(): Promise<void> {
+  await usb()?.requestDevice({ filters: [...Object.keys(POS_VENDORS).map((v) => ({ vendorId: Number(v) })), { classCode: PRINTER_CLASS }] });
+}
+
+/** Krátký zkušební tisk ESC/POS přímo do USB tiskárny (bez Windows). Chyba = tiskárnu drží ovladač / jiný program. */
+export async function usbTestPrint(dev: UsbDeviceLike, title: string): Promise<void> {
+  const p = new EscPos(32, "cp852").align("center").line(title).line(new Date().toLocaleString("cs-CZ")).line("").line("").line("").raw(0x1d, 0x56, 0x42, 0x00);
+  await writeToUsb(dev, Uint8Array.from(p.bytes));
+}

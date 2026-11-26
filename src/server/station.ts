@@ -391,7 +391,7 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }
 
-const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating"];
+const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy"];
 
 export interface StationDiagnostics {
   /** texty komponenty (jazyk uživatele) */
