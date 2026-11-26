@@ -124,6 +124,8 @@ export const devicePrinter = defineObject({
   },
   titleField: "label",
   list: ["label", "printerName", "paper", "copies", "isDefault", "present", "state", "queued", "stateAt"],
+  // ve výběru tiskárny (Správa tisku, pokladna) jen tiskárny, které Windows právě hlásí
+  lookupWhere: { present: true },
   form: [{ label: "@SYS:General", fields: ["deviceId", "label", "printerName", "paper", "copies", "isDefault", "present"] }],
   unique: [["deviceId", "printerName"]],
   defaultSort: { field: "label", dir: "asc" },

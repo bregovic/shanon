@@ -101,7 +101,8 @@ export async function stationAuth(authorization: string | null) {
 type Station = NonNullable<Awaited<ReturnType<typeof stationAuth>>>;
 
 /** virtuální tiskárny Windows (PDF, XPS, OneNote, fax) se mezi tiskárny zařízení nezapisují */
-const VIRTUAL = /fax|onenote|xps document writer|print to pdf|tisk do pdf|send to/i;
+/** tiskárny, které nejsou skutečné (tisk do souboru, sdílení, záznam obrazovky) – do Shanonu se nehlásí */
+const VIRTUAL = /fax|onenote|xps|pdf|send to|odeslat do|snagit|anydesk|teamviewer|evernote|webex|zoom|foxit|nitro|doro|bullzip|cutepdf/i;
 
 /** Stanice hlásí počítač, verzi a tiskárny Windows — nové tiskárny se zapíší k zařízení (papír odhadem z názvu). */
 const STATES = new Set(["ready", "printing", "offline", "noPaper", "lowPaper", "jammed", "doorOpen", "toner", "error", "unknown"]);

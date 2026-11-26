@@ -1067,7 +1067,7 @@ export const refOptions = (ctx: Ctx, objectId: string, q: string, client?: Prism
       const def = getObject(objectId);
       // hvězdička = hledání podle čísla / kódu (DOD*, *0001), jinak podle textu (u partnerů jméno)
       // omezení z formuláře (lookupFilter): jen existující pole cíle, přesná shoda
-      const filter = Object.fromEntries(Object.entries(where ?? {}).filter(([k, v]) => k in def.fields && typeof v === "string"));
+      const filter: Record<string, unknown> = { ...Object.fromEntries(Object.entries(where ?? {}).filter(([k, v]) => k in def.fields && typeof v === "string")), ...(def.lookupWhere ?? {}) };
       const res = q.includes("*") ? await s.list(objectId, { filters: { [def.titleField]: q.trim() }, filter, pageSize: 30 }) : await s.list(objectId, { q, filter, pageSize: 30 });
       // upřesnění: název (položka, účet…), u odběratele název subjektu (titleRef), jinak druhý textový sloupec
       const sub = nameFieldOf(def) ?? def.list.find((f) => f !== def.titleField && def.fields[f].edt.kind === "string");

@@ -124,6 +124,8 @@ export interface ObjectDef {
    * neupravených kopií (`src/server/dat.ts`); objekt musí mít pole `DAT_FIELDS` (src/core/dat-fields.ts)
    */
   datLayer?: boolean;
+  /** výběr tohoto objektu v odkazech (combobox) jen záznamy s těmito hodnotami – např. tiskárny jen připojené */
+  lookupWhere?: Record<string, unknown>;
   /** podřízené řádky zobrazené ve formuláři (např. řádky dokladu) */
   /**
    * podřízené záznamy zobrazené ve formuláři. `owned: false` = jen přehled

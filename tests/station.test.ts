@@ -183,6 +183,12 @@ describe("tisková stanice", () => {
     await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true, state: "ready" }, { name: "HP LaserJet" }] });
     expect(await helloWanted(st)).toBe(false);
     expect(stationAgentVersion()).toBe("1.1.0");
+    // nabídka tiskáren: jen skutečné a připojené (Snagit / PDF se nehlásí, odpojená se nenabízí)
+    const { refOptions } = await import("@/server/data");
+    await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true }, { name: "Snagit 2022" }, { name: "Adobe PDF" }] });
+    const opts = (await refOptions(P, "int.devicePrinter", "", client)).map((o) => o.title);
+    expect(opts.some((t) => t.includes("EPSON TM-T20III"))).toBe(true);
+    expect(opts.some((t) => /Snagit|PDF|HP LaserJet/.test(t))).toBe(false);
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {
