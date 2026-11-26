@@ -76,4 +76,44 @@ describe("vyrovnání řádku deníku", () => {
     await deleteRecord(C, "gl.journalLine", String(ln3.id), client);
     expect((await listRecords(C, "gl.journalSettlement", { filter: { journalId: j3.id } }, client).catch(() => ({ total: 0 }))).total).toBe(0);
   }, 120_000);
+
+  it("záloha a smlouva (první platba): úhrada zálohy na 324, aktivace smlouvy a úhrada první splátky", async () => {
+    const C = (await provisionTenant(client, { code: `t-js2-${run}`, name: "JS2", adminEmail: `js2-${run}@test.local`, adminPassword: "heslo-12345", modules: ["ar", "bank", "inv"], company: { code: "J", name: "J" } })).ctx;
+    const acc = async (n: string) => String((await listRecords(C, "gl.account", { filter: { accountNum: n } }, client)).rows[0].id);
+    const [grp] = (await listRecords(C, "ar.group", {}, client)).rows;
+    const subj = await saveRecord(C, "gab.subject", null, { name: "Karel Záloha" }, undefined, client);
+    const cust = await saveRecord(C, "ar.customer", null, { subjectId: subj.id, groupId: grp.id }, undefined, client);
+    const a261 = await acc("261000");
+    const adv = await saveRecord(C, "ar.advance", null, { customerId: cust.id, amount: "500", issueDate: "2026-11-20", description: "Záloha" }, undefined, client);
+    // smlouva v režimu Kalendář čeká na první platbu
+    const [prm] = (await listRecords(C, "ar.parameters", {}, client)).rows;
+    await saveRecord(C, "ar.parameters", String(prm.id), { agreementMode: "schedule" }, prm.version as number, client);
+    const g = (await listRecords(C, "inv.itemGroup", {}, client)).rows[0];
+    const u = (await listRecords(C, "inv.unit", {}, client)).rows[0];
+    const tariff = await saveRecord(C, "inv.item", null, { itemNum: "M1", name: "Měsíc", groupId: g.id, unitId: u.id, salesPrice: "800", priceInclTax: true, agreementMonths: 1 }, undefined, client);
+    const agr = await saveRecord(C, "ar.agreement", null, { customerId: cust.id, itemId: tariff.id, startDate: "2026-11-20" }, undefined, client);
+    await runAction(C, "ar.agreement", String(agr.id), "requestPayment", client);
+
+    const j = await saveRecord(C, "gl.journal", null, { date: "2026-11-21", description: "Úhrady" }, undefined, client);
+    const l1 = await saveRecord(C, "gl.journalLine", null, { journalId: j.id, accountType: "ledger", offsetType: "ledger", offsetAccountId: a261 }, undefined, client);
+    const l2 = await saveRecord(C, "gl.journalLine", null, { journalId: j.id, accountType: "ledger", offsetType: "ledger", offsetAccountId: a261 }, undefined, client);
+    const va = await settleView(C, String(l1.id), { type: "advance" }, "cs", client);
+    expect(va.rows.map((r) => [r.type, r.remaining])).toEqual([["advance", "500.00"]]);
+    await settleSave(C, String(l1.id), [{ kind: "customer", type: "advance", transId: va.rows[0].transId, amount: "" }], client);
+    const vg = await settleView(C, String(l2.id), { type: "agreement" }, "cs", client);
+    expect(vg.rows.map((r) => [r.type, r.remaining])).toEqual([["agreement", "800.00"]]);
+    await settleSave(C, String(l2.id), [{ kind: "customer", type: "agreement", transId: vg.rows[0].transId, amount: "" }], client);
+    expect([(await getRecord(C, "gl.journalLine", String(l1.id), client))!.credit, (await getRecord(C, "gl.journalLine", String(l2.id), client))!.credit]).toEqual(["500.00", "800.00"]);
+
+    await runAction(C, "gl.journal", String(j.id), "post", client);
+    expect((await getRecord(C, "ar.advance", String(adv.id), client))!.paidAmount).toBe("500.00");
+    const a = (await getRecord(C, "ar.agreement", String(agr.id), client))!;
+    expect(a.status).toBe("active");
+    const invs = (await listRecords(C, "ar.trans", { filter: { kind: "invoice" } }, client)).rows;
+    expect(invs.map((x) => [x.amount, x.paidAmount, x.closed])).toEqual([["800.00", "800.00", true]]);
+    // záloha šla na účet záloh (324)
+    const a324 = await acc("324000");
+    const tr = (await listRecords(C, "gl.trans", { filter: { accountId: a324 } }, client)).rows;
+    expect(tr.map((x) => x.amount)).toContain("-500.00"); // + DPH ze zálohy (daňový doklad k přijaté platbě)
+  }, 120_000);
 });

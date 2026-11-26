@@ -13,7 +13,9 @@ import { fromCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type EventContext, type ObjectHandlers, type RecordData } from "@/core/module";
 import { allocateVoucher, checkText, convertLines, postVoucher, resolveJournalName, type PostingLine } from "./posting";
 import { dimsOf, offsetDimsOf } from "./dimensions";
-import { applySettlements, checkSettlements, linePartner, settlementsOf } from "./settlement";
+import { applySettlements, checkSettlements, linePartner, settleRef, settlementsOf } from "./settlement";
+import { advanceAccount, recordAdvancePayment } from "@/modules/tax/orders";
+import { activateScheduleByPayment, agreementAdvancePaid } from "@/modules/tax/agreements";
 
 const zero = BigInt(0);
 
@@ -136,8 +138,13 @@ export async function planJournal(data: DataApi, journal: RecordData, companyId:
       if (!off) errors.push({ ref: "@GL:LineAccountMissing", params: { line: String(n) } });
       else legs.push({ ...off, line: l, lineNo: n, amount: -amount, currencyId, amountCur: neg(amountCur), dims: offsetDimsOf(l) });
     }
+    // vyrovnání se zálohou: strana partnera na účet záloh (324 / 314), jako úhrada zálohy z výpisu
+    const advSettle = (settles.get(String(l.id)) ?? []).find((x) => x.settleKind === "advance");
+    if (advSettle)
+      for (const x of legs)
+        if (x.partner && x.partner.kind === advSettle.partnerType) x.accountId = await advanceAccount(data, x.partner.kind, settleRef(advSettle));
     // úhrada s VS otevřené faktury partnera: účet salda, na kterém faktura vznikla (účtovací profil, např. dar 379)
-    if (l.vs) {
+    if (l.vs && !advSettle) {
       for (const x of legs) {
         if (!x.partner) continue;
         const obj = x.partner.kind === "customer" ? "ar.trans" : "ap.trans";
@@ -293,6 +300,13 @@ export function cachedReads(data: DataApi): DataApi {
 
 export async function runJournal(ctx: EventContext, journal: RecordData, dryRun: boolean) {
   const data = cachedReads(ctx.data);
+  // vyrovnání se smlouvou (první platba): zaúčtování smlouvu aktivuje – faktura první splátky, platba ji uhradí
+  if (!dryRun)
+    for (const list of (await settlementsOf(data, String(journal.id))).values())
+      for (const s of list.filter((x) => x.settleKind === "agreement" && x.agreementId)) {
+        const t = await activateScheduleByPayment(data, String(s.agreementId));
+        await data.update("gl.journalSettlement", String(s.id), { settleKind: "invoice", customerTransId: t.id });
+      }
   const plan = await planJournal(data, journal, ctx.companyId);
   // chyby: pro Ověřit text, pro Zaúčtovat první chyba jako výjimka (původní hláška)
   const raw: { ref: string; params?: Record<string, string>; prefix?: string }[] = [...plan.errors];
@@ -392,6 +406,13 @@ async function partnerTrans(data: DataApi, x: Leg, posted: PostingLine, voucher:
   // vyrovnání z dialogu: přesně vybrané doklady a částky (jen strana řádku s partnerem vyrovnání)
   const lp = linePartner(x.line);
   const own = settles.length && lp && lp.kind === p.kind && lp.id === String(p.rec.id) ? settles : [];
+  // záloha: úhrada zálohy (Uhrazeno, položka „Záloha“ v saldu, DPH zálohy) a případně aktivace smlouvy – bez další položky salda
+  const adv = own.find((s) => s.settleKind === "advance");
+  if (adv) {
+    await recordAdvancePayment(data, p.kind, settleRef(adv), { paidCur: -cur, paidAcc: -acc, voucherId: String(voucher.id), documentNum: String(voucher.voucherNum ?? ""), date: voucher.date, vs, currencyId: posted.currencyId ?? null });
+    await agreementAdvancePaid(data, p.kind, settleRef(adv));
+    return;
+  }
   if (own.length) await applySettlements(data, p.kind, own);
   else if (isPayment && vs) {
     const [inv] = (await data.find(obj, { [field]: p.rec.id, kind: "invoice", vs, closed: false }, { take: 1 })) as RecordData[];

@@ -8,7 +8,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { UserError } from "@/core/module";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
-import { linePartner, lineAmount, saveSettlement, settleCandidates, type PartnerKind, type SettleCandidate, type SettleCriteria } from "@/modules/gl/settlement";
+import { linePartner, lineAmount, saveSettlement, settleCandidates, type PartnerKind, type SettleCandidate, type SettleKind, type SettleCriteria } from "@/modules/gl/settlement";
 import { inTenant, type Ctx } from "./data";
 import { prisma } from "./db";
 import { getT } from "./i18n";
@@ -16,7 +16,7 @@ import { getT } from "./i18n";
 const KEYS = [
   "SettleTitle", "SettleHint", "SettlePartnerOnly", "SettleKind", "SettleCustomers", "SettleVendors", "SettleAll", "SettleSearchText", "SettleDateFrom",
   "SettleDateTo", "SettleSearch", "SettlePartner", "SettleDoc", "SettleDue", "SettleRemaining", "SettlePay", "SettleSelected", "SettleLine", "SettleSave",
-  "SettleClear", "SettleNone2", "Vs", "Date", "Amount",
+  "SettleClear", "SettleNone2", "SettleWhat", "SettleKindInvoice", "SettleKindAdvance", "SettleKindAgreement", "Vs", "Date", "Amount",
 ] as const;
 
 export interface SettleView {
@@ -65,8 +65,8 @@ export async function settleView(ctx: Ctx, lineId: string, criteria: SettleCrite
   );
 }
 
-export async function settleSave(ctx: Ctx, lineId: string, items: { kind: PartnerKind; transId: string; amount: string }[], client: PrismaClient = prisma): Promise<void> {
-  if (!UUID.test(lineId) || items.some((i) => !UUID.test(i.transId) || (i.kind !== "customer" && i.kind !== "vendor"))) throw new UserError("@SYS:InvalidValue");
+export async function settleSave(ctx: Ctx, lineId: string, items: { kind: PartnerKind; type?: SettleKind; transId: string; amount: string }[], client: PrismaClient = prisma): Promise<void> {
+  if (!UUID.test(lineId) || items.some((i) => !UUID.test(i.transId) || (i.kind !== "customer" && i.kind !== "vendor") || (i.type && !["invoice", "advance", "agreement"].includes(i.type)))) throw new UserError("@SYS:InvalidValue");
   if (!can(ctx.perms, "gl.journalLine", "write")) throw new UserError("@SYS:NoAccess");
   for (const i of items) if (i.amount && !/^-?\d+([.,]\d{1,2})?$/.test(i.amount.replace(/\s/g, ""))) throw new UserError("@SYS:InvalidValue");
   await inTenant(

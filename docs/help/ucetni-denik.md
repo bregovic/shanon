@@ -35,7 +35,13 @@ Každý modul má své deníky: [Obecné deníky](/gl/journal?filter.journalType
 
 ## Vyrovnání s otevřenými položkami
 
-Řádek, který hradí faktury (nebo dobropisy) odběratele či dodavatele, vyrovnáte tlačítkem **Vyrovnat** nad mřížkou (pro vybraný řádek):
+Řádek, který hradí doklady odběratele či dodavatele, vyrovnáte v menu **Funkce ▾ → Vyrovnat…** nad mřížkou (pro vybraný řádek); **Zrušit vyrovnání** výběr smaže.
+
+V dialogu nejdřív zvolte **Co vyrovnat**:
+- **Faktury a dobropisy** – i víc dokladů najednou a i částečně;
+- **Zálohy** – jedna záloha na řádek a na celou částku řádku; řádek se zaúčtuje na účet záloh (324 / 314) včetně DPH ze zálohy, stejně jako úhrada z výpisu;
+- **Smlouvy – první platba** – smlouva čekající na první platbu (režim Kalendář); částka = první splátka. Zaúčtování smlouvu aktivuje (faktura první splátky) a platba fakturu uhradí.
+
 
 - Dialog ukáže otevřené položky **partnera řádku**; vypnutím *Jen partner řádku* hledáte u všech – podle druhu (odběratelé / dodavatelé), **VS**, **částky**, data a čísla dokladu nebo jména partnera.
 - Zaškrtněte doklady a u každého částku **Uhradit** (předvyplní se zbytek řádku, nejvýš zbytek dokladu) – jde uhradit i část.

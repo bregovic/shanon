@@ -73,6 +73,17 @@ export const JournalSettleStatus = defineEnum({
   ],
 });
 
+/** co řádek deníku vyrovnává: fakturu / dobropis (saldo), zálohu, první platbu smlouvy (aktivace) */
+export const JournalSettleKind = defineEnum({
+  id: "JournalSettleKind",
+  label: "@GL:SettleWhat",
+  values: [
+    { value: "invoice", label: "@GL:SettleKindInvoice" },
+    { value: "advance", label: "@GL:SettleKindAdvance" },
+    { value: "agreement", label: "@GL:SettleKindAgreement" },
+  ],
+});
+
 export const PeriodStatus = defineEnum({
   id: "PeriodStatus",
   label: "@GL:PeriodStatus",
@@ -625,6 +636,7 @@ export const journalLine = defineObject({
     "text",
     "debit",
     "credit",
+    "vs",
     "settleStatus",
     "offsetType",
     "offsetAccountId",
@@ -654,14 +666,18 @@ export const journalSettlement = defineObject({
     journalId: { edt: JournalRef, mandatory: true },
     journalLineId: { edt: refEdt("gl.journalLine", "@GL:JournalLine"), mandatory: true },
     partnerType: { edt: enumEdt(LedgerAccountType), mandatory: true },
+    settleKind: { edt: enumEdt(JournalSettleKind), mandatory: true, default: "invoice" },
     customerTransId: { edt: refEdt("ar.trans", "@GL:SettleTrans"), optionalRef: true },
     vendorTransId: { edt: refEdt("ap.trans", "@GL:SettleTrans"), optionalRef: true },
+    customerAdvanceId: { edt: refEdt("ar.advance", "@GL:SettleKindAdvance"), optionalRef: true },
+    vendorAdvanceId: { edt: refEdt("ap.advance", "@GL:SettleKindAdvance"), optionalRef: true },
+    agreementId: { edt: refEdt("ar.agreement", "@GL:SettleKindAgreement"), optionalRef: true },
     amount: { edt: Edts.AmountCur, label: "@GL:SettleAmount", mandatory: true },
   },
   titleField: "amount",
   indexes: [["journalId"], ["journalLineId"]],
-  list: ["journalLineId", "partnerType", "customerTransId", "vendorTransId", "amount"],
-  form: [{ label: "@SYS:General", fields: ["journalId", "journalLineId", "partnerType", "customerTransId", "vendorTransId", "amount"] }],
+  list: ["journalLineId", "partnerType", "settleKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "agreementId", "amount"],
+  form: [{ label: "@SYS:General", fields: ["journalId", "journalLineId", "partnerType", "settleKind", "customerTransId", "vendorTransId", "customerAdvanceId", "vendorAdvanceId", "agreementId", "amount"] }],
 });
 
 export default defineModule({
@@ -670,7 +686,7 @@ export default defineModule({
   description: "@GL:ModuleDesc",
   icon: "BookNumber",
   dependsOn: ["sys"],
-  enums: [DupCheck, DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus, SystemPosting, JournalType, VoucherAllocation, LedgerAccountType, JournalSettleStatus],
+  enums: [DupCheck, DimSource, DimRequirement, LedgerRateSource, PostingType, AccountType, JournalStatus, PeriodStatus, SystemPosting, JournalType, VoucherAllocation, LedgerAccountType, JournalSettleStatus, JournalSettleKind],
   objects: [parameters, systemAccount, dimension, dimensionValue, dimensionRule, account, fiscalYear, period, voucher, trans, journalName, journal, journalLine, journalSettlement],
   reports: glReports,
   menu: [
@@ -887,6 +903,13 @@ export default defineModule({
       JournalNum: "Číslo deníku",
       JournalLine: "Řádek deníku",
       SettleStatus: "Vyrovnání",
+      SettleWhat: "Co vyrovnat",
+      SettleKindInvoice: "Faktury a dobropisy",
+      SettleKindAdvance: "Zálohy",
+      SettleKindAgreement: "Smlouvy – první platba",
+      SettleFunctions: "Funkce",
+      SettleWhole: "Řádek {line}: záloha nebo smlouva se vyrovnává jedna na řádek a na celou částku řádku.",
+      SettleAgreementAmount: "Řádek {line}: smlouva {doc} čeká na první splátku {rest}.",
       SettleNone: "Nevyrovnáno",
       SettlePartial: "Částečně",
       SettleFull: "Vyrovnáno",
@@ -1138,6 +1161,13 @@ export default defineModule({
       JournalNum: "Journal number",
       JournalLine: "Journal line",
       SettleStatus: "Settlement",
+      SettleWhat: "Settle",
+      SettleKindInvoice: "Invoices and credit notes",
+      SettleKindAdvance: "Advances",
+      SettleKindAgreement: "Agreements – first payment",
+      SettleFunctions: "Functions",
+      SettleWhole: "Line {line}: an advance or agreement is settled one per line for the whole line amount.",
+      SettleAgreementAmount: "Line {line}: agreement {doc} awaits the first instalment {rest}.",
       SettleNone: "Not settled",
       SettlePartial: "Partly",
       SettleFull: "Settled",

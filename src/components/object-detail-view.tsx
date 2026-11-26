@@ -41,7 +41,7 @@ import { Add24Regular, ArrowDownload24Regular, ArrowUpload24Regular, Copy24Regul
 import { PostingPreviewDrawer } from "./posting-preview";
 import type { LineDims } from "./dims-dialog";
 import { ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons";
-import { bulkRecordAction, deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction } from "@/app/actions";
+import { bulkRecordAction, deleteRecordsAction, runRecordAction, runUploadAction, saveRecordAction, duplicateRecordAction, settleSaveAction } from "@/app/actions";
 import { objectHref, type FieldMeta } from "@/lib/meta";
 import type { UiLabels } from "@/server/ui";
 import { DeleteDialog } from "./delete-dialog";
@@ -73,8 +73,8 @@ export interface LineSpec {
   editable: boolean;
   /** jen Smazat (přehled samostatných záznamů, `lines[].deletable`) */
   deletable?: boolean;
-  /** tlačítko Vyrovnat u vybraného řádku (`lines[].settle`) a jeho popisek */
-  settle?: string;
+  /** menu Funkce u vybraného řádku (`lines[].settle`): Vyrovnat…, Zrušit vyrovnání */
+  settle?: { menu: string; settle: string; clear: string };
   /** řádky jsou samostatné doklady — dvojklik otevře jejich stránku */
   overview: boolean;
   /** úprava přímo v mřížce (deník) */
@@ -155,13 +155,34 @@ const useStyles = makeStyles({
 });
 
 /** Vyrovnat: dialog otevřených položek salda k vybranému řádku deníku. */
-function SettleButton({ label, lineId, lang, onSaved }: { label: string; lineId: string | null; lang: string; onSaved: () => void }) {
+function SettleButton({ label, lineId, lang, onSaved }: { label: { menu: string; settle: string; clear: string }; lineId: string | null; lang: string; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string>();
+  const clear = async () => {
+    if (!lineId) return;
+    const r = await settleSaveAction(lineId, []);
+    if (!r.ok) setError(r.message);
+    else {
+      setError(undefined);
+      onSaved();
+    }
+  };
   return (
     <>
-      <Button appearance="subtle" disabled={!lineId} onClick={() => setOpen(true)}>
-        {label}
-      </Button>
+      <Menu>
+        <MenuTrigger disableButtonEnhancement>
+          <Button appearance="subtle" disabled={!lineId} title={error}>
+            {label.menu} ▾
+          </Button>
+        </MenuTrigger>
+        <MenuPopover>
+          <MenuList>
+            <MenuItem onClick={() => setOpen(true)}>{label.settle}…</MenuItem>
+            <MenuItem onClick={() => void clear()}>{label.clear}</MenuItem>
+          </MenuList>
+        </MenuPopover>
+      </Menu>
+      {error && <Text style={{ color: tokens.colorPaletteRedForeground1 }}>{error}</Text>}
       <SettleDialog lineId={lineId} open={open} lang={lang} onClose={() => setOpen(false)} onSaved={() => (setOpen(false), onSaved())} />
     </>
   );

@@ -51,7 +51,7 @@ export function SettleDialog({ lineId, open, onClose, onSaved, lang }: { lineId:
   const s = useStyles();
   const nf = useMemo(() => new Intl.NumberFormat(lang === "en" ? "en-GB" : "cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), [lang]);
   const [view, setView] = useState<SettleView | null>(null);
-  const [crit, setCrit] = useState<SettleCriteria>({ partnerOnly: true });
+  const [crit, setCrit] = useState<SettleCriteria>({ partnerOnly: true, type: "invoice" });
   const [pick, setPick] = useState<Pick>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -80,7 +80,7 @@ export function SettleDialog({ lineId, open, onClose, onSaved, lang }: { lineId:
     // eslint-disable-next-line react-hooks/set-state-in-effect -- nový dialog = nový výběr
     setPick({});
     setView(null);
-    const c: SettleCriteria = { partnerOnly: true };
+    const c: SettleCriteria = { partnerOnly: true, type: "invoice" };
     setCrit(c);
     void load(c);
   }, [open, lineId, load]);
@@ -111,7 +111,7 @@ export function SettleDialog({ lineId, open, onClose, onSaved, lang }: { lineId:
   const save = async (clear = false) => {
     if (!lineId) return;
     setBusy(true);
-    const items = clear ? [] : chosen.map((r) => ({ kind: r.kind, transId: r.transId, amount: String(pick[r.transId] ?? "") }));
+    const items = clear ? [] : chosen.map((r) => ({ kind: r.kind, type: r.type, transId: r.transId, amount: String(pick[r.transId] ?? "") }));
     const r = await settleSaveAction(lineId, items);
     setBusy(false);
     if (!r.ok) return setError(r.message);
@@ -143,6 +143,22 @@ export function SettleDialog({ lineId, open, onClose, onSaved, lang }: { lineId:
                 void load(crit);
               }}
             >
+              <Field label={T.SettleWhat}>
+                <Select
+                  value={crit.type ?? "invoice"}
+                  onChange={(_, d) => {
+                    // jiný druh = jiný výběr
+                    const c = { ...crit, type: d.value as SettleCriteria["type"] };
+                    setCrit(c);
+                    setPick({});
+                    void load(c);
+                  }}
+                >
+                  <option value="invoice">{T.SettleKindInvoice}</option>
+                  <option value="advance">{T.SettleKindAdvance}</option>
+                  <option value="agreement">{T.SettleKindAgreement}</option>
+                </Select>
+              </Field>
               {hasPartner && (
                 <Field label={T.SettlePartnerOnly}>
                   <Switch checked={crit.partnerOnly !== false} onChange={(_, d) => setC({ partnerOnly: d.checked })} />

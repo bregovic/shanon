@@ -115,7 +115,7 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
               sortField: ld.defaultSort?.field,
               editable: (l.owned !== false || (!!l.via && !!key)) && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               deletable: !!l.deletable && can(s.ctx.perms, ld.id, "delete"),
-              settle: l.settle ? t("@GL:SettleOpen") : undefined,
+              settle: l.settle ? { menu: t("@GL:SettleFunctions"), settle: t("@GL:SettleOpen"), clear: t("@GL:SettleClear") } : undefined,
               initial: { rows: initial.rows, total: initial.total, totals: initial.totals },
             };
           }),

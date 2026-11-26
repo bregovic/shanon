@@ -1488,7 +1488,7 @@ export async function settleViewAction(lineId: string, criteria: SettleCriteria)
 }
 
 /** Deník → Vyrovnat → Uložit: vybrané položky a částky (prázdný seznam = zrušit vyrovnání). */
-export async function settleSaveAction(lineId: string, items: { kind: "customer" | "vendor"; transId: string; amount: string }[]): Promise<ActionResult<null>> {
+export async function settleSaveAction(lineId: string, items: { kind: "customer" | "vendor"; type?: "invoice" | "advance" | "agreement"; transId: string; amount: string }[]): Promise<ActionResult<null>> {
   const s = await requireSession();
   try {
     await settleSave(s.ctx, lineId, Array.isArray(items) ? items.slice(0, 200) : []);

@@ -1598,33 +1598,43 @@ model GlJournalLine {
 
 /// gl.journalSettlement — generováno z definice objektu
 model GlJournalSettlement {
-  id              String   @id @default(uuid(7)) @db.Uuid
-  tenantId        String   @map("tenant_id") @db.Uuid
-  companyId       String   @map("company_id") @db.Uuid
-  journalId       String   @map("journal_id") @db.Uuid
-  journalLineId   String   @map("journal_line_id") @db.Uuid
-  partnerType     String   @map("partner_type") @db.VarChar(40)
-  customerTransId String?  @map("customer_trans_id") @db.Uuid
-  vendorTransId   String?  @map("vendor_trans_id") @db.Uuid
-  amount          Decimal  @db.Decimal(18, 2)
-  ext             Json     @default("{}")
-  version         Int      @default(1)
-  createdAt       DateTime @default(now()) @map("created_at")
-  createdBy       String?  @map("created_by") @db.Uuid
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy       String?  @map("updated_by") @db.Uuid
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  journalId         String   @map("journal_id") @db.Uuid
+  journalLineId     String   @map("journal_line_id") @db.Uuid
+  partnerType       String   @map("partner_type") @db.VarChar(40)
+  settleKind        String   @default("invoice") @map("settle_kind") @db.VarChar(40)
+  customerTransId   String?  @map("customer_trans_id") @db.Uuid
+  vendorTransId     String?  @map("vendor_trans_id") @db.Uuid
+  customerAdvanceId String?  @map("customer_advance_id") @db.Uuid
+  vendorAdvanceId   String?  @map("vendor_advance_id") @db.Uuid
+  agreementId       String?  @map("agreement_id") @db.Uuid
+  amount            Decimal  @db.Decimal(18, 2)
+  ext               Json     @default("{}")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at")
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy         String?  @map("updated_by") @db.Uuid
 
-  company       SysCompany    @relation("GlJournalSettlement_company", fields: [companyId], references: [id], onDelete: Restrict)
-  journal       GlJournal     @relation("GlJournalSettlement_journal", fields: [journalId], references: [id], onDelete: Restrict)
-  journalLine   GlJournalLine @relation("GlJournalSettlement_journalLine", fields: [journalLineId], references: [id], onDelete: Restrict)
-  customerTrans ArTrans?      @relation("GlJournalSettlement_customerTrans", fields: [customerTransId], references: [id], onDelete: Restrict)
-  vendorTrans   ApTrans?      @relation("GlJournalSettlement_vendorTrans", fields: [vendorTransId], references: [id], onDelete: Restrict)
+  company         SysCompany    @relation("GlJournalSettlement_company", fields: [companyId], references: [id], onDelete: Restrict)
+  journal         GlJournal     @relation("GlJournalSettlement_journal", fields: [journalId], references: [id], onDelete: Restrict)
+  journalLine     GlJournalLine @relation("GlJournalSettlement_journalLine", fields: [journalLineId], references: [id], onDelete: Restrict)
+  customerTrans   ArTrans?      @relation("GlJournalSettlement_customerTrans", fields: [customerTransId], references: [id], onDelete: Restrict)
+  vendorTrans     ApTrans?      @relation("GlJournalSettlement_vendorTrans", fields: [vendorTransId], references: [id], onDelete: Restrict)
+  customerAdvance ArAdvance?    @relation("GlJournalSettlement_customerAdvance", fields: [customerAdvanceId], references: [id], onDelete: Restrict)
+  vendorAdvance   ApAdvance?    @relation("GlJournalSettlement_vendorAdvance", fields: [vendorAdvanceId], references: [id], onDelete: Restrict)
+  agreement       ArAgreement?  @relation("GlJournalSettlement_agreement", fields: [agreementId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, companyId])
   @@index([journalId])
   @@index([journalLineId])
   @@index([customerTransId])
   @@index([vendorTransId])
+  @@index([customerAdvanceId])
+  @@index([vendorAdvanceId])
+  @@index([agreementId])
   @@index([tenantId, companyId, journalId])
   @@index([tenantId, companyId, journalLineId])
   @@map("gl_journal_settlement")
@@ -2385,18 +2395,19 @@ model ArAgreement {
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy      String?   @map("updated_by") @db.Uuid
 
-  company                     SysCompany          @relation("ArAgreement_company", fields: [companyId], references: [id], onDelete: Restrict)
-  customer                    ArCustomer          @relation("ArAgreement_customer", fields: [customerId], references: [id], onDelete: Restrict)
-  item                        InvItem?            @relation("ArAgreement_item", fields: [itemId], references: [id], onDelete: Restrict)
-  currency                    SysCurrency?        @relation("ArAgreement_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  order                       ArOrder?            @relation("ArAgreement_order", fields: [orderId], references: [id], onDelete: Restrict)
-  advance                     ArAdvance?          @relation("ArAgreement_advance", fields: [advanceId], references: [id], onDelete: Restrict)
-  paymentLog                  IntLog?             @relation("ArAgreement_paymentLog", fields: [paymentLogId], references: [id], onDelete: Restrict)
-  arAgreementLine_agreement   ArAgreementLine[]   @relation("ArAgreementLine_agreement")
-  arOrder_agreement           ArOrder[]           @relation("ArOrder_agreement")
-  arInvoice_agreement         ArInvoice[]         @relation("ArInvoice_agreement")
-  arAdvance_agreement         ArAdvance[]         @relation("ArAdvance_agreement")
-  bankStatementLine_agreement BankStatementLine[] @relation("BankStatementLine_agreement")
+  company                       SysCompany            @relation("ArAgreement_company", fields: [companyId], references: [id], onDelete: Restrict)
+  customer                      ArCustomer            @relation("ArAgreement_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  item                          InvItem?              @relation("ArAgreement_item", fields: [itemId], references: [id], onDelete: Restrict)
+  currency                      SysCurrency?          @relation("ArAgreement_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  order                         ArOrder?              @relation("ArAgreement_order", fields: [orderId], references: [id], onDelete: Restrict)
+  advance                       ArAdvance?            @relation("ArAgreement_advance", fields: [advanceId], references: [id], onDelete: Restrict)
+  paymentLog                    IntLog?               @relation("ArAgreement_paymentLog", fields: [paymentLogId], references: [id], onDelete: Restrict)
+  glJournalSettlement_agreement GlJournalSettlement[] @relation("GlJournalSettlement_agreement")
+  arAgreementLine_agreement     ArAgreementLine[]     @relation("ArAgreementLine_agreement")
+  arOrder_agreement             ArOrder[]             @relation("ArOrder_agreement")
+  arInvoice_agreement           ArInvoice[]           @relation("ArInvoice_agreement")
+  arAdvance_agreement           ArAdvance[]           @relation("ArAdvance_agreement")
+  bankStatementLine_agreement   BankStatementLine[]   @relation("BankStatementLine_agreement")
 
   @@index([tenantId, companyId])
   @@index([customerId])
@@ -2695,17 +2706,18 @@ model ArAdvance {
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy     String?   @map("updated_by") @db.Uuid
 
-  company                           SysCompany          @relation("ArAdvance_company", fields: [companyId], references: [id], onDelete: Restrict)
-  customer                          ArCustomer          @relation("ArAdvance_customer", fields: [customerId], references: [id], onDelete: Restrict)
-  order                             ArOrder?            @relation("ArAdvance_order", fields: [orderId], references: [id], onDelete: Restrict)
-  currency                          SysCurrency?        @relation("ArAdvance_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  taxCode                           TaxCode?            @relation("ArAdvance_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  agreement                         ArAgreement?        @relation("ArAdvance_agreement", fields: [agreementId], references: [id], onDelete: Restrict)
-  arAgreement_advance               ArAgreement[]       @relation("ArAgreement_advance")
-  arInvoice_advance                 ArInvoice[]         @relation("ArInvoice_advance")
-  arTrans_advance                   ArTrans[]           @relation("ArTrans_advance")
-  bankStatementLine_customerAdvance BankStatementLine[] @relation("BankStatementLine_customerAdvance")
-  shopOrder_advance                 ShopOrder[]         @relation("ShopOrder_advance")
+  company                             SysCompany            @relation("ArAdvance_company", fields: [companyId], references: [id], onDelete: Restrict)
+  customer                            ArCustomer            @relation("ArAdvance_customer", fields: [customerId], references: [id], onDelete: Restrict)
+  order                               ArOrder?              @relation("ArAdvance_order", fields: [orderId], references: [id], onDelete: Restrict)
+  currency                            SysCurrency?          @relation("ArAdvance_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxCode                             TaxCode?              @relation("ArAdvance_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  agreement                           ArAgreement?          @relation("ArAdvance_agreement", fields: [agreementId], references: [id], onDelete: Restrict)
+  glJournalSettlement_customerAdvance GlJournalSettlement[] @relation("GlJournalSettlement_customerAdvance")
+  arAgreement_advance                 ArAgreement[]         @relation("ArAgreement_advance")
+  arInvoice_advance                   ArInvoice[]           @relation("ArInvoice_advance")
+  arTrans_advance                     ArTrans[]             @relation("ArTrans_advance")
+  bankStatementLine_customerAdvance   BankStatementLine[]   @relation("BankStatementLine_customerAdvance")
+  shopOrder_advance                   ShopOrder[]           @relation("ShopOrder_advance")
 
   @@index([tenantId, companyId])
   @@index([customerId])
@@ -3306,16 +3318,17 @@ model ApAdvance {
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy     String?   @map("updated_by") @db.Uuid
 
-  company                         SysCompany          @relation("ApAdvance_company", fields: [companyId], references: [id], onDelete: Restrict)
-  vendor                          ApVendor            @relation("ApAdvance_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
-  order                           ApOrder?            @relation("ApAdvance_order", fields: [orderId], references: [id], onDelete: Restrict)
-  currency                        SysCurrency?        @relation("ApAdvance_currency", fields: [currencyId], references: [id], onDelete: Restrict)
-  taxCode                         TaxCode?            @relation("ApAdvance_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
-  agreement                       ApAgreement?        @relation("ApAdvance_agreement", fields: [agreementId], references: [id], onDelete: Restrict)
-  apAgreement_advance             ApAgreement[]       @relation("ApAgreement_advance")
-  apInvoice_advance               ApInvoice[]         @relation("ApInvoice_advance")
-  apTrans_advance                 ApTrans[]           @relation("ApTrans_advance")
-  bankStatementLine_vendorAdvance BankStatementLine[] @relation("BankStatementLine_vendorAdvance")
+  company                           SysCompany            @relation("ApAdvance_company", fields: [companyId], references: [id], onDelete: Restrict)
+  vendor                            ApVendor              @relation("ApAdvance_vendor", fields: [vendorId], references: [id], onDelete: Restrict)
+  order                             ApOrder?              @relation("ApAdvance_order", fields: [orderId], references: [id], onDelete: Restrict)
+  currency                          SysCurrency?          @relation("ApAdvance_currency", fields: [currencyId], references: [id], onDelete: Restrict)
+  taxCode                           TaxCode?              @relation("ApAdvance_taxCode", fields: [taxCodeId], references: [id], onDelete: Restrict)
+  agreement                         ApAgreement?          @relation("ApAdvance_agreement", fields: [agreementId], references: [id], onDelete: Restrict)
+  glJournalSettlement_vendorAdvance GlJournalSettlement[] @relation("GlJournalSettlement_vendorAdvance")
+  apAgreement_advance               ApAgreement[]         @relation("ApAgreement_advance")
+  apInvoice_advance                 ApInvoice[]           @relation("ApInvoice_advance")
+  apTrans_advance                   ApTrans[]             @relation("ApTrans_advance")
+  bankStatementLine_vendorAdvance   BankStatementLine[]   @relation("BankStatementLine_vendorAdvance")
 
   @@index([tenantId, companyId])
   @@index([vendorId])
