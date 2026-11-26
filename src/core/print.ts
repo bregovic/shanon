@@ -236,6 +236,22 @@ export function valueAt(data: PrintData, path: string): unknown {
 }
 
 /** České číslo účtu (předčíslí-číslo/banka) → IBAN. */
+/**
+ * IBAN k uložení účtu: prázdný = z českého čísla účtu; změněné číslo účtu přepočte IBAN, který byl dopočtený
+ * ze starého čísla (ručně zadaný jiný IBAN zůstane). `before` = uložený záznam před změnou.
+ */
+export function ibanFor(d: Record<string, unknown>, before: Record<string, unknown> | null): string | null {
+  const acc = d.accountNum ? String(d.accountNum) : "";
+  const iban = d.iban ? String(d.iban).replace(/\s/g, "").toUpperCase() : "";
+  if (!acc) return iban || null;
+  if (!iban) return czIban(acc) ?? null;
+  const changedAcc = !!before && String(before.accountNum ?? "") !== acc;
+  const ibanTouched = !!before && String(before.iban ?? "").replace(/\s/g, "").toUpperCase() !== iban;
+  const wasDerived = !!before && (!before.iban || czIban(String(before.accountNum ?? "")) === String(before.iban).replace(/\s/g, "").toUpperCase());
+  if (changedAcc && !ibanTouched && wasDerived) return czIban(acc) ?? iban;
+  return iban;
+}
+
 export function czIban(account: string | null | undefined): string | null {
   const m = /^(?:(\d{1,6})-)?(\d{2,10})\/(\d{4})$/.exec(String(account ?? "").replace(/\s/g, ""));
   if (!m) return null;

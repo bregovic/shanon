@@ -262,6 +262,9 @@ export function partnerLedger(sp: PartnerLedgerSpec) {
     defaultSort: { field: "accountNum", dir: "asc" },
     actions: [{ id: "ares", label: "@GAB:FromAres" }],
     lines: [
+      // kontakty a adresy subjektu adresáře přímo na kartě partnera (jako v AX)
+      { object: "gab.contact", field: "subjectId", label: "@GAB:Contacts", owned: false, via: "subjectId" },
+      { object: "gab.address", field: "subjectId", label: "@GAB:Addresses", owned: false, via: "subjectId" },
       { object: id("trans"), field: partnerId, label: L("TransPlural"), owned: false },
       { object: id("order"), field: partnerId, label: L("Orders"), owned: false },
       { object: id("invoice"), field: partnerId, label: L("Invoices"), owned: false },

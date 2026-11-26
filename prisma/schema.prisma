@@ -1054,6 +1054,8 @@ model GabContact {
   subjectId   String   @map("subject_id") @db.Uuid
   kind        String   @default("email") @db.VarChar(40)
   value       String   @db.VarChar(254)
+  purpose     String?  @default("business") @db.VarChar(40)
+  isPrimary   Boolean  @default(false) @map("is_primary")
   description String?  @db.VarChar(255)
   ext         Json     @default("{}")
   version     Int      @default(1)
@@ -1067,6 +1069,7 @@ model GabContact {
 
   @@index([tenantId, companyId])
   @@index([subjectId])
+  @@index([tenantId, companyId, subjectId, kind])
   @@map("gab_contact")
 }
 

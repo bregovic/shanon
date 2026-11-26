@@ -10,7 +10,7 @@
  * a u faktury se navýší Uhrazeno, při plné úhradě se položka vyrovná.
  */
 import { csvMatchesAccount, decodeText, parseCsvStatement, toCsvFormat } from "./csv-statement";
-import { czIban } from "@/core/print";
+import { ibanFor } from "@/core/print";
 import { fromCents, sumCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData, type ValidationErrors } from "@/core/module";
 import { qrGlAccount } from "./qr-account";
@@ -188,6 +188,21 @@ export async function autoMatch(data: DataApi, statementId: string): Promise<num
     }
   }
   return n;
+}
+
+/** Řádky nezaúčtovaných výpisů spárované na doklad → nespárované; u zaúčtovaného výpisu smazání odmítne. */
+async function unmatchLines(data: DataApi, field: "customerAdvanceId" | "vendorAdvanceId" | "agreementId", id: string): Promise<string | void> {
+  let lines: RecordData[] = [];
+  try {
+    lines = await data.find("bank.statementLine", { [field]: id }, { take: 200 });
+  } catch {
+    return; // Banka vypnutá
+  }
+  if (!lines.length) return;
+  const sts = new Map((await data.find("bank.statement", { id: { in: [...new Set(lines.map((l) => String(l.statementId)))] } }, { take: 200 })).map((x) => [String(x.id), x]));
+  const posted = lines.find((l) => sts.get(String(l.statementId))?.status === "posted");
+  if (posted) throw new UserError("@BANK:DocInPostedStatement", { num: String(sts.get(String(posted.statementId))?.statementNum ?? ""), line: String(posted.lineNum ?? "") });
+  for (const l of lines) await data.update("bank.statementLine", String(l.id), { [field]: null, matchKind: "none", ...(field === "agreementId" ? { customerId: null } : {}) });
 }
 
 /** Vazby výpisů na deník pryč (podle výpisu nebo deníku); zaúčtovaný deník se neodpojí. */
@@ -403,7 +418,7 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
   "bank.account": {
     async beforeSave(ctx, d) {
       // české číslo účtu → IBAN (dopočítá se sám)
-      if (!d.iban && d.accountNum) d.iban = czIban(String(d.accountNum));
+      d.iban = ibanFor(d, d.id ? await ctx.data.get("bank.account", String(d.id)) : null);
       // výchozí jen jeden na měnu (prázdná měna = účetní měna)
       if (d.isDefault) {
         const base = await accountingCurrencyId(ctx.data, ctx.companyId);
@@ -420,6 +435,10 @@ export const bankHandlers: Record<string, ObjectHandlers> = {
     },
   },
   /** Smazání rozpracovaného deníku vytvořeného z výpisu: výpis a jeho řádky zapomenou vazbu (deník jde vytvořit znovu). */
+  // smazání nezaplacené zálohy / smlouvy: řádky nezaúčtovaných výpisů spárované na ni se odpárují (zaúčtovaný výpis ji drží)
+  "ar.advance": { beforeDelete: (ctx, d) => unmatchLines(ctx.data, "customerAdvanceId", String(d.id)) },
+  "ap.advance": { beforeDelete: (ctx, d) => unmatchLines(ctx.data, "vendorAdvanceId", String(d.id)) },
+  "ar.agreement": { beforeDelete: (ctx, d) => unmatchLines(ctx.data, "agreementId", String(d.id)) },
   "gl.journal": {
     async beforeDelete(ctx, j) {
       if (j.status && j.status !== "draft") return;

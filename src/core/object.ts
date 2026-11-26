@@ -136,6 +136,11 @@ export interface ObjectDef {
     field: string;
     label: LabelRef;
     owned?: boolean;
+    /**
+     * řádky jiného záznamu, na který záznam odkazuje (`via` = pole záznamu, např. subjectId odběratele →
+     * kontakty a adresy subjektu); jdou upravovat, se záznamem se nemažou
+     */
+    via?: string;
     /** tlačítko Vyrovnat u vybraného řádku (deník: otevřené položky salda, `gl/settlement.ts`) */
     settle?: boolean;
     /** přehled (`owned: false`), ze kterého jde vybrané záznamy smazat (výpisy u bankovního účtu); pravidla mazání má objekt řádků */

@@ -1020,8 +1020,14 @@ async function advanceDataset(data: DataApi, companyId: string | null, id: strin
     },
     lines: [{ description: text, qty: "1", unit: "", unitPrice: fromCents(gross), rate: taxDoc ? rate : "", net: taxDoc ? adv.taxBase : fromCents(gross), tax: taxDoc ? adv.taxAmount : "0", gross: fromCents(gross) }],
     vat: taxDoc ? [{ rate, base: adv.taxBase, tax: adv.taxAmount, gross: fromCents(gross) }] : [],
-    qr: !taxDoc && company.iban && due > zero ? await paymentQr(data, { iban: company.iban, amount: fromCents(due), currency, vs, date: (adv.dueDate as string) ?? null, message: `Záloha ${adv.advanceNum}` }) : "",
+    qr: !taxDoc && company.iban && due > zero ? await paymentQr(data, { iban: company.iban, amount: fromCents(due), currency, vs, date: (adv.dueDate as string) ?? null, message: await advanceQrMessage(data, adv) }) : "",
   };
+}
+
+/** Text platby v QR zálohy: záloha ke smlouvě = „Smlouva <číslo>“ (člen zná smlouvu, ne zálohu), jinak „Záloha <číslo>“. */
+async function advanceQrMessage(data: DataApi, adv: RecordData): Promise<string> {
+  const agr = adv.agreementId ? await data.get("ar.agreement", String(adv.agreementId)).catch(() => null) : null;
+  return agr?.agreementNum ? `Smlouva ${agr.agreementNum}` : `Záloha ${adv.advanceNum}`;
 }
 
 /** Rozvržení zálohy = faktura s nadpisem podle stavu (výzva k platbě / daňový doklad). */

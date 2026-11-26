@@ -83,10 +83,13 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
           .map(async (l) => {
             const ld = registry.objects.get(l.object)!;
             const lm = fieldsMeta(s.ctx, ld, t);
-            const initial = await listRecords(s.ctx, ld.id, { filter: { [l.field]: id }, pageSize: l.inline ? 2000 : 100, maxPageSize: l.inline ? 2000 : undefined, lang: s.lang, totals: true });
+            // řádky odkazovaného záznamu (kontakty subjektu u odběratele): klíč = hodnota pole záznamu
+            const key = l.via ? String(record[l.via] ?? "") : id;
+            const initial = await listRecords(s.ctx, ld.id, { filter: { [l.field]: key || "-" }, pageSize: l.inline ? 2000 : 100, maxPageSize: l.inline ? 2000 : undefined, lang: s.lang, totals: true });
             return {
               objectId: ld.id,
               field: l.field,
+              parentKey: l.via ? key : undefined,
               label: t(l.label),
               titleField: ld.titleField,
               columns: ld.list.filter((f) => f !== l.field && !hiddenFields(s.ctx, ld).includes(f)).map((f) => lm[f]),
@@ -103,14 +106,14 @@ export default async function ObjectDetailPage({ params, searchParams }: { param
                 .filter((d) => d.fields.length),
               dims: l.dims && dimDefs.length ? { ...l.dims, defs: dimDefs } : undefined,
               // přehled samostatných dokladů (výpisy účtu, faktury odběratele): jen otevřít
-              overview: l.owned === false || !!ld.systemOnly,
+              overview: (l.owned === false && !l.via) || !!ld.systemOnly,
               inline: !!l.inline,
               // řádek s akcemi (Osamostatnit…) se otevírá na své stránce
               openInPage: !!ld.actions?.some((a) => !a.bulk),
               // hromadné akce nad vybranými řádky (deník z vybraných řádků výpisu…)
               bulkActions: can(s.ctx.perms, ld.id, "write") ? (ld.actions ?? []).filter((a) => a.bulk && (!a.module || s.ctx.modules.has(a.module))).map((a) => ({ id: a.id, label: t(a.label), icon: a.icon })) : [],
               sortField: ld.defaultSort?.field,
-              editable: l.owned !== false && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
+              editable: (l.owned !== false || (!!l.via && !!key)) && !ld.systemOnly && !locked && can(s.ctx.perms, ld.id, "write"),
               deletable: !!l.deletable && can(s.ctx.perms, ld.id, "delete"),
               settle: l.settle ? t("@GL:SettleOpen") : undefined,
               initial: { rows: initial.rows, total: initial.total, totals: initial.totals },

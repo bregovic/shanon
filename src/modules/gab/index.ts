@@ -2,6 +2,7 @@ import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule } from "@/core/module";
 import { defineObject } from "@/core/object";
 import { checkAllSubjectsVat } from "./vat-registry";
+import { contactSetup } from "./contacts";
 
 export const SubjectType = defineEnum({
   id: "SubjectType",
@@ -28,7 +29,23 @@ export const ContactKind = defineEnum({
   values: [
     { value: "email", label: "@SYS:Email" },
     { value: "phone", label: "@SYS:Phone" },
+    { value: "mobile", label: "@GAB:Mobile" },
     { value: "web", label: "@GAB:Web" },
+    { value: "fax", label: "@GAB:Fax" },
+    { value: "other", label: "@GAB:OtherContact" },
+  ],
+});
+
+/** účel kontaktu / adresy (jako v AX: firemní, soukromý, fakturace…) */
+export const ContactPurpose = defineEnum({
+  id: "ContactPurpose",
+  label: "@GAB:Purpose",
+  values: [
+    { value: "business", label: "@GAB:PurposeBusiness" },
+    { value: "personal", label: "@GAB:PurposePersonal" },
+    { value: "invoice", label: "@GAB:PurposeInvoice" },
+    { value: "documents", label: "@GAB:PurposeDocuments" },
+    { value: "other", label: "@GAB:PurposeOther" },
   ],
 });
 
@@ -173,11 +190,15 @@ export const contact = defineObject({
     subjectId: { edt: SubjectRef, mandatory: true },
     kind: { edt: enumEdt(ContactKind), mandatory: true, default: "email" },
     value: { edt: ContactValue, mandatory: true },
+    purpose: { edt: enumEdt(ContactPurpose), default: "business" },
+    /** hlavní e-mail / telefon → pole subjektu (doklady, pošta) */
+    isPrimary: { edt: Edts.NoYes, label: "@GAB:Primary", help: "@GAB:PrimaryHelp" },
     description: { edt: Edts.Description },
   },
   titleField: "value",
-  list: ["subjectId", "kind", "value", "description"],
-  form: [{ label: "@SYS:General", fields: ["subjectId", "kind", "value", "description"] }],
+  list: ["subjectId", "kind", "value", "purpose", "isPrimary", "description"],
+  form: [{ label: "@SYS:General", fields: ["subjectId", "kind", "value", "purpose", "isPrimary", "description"] }],
+  indexes: [["subjectId", "kind"]],
   defaultSort: { field: "value", dir: "asc" },
 });
 
@@ -198,8 +219,10 @@ export default defineModule({
       },
     },
   ],
+  // e-mail a telefon starších subjektů → kontakty (jednorázově)
+  setup: contactSetup,
   dependsOn: ["sys"],
-  enums: [VatReliability, BankAccountSource, SubjectType, AddressKind, ContactKind],
+  enums: [VatReliability, BankAccountSource, SubjectType, AddressKind, ContactKind, ContactPurpose],
   objects: [subject, bankAccount, address, contact],
   menu: [
     { label: "@GAB:Module", items: [{ object: "gab.subject" }] },
@@ -280,6 +303,17 @@ export default defineModule({
       ContactKind: "Druh kontaktu",
       ContactValue: "Hodnota",
       Web: "Web",
+      Mobile: "Mobil",
+      Fax: "Fax",
+      OtherContact: "Jiný",
+      Purpose: "Účel",
+      PurposeBusiness: "Firemní",
+      PurposePersonal: "Soukromý",
+      PurposeInvoice: "Fakturace",
+      PurposeDocuments: "Doklady a upomínky",
+      PurposeOther: "Jiný",
+      Primary: "Hlavní",
+      PrimaryHelp: "Hlavní e-mail a telefon se propíší do subjektu – berou je doklady, pošta a portály.",
       FromAres: "Doplnit z ARES",
       AresNotFound: "V ARES nic nenalezeno pro „{query}“.",
       AresAmbiguous: "„{query}“ odpovídá v ARES {n} subjektům — vyplňte IČO.",
@@ -359,6 +393,17 @@ export default defineModule({
       ContactKind: "Contact type",
       ContactValue: "Value",
       Web: "Web",
+      Mobile: "Mobile",
+      Fax: "Fax",
+      OtherContact: "Other",
+      Purpose: "Purpose",
+      PurposeBusiness: "Business",
+      PurposePersonal: "Personal",
+      PurposeInvoice: "Invoicing",
+      PurposeDocuments: "Documents and reminders",
+      PurposeOther: "Other",
+      Primary: "Primary",
+      PrimaryHelp: "The primary email and phone are copied to the subject – documents, mail and portals use them.",
       FromAres: "Fill in from ARES",
       AresNotFound: "Nothing found in ARES for “{query}”.",
       AresAmbiguous: "“{query}” matches {n} parties in ARES — fill in the registration number.",

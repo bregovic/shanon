@@ -63,6 +63,8 @@ type Row = Record<string, unknown>;
 export interface LineSpec {
   objectId: string;
   field: string;
+  /** řádky odkazovaného záznamu (`lines[].via`): klíč místo id záznamu */
+  parentKey?: string;
   label: string;
   titleField: string;
   columns: FieldMeta[];
@@ -684,7 +686,7 @@ export function ObjectDetailView(p: ObjectDetailProps) {
         {!p.id && p.autoCreate && p.newLinesHint && <Text style={{ color: tokens.colorNeutralForeground3 }}>{p.newLinesHint}</Text>}
         {p.id &&
           p.lines.map((l) => (
-            <Lines key={l.objectId} spec={l} parentId={p.id!} lang={p.lang} labels={p.labels} />
+            <Lines key={`${l.objectId}:${l.field}`} spec={l} parentId={l.parentKey ?? p.id!} lang={p.lang} labels={p.labels} />
           ))}
       </PageContent>
 

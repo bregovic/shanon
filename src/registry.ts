@@ -36,6 +36,7 @@ import { documentResultHandlers } from "@/modules/int/documents";
 import { deviceHandlers } from "@/modules/int/device-handlers";
 import org, { orgHandlers } from "@/modules/org";
 import { aresHandlers } from "@/modules/gab/registry-lookup";
+import { contactHandlers } from "@/modules/gab/contacts";
 import qa, { qaHandlers } from "@/modules/qa";
 import { bankHandlers } from "@/modules/bank/handlers";
 import { paymentHandlers } from "@/modules/bank/payments";
@@ -81,7 +82,7 @@ NumberedObject.values = modules.flatMap((m) =>
   m.objects.filter((o) => o.numberSeq).map((o) => ({ value: o.id, label: o.labelPlural })),
 );
 
-export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, vatPaymentHandlers, invHandlers, posHandlers, intHandlers, documentResultHandlers, deviceHandlers, orgHandlers, aresHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers, shopHandlers, nonPayerHandlers, wfHandlers, hrHandlers]);
+export const registry = buildRegistry(modules, extensions, [sysHandlers, glHandlers, journalHandlers, journalTaxHandlers, arLedger.handlers, apLedger.handlers, bankHandlers, vatReturnHandlers, vatPaymentHandlers, invHandlers, posHandlers, intHandlers, documentResultHandlers, deviceHandlers, orgHandlers, aresHandlers, contactHandlers, qaHandlers, dimensionHandlers, batchHandlers, basketHandlers, cashHandlers, prtHandlers, whsHandlers, paymentHandlers, isdocHandlers, portalHandlers, shopHandlers, nonPayerHandlers, wfHandlers, hrHandlers]);
 
 // odkazy na daňové kódy, skupiny DPH a položky DPH (zjednodušení DPH pro neplátce maže jen nepoužité)
 for (const o of registry.objects.values())
