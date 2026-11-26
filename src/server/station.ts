@@ -10,6 +10,8 @@
  */
 import "server-only";
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { newPairCode, stationSha } from "./station-codes";
 import { stationSetupExe, stationSetupScript } from "./station-installer";
 import { publicUrl } from "./system-mail";
@@ -102,17 +104,21 @@ type Station = NonNullable<Awaited<ReturnType<typeof stationAuth>>>;
 const VIRTUAL = /fax|onenote|xps document writer|print to pdf|tisk do pdf|send to/i;
 
 /** Stanice hlásí počítač, verzi a tiskárny Windows — nové tiskárny se zapíší k zařízení (papír odhadem z názvu). */
-export async function stationHello(st: Station, info: { host?: string; version?: string; printers?: { name: string; default?: boolean }[] }) {
+const STATES = new Set(["ready", "printing", "offline", "noPaper", "lowPaper", "jammed", "doorOpen", "toner", "error", "unknown"]);
+
+export async function stationHello(st: Station, info: { host?: string; version?: string; printers?: { name: string; default?: boolean; state?: string; queued?: number }[] }) {
   const found = (info.printers ?? [])
     .filter((p) => p && typeof p.name === "string" && p.name.trim() && !VIRTUAL.test(p.name))
     .slice(0, 50)
-    .map((p) => ({ name: p.name.trim().slice(0, 200), isDefault: !!p.default }));
+    .map((p) => ({ name: p.name.trim().slice(0, 200), isDefault: !!p.default, state: STATES.has(String(p.state)) ? String(p.state) : null, queued: Number.isFinite(Number(p.queued)) ? Math.max(0, Math.min(9999, Math.round(Number(p.queued)))) : null }));
+  const now = new Date().toISOString();
   await inTenant(st.ctx, async (s) => {
     const api = s.sys().api();
     const dev = await api.update("int.device", st.deviceId, {
       hostName: info.host ? String(info.host).slice(0, 120) : null,
       agentVersion: info.version ? String(info.version).slice(0, 40) : null,
       lastSeenAt: new Date().toISOString(),
+      helloWanted: false,
     });
     const known = await api.find("int.devicePrinter", { deviceId: st.deviceId }, { take: 200 });
     for (const f of found) {
@@ -126,10 +132,12 @@ export async function stationHello(st: Station, info: { host?: string; version?:
           copies: 1,
           isDefault: f.isDefault,
           present: true,
+          ...(f.state ? { state: f.state, queued: f.queued, stateAt: now } : {}),
         });
-      else if (k.isDefault !== f.isDefault || !k.present) await api.update("int.devicePrinter", String(k.id), { isDefault: f.isDefault, present: true });
+      else if (k.isDefault !== f.isDefault || !k.present || f.state)
+        await api.update("int.devicePrinter", String(k.id), { isDefault: f.isDefault, present: true, ...(f.state ? { state: f.state, queued: f.queued, stateAt: now } : {}) });
     }
-    for (const k of known) if (k.present && !found.some((f) => f.name === k.printerName)) await api.update("int.devicePrinter", String(k.id), { present: false, isDefault: false });
+    for (const k of known) if (k.present && !found.some((f) => f.name === k.printerName)) await api.update("int.devicePrinter", String(k.id), { present: false, isDefault: false, state: "offline", stateAt: now });
     // první hlášení tiskáren: výchozí pravidla tisku pro tento počítač
     if (!known.length && found.length) await defaultPrintRules(api, st.deviceId);
   });
@@ -165,7 +173,8 @@ export async function takeJobs(st: Station, waitSec: number) {
   for (;;) {
     const jobs = await pendingJobs(st);
     const left = until - Date.now();
-    if (jobs.length || left <= 0) return jobs;
+    // Shanon chce hlášení tiskáren (Diagnostika → Obnovit stav): odpovědět hned, stanice ho pošle
+    if (jobs.length || left <= 0 || (await helloWanted(st))) return jobs;
     await new Promise<void>((resolve) => {
       const off = onStationWake(st.deviceId, () => {
         clearTimeout(t);
@@ -357,4 +366,102 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   const dev = await withTenant(m[1], (tx) => tx.intDevice.findFirst({ where: { tenantId: m[1], pairHash: sha(code), active: true } }));
   if (!dev?.pairExpires || dev.pairExpires.getTime() < Date.now()) return null;
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
+}
+
+export interface StationDiagnostics {
+  /** podle čeho Shanon počítač pozná: zapamatovaný v prohlížeči, uživatel počítače, nepozná */
+  source: "browser" | "user" | "none";
+  /** zapamatovaný počítač prohlížeče v Shanonu není (smazané / neaktivní zařízení) */
+  staleBrowser: boolean;
+  /** kolik aktivních počítačů má uživatel jako Uživatel počítače */
+  userDevices: number;
+  device: { id: string; name: string; code: string; hostName: string; paired: boolean; online: boolean; lastSeenAt: string | null; version: string } | null;
+  printers: { id: string; label: string; printerName: string; paper: string; isDefault: boolean; present: boolean; state: string | null; stateLabel: string; queued: number | null; stateAt: string | null }[];
+  /** verze programu stanice v Shanonu (stanice starší než tahle se aktualizuje sama, 1.0.0 jen přeinstalací) */
+  agentVersion: string;
+  /** kam by teď šel tisk z tohoto prohlížeče */
+  receipt: string | null;
+  documents: string | null;
+}
+
+/** Nastavení → Diagnostika tohoto počítače: pozná Shanon prohlížeč, běží stanice, jaké tiskárny, kam se tiskne. */
+export async function stationDiagnostics(ctx: Ctx, browserStationId: string | null): Promise<StationDiagnostics> {
+  return inTenant(ctx, async (s) => {
+    const api = s.sys().api();
+    const active = await api.find("int.device", { active: true }, { take: 500 });
+    const mine = active.filter((d) => d.userId === ctx.userId);
+    const fromBrowser = browserStationId ? active.find((d) => d.id === browserStationId) : undefined;
+    const dev = fromBrowser ?? (mine.length === 1 ? mine[0] : undefined);
+    const source = fromBrowser ? "browser" : dev ? "user" : "none";
+    const printers = dev ? await api.find("int.devicePrinter", { deviceId: dev.id }, { take: 100, orderBy: { label: "asc" } }) : [];
+    const target = async (docType: string) => {
+      const t = await resolvePrintTarget(api, docType, { stationId: dev ? String(dev.id) : null, userId: ctx.userId }).catch(() => null);
+      return t ? `${t.printer.label} · ${t.device.name}` : null;
+    };
+    const seen = dev?.lastSeenAt ? new Date(String(dev.lastSeenAt)).getTime() : 0;
+    return {
+      source,
+      staleBrowser: !!browserStationId && !fromBrowser,
+      userDevices: mine.length,
+      device: dev
+        ? {
+            id: String(dev.id),
+            name: String(dev.name ?? ""),
+            code: String(dev.code ?? ""),
+            hostName: String(dev.hostName ?? ""),
+            paired: !!dev.paired,
+            online: !!seen && Date.now() - seen < ONLINE_MS,
+            lastSeenAt: dev.lastSeenAt ? new Date(String(dev.lastSeenAt)).toISOString() : null,
+            version: String(dev.agentVersion ?? ""),
+          }
+        : null,
+      printers: printers.map((x) => ({
+        id: String(x.id),
+        label: String(x.label ?? x.printerName),
+        printerName: String(x.printerName ?? ""),
+        paper: String(x.paper ?? "a4"),
+        isDefault: !!x.isDefault,
+        present: x.present !== false,
+        state: x.state ? String(x.state) : null,
+        stateLabel: x.state ? resolveLabel(labelTable, `@INT:PS${String(x.state)[0].toUpperCase()}${String(x.state).slice(1)}`, ctx.lang ?? "cs") : "",
+        queued: x.queued === null || x.queued === undefined ? null : Number(x.queued),
+        stateAt: x.stateAt ? new Date(String(x.stateAt)).toISOString() : null,
+      })),
+      agentVersion: stationAgentVersion(),
+      receipt: await target("pos.receipt"),
+      // ostatní doklady: pravidlo „*“ (vzorový doklad bez vlastního pravidla)
+      documents: await target("ar.invoice"),
+    };
+  });
+}
+
+/** Žádá Shanon od stanice nové hlášení tiskáren? (odpověď na dotaz úloh nese `hello: true`) */
+export async function helloWanted(st: Station): Promise<boolean> {
+  return inTenant(st.ctx, async (s) => !!(await s.sys().api().get("int.device", st.deviceId))?.helloWanted);
+}
+
+/** Diagnostika → Obnovit stav: stanice hned pošle tiskárny a jejich stav (stanice 1.1+). */
+export async function stationRefresh(ctx: Ctx, deviceId: string): Promise<void> {
+  await inTenant(ctx, async (s) => {
+    const api = s.sys().api();
+    if (!(await api.get("int.device", deviceId))) throw new UserError("@SYS:NotFound");
+    await api.update("int.device", deviceId, { helloWanted: true });
+  });
+  wakeStation(deviceId, 200);
+}
+
+/** Verze programu stanice v Shanonu (z src/station/stanice.ps1) – starší stanice se samy aktualizují. */
+export function stationAgentVersion(): string {
+  try {
+    const src = readFileSync(join(process.cwd(), "src", "station", "stanice.ps1"), "utf8");
+    return /\$Version = '([^']+)'/.exec(src)?.[1] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Program stanice pro samoaktualizaci (UTF-8 s BOM, CRLF – jako při instalaci, bez párovacího kódu). */
+export function stationAgentFile(): Buffer {
+  const src = readFileSync(join(process.cwd(), "src", "station", "stanice.ps1"), "utf8").replace(/\r?\n/g, "\r\n");
+  return Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(src, "utf8")]);
 }

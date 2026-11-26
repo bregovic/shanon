@@ -50,6 +50,17 @@ prohlížeče** (Chrome, Edge) na stejném počítači jde na tiskárny stanice,
 - bez výběru se použije počítač, jehož **Uživatelem počítače** jste (Integrace → Zařízení; doplní se při instalaci) –
   jen když je takový jeden.
 
+## Diagnostika tohoto počítače
+
+**Nastavení → Diagnostika tohoto počítače** ukáže, jestli Shanon tento prohlížeč pozná (a podle čeho), jestli stanice
+na počítači běží (naposledy ozvaná, verze programu), jaké tiskárny Windows nahlásila – papír, výchozí, **stav**
+(připravená, tiskne, offline, došel papír, zaseknutý papír, otevřený kryt, toner, chyba) a úlohy ve frontě Windows –
+a kam teď půjde účtenka a ostatní doklady. **Obnovit stav tiskáren** si vyžádá stav hned, **Zkušební stránka**
+vytiskne test. Tiskárna, kterou Windows nemají nainstalovanou (chybí ovladač), se v seznamu neobjeví – nainstalujte
+nejdřív ovladač tiskárny ve Windows.
+
+Program stanice se od verze 1.1 aktualizuje sám; starší verzi nainstalujte jednou znovu (Nainstalovat na tento počítač).
+
 ## Zrušení tisku
 
 V **Integrace → Tiskové úlohy** (nebo u zařízení) jde čekající či odeslanou úlohu **Zrušit tisk** (i víc najednou).

@@ -7,7 +7,7 @@
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
 import { retireTestScale } from "./test-env";
-import { DevicePaper, PrintJobStatus, PrintRuleDoc, device, devicePrinter, printJob, printRule } from "./devices";
+import { DevicePaper, PrintJobStatus, PrinterState, PrintRuleDoc, device, devicePrinter, printJob, printRule } from "./devices";
 import { FORM_CS, FORM_EN, FormFieldKind, FormFieldWidth, FormMapping, form, formField } from "./forms";
 import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
@@ -724,7 +724,7 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [PortalPurpose, PortalBackground, PortalCorners, PortalLogoBadge, PortalLogoSize, PortalAlign, FormFieldKind, FormMapping, FormFieldWidth, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, DevicePaper, PrintRuleDoc],
+  enums: [PortalPurpose, PortalBackground, PortalCorners, PortalLogoBadge, PortalLogoSize, PortalAlign, FormFieldKind, FormMapping, FormFieldWidth, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, PrinterState, DevicePaper, PrintRuleDoc],
   objects: [connection, log, portal, portalUpload, portalContact, form, formField, document, documentLine, mail, device, devicePrinter, printRule, printJob],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
@@ -746,6 +746,20 @@ export default defineModule({
       DeviceHost: "Počítač",
       DeviceUser: "Uživatel počítače",
       PJCancelled: "Zrušeno",
+      PrinterState: "Stav tiskárny",
+      PSReady: "Připravená",
+      PSPrinting: "Tiskne",
+      PSOffline: "Offline / nepřipojená",
+      PSNoPaper: "Došel papír",
+      PSLowPaper: "Dochází papír",
+      PSJammed: "Zaseknutý papír",
+      PSDoorOpen: "Otevřený kryt",
+      PSToner: "Toner / páska",
+      PSError: "Chyba",
+      PSUnknown: "Neznámý",
+      PrinterQueued: "Ve frontě Windows",
+      PrinterStateAt: "Stav k",
+      DeviceHelloWanted: "Žádost o stav",
       PJCancel: "Zrušit tisk",
       PJCancelDone: "Úloha je už vytištěná nebo skončila chybou – zrušit nejde.",
       PJCancelledBy: "Zrušil(a) {user}",
@@ -1420,6 +1434,20 @@ export default defineModule({
       DeviceHost: "Computer",
       DeviceUser: "Computer user",
       PJCancelled: "Cancelled",
+      PrinterState: "Printer state",
+      PSReady: "Ready",
+      PSPrinting: "Printing",
+      PSOffline: "Offline / not connected",
+      PSNoPaper: "Out of paper",
+      PSLowPaper: "Paper low",
+      PSJammed: "Paper jam",
+      PSDoorOpen: "Cover open",
+      PSToner: "Toner / ribbon",
+      PSError: "Error",
+      PSUnknown: "Unknown",
+      PrinterQueued: "In Windows queue",
+      PrinterStateAt: "State as of",
+      DeviceHelloWanted: "State requested",
       PJCancel: "Cancel printing",
       PJCancelDone: "The job is already printed or failed – it cannot be cancelled.",
       PJCancelledBy: "Cancelled by {user}",

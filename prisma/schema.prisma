@@ -4935,6 +4935,7 @@ model IntDevice {
   active       Boolean   @default(true)
   paired       Boolean   @default(false)
   lastSeenAt   DateTime? @map("last_seen_at")
+  helloWanted  Boolean   @default(false) @map("hello_wanted")
   userId       String?   @map("user_id") @db.VarChar(36)
   hostName     String?   @map("host_name") @db.VarChar(120)
   agentVersion String?   @map("agent_version") @db.VarChar(40)
@@ -4963,22 +4964,25 @@ model IntDevice {
 
 /// int.devicePrinter — generováno z definice objektu
 model IntDevicePrinter {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
-  deviceId    String   @map("device_id") @db.Uuid
-  label       String   @db.VarChar(120)
-  printerName String   @map("printer_name") @db.VarChar(200)
-  paper       String   @default("a4") @db.VarChar(40)
-  copies      Int?     @default(1)
-  isDefault   Boolean  @default(false) @map("is_default")
-  present     Boolean  @default(true)
-  ext         Json     @default("{}")
-  version     Int      @default(1)
-  createdAt   DateTime @default(now()) @map("created_at")
-  createdBy   String?  @map("created_by") @db.Uuid
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?  @map("updated_by") @db.Uuid
+  id          String    @id @default(uuid(7)) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  deviceId    String    @map("device_id") @db.Uuid
+  label       String    @db.VarChar(120)
+  printerName String    @map("printer_name") @db.VarChar(200)
+  paper       String    @default("a4") @db.VarChar(40)
+  copies      Int?      @default(1)
+  isDefault   Boolean   @default(false) @map("is_default")
+  present     Boolean   @default(true)
+  state       String?   @db.VarChar(40)
+  queued      Int?
+  stateAt     DateTime? @map("state_at")
+  ext         Json      @default("{}")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?   @map("updated_by") @db.Uuid
 
   company                    SysCompany     @relation("IntDevicePrinter_company", fields: [companyId], references: [id], onDelete: Restrict)
   device                     IntDevice      @relation("IntDevicePrinter_device", fields: [deviceId], references: [id], onDelete: Restrict)

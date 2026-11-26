@@ -166,6 +166,23 @@ describe("tisková stanice", () => {
     expect((await getRecord(P, "int.printJob", jobs[0].id, client))!.status).toBe("cancelled");
     await expect(runAction(P, "int.printJob", jobs[0].id, "cancel", client)).rejects.toMatchObject({ label: "@INT:PJCancelDone" });
     expect(await takeJobs(st, 0)).toHaveLength(0);
+
+    // stav tiskáren: stanice 1.1 hlásí stav a frontu; Obnovit stav = dotaz úloh odpoví hned s hello
+    const { stationDiagnostics, stationRefresh, helloWanted, stationAgentVersion } = await import("@/server/station");
+    await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true, state: "noPaper", queued: 2 }, { name: "HP LaserJet", state: "nesmysl" }] });
+    const d = await stationDiagnostics(P, paired.deviceId);
+    expect([d.source, d.device?.online, d.device?.version]).toEqual(["browser", true, "1.1.0"]);
+    const epson = d.printers.find((x) => x.printerName === "EPSON TM-T20III")!;
+    expect([epson.state, epson.stateLabel, epson.queued]).toEqual(["noPaper", "Došel papír", 2]);
+    expect(d.printers.find((x) => x.printerName === "HP LaserJet")!.state).toBeNull(); // neznámá hodnota se nezapíše
+    expect(d.receipt).toContain("EPSON");
+    expect((await stationDiagnostics(P, null)).source).toBe("user");
+    await stationRefresh(P, paired.deviceId);
+    expect(await helloWanted(st)).toBe(true);
+    expect(await takeJobs(st, 5)).toHaveLength(0); // odpoví hned, ne za 5 s
+    await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true, state: "ready" }, { name: "HP LaserJet" }] });
+    expect(await helloWanted(st)).toBe(false);
+    expect(stationAgentVersion()).toBe("1.1.0");
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

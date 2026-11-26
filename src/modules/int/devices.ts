@@ -22,6 +22,24 @@ export const PrintJobStatus = defineEnum({
   ],
 });
 
+/** stav tiskárny podle Windows (Win32_Printer), jak ho naposledy nahlásila stanice */
+export const PrinterState = defineEnum({
+  id: "IntPrinterState",
+  label: "@INT:PrinterState",
+  values: [
+    { value: "ready", label: "@INT:PSReady", color: "success" },
+    { value: "printing", label: "@INT:PSPrinting", color: "informative" },
+    { value: "offline", label: "@INT:PSOffline", color: "danger" },
+    { value: "noPaper", label: "@INT:PSNoPaper", color: "danger" },
+    { value: "lowPaper", label: "@INT:PSLowPaper", color: "warning" },
+    { value: "jammed", label: "@INT:PSJammed", color: "danger" },
+    { value: "doorOpen", label: "@INT:PSDoorOpen", color: "danger" },
+    { value: "toner", label: "@INT:PSToner", color: "warning" },
+    { value: "error", label: "@INT:PSError", color: "danger" },
+    { value: "unknown", label: "@INT:PSUnknown" },
+  ],
+});
+
 /** papír tiskárny stanice: běžná tiskárna (A4) nebo role / A6 pro účtenky */
 export const DevicePaper = defineEnum({
   id: "IntDevicePaper",
@@ -51,6 +69,8 @@ export const device = defineObject({
     active: { edt: Edts.NoYes, label: "@INT:Active", default: true },
     paired: { edt: Edts.NoYes, label: "@INT:DevicePaired", readOnly: true },
     lastSeenAt: { edt: Edts.DateTime, label: "@INT:DeviceLastSeen", readOnly: true },
+    /** Shanon chce hned nové hlášení tiskáren (Diagnostika → Obnovit stav); stanice ho pošle a příznak smaže */
+    helloWanted: { edt: Edts.NoYes, label: "@INT:DeviceHelloWanted", readOnly: true },
     /** kdo na počítači pracuje: tisk tohoto uživatele bez zástupce Shanon Pokladna jde na tento počítač (jediný) */
     userId: { edt: Edts.User, label: "@INT:DeviceUser", help: "@INT:DeviceUserHelp" },
     hostName: { edt: Str("DeviceHost", "@INT:DeviceHost", 120), readOnly: true },
@@ -97,9 +117,13 @@ export const devicePrinter = defineObject({
     isDefault: { edt: Edts.NoYes, label: "@INT:PrinterDefault", readOnly: true },
     /** stanice ji při posledním hlášení na počítači našla */
     present: { edt: Edts.NoYes, label: "@INT:PrinterPresent", readOnly: true, default: true },
+    /** stav podle Windows a počet úloh ve frontě Windows (stanice 1.1+) */
+    state: { edt: enumEdt(PrinterState), readOnly: true },
+    queued: { edt: Edts.Int, label: "@INT:PrinterQueued", readOnly: true },
+    stateAt: { edt: Edts.DateTime, label: "@INT:PrinterStateAt", readOnly: true },
   },
   titleField: "label",
-  list: ["label", "printerName", "paper", "copies", "isDefault", "present"],
+  list: ["label", "printerName", "paper", "copies", "isDefault", "present", "state", "queued", "stateAt"],
   form: [{ label: "@SYS:General", fields: ["deviceId", "label", "printerName", "paper", "copies", "isDefault", "present"] }],
   unique: [["deviceId", "printerName"]],
   defaultSort: { field: "label", dir: "asc" },

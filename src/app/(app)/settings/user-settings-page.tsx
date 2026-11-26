@@ -10,7 +10,7 @@ import { stationChoices } from "@/server/station";
 const KEYS = [
   "UserSettings", "Profile", "Language", "ChangePassword", "CurrentPassword", "NewPassword", "RepeatPassword", "PasswordRules",
   "PasswordChanged", "PosPin", "PosPinHelp", "PosPinSet", "PosPinNone", "Notifications", "NotifyDailySummary", "NotifyOverdue",
-  "NotifyIntegration", "NotifyInfo", "NotifyEmail", "Saved", "Save", "Name", "Email", "FirstName", "LastName", "InstallApp", "InstallAppHelp", "InstallAppIos", "InstallAppDone", "DefaultCompany", "DefaultCompanyHelp", "DefaultCompanyFirst", "Preferences", "StationApp", "StationAppInstall", "StationAppInstalled", "StationThisBrowser", "StationThisBrowserHelp", "StationNone", "StationChosen"];
+  "NotifyIntegration", "NotifyInfo", "NotifyEmail", "Saved", "Save", "Name", "Email", "FirstName", "LastName", "InstallApp", "InstallAppHelp", "InstallAppIos", "InstallAppDone", "DefaultCompany", "DefaultCompanyHelp", "DefaultCompanyFirst", "Preferences", "StationApp", "StationAppInstall", "StationAppInstalled", "StationThisBrowser", "StationThisBrowserHelp", "StationNone", "StationChosen", "StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating"];
 
 /** Nastavení (ozubené kolo) a Můj profil (iniciály) — jedna komponenta, jiné karty. */
 export async function userSettingsPage(section: "profile" | "settings") {

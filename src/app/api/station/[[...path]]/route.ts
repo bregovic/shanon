@@ -9,11 +9,12 @@
  *   GET  /api/station/installer/<kód>             Shanon-instalace.exe (párovací kód v adrese = odkaz z Nastavení / Zařízení)
  *   GET  /api/station/installer/<kód>/setup.ps1   instalační skript, který si instalátor stáhne
  *   POST /api/station/jobs/<id>         { ok, message } výsledek tisku
+ *   GET  /api/station/agent             program stanice (samoaktualizace, když úlohy hlásí novější `agent`)
  */
 import { UserError } from "@/core/module";
 import { fillLabel, resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
-import { jobPdf, pairStation, reportJob, stationAuth, stationHello, stationInstallerFile, takeJobs } from "@/server/station";
+import { jobPdf, pairStation, reportJob, stationAuth, stationHello, stationInstallerFile, takeJobs, helloWanted, stationAgentFile, stationAgentVersion } from "@/server/station";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
     if (!st) return json({ error: "Stanice není spárovaná nebo je vypnutá." }, 401);
     if (path[0] === "hello" && path.length === 1) {
       const b = await body(req);
-      await stationHello(st, { host: b.host ? String(b.host) : undefined, version: b.version ? String(b.version) : undefined, printers: Array.isArray(b.printers) ? (b.printers as { name: string; default?: boolean }[]) : [] });
+      await stationHello(st, { host: b.host ? String(b.host) : undefined, version: b.version ? String(b.version) : undefined, printers: Array.isArray(b.printers) ? (b.printers as { name: string; default?: boolean; state?: string; queued?: number }[]) : [] });
       return json({ ok: true });
     }
     if (path[0] === "jobs" && path.length === 2 && UUID.test(path[1])) {
@@ -84,7 +85,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ path?: s
     if (!st) return json({ error: "Stanice není spárovaná nebo je vypnutá." }, 401);
     if (path[0] === "jobs" && path.length === 1) {
       const wait = Number(new URL(req.url).searchParams.get("wait") ?? 0) || 0;
-      return json({ jobs: await takeJobs(st, wait) });
+      const jobs = await takeJobs(st, wait);
+      // agent = verze programu v Shanonu (starší stanice se aktualizuje), hello = poslat hned tiskárny a stav
+      return json({ jobs, agent: stationAgentVersion(), hello: await helloWanted(st) });
+    }
+    if (path[0] === "agent" && path.length === 1) {
+      return new Response(new Uint8Array(stationAgentFile()), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
     }
     if (path[0] === "jobs" && path.length === 3 && UUID.test(path[1]) && path[2] === "pdf") {
       const r = await jobPdf(st, path[1]);

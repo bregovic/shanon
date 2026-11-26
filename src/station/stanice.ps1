@@ -8,10 +8,12 @@
 # po přihlášení do Windows.
 #
 # Stanice: dlouhým dotazem čeká na tiskové úlohy (/api/station/jobs), stáhne PDF a vytiskne ho
-# SumatraPDF na tiskárnu z napojení, výsledek nahlásí. Každých 10 minut nahlásí tiskárny Windows.
+# SumatraPDF na tiskárnu z napojení, výsledek nahlásí. Každých 10 minut (a na žádost Shanonu hned) nahlásí
+# tiskárny Windows i s jejich stavem a frontou. Když Shanon hlásí novější verzi programu, stanice se sama
+# aktualizuje (/api/station/agent) a spustí znovu.
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.0'
+$Version = '1.1.0'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 # SHANON_STATION_DIR = jiná složka (zkouška stanice bez instalace)
 $AppDir = if ($env:SHANON_STATION_DIR) { $env:SHANON_STATION_DIR } else { Join-Path $env:LOCALAPPDATA 'ShanonPokladna' }
@@ -137,8 +139,22 @@ function Read-Config {
   return @{ url = $c.url.TrimEnd('/'); headers = @{ Authorization = "Bearer $token" } }
 }
 
+# stav tiskárny podle Windows (Win32_Printer: PrinterStatus, DetectedErrorState, WorkOffline)
+function Get-PrinterState($P) {
+  $e = [int]$P.DetectedErrorState; $s = [int]$P.PrinterStatus
+  if ($P.WorkOffline -or $s -eq 7 -or $e -eq 9) { return 'offline' }
+  switch ($e) { 4 { return 'noPaper' } 3 { return 'lowPaper' } 8 { return 'jammed' } 7 { return 'doorOpen' } 5 { return 'toner' } 6 { return 'toner' } 10 { return 'error' } 11 { return 'error' } }
+  if ($s -eq 4) { return 'printing' }
+  if ($s -eq 3) { return 'ready' }
+  return 'unknown'
+}
+
 function Send-Hello($Cfg) {
-  $printers = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | ForEach-Object { @{ name = $_.Name; default = [bool]$_.Default } })
+  $queue = @(Get-CimInstance Win32_PrintJob -ErrorAction SilentlyContinue)
+  $printers = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | ForEach-Object {
+    $n = $_.Name
+    @{ name = $n; default = [bool]$_.Default; state = (Get-PrinterState $_); queued = @($queue | Where-Object { $_.Name -like "$n,*" }).Count }
+  })
   [void](Invoke-Json 'POST' "$($Cfg.url)/api/station/hello" @{ host = $env:COMPUTERNAME; version = $Version; printers = $printers } $Cfg.headers)
 }
 
@@ -168,10 +184,15 @@ function Start-Station {
   $cfg = Read-Config
   if (-not (Test-Path $SumatraExe)) { try { Install-Sumatra } catch { Write-Log "SumatraPDF: $($_.Exception.Message)" } }
   $nextHello = Get-Date
-  while ($true) {
+  $update = $false
+  while (-not $update) {
     try {
       if ((Get-Date) -ge $nextHello) { Send-Hello $cfg; $nextHello = (Get-Date).AddMinutes(10) }
       $r = Invoke-Json 'GET' "$($cfg.url)/api/station/jobs?wait=25" $null $cfg.headers 45
+      # Shanon chce stav tiskáren hned (Diagnostika → Obnovit stav)
+      if ($r.hello) { Send-Hello $cfg; $nextHello = (Get-Date).AddMinutes(10) }
+      # novější program stanice v Shanonu → stáhnout, nahradit a spustit znovu
+      if ($r.agent -and ([version]$r.agent -gt [version]$Version)) { $update = Update-Agent $cfg ([string]$r.agent) }
       foreach ($job in @($r.jobs)) {
         try { Print-Job $cfg $job }
         catch {
@@ -186,6 +207,26 @@ function Start-Station {
       if ($code -eq 401) { Write-Log 'Stanice je v Shanonu odpojená — stáhněte instalaci znovu.'; Start-Sleep -Seconds 300 }
       else { Write-Log "Spojení: $($_.Exception.Message)"; Start-Sleep -Seconds 5 }
     }
+  }
+  # aktualizace: uvolnit zámek a spustit novou verzi (skrytě přes stanice.vbs)
+  $mutex.ReleaseMutex(); $mutex.Dispose()
+  Start-Process "$env:SystemRoot\System32\wscript.exe" -ArgumentList ('"' + (Join-Path $AppDir 'stanice.vbs') + '"')
+}
+
+# stáhne program stanice ze Shanonu a nahradí stanice.ps1; true = spustit znovu
+function Update-Agent($Cfg, [string]$Want) {
+  $tmp = Join-Path $AppDir 'stanice.new.ps1'
+  try {
+    Invoke-WebRequest -Uri "$($Cfg.url)/api/station/agent" -Headers $Cfg.headers -OutFile $tmp -UseBasicParsing -TimeoutSec 60 | Out-Null
+    $text = [IO.File]::ReadAllText($tmp)
+    if (-not $text.Contains('#--AGENT--') -or -not $text.Contains("`$Version = '$Want'")) { throw 'stažený program není platný' }
+    Move-Item $tmp (Join-Path $AppDir 'stanice.ps1') -Force
+    Write-Log "Aktualizace stanice $Version → $Want"
+    return $true
+  } catch {
+    Write-Log "Aktualizace se nepovedla: $($_.Exception.Message)"
+    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+    return $false
   }
 }
 

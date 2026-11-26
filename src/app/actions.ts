@@ -5,7 +5,7 @@ import type { SettleCriteria } from "@/modules/gl/settlement";
 import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
-import { queueStationPrint, stationClaim, stationSetup } from "@/server/station";
+import { queueStationPrint, stationClaim, stationDiagnostics, stationRefresh, stationSetup, type StationDiagnostics } from "@/server/station";
 import { createCompanyFromRegistry } from "@/server/company-lookup";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
@@ -1525,6 +1525,41 @@ export async function stationClaimAction(deviceId: string): Promise<ActionResult
   try {
     if (!/^[0-9a-f-]{36}$/.test(deviceId) || !s.ctx.modules.has("int")) throw new UserError("@SYS:InvalidValue");
     await stationClaim(s.ctx, deviceId);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Nastavení → Diagnostika tohoto počítače (stanice, tiskárny, kam se tiskne). */
+export async function stationDiagnosticsAction(browserStationId: string | null): Promise<ActionResult<StationDiagnostics>> {
+  const s = await requireSession();
+  try {
+    if (!s.ctx.modules.has("int")) throw new UserError("@SYS:NoAccess");
+    return { ok: true, data: await stationDiagnostics(s.ctx, browserStationId && /^[0-9a-f-]{36}$/.test(browserStationId) ? browserStationId : null) };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Diagnostika → Zkušební stránka na tiskárnu počítače. */
+export async function stationTestPageAction(printerId: string): Promise<ActionResult<null>> {
+  const s = await requireSession();
+  try {
+    if (!/^[0-9a-f-]{36}$/.test(printerId)) throw new UserError("@SYS:InvalidValue");
+    await runAction(s.ctx, "int.devicePrinter", printerId, "test");
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Diagnostika → Obnovit stav: stanice hned nahlásí tiskárny a jejich stav. */
+export async function stationRefreshAction(deviceId: string): Promise<ActionResult<null>> {
+  const s = await requireSession();
+  try {
+    if (!/^[0-9a-f-]{36}$/.test(deviceId) || !s.ctx.modules.has("int")) throw new UserError("@SYS:InvalidValue");
+    await stationRefresh(s.ctx, deviceId);
     return { ok: true, data: null };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
