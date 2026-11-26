@@ -124,7 +124,7 @@ export const entity = defineObject({
     /** zkratka pro veřejné odkazy (dodavatelský portál /<zkratka>/doklady) — jedinečná v celé aplikaci */
     publicSlug: { edt: defineEdt({ id: "OrgPublicSlug", kind: "string", label: "@ORG:PublicSlug", maxLength: 40, pattern: /^[a-z0-9][a-z0-9-]{1,39}$/, patternMessage: "@ORG:PublicSlugHelp", transform: "lower" }) },
     // logo na tiskových sestavách (faktura, účtenka)
-    logo: { edt: Str("OrgLogo", "@ORG:Logo", 36), image: true, readOnly: true },
+    logo: { edt: Str("OrgLogo", "@ORG:Logo", 36), image: true, readOnly: true, help: "@ORG:LogoHelp" },
     // šablona e-mailu dokladů (src/modules/org/mail-template.ts): předmět a text s proměnnými, podpis
     mailInvoiceSubject: { edt: Edts.Description, label: "@ORG:MailInvoiceSubject", help: "@ORG:MailVarsHelp" },
     mailInvoiceBody: { edt: Edts.Notes, label: "@ORG:MailInvoiceBody" },
@@ -352,6 +352,7 @@ export default defineModule({
   labels: {
     cs: {
       Logo: "Logo",
+      LogoHelp: "Doporučeno: PNG s průhledným pozadím, na šířku v poměru asi 3 : 1, např. 900 × 300 px. Tiskne se na faktuře (55 × 20 mm), na účtence (40 × 12 mm; termotiskárna tiskne černobíle – volte kontrastní logo) a v hlavičce aplikace (výška 32 px).",
       MailTemplate: "Šablona e-mailu dokladů",
       MailInvoiceSubject: "Faktura – předmět",
       MailInvoiceBody: "Faktura – text",
@@ -518,6 +519,7 @@ export default defineModule({
     },
     en: {
       Logo: "Logo",
+      LogoHelp: "Recommended: PNG with a transparent background, landscape about 3 : 1, e.g. 900 × 300 px. Printed on invoices (55 × 20 mm), receipts (40 × 12 mm; thermal printers print black and white – use a high-contrast logo) and in the app header (32 px high).",
       MailTemplate: "Document e-mail template",
       MailInvoiceSubject: "Invoice – subject",
       MailInvoiceBody: "Invoice – text",

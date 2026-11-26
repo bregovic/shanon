@@ -428,7 +428,7 @@ function ImageField({
     else onChange(f.name, r.data);
   };
   return (
-    <Field label={f.label} validationMessage={error}>
+    <Field label={f.label} validationMessage={error} hint={f.help}>
       <div
         onDragOver={(e) => {
           if (!can) return;

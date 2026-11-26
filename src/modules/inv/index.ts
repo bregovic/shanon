@@ -109,7 +109,7 @@ export const category = defineObject({
     eshop: { edt: Edts.NoYes, label: "@INV:CategoryEshop", default: true, module: "shop", help: "@INV:CategoryEshopHelp", aliases: ["v eshopu", "eshop"] },
     slug: { edt: CategorySlug, module: "shop", help: "@INV:SlugAuto", aliases: ["adresa"] },
     description: { edt: Edts.Notes, label: "@SYS:Description", module: "shop", aliases: ["popis"] },
-    image: { edt: defineEdt({ id: "CategoryImageRef", kind: "string", label: "@SYS:Image", maxLength: 36 }), image: true, readOnly: true, module: "shop", aliases: ["obrazek", "obrázek"] },
+    image: { edt: defineEdt({ id: "CategoryImageRef", kind: "string", label: "@SYS:Image", maxLength: 36 }), image: true, readOnly: true, module: "shop", aliases: ["obrazek", "obrázek"], help: "@INV:CategoryImageHelp" },
   },
   titleField: "code",
   list: ["code", "name", "parentId", "sortOrder", "eshop", "blocked"],
@@ -163,7 +163,7 @@ export const item = defineObject({
     agreementMonths: { edt: Edts.Int, label: "@INV:AgreementMonths", help: "@INV:AgreementMonthsHelp", module: "ar", aliases: ["tarif mesice", "obdobi mesice"] },
     description: { edt: Edts.Notes, label: "@INV:Description", aliases: ["popis", "description"] },
     blocked: { edt: Edts.NoYes, label: "@GL:Blocked" },
-    image: { edt: defineEdt({ id: "ImageRef", kind: "string", label: "@SYS:Image", maxLength: 36 }), image: true, readOnly: true, aliases: ["obrazek", "obrázek", "foto", "fotka", "image", "picture"] },
+    image: { edt: defineEdt({ id: "ImageRef", kind: "string", label: "@SYS:Image", maxLength: 36 }), image: true, readOnly: true, aliases: ["obrazek", "obrázek", "foto", "fotka", "image", "picture"], help: "@INV:ImageHelp" },
     // e-shop (modul shop): položka v obchodě a její kategorie; popis a obrázek jsou společné
     eshop: { edt: Edts.NoYes, label: "@INV:Eshop", module: "shop", aliases: ["eshop", "e-shop", "v eshopu"] },
     /** rezerva ceny při vážení (e-shop); prázdné = podle obchodu */
@@ -324,6 +324,8 @@ export default defineModule({
   setup: invSetup,
   labels: {
     cs: {
+      ImageHelp: "Doporučeno: čtverec aspoň 1200 × 1200 px, výrobek uprostřed na světlém pozadí. E-shop a kasa ho zobrazují ve čtverci nebo 4 : 3 – okraje se mohou oříznout.",
+      CategoryImageHelp: "Doporučeno: 1200 × 900 px (poměr 4 : 3), motiv uprostřed.",
       PriceCurrency: "Měna cen",
       Module: "Položky",
       ModuleDesc: "Zboží, výrobky a služby s cenami, DPH a jednotkami — pro faktury, pokladnu i e-shop.",
@@ -395,6 +397,8 @@ export default defineModule({
       DiscountValue: "Vyplňte výši slevy.",
     },
     en: {
+      ImageHelp: "Recommended: square, at least 1200 × 1200 px, product in the middle on a light background. The e-shop and POS show it square or 4 : 3 – edges may be cropped.",
+      CategoryImageHelp: "Recommended: 1200 × 900 px (4 : 3), subject in the middle.",
       PriceCurrency: "Price currency",
       Module: "Products",
       ModuleDesc: "Goods, products and services with prices, VAT and units — for invoices, POS and e-shop.",
