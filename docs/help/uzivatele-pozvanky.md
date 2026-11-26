@@ -5,6 +5,16 @@ objects: qa.feedback
 order: 5
 summary: Pozvání nového uživatele e-mailem, reset hesla, „Nemůžu se přihlásit“ a kam psát náměty a zpětnou vazbu.
 ---
+## Výchozí role
+
+Ve Správě systému → Role jsou připravené role, které stačí přiřadit uživateli:
+
+- **Pokladník** – jen pokladna, po přihlášení rovnou kasa.
+- **Pracovník** – jen nahrání dokladů.
+- **Auditor (jen čtení účetnictví)** – hlavní kniha, pokladní kniha, banka, odběratelé, dodavatelé, DPH a adresář:
+  zobrazí, vytiskne a vyexportuje (Excel, PDF, ISDOC), ale nic nezaloží, nezmění, nesmaže ani nezaúčtuje.
+  Role platí pro firmy, ke kterým uživatele přiřadíte.
+
 ## Pozvat nového uživatele
 
 1. [Uživatelé](/system/users) → **Nový**: jméno, příjmení, e-mail a firmy s rolemi.
