@@ -40,6 +40,21 @@ Platí nejpřesnější pravidlo. Doklad bez pravidla se tiskne jako dřív z pr
 Tlačítko **Tisk** (v dokladu, v seznamu, v náhledu i v kase) pošle doklad na tiskárnu a ukáže „Odesláno na tiskárnu …“.
 Když program na počítači zrovna neběží, úloha počká. Přehled a chyby: [Tiskové úlohy](/int/printJob).
 
+## Tisk z běžného prohlížeče
+
+Zástupce **Shanon** otevírá Shanon ve vlastním okně, které ví, že je na počítači se stanicí. Tisk z **běžného
+prohlížeče** (Chrome, Edge) na stejném počítači jde na tiskárny stanice, když Shanon počítač pozná:
+
+- prohlížeč, ze kterého jste stáhli instalaci (Nastavení → Nainstalovat na tento počítač), si počítač zapamatuje sám;
+- v jiném prohlížeči vyberte v **Nastavení → Tento prohlížeč tiskne přes počítač**;
+- bez výběru se použije počítač, jehož **Uživatelem počítače** jste (Integrace → Zařízení; doplní se při instalaci) –
+  jen když je takový jeden.
+
+## Zrušení tisku
+
+V **Integrace → Tiskové úlohy** (nebo u zařízení) jde čekající či odeslanou úlohu **Zrušit tisk** (i víc najednou).
+Stanice ji pak nevytiskne. Úlohu, kterou už Windows poslala tiskárně, zastavíte ve frontě tiskárny ve Windows.
+
 ## Kasa bez připojení
 
 Když vypadne internet, kasa prodává dál: platba **hotově** nebo **kartou na samostatném terminálu** se uloží v pokladně,

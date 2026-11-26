@@ -139,6 +139,35 @@ describe("tisková stanice", () => {
     expect((await pairStation(again.href.split("/").pop()!, { host: "kancelar-2" }))?.deviceId).toBe(r!.deviceId);
   });
 
+  it("tisk z běžného prohlížeče (bez zástupce) jde na počítač uživatele; tiskovou úlohu jde zrušit", async () => {
+    // instalace z Nastavení: zařízení dostane uživatele a vrátí se jeho id (prohlížeč si ho zapamatuje)
+    const f = await stationSetup(P, null);
+    const paired = (await pairStation(f.href.split("/").pop()!, { host: "recepce", version: "1.0.0" }))!;
+    expect(f.deviceId).toBe(paired.deviceId);
+    expect((await getRecord(P, "int.device", paired.deviceId, client))!.userId).toBe(P.userId);
+    const st = (await stationAuth(`Bearer ${paired.token}`))!;
+    await stationHello(st, { host: "recepce", printers: [{ name: "EPSON TM-T20III", default: true }, { name: "HP LaserJet" }] });
+    // víc počítačů téhož uživatele = nevíme, který → prohlížeč; jediný → ten
+    const rc = String((await listRecords(P, "pos.receipt", {}, client)).rows[0].id);
+    const before = await queueStationPrint(P, "pos.receipt", [rc]);
+    expect(before?.device).not.toBe("recepce");
+    for (const d of (await listRecords(P, "int.device", { pageSize: 100 }, client)).rows)
+      if (d.id !== paired.deviceId && d.userId) await saveRecord(P, "int.device", String(d.id), { userId: null }, d.version as number, client);
+    // výchozí pravidla počítače (ostatní doklady → A4), tisk bez stationId = počítač uživatele
+    const q = (await queueStationPrint(P, "pos.receipt", [rc]))!;
+    expect(q.device).toBe("recepce");
+    const jobs = await takeJobs(st, 0);
+    expect(jobs).toHaveLength(1);
+    // zrušit: stanice PDF nedostane a pozdní výsledek stav nepřepíše
+    await runAction(P, "int.printJob", jobs[0].id, "cancel", client);
+    expect((await getRecord(P, "int.printJob", jobs[0].id, client))!.status).toBe("cancelled");
+    await expect(jobPdf(st, jobs[0].id)).rejects.toMatchObject({ label: "@SYS:NotFound" });
+    await reportJob(st, jobs[0].id, true);
+    expect((await getRecord(P, "int.printJob", jobs[0].id, client))!.status).toBe("cancelled");
+    await expect(runAction(P, "int.printJob", jobs[0].id, "cancel", client)).rejects.toMatchObject({ label: "@INT:PJCancelDone" });
+    expect(await takeJobs(st, 0)).toHaveLength(0);
+  });
+
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {
     expect(printSettings({ paper: "receiptA6" }, 1)).toBe("noscale,paper=A6");
     expect(printSettings({ paper: "a4" }, 3)).toBe("fit,paper=A4,3x");

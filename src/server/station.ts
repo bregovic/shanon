@@ -14,7 +14,7 @@ import { newPairCode, stationSha } from "./station-codes";
 import { stationSetupExe, stationSetupScript } from "./station-installer";
 import { publicUrl } from "./system-mail";
 import type { RecordData } from "@/core/module";
-import { UserError } from "@/core/module";
+import { UserError, type DataApi } from "@/core/module";
 import { PAPERS, type PrintLayout } from "@/core/print";
 import { prisma, withTenant } from "./db";
 import { companyModules } from "./modules";
@@ -198,7 +198,8 @@ export async function jobPdf(st: Station, jobId: string): Promise<{ pdf: Buffer;
   const { job, conn, dev } = await inTenant(st.ctx, async (s) => {
     const api = s.sys().api();
     const job = await api.get("int.printJob", jobId);
-    if (!job || job.deviceId !== st.deviceId) throw new UserError("@SYS:NotFound");
+    // zrušená úloha: stanice ji nevytiskne (PDF nedostane)
+    if (!job || job.deviceId !== st.deviceId || job.status === "cancelled") throw new UserError("@SYS:NotFound");
     return { job, conn: await api.get("int.devicePrinter", String(job.printerId)), dev: await api.get("int.device", st.deviceId) };
   });
   const copies = Number(job.copies) || 1;
@@ -241,6 +242,7 @@ export async function reportJob(st: Station, jobId: string, ok: boolean, message
     const api = s.sys().api();
     const job = await api.get("int.printJob", jobId);
     if (!job || job.deviceId !== st.deviceId) throw new UserError("@SYS:NotFound");
+    if (job.status === "cancelled") return; // zrušená mezitím – výsledek nepřepíše stav
     await api.update("int.printJob", jobId, {
       status: ok ? "done" : "error",
       doneAt: ok ? new Date().toISOString() : null,
@@ -270,7 +272,9 @@ export async function queueStationPrint(ctx: Ctx, docType: string, ids: string[]
       recs.push(r);
     }
     const api = s.sys().api();
-    const target = await resolvePrintTarget(api, docType, { recordId: ids[0], stationId: opts.stationId ?? null, userId: ctx.userId });
+    // bez zástupce Shanon Pokladna (běžný prohlížeč): počítač, na kterém uživatel pracuje
+    const stationId = opts.stationId ?? (await userStation(api, ctx.userId));
+    const target = await resolvePrintTarget(api, docType, { recordId: ids[0], stationId, userId: ctx.userId });
     if (!target) return null;
     const conn = target.printer;
     for (const r of recs)
@@ -297,8 +301,8 @@ export async function queueStationPrint(ctx: Ctx, docType: string, ids: string[]
  * Nastavení → „Nainstalovat na tento počítač“: instalátor pro zařízení tohoto počítače (zná ho zástupce
  * Shanon Pokladna), jinak nové zařízení pojmenované při spárování podle názvu počítače. Právo = zápis zařízení.
  */
-export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{ href: string }> {
-  const { code } = await inTenant(ctx, async (s) => {
+export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{ href: string; deviceId: string }> {
+  const { code, dev } = await inTenant(ctx, async (s) => {
     const api = s.sys().api();
     let dev = deviceId ? await api.get("int.device", deviceId).catch(() => null) : null;
     if (dev && !dev.active) dev = null;
@@ -306,13 +310,41 @@ export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{
       const used = new Set((await api.find("int.device", {}, { take: 1000 })).map((d) => String(d.code)));
       let n = 1;
       while (used.has(`PC${n}`)) n++;
-      dev = await api.create("int.device", { code: `PC${n}`, name: resolveLabel(labelTable, "@INT:DeviceSetupName", ctx.lang ?? "cs"), autoName: true, active: true });
-    }
+      dev = await api.create("int.device", { code: `PC${n}`, name: resolveLabel(labelTable, "@INT:DeviceSetupName", ctx.lang ?? "cs"), autoName: true, active: true, userId: ctx.userId });
+    } else if (!dev.userId) await api.update("int.device", String(dev.id), { userId: ctx.userId });
     const pc = newPairCode(ctx.tenantId);
     await api.update("int.device", String(dev.id), { pairHash: pc.hash, pairExpires: pc.expires.toISOString() });
     return { code: pc.code, dev };
   });
-  return { href: installerHref(code) };
+  return { href: installerHref(code), deviceId: String(dev.id) };
+}
+
+/**
+ * Počítač pro tisk bez zástupce Shanon Pokladna (běžný prohlížeč, jiný profil): jediné aktivní zařízení,
+ * jehož uživatelem je přihlášený (doplní instalace nebo výběr v Nastavení). Víc počítačů = nevíme → null.
+ */
+async function userStation(api: DataApi, userId: string): Promise<string | null> {
+  // pole typu uživatel filtruje datová služba podle jména / e-mailu – zařízení firmy je pár, porovnat v paměti
+  const devs = (await api.find("int.device", { active: true }, { take: 500 })).filter((d) => d.userId === userId);
+  return devs.length === 1 ? String(devs[0].id) : null;
+}
+
+/** Nastavení → Tento prohlížeč tiskne přes: zařízení (aktivní, spárovaná) pro výběr. */
+export async function stationChoices(ctx: Ctx): Promise<{ id: string; label: string; mine: boolean }[]> {
+  return inTenant(ctx, async (s) => {
+    const devs = await s.sys().api().find("int.device", { active: true, paired: true }, { take: 100, orderBy: { code: "asc" } });
+    return devs.map((d) => ({ id: String(d.id), label: [d.name, d.hostName && d.hostName !== d.name ? d.hostName : null].filter(Boolean).join(" · ") || String(d.code), mine: d.userId === ctx.userId }));
+  });
+}
+
+/** Výběr počítače v Nastavení: zařízení dostane uživatele (když ho ještě nemá) – tisk ho pak pozná i jinde. */
+export async function stationClaim(ctx: Ctx, deviceId: string): Promise<void> {
+  await inTenant(ctx, async (s) => {
+    const api = s.sys().api();
+    const dev = await api.get("int.device", deviceId);
+    if (!dev || !dev.active) throw new UserError("@SYS:NotFound");
+    if (!dev.userId) await api.update("int.device", deviceId, { userId: ctx.userId });
+  });
 }
 
 /** odkaz na instalátor: v adrese je párovací kód — instalátor si ho po stažení přečte ze záznamu Windows o původu */

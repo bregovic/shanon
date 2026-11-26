@@ -26,6 +26,15 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
       },
     },
   },
+  "int.printJob": {
+    actions: {
+      /** Zrušit: úloha čeká nebo je odeslaná stanici (ještě nevytištěná) → stanice ji vynechá / nevezme znovu */
+      async cancel(ctx, job) {
+        if (job.status !== "queued" && job.status !== "sent") throw new UserError("@INT:PJCancelDone");
+        await ctx.data.update("int.printJob", String(job.id), { status: "cancelled", message: ctx.t("@INT:PJCancelledBy", { user: ctx.userName ?? "" }).slice(0, 250) });
+      },
+    },
+  },
   "int.devicePrinter": {
     beforeSave(_ctx, d) {
       if (!d.label && d.printerName) d.label = String(d.printerName).slice(0, 120);

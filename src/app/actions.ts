@@ -5,7 +5,7 @@ import type { SettleCriteria } from "@/modules/gl/settlement";
 import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
-import { queueStationPrint, stationSetup } from "@/server/station";
+import { queueStationPrint, stationClaim, stationSetup } from "@/server/station";
 import { createCompanyFromRegistry } from "@/server/company-lookup";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
@@ -1467,7 +1467,7 @@ export async function stationPrintAction(docType: string, ids: string[], station
 }
 
 /** Nastavení → Nainstalovat na tento počítač: instalátor Shanon Pokladna (`stationId` = zařízení ze zástupce, jinak nové). */
-export async function stationSetupAction(stationId?: string | null): Promise<ActionResult<{ href: string }>> {
+export async function stationSetupAction(stationId?: string | null): Promise<ActionResult<{ href: string; deviceId: string }>> {
   const s = await requireSession();
   try {
     if (!s.ctx.modules.has("int") || !can(s.ctx.perms, "int.device", "write")) throw new UserError("@SYS:NoAccess");
@@ -1513,6 +1513,18 @@ export async function markSettleSaveAction(objectId: string, id: string, lineId:
   const s = await requireSession();
   try {
     await markSettleSave(s.ctx, objectId, id, lineId, String(amount ?? ""));
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Nastavení → Tento prohlížeč tiskne přes počítač: zařízení dostane uživatele (pozná ho tisk i z jiných prohlížečů). */
+export async function stationClaimAction(deviceId: string): Promise<ActionResult<null>> {
+  const s = await requireSession();
+  try {
+    if (!/^[0-9a-f-]{36}$/.test(deviceId) || !s.ctx.modules.has("int")) throw new UserError("@SYS:InvalidValue");
+    await stationClaim(s.ctx, deviceId);
     return { ok: true, data: null };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);

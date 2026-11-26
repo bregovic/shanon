@@ -18,6 +18,7 @@ export const PrintJobStatus = defineEnum({
     { value: "sent", label: "@INT:PJSent", color: "warning" },
     { value: "done", label: "@INT:PJDone", color: "success" },
     { value: "error", label: "@INT:PJError", color: "danger" },
+    { value: "cancelled", label: "@INT:PJCancelled" },
   ],
 });
 
@@ -50,6 +51,8 @@ export const device = defineObject({
     active: { edt: Edts.NoYes, label: "@INT:Active", default: true },
     paired: { edt: Edts.NoYes, label: "@INT:DevicePaired", readOnly: true },
     lastSeenAt: { edt: Edts.DateTime, label: "@INT:DeviceLastSeen", readOnly: true },
+    /** kdo na počítači pracuje: tisk tohoto uživatele bez zástupce Shanon Pokladna jde na tento počítač (jediný) */
+    userId: { edt: Edts.User, label: "@INT:DeviceUser", help: "@INT:DeviceUserHelp" },
     hostName: { edt: Str("DeviceHost", "@INT:DeviceHost", 120), readOnly: true },
     agentVersion: { edt: Str("DeviceVersion", "@INT:DeviceVersion", 40), readOnly: true },
     /** založeno z Nastavení („Nainstalovat na tento počítač“) — kód a název se při spárování vezmou z názvu počítače */
@@ -60,9 +63,9 @@ export const device = defineObject({
     pairExpires: { edt: Edts.DateTime, label: "@INT:DevicePaired", readOnly: true },
   },
   titleField: "code",
-  list: ["code", "name", "registerId", "active", "paired", "lastSeenAt", "hostName", "agentVersion"],
+  list: ["code", "name", "userId", "registerId", "active", "paired", "lastSeenAt", "hostName", "agentVersion"],
   form: [
-    { label: "@SYS:General", fields: ["code", "name", "registerId", "active"] },
+    { label: "@SYS:General", fields: ["code", "name", "userId", "registerId", "active"] },
     { label: "@INT:State", fields: ["paired", "lastSeenAt", "hostName", "agentVersion"] },
   ],
   unique: [["code"]],
@@ -159,4 +162,6 @@ export const printJob = defineObject({
   form: [{ label: "@SYS:General", fields: ["reference", "deviceId", "printerId", "copies", "status", "sentAt", "doneAt", "message"] }],
   indexes: [["deviceId", "status"]],
   defaultSort: { field: "createdAt", dir: "desc" },
+  // čekající / odeslanou úlohu jde zrušit (i hromadně ze seznamu); stanice ji pak nevytiskne
+  actions: [{ id: "cancel", label: "@INT:PJCancel", bulk: true }],
 });

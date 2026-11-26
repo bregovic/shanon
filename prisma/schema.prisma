@@ -4935,6 +4935,7 @@ model IntDevice {
   active       Boolean   @default(true)
   paired       Boolean   @default(false)
   lastSeenAt   DateTime? @map("last_seen_at")
+  userId       String?   @map("user_id") @db.VarChar(36)
   hostName     String?   @map("host_name") @db.VarChar(120)
   agentVersion String?   @map("agent_version") @db.VarChar(40)
   autoName     Boolean   @default(false) @map("auto_name")
