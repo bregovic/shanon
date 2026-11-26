@@ -137,6 +137,12 @@ describe("tisková stanice", () => {
     // znovu z téhož počítače (zástupce zná zařízení) → stejné zařízení, nový kód
     const again = await stationSetup(P, r!.deviceId);
     expect((await pairStation(again.href.split("/").pop()!, { host: "kancelar-2" }))?.deviceId).toBe(r!.deviceId);
+    // přeinstalace z prohlížeče, který počítač nezná (nové zařízení) → spáruje se původní zařízení počítače
+    const fresh = await stationSetup(P, null);
+    expect(fresh.deviceId).not.toBe(r!.deviceId);
+    const re = (await pairStation(fresh.href.split("/").pop()!, { host: "KANCELAR-2", version: "1.1.0" }))!;
+    expect(re.deviceId).toBe(r!.deviceId);
+    expect(await getRecord(P, "int.device", fresh.deviceId, client)).toBeNull();
   });
 
   it("tisk z běžného prohlížeče (bez zástupce) jde na počítač uživatele; tiskovou úlohu jde zrušit", async () => {

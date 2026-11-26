@@ -63,6 +63,28 @@ export async function pairStation(code: string, info: { host?: string; version?:
   if (!ctx) return null;
   const token = `shs.${tenantId}.${randomBytes(24).toString("base64url")}`;
   const host = info.host ? String(info.host).slice(0, 120) : null;
+  // přeinstalace počítače, který už v Shanonu je (nové zařízení z Nastavení, stejný název počítače):
+  // spárovat původní zařízení – zůstanou jeho tiskárny, pravidla tisku i pokladna; nové se smaže
+  const same = dev.autoName && host
+    ? await inTenant(ctx, async (s) => (await s.sys().api().find("int.device", { active: true }, { take: 500 })).find((d) => d.id !== dev.id && String(d.hostName ?? "").toLowerCase() === host.toLowerCase()) ?? null)
+    : null;
+  if (same) {
+    await inTenant(ctx, async (s) => {
+      const api = s.sys().api();
+      await api.update("int.device", String(same.id), {
+        tokenHash: sha(token),
+        pairHash: null,
+        pairExpires: null,
+        paired: true,
+        hostName: host,
+        agentVersion: info.version ? String(info.version).slice(0, 40) : null,
+        lastSeenAt: new Date().toISOString(),
+        ...(same.userId ? {} : { userId: dev.userId ?? null }),
+      });
+      await api.remove("int.device", String(dev.id)).catch(() => api.update("int.device", String(dev.id), { active: false, pairHash: null, pairExpires: null }));
+    });
+    return { token, deviceId: String(same.id), name: String(same.name ?? host) };
+  }
   await inTenant(ctx, async (s) => {
     const api = s.sys().api();
     // založeno z Nastavení: kód a název podle počítače (kód jen když je volný)
