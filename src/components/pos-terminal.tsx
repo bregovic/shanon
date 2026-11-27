@@ -891,7 +891,9 @@ export function PosTerminal(p: {
     else if (serialPrinter) void grantedPort().then((port) => setPortReady(!!port));
   }, [serialPrinter, usbPrinter, netPrinter, sdpPrinter, p.printer]);
 
-  const escpos = async (r: ReceiptPrint | null, drawerOnly = false) => {
+  // chyba při přípravě / odeslání tisku se ukáže v kase (dřív zmizela a nic nevyjelo)
+  const escpos = (r: ReceiptPrint | null, drawerOnly = false) => escposRun(r, drawerOnly).catch((e) => setError(`${L.PrinterNetError} ${String((e as Error)?.message ?? e)}`));
+  const escposRun = async (r: ReceiptPrint | null, drawerOnly = false) => {
     const pr = p.printer!;
     const width0 = pr.paperWidth === "58" ? 32 : 48;
     if (sdpPrinter) {

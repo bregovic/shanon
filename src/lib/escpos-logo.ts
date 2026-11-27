@@ -13,6 +13,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("logo"));
+    // obrázek, který se nenačte do 4 s, účtenku nezdrží (vytiskne se bez loga)
+    setTimeout(() => reject(new Error("logo timeout")), 4000);
     img.src = src;
   });
 }
@@ -59,7 +61,7 @@ export function logoRaster(logoId: string | null | undefined, paperWidth: string
 
 /** logo + účtenka (bez loga jen účtenka) */
 export async function withLogo(receipt: Uint8Array, logoId: string | null | undefined, paperWidth: string): Promise<Uint8Array> {
-  const logo = await logoRaster(logoId, paperWidth);
+  const logo = await logoRaster(logoId, paperWidth).catch(() => null);
   if (!logo) return receipt;
   const all = new Uint8Array(logo.length + receipt.length);
   all.set(logo);
