@@ -209,3 +209,26 @@ Návod: Nápověda → E-shop."
 - Změnit datum vykázání daňové transakce (nárok na odpočet v jiném období)."
 2026-11-23;feature;Odběratelé;Smlouvy na období (členství, předplatné);CR-111;e8c081f;"- Prodejní smlouva s tarifem z položky: výzva k platbě, aktivace platbou, zaúčtovaná faktura, dávka s obnovou a blokací nezaplacených; portál pro uzavření smlouvy."
 2026-11-23;fix;Integrace;ISDOC v PDF z Pohody;;32f35e8;"- Vložený ISDOC v PDF z Pohody se znovu najde (doklad se načte i s řádky)."
+2026-11-27;feature;Pokladna;Oprava účtenky;CR-122;33ad28f;"- Kasa → Účtenky: účtenky směny – Otevřít do nákupu, Tisk, Stornovat, Smazat poslední.
+- Jen jiný odběratel = Uložit odběratele (stejná účtenka); jiné položky = Přepsat účtenku na stejném čísle (do uzávěrky, mimo EET, e-mail a kartu přes terminál), jinak storno + nová účtenka.
+- Seznam Účtenky: odběratel i po uzávěrce do podání DPH (kontrolní hlášení se přepočte), způsob platby do uzávěrky, Stornovat, QR Označit jako zaplacené.
+- ISDOC účtenek (i hromadně v ZIP), tiskárna účtenek přes USB na tabletu."
+2026-11-27;feature;Integrace;Tisková stanice: diagnostika a katalog tiskáren;;d7e445f;"- Zařízení → Diagnostika tohoto počítače (i v detailu zařízení): stanice, tiskárny, stav, fronta, zkušební stránka, USB tiskárny bez instalace.
+- Používané / nalezené tiskárny, Katalog tiskáren s odkazem na ovladač výrobce – další počítač převezme nastavení.
+- Mazání tiskových úloh a zařízení, Zrušit tisk; stanice 1.2 se aktualizuje sama a nehlásí virtuální tiskárny."
+2026-11-27;feature;Odběratelé;Smlouvy podle kalendáře a portál smluv;CR-121;63d5cce;"- Smlouva podle kalendáře splátek: VS a číslo karty, aktivace první platbou, faktury podle kalendáře, blokace po splatnosti; tarif za kartu.
+- Aktivace smlouvy = objednávka K fakturaci, Vyfakturovat i hromadně.
+- Portál smluv: formulář s poli (i Načíst z ARES), obchodní podmínky a smlouva v PDF e-mailem, QR platba, platba kartou bránou; vzhled portálu (logo, barvy, pozadí) [CR-119]."
+2026-11-27;feature;Hlavní kniha;Vyrovnání v deníku;CR-120;a34c1a5;"- Deník: Vyrovnat řádek s otevřenými položkami salda (i zálohy a smlouvy), stav vyrovnání; Označit k vyrovnání z faktury / zálohy / smlouvy.
+- Výpis: Náhled dokladu, smazání výpisu z detailu bankovního účtu."
+2026-11-27;change;DPH;Daňový kód položek jen přes skupiny DPH;;34af55e;"- Kód DPH se určuje kombinací skupina DPH partnera × položka DPH; nasazení převedlo dřívější výjimky na položku DPH.
+- Kód ekonomické činnosti do přiznání; Zkontrolovat odeslání datovou schránkou."
+2026-11-27;feature;Integrace;Ostrý a testovací provoz napojení;CR-117;70263fb;"- Na testovacím serveru se ostrá napojení (EET, schránka, pošta, platby) nepoužijí bez povolení; migrace přenáší napojení bez hesel a certifikátů."
+2026-11-27;feature;Organizace;Migrace firmy a ARES;CR-115;26c7ff3;"- Migrace firmy ze šablony JSON (kontrola, spuštění, export), i nastavení e-shopu.
+- Doplnit z ARES: CZ-NACE, ověření plátce DPH, finanční úřad a zveřejněné účty do Banky."
+2026-11-27;feature;Adresář;Kontakty jako v AX;;7778b5c;"- Kontakty s druhem a účelem, hlavní e-mail / telefon subjektu, kontakty a adresy na kartě odběratele a dodavatele."
+2026-11-27;feature;Testování a vývoj;Náměty: zadavatel a upozornění;;6d6ae36;"- Námět jde zapsat za jiného uživatele (Zadavatel).
+- Upozornění správcům na nový námět, zadavateli na odpověď, změnu stavu a požadavek k vyzkoušení."
+2026-11-27;feature;Správa systému;Výchozí role a ovládání;;5213765;"- Výchozí role Auditor (jen čtení účetnictví, banky, partnerů a DPH).
+- Lišta s tlačítky ukotvená pod hlavičkou, pole jen ke čtení jdou kopírovat, hromadné stažení souborů v ZIP."
+2026-11-27;feature;E-shop;Úvod e-shopu;CR-116;c825a8d;"- Typ úvodu (vedle textu, přes celou šířku, banner), animace, druhá barva přechodu."
