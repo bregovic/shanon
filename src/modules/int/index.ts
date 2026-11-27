@@ -730,7 +730,7 @@ export default defineModule({
   setup: intSetup,
   menu: [
     { label: "@INT:Module", items: [{ object: "int.connection" }, { object: "int.log" }] },
-    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }, { object: "int.printerModel" }, { href: "/int/diagnostika", label: "@SYS:StationDiag" }] },
+    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }, { object: "int.printerModel" }] },
     { label: "@INT:Documents", items: [{ object: "int.document" }, { object: "int.portal" }, { object: "int.form" }, { object: "int.portalContact" }] },
     { label: "@INT:Mails", items: [{ object: "int.mail" }] },
     { label: "@INT:Documents", kind: "functions", items: [{ href: "/int/doc-import", label: "@INT:DocImport" }] },

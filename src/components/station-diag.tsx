@@ -3,7 +3,7 @@
 /**
  * Diagnostika tiskové stanice: pozná Shanon tento prohlížeč (nebo vybrané zařízení), běží stanice, tiskárny
  * se stavem z Windows, kam jde účtenka a ostatní doklady; Obnovit stav, Zkušební stránka. Texty dodá server.
- * Použití: Nastavení (tento počítač), detail zařízení (akce Diagnostika), stránka /int/diagnostika.
+ * Použití: Nastavení (tento počítač), detail zařízení (akce Diagnostika), seznam Zařízení (tlačítko Diagnostika tohoto počítače).
  */
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -130,10 +130,10 @@ export function StationDiag({
     setMsg(r.data.message ?? T.StationDiagSaved ?? "");
     await load();
   };
-  /** Přidat tento počítač: zařízení v Shanonu + instalace stanice (tiskárny nahlásí až program na počítači) */
+  /** Přidat tento počítač: jen zařízení v Shanonu (prohlížeč si ho zapamatuje), nic se nestahuje */
   const addPc = async () => {
     setBusy(true);
-    const r = await stationSetupAction(stationId()).catch(() => null);
+    const r = await stationSetupAction(stationId(), false).catch(() => null);
     setBusy(false);
     if (!r?.ok) return setMsg(r?.message ?? "");
     try {
@@ -141,9 +141,17 @@ export function StationDiag({
     } catch {
       /* bez úložiště pozná počítač server podle uživatele zařízení */
     }
-    void navigator.clipboard
-      ?.writeText(new URL(r.data.href, window.location.href).href)
-      .catch(() => undefined);
+    await load();
+    setMsg(T.StationDiagAdded ?? "");
+  };
+  /** Stáhnout instalaci stanice pro toto zařízení (tiskárny Windows nahlásí až program na počítači) */
+  const install = async (id: string) => {
+    setBusy(true);
+    const r = await stationSetupAction(id).catch(() => null);
+    setBusy(false);
+    if (!r?.ok) return setMsg(r?.message ?? "");
+    // stažení přímo z adresy (Windows si zapamatuje odkud – instalátor z toho vezme párovací kód), záloha do schránky
+    void navigator.clipboard?.writeText(new URL(r.data.href, window.location.href).href).catch(() => undefined);
     window.location.assign(r.data.href);
     setMsg(T.StationDiagAddPcHint ?? "");
   };
@@ -316,6 +324,16 @@ export function StationDiag({
                 {T.StationDiagRefresh}
               </Button>
             </div>
+          )}
+          {!d.device.paired && d.canEdit && (
+            <>
+              <Text size={200}>{T.StationDiagInstallHint}</Text>
+              <div>
+                <Button size="small" disabled={busy} onClick={() => void install(d.device!.id)}>
+                  {T.StationDiagInstall}
+                </Button>
+              </div>
+            </>
           )}
         </>
       )}

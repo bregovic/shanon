@@ -240,6 +240,11 @@ describe("tisková stanice", () => {
     const d = await stationDiagnostics(P, null, b.id);
     expect(d.usbNoDriver).toEqual([{ name: "Brother QL800", model: "Brother QL-800", driverUrl: "https://example.com/ql800" }]);
     expect(d.canEdit).toBe(true);
+    // Přidat tento počítač (diagnostika): jen zařízení, bez párovacího kódu a instalace
+    const only = await stationSetup(P, null, { pair: false });
+    expect(only.href).toBe("");
+    const od = (await getRecord(P, "int.device", only.deviceId, client))!;
+    expect([od.paired, od.active]).toEqual([false, true]);
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

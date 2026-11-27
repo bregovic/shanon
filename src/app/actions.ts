@@ -1467,11 +1467,11 @@ export async function stationPrintAction(docType: string, ids: string[], station
 }
 
 /** Nastavení → Nainstalovat na tento počítač: instalátor Shanon Pokladna (`stationId` = zařízení ze zástupce, jinak nové). */
-export async function stationSetupAction(stationId?: string | null): Promise<ActionResult<{ href: string; deviceId: string }>> {
+export async function stationSetupAction(stationId?: string | null, pair = true): Promise<ActionResult<{ href: string; deviceId: string }>> {
   const s = await requireSession();
   try {
     if (!s.ctx.modules.has("int") || !can(s.ctx.perms, "int.device", "write")) throw new UserError("@SYS:NoAccess");
-    return { ok: true, data: await stationSetup(s.ctx, stationId && /^[0-9a-f-]{36}$/.test(stationId) ? stationId : null) };
+    return { ok: true, data: await stationSetup(s.ctx, stationId && /^[0-9a-f-]{36}$/.test(stationId) ? stationId : null, { pair: pair !== false }) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

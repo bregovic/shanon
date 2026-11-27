@@ -86,6 +86,8 @@ export const device = defineObject({
   },
   titleField: "code",
   list: ["code", "name", "userId", "registerId", "active", "paired", "lastSeenAt", "hostName", "agentVersion"],
+  // Diagnostika tohoto počítače přímo ze seznamu (bez instalace; nezná-li ho Shanon, nabídne Přidat tento počítač)
+  listDialog: { kind: "stationDiag", label: "@SYS:StationDiag" },
   form: [
     { label: "@SYS:General", fields: ["code", "name", "userId", "registerId", "active"] },
     { label: "@INT:State", fields: ["paired", "lastSeenAt", "hostName", "agentVersion"] },

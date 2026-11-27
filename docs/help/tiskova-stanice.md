@@ -75,8 +75,8 @@ na tomto počítači jde otevřít i bez připojení. Odběratel, QR platba, pro
 
 ## Diagnostika, používané tiskárny a katalog
 
-**Integrace → Diagnostika tohoto počítače** (i v detailu zařízení a v Nastavení) ukáže, zda Shanon počítač zná, zda stanice běží
-a jaké tiskárny Windows hlásí. Počítač, který Shanon nezná, přidáte tlačítkem **Přidat tento počítač** (stáhne instalaci stanice).
+Tlačítko **Diagnostika tohoto počítače** v seznamu **Zařízení** (i akce Diagnostika v detailu zařízení a Nastavení) ukáže, zda Shanon počítač zná, zda stanice běží
+a jaké tiskárny Windows hlásí. Počítač, který Shanon nezná, přidáte tlačítkem **Přidat tento počítač** (jen ho založí); tiskárny Windows nahlásí až stanice – **Stáhnout instalaci stanice**.
 
 Tiskárny jsou **používané** a **nalezené**: v pravidlech tisku a u pokladny se nabízejí jen používané. Zaškrtnutím je zapnete
 nebo vypnete. Nová tiskárna se zapne sama, jen když je výchozí ve Windows, je na účtenky nebo ji zná katalog.

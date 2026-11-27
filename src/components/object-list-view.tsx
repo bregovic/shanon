@@ -26,7 +26,7 @@ import { PrintDialog, type PrintDialogLabels } from "./print-dialog";
 import { printInFrame } from "@/lib/print-frame";
 import { printHref } from "@/lib/station-print";
 import type { ActionIcon as ActionIconName } from "@/core/object";
-import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Mail24Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular } from "@fluentui/react-icons";
+import { Add24Regular, ArrowClockwise24Regular, ArrowMinimize24Regular, ArrowDownload24Regular, Copy24Regular, Delete24Regular, Dismiss16Regular, Edit24Regular, Filter16Regular, Mail24Regular, Print24Regular, QuestionCircle24Regular, StarAdd16Regular, Stethoscope24Regular } from "@fluentui/react-icons";
 import { DateInput } from "./date-input";
 import { bulkRecordAction, deleteRecordsAction, duplicateRecordAction, mergeRecordsAction, runRecordAction } from "@/app/actions";
 import { toast } from "./toast";
@@ -43,6 +43,7 @@ import type { FormGroup, Values } from "./record-form";
 import { useShortcuts } from "./shortcuts";
 import { goBack } from "@/lib/nav-back";
 import { SmartGrid } from "./smart-grid";
+import { StationDiag } from "./station-diag";
 
 type Row = Record<string, unknown>;
 
@@ -69,6 +70,8 @@ export interface ObjectListProps {
   viewName?: string;
   /** Sloučit vybrané záznamy (ObjectDef.mergeable) */
   mergeable?: boolean;
+  /** tlačítko v liště → dialog bez výběru záznamu (ObjectDef.listDialog) */
+  listDialog?: { kind: "stationDiag"; label: string };
   /** akce nad víc vybranými záznamy (výpisy → deník HK) */
   bulkActions?: { id: string; label: string; icon?: ActionIconName; input?: { name: string; label: string; kind: "date" } }[];
   /** hromadný tisk vybraných dokladů (tisknutelný objekt): adresa `/print/<objekt>/batch` */
@@ -95,6 +98,7 @@ export function ObjectListView(p: ObjectListProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Row[]>([]);
   const [reload, setReload] = useState(0);
+  const [listDialogOpen, setListDialogOpen] = useState(false);
   const [drawer, setDrawer] = useState<{ open: boolean; id: string | null; title: string; values?: Values; titles?: Record<string, string> }>({ open: false, id: null, title: "" });
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string>();
@@ -314,8 +318,36 @@ export function ObjectListView(p: ObjectListProps) {
         <Button appearance="subtle" icon={<ArrowClockwise24Regular />} title={`${p.labels.actions.refresh} (Shift+R)`} onClick={() => setReload((n) => n + 1)}>
           {p.labels.actions.refresh}
         </Button>
+        {p.listDialog && (
+          <Button appearance="subtle" icon={<Stethoscope24Regular />} onClick={() => setListDialogOpen(true)}>
+            {p.listDialog.label}
+          </Button>
+        )}
         {p.helpHref && <Button appearance="subtle" icon={<QuestionCircle24Regular />} title={p.helpLabel} aria-label={p.helpLabel} onClick={() => router.push(p.helpHref!)} />}
       </ActionBar>
+      {p.listDialog && listDialogOpen && (
+        <Dialog
+          open
+          onOpenChange={(_, d) => {
+            if (d.open) return;
+            setListDialogOpen(false);
+            // diagnostika mohla založit zařízení / změnit tiskárny
+            setReload((n) => n + 1);
+          }}
+        >
+          <DialogSurface style={{ maxWidth: "min(760px, 96vw)" }}>
+            <DialogBody>
+              <DialogTitle>{p.listDialog.label}</DialogTitle>
+              <DialogContent>
+                <StationDiag />
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setListDialogOpen(false)}>{p.labels.actions.cancel}</Button>
+              </DialogActions>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
+      )}
 
       <PageContent>
         {error && (

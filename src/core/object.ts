@@ -128,6 +128,8 @@ export interface ObjectDef {
   datLayer?: boolean;
   /** výběr tohoto objektu v odkazech (combobox) jen záznamy s těmito hodnotami – např. tiskárny jen připojené */
   lookupWhere?: Record<string, unknown>;
+  /** tlačítko v liště seznamu otevře dialog bez výběru záznamu (stationDiag = diagnostika počítače, u kterého uživatel sedí) */
+  listDialog?: { kind: "stationDiag"; label: LabelRef };
   /** podřízené řádky zobrazené ve formuláři (např. řádky dokladu) */
   /**
    * podřízené záznamy zobrazené ve formuláři. `owned: false` = jen přehled

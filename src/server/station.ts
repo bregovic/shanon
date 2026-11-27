@@ -367,7 +367,7 @@ export async function queueStationPrint(ctx: Ctx, docType: string, ids: string[]
  * Nastavení → „Nainstalovat na tento počítač“: instalátor pro zařízení tohoto počítače (zná ho zástupce
  * Shanon Pokladna), jinak nové zařízení pojmenované při spárování podle názvu počítače. Právo = zápis zařízení.
  */
-export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{ href: string; deviceId: string }> {
+export async function stationSetup(ctx: Ctx, deviceId: string | null, opts: { pair?: boolean } = {}): Promise<{ href: string; deviceId: string }> {
   const { code, dev } = await inTenant(ctx, async (s) => {
     const api = s.sys().api();
     let dev = deviceId ? await api.get("int.device", deviceId).catch(() => null) : null;
@@ -378,11 +378,13 @@ export async function stationSetup(ctx: Ctx, deviceId: string | null): Promise<{
       while (used.has(`PC${n}`)) n++;
       dev = await api.create("int.device", { code: `PC${n}`, name: resolveLabel(labelTable, "@INT:DeviceSetupName", ctx.lang ?? "cs"), autoName: true, active: true, userId: ctx.userId });
     } else if (!dev.userId) await api.update("int.device", String(dev.id), { userId: ctx.userId });
+    // jen založit (Diagnostika → Přidat tento počítač): instalace se stáhne až na vlastní tlačítko
+    if (opts.pair === false) return { code: "", dev };
     const pc = newPairCode(ctx.tenantId);
     await api.update("int.device", String(dev.id), { pairHash: pc.hash, pairExpires: pc.expires.toISOString() });
     return { code: pc.code, dev };
   });
-  return { href: installerHref(code), deviceId: String(dev.id) };
+  return { href: code ? installerHref(code) : "", deviceId: String(dev.id) };
 }
 
 /**
@@ -425,7 +427,7 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }
 
-const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved"];
+const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved", "StationDiagInstall", "StationDiagInstallHint", "StationDiagAdded"];
 
 export interface StationDiagnostics {
   /** texty komponenty (jazyk uživatele) */
