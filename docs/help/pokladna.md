@@ -74,6 +74,20 @@ Termotiskárnu ESC/POS (např. Epson TM-m30III) připojenou kabelem USB k tablet
 Když se po připojení kabelu nabídne jiná aplikace (třeba tisková služba Epson), nenastavujte ji jako výchozí pro toto zařízení –
 tiskárnu by si vzala a kasa by ji neviděla.
 
+## Tiskárna Epson v síti (tablet bez kabelu)
+
+Epson TM se síťovým portem (LAN) kasa na tabletu ovládá přes síť, bez kabelu k tabletu. Pokladní zásuvka zůstává
+zapojená v tiskárně (zdířka se symbolem zásuvky).
+
+1. Zjistěte IP adresu tiskárny: vypněte ji, podržte **Feed** a zapněte – vytiskne nastavení sítě (IP Address). V routeru jí
+   nastavte pevnou adresu (rezervace DHCP), ať se nemění.
+2. [Integrace → Napojení](/int/connection) → **Nový**: druh **Tiskárna**, ovladač **Epson v síti (ePOS) – tablet (Chrome)**,
+   **IP adresa tiskárny**, papír 80 mm, kódová stránka PC852, **Otevírat pokladní zásuvku**, případně **Tisknout účtenku automaticky**.
+3. Na tabletu (ve stejné Wi-Fi) jednou otevřete v Chrome `https://<IP tiskárny>` a potvrďte certifikát tiskárny
+   (**Rozšířené → Pokračovat**). Pak v kase **Připojit tiskárnu**; když se Chrome zeptá na přístup k zařízením v místní síti, povolte ho.
+
+Když tiskárna neodpovídá, kasa to napíše – zkontrolujte, že je zapnutá a tablet je ve stejné síti, případně znovu potvrďte certifikát.
+
 ## Pokladní váha
 
 Váha se připojuje k počítači pokladny kabelem RS-232 nebo USB (převodník na sériový port) a čte se přímo z prohlížeče (Chrome nebo Edge).

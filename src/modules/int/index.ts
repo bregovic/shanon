@@ -60,6 +60,8 @@ export const Driver = defineEnum({
     { value: "browser", label: "@INT:DrvBrowser" },
     { value: "escposSerial", label: "@INT:DrvEscposSerial" },
     { value: "escposUsb", label: "@INT:DrvEscposUsb" },
+    // síťová tiskárna Epson TM přímo z prohlížeče kasy (ePOS-Print, src/lib/epos.ts)
+    { value: "escposNet", label: "@INT:DrvEscposNet" },
     { value: "manual", label: "@INT:DrvManual" },
     { value: "sumup", label: "@INT:DrvSumup" },
     { value: "simulator", label: "@INT:DrvSimulator" },
@@ -214,7 +216,7 @@ const EET = { field: "kind", in: ["eet"] };
 const PRINTER = { field: "kind", in: ["printer"] };
 const SUMUP = { field: "driver", in: ["sumup"] };
 const COMGATE = { field: "driver", in: ["comgate"] };
-const SERIAL = { field: "driver", in: ["escposSerial", "escposUsb"] };
+const SERIAL = { field: "driver", in: ["escposSerial", "escposUsb", "escposNet"] };
 const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
 const ISDS = { field: "kind", in: ["isds"] };
@@ -254,6 +256,8 @@ export const connection = defineObject({
     // tiskárna
     paperWidth: { edt: enumEdt(PaperWidth), default: "80", visibleWhen: PRINTER },
     codePage: { edt: enumEdt(CodePage), default: "cp852", visibleWhen: SERIAL },
+    /** síťová tiskárna Epson (ePOS-Print): IP adresa v místní síti, volitelně :port */
+    printerHost: { edt: Str("PrinterHost", "@INT:PrinterHost", 120, /^[A-Za-z0-9.-]{1,100}(:\d{1,5})?$/, "@INT:PrinterHostHelp"), help: "@INT:PrinterHostHelp", visibleWhen: { field: "driver", in: ["escposNet"] } },
     baudRate: { edt: Edts.Int, label: "@INT:BaudRate", default: 9600, visibleWhen: { field: "driver", in: ["escposSerial", "scaleSerial"] } },
     // pokladní váha (sériový port): protokol a parametry portu podle nastavení váhy
     scaleProtocol: { edt: enumEdt(ScaleProtocol), default: "toledo8217", visibleWhen: { field: "driver", in: ["scaleSerial", "scaleSim"] } },
@@ -1362,6 +1366,9 @@ export default defineModule({
       DrvBrowser: "Tisk z prohlížeče",
       DrvEscposSerial: "ESC/POS přes USB/sériový port",
       DrvEscposUsb: "ESC/POS přes USB – tablet (Chrome)",
+      DrvEscposNet: "Epson v síti (ePOS) – tablet (Chrome)",
+      PrinterHost: "IP adresa tiskárny",
+      PrinterHostHelp: "Adresa tiskárny v místní síti, např. 192.168.1.32 (vytiskne ji tiskárna při zapnutí se stisknutým Feed). Nastavte jí v routeru pevnou adresu.",
       DrvManual: "Ruční potvrzení na terminálu",
       DrvSumup: "SumUp Solo (Cloud API)",
       DrvSimulator: "Simulátor (zkoušení)",
@@ -2079,6 +2086,9 @@ export default defineModule({
       DrvBrowser: "Browser printing",
       DrvEscposSerial: "ESC/POS over USB/serial port",
       DrvEscposUsb: "ESC/POS over USB – tablet (Chrome)",
+      DrvEscposNet: "Epson on network (ePOS) – tablet (Chrome)",
+      PrinterHost: "Printer IP address",
+      PrinterHostHelp: "Printer address in the local network, e.g. 192.168.1.32 (printed by the printer when switched on with Feed held). Give it a fixed address in the router.",
       DrvManual: "Manual confirmation on terminal",
       DrvSumup: "SumUp Solo (Cloud API)",
       DrvSimulator: "Simulator (testing)",

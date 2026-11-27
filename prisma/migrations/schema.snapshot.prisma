@@ -4536,6 +4536,7 @@ model IntConnection {
   isdsPassword    String?   @map("isds_password") @db.VarChar(4000)
   paperWidth      String?   @default("80") @map("paper_width") @db.VarChar(40)
   codePage        String?   @default("cp852") @map("code_page") @db.VarChar(40)
+  printerHost     String?   @map("printer_host") @db.VarChar(120)
   baudRate        Int?      @default(9600) @map("baud_rate")
   scaleProtocol   String?   @default("toledo8217") @map("scale_protocol") @db.VarChar(40)
   scaleSerial     String?   @map("scale_serial") @db.VarChar(60)

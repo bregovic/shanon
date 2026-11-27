@@ -95,6 +95,7 @@ import {
   type OfflineSaleRec,
 } from "@/lib/pos-offline";
 import { receiptData } from "@/lib/receipt-data";
+import { eposCheck, eposPrint } from "@/lib/epos";
 import {
   EscPos,
   grantedPort,
@@ -402,7 +403,7 @@ export function PosTerminal(p: {
   boxes?: { code: string; name: string }[];
   /** tisková šablona účtenky (Tiskové sestavy); bez ní vestavěná účtenka */
   receiptLayout?: PrintLayout | null;
-  printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean } | null;
+  printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean; host?: string } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
   /** testovací server: kódy ručně povolených ostrých napojení (upozornění nahoře) */
@@ -823,17 +824,33 @@ export function PosTerminal(p: {
   }, [p.register.id, netDown, syncOffline]);
   // tiskárna ESC/POS přímo z kasy: sériový port (Web Serial) nebo USB kabel k tabletu (WebUSB)
   const usbPrinter = p.printer?.driver === "escposUsb";
-  const serialPrinter = p.printer?.driver === "escposSerial" || usbPrinter;
+  // Epson v místní síti (ePOS-Print): stejné ESC/POS, posílá prohlížeč přes HTTPS
+  const netPrinter = p.printer?.driver === "escposNet" && !!p.printer.host;
+  const serialPrinter = p.printer?.driver === "escposSerial" || usbPrinter || netPrinter;
   const [portReady, setPortReady] = useState(false);
   const terminalPay = !!p.payment && p.payment.driver !== "manual";
 
+  /** síťová tiskárna neodpovídá: nejčastěji nepotvrzený certifikát tiskárny v Chrome (odkaz v hlášce) */
+  const netFail = (code: string) => setError(code === "network" ? L.PrinterNetDown.replace(/\{host\}/g, p.printer?.host ?? "") : `${L.PrinterNetError} ${code}`);
   useEffect(() => {
-    if (usbPrinter) void grantedUsbPrinter().then((d) => setPortReady(!!d));
+    if (netPrinter) void eposCheck(p.printer!.host!).then((r) => setPortReady(r.ok));
+    else if (usbPrinter) void grantedUsbPrinter().then((d) => setPortReady(!!d));
     else if (serialPrinter) void grantedPort().then((port) => setPortReady(!!port));
-  }, [serialPrinter, usbPrinter]);
+  }, [serialPrinter, usbPrinter, netPrinter, p.printer]);
 
   const escpos = async (r: ReceiptPrint | null, drawerOnly = false) => {
     const pr = p.printer!;
+    const width0 = pr.paperWidth === "58" ? 32 : 48;
+    if (netPrinter) {
+      const data =
+        drawerOnly || !r
+          ? Uint8Array.from(new EscPos(width0, pr.codePage).drawer().bytes)
+          : receiptEscPos(r, L, fmt, { width: width0, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale });
+      const res = await eposPrint(pr.host!, data);
+      setPortReady(res.ok || res.code !== "network");
+      if (!res.ok) netFail(res.code);
+      return;
+    }
     const usbDev = usbPrinter ? await grantedUsbPrinter() : null;
     const port = usbPrinter ? null : await grantedPort();
     if (!usbDev && !port) {
@@ -887,6 +904,16 @@ export function PosTerminal(p: {
     setScaleState({ busy: false, reading: null, error: L.ScaleNotStable });
   };
   const connectPrinter = async () => {
+    if (netPrinter) {
+      const r = await eposCheck(p.printer!.host!);
+      setPortReady(r.ok);
+      if (!r.ok) {
+        netFail(r.code);
+        // certifikát tiskárny: otevřít její stránku, potvrdit (Pokračovat) a vrátit se do kasy
+        if (r.code === "network") window.open(`https://${p.printer!.host}/`, "_blank", "noopener");
+      } else setError(undefined);
+      return;
+    }
     if (usbPrinter) {
       if (!usbSupported()) return setError(L.PrinterUsbUnsupported);
       return setPortReady(!!(await requestUsbPrinter().catch(() => null)));

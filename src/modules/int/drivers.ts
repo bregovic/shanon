@@ -45,7 +45,7 @@ export const DRIVERS: Record<string, string[]> = {
   mail: ["system", "smtp", "mailTest"],
   isds: ["isds", "isdsTest"],
   eet: ["eet2", "eetSimulator"],
-  printer: ["browser", "escposSerial", "escposUsb"],
+  printer: ["browser", "escposSerial", "escposUsb", "escposNet"],
   payment: ["manual", "sumup", "simulator", "comgate", "gatewaySim"],
   scale: ["scaleSerial", "scaleSim"],
   api: ["rest"],
