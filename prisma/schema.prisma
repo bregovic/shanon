@@ -4983,8 +4983,9 @@ model IntDevicePrinter {
   tenantId    String    @map("tenant_id") @db.Uuid
   companyId   String    @map("company_id") @db.Uuid
   deviceId    String    @map("device_id") @db.Uuid
-  label       String    @db.VarChar(120)
-  printerName String    @map("printer_name") @db.VarChar(200)
+  label       String?   @db.VarChar(120)
+  copyFromId  String?   @map("copy_from_id") @db.Uuid
+  printerName String?   @map("printer_name") @db.VarChar(200)
   enabled     Boolean   @default(true)
   driverName  String?   @map("driver_name") @db.VarChar(200)
   modelId     String?   @map("model_id") @db.Uuid
@@ -5002,16 +5003,19 @@ model IntDevicePrinter {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy   String?   @map("updated_by") @db.Uuid
 
-  company                    SysCompany       @relation("IntDevicePrinter_company", fields: [companyId], references: [id], onDelete: Restrict)
-  device                     IntDevice        @relation("IntDevicePrinter_device", fields: [deviceId], references: [id], onDelete: Restrict)
-  model                      IntPrinterModel? @relation("IntDevicePrinter_model", fields: [modelId], references: [id], onDelete: Restrict)
-  posRegister_stationPrinter PosRegister[]    @relation("PosRegister_stationPrinter")
-  intPrintRule_printer       IntPrintRule[]   @relation("IntPrintRule_printer")
-  intPrintJob_printer        IntPrintJob[]    @relation("IntPrintJob_printer")
+  company                    SysCompany         @relation("IntDevicePrinter_company", fields: [companyId], references: [id], onDelete: Restrict)
+  device                     IntDevice          @relation("IntDevicePrinter_device", fields: [deviceId], references: [id], onDelete: Restrict)
+  copyFrom                   IntDevicePrinter?  @relation("IntDevicePrinter_copyFrom", fields: [copyFromId], references: [id], onDelete: Restrict)
+  model                      IntPrinterModel?   @relation("IntDevicePrinter_model", fields: [modelId], references: [id], onDelete: Restrict)
+  posRegister_stationPrinter PosRegister[]      @relation("PosRegister_stationPrinter")
+  intDevicePrinter_copyFrom  IntDevicePrinter[] @relation("IntDevicePrinter_copyFrom")
+  intPrintRule_printer       IntPrintRule[]     @relation("IntPrintRule_printer")
+  intPrintJob_printer        IntPrintJob[]      @relation("IntPrintJob_printer")
 
   @@unique([tenantId, companyId, deviceId, printerName])
   @@index([tenantId, companyId])
   @@index([deviceId])
+  @@index([copyFromId])
   @@index([modelId])
   @@map("int_device_printer")
 }

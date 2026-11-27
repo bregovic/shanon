@@ -122,13 +122,16 @@ export const devicePrinter = defineObject({
   fields: {
     deviceId: { edt: refEdt("int.device", "@INT:Device"), mandatory: true },
     /** zobrazovaný název „KASA1 · XP-58“ (lze přejmenovat, např. „Účtenky u pultu“) */
-    label: { edt: Edts.Name, label: "@INT:Printer", mandatory: true },
-    printerName: { edt: Str("StationPrinter", "@INT:PrinterName", 200), mandatory: true },
+    /** prázdný = podle názvu ve Windows (obsluha) */
+    label: { edt: Edts.Name, label: "@INT:Printer" },
+    /** ruční přidání: vybrat tiskárnu jiného počítače / model z katalogu → název ve Windows, papír a kopie se doplní (obsluha) */
+    copyFromId: { edt: refEdt("int.devicePrinter", "@INT:PrinterCopyFrom"), help: "@INT:PrinterCopyFromHelp" },
+    printerName: { edt: Str("StationPrinter", "@INT:PrinterName", 200), help: "@INT:PrinterNameHelp" },
     /** používat na tomto počítači: jen používané se nabízí v pravidlech tisku a u pokladny (ostatní = jen nalezené) */
     enabled: { edt: Edts.NoYes, label: "@INT:PrinterEnabled", help: "@INT:PrinterEnabledHelp", default: true },
     /** ovladač Windows (rozpoznání modelu pro katalog) */
     driverName: { edt: Str("StationDriver", "@INT:PrinterDriver", 200), readOnly: true },
-    modelId: { edt: refEdt("int.printerModel", "@INT:PrinterModel"), optionalRef: true },
+    modelId: { edt: refEdt("int.printerModel", "@INT:PrinterModel"), optionalRef: true, help: "@INT:PrinterModelHelp" },
     paper: { edt: enumEdt(DevicePaper), mandatory: true, default: "a4" },
     copies: { edt: Edts.Int, label: "@INT:Copies", default: 1 },
     isDefault: { edt: Edts.NoYes, label: "@INT:PrinterDefault", readOnly: true },
@@ -140,10 +143,10 @@ export const devicePrinter = defineObject({
     stateAt: { edt: Edts.DateTime, label: "@INT:PrinterStateAt", readOnly: true },
   },
   titleField: "label",
-  list: ["label", "enabled", "printerName", "paper", "copies", "isDefault", "present", "state", "queued", "stateAt", "modelId"],
+  list: ["label", "enabled", "copyFromId", "modelId", "printerName", "paper", "copies", "isDefault", "present", "state", "queued", "stateAt"],
   // ve výběru tiskárny (Správa tisku, pokladna) jen používané tiskárny, které Windows právě hlásí
   lookupWhere: { present: true, enabled: true },
-  form: [{ label: "@SYS:General", fields: ["deviceId", "label", "enabled", "printerName", "driverName", "modelId", "paper", "copies", "isDefault", "present"] }],
+  form: [{ label: "@SYS:General", fields: ["deviceId", "copyFromId", "modelId", "printerName", "label", "enabled", "driverName", "paper", "copies", "isDefault", "present"] }],
   unique: [["deviceId", "printerName"]],
   defaultSort: { field: "label", dir: "asc" },
   actions: [

@@ -265,6 +265,14 @@ describe("tisková stanice", () => {
     d2 = await stationDiagnostics(P, null, b.id);
     expect(d2.connectable).toEqual([]);
     expect(d2.device!.connectResult).toMatch(/\\\\server\\Kancl: OK$/);
+
+    // ruční přidání tiskárny k zařízení: Podle tiskárny jiného počítače / Model z katalogu doplní název ve Windows a papír
+    const src = (await listRecords(P, "int.devicePrinter", { filter: { deviceId: b.id } }, client)).rows.find((x) => x.printerName === "Brother QL-800 (kopie 1)")!;
+    const m1 = await saveRecord(P, "int.devicePrinter", null, { deviceId: only.deviceId, copyFromId: src.id }, undefined, client);
+    expect([m1.printerName, m1.label, m1.paper, m1.copies, m1.modelId]).toEqual(["Brother QL-800 (kopie 1)", "Brother QL-800 (kopie 1)", "58", 2, model.id]);
+    const m2 = await saveRecord(P, "int.devicePrinter", null, { deviceId: only.deviceId, modelId: model.id }, undefined, client);
+    expect([m2.printerName, m2.paper, m2.enabled]).toEqual(["Brother QL-800", "58", true]);
+    await expect(saveRecord(P, "int.devicePrinter", null, { deviceId: only.deviceId }, undefined, client)).rejects.toBeTruthy();
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

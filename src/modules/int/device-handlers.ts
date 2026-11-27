@@ -3,7 +3,7 @@
  * tiskárny a kontrola pravidel Správy tisku. Fronta tisku a rozhraní stanice jsou v src/server/station.ts
  * (mimo moduly — importuje registr).
  */
-import { UserError, type ObjectHandlers } from "@/core/module";
+import { UserError, type ObjectHandlers, type ValidationErrors } from "@/core/module";
 import { newPairCode } from "@/server/station-codes";
 import { wakeStation } from "@/server/station-wake";
 import { SHARE_PATH } from "./print-rules";
@@ -55,7 +55,18 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
         /* pokladna vypnutá */
       }
     },
-    beforeSave(_ctx, d) {
+    async beforeSave(ctx, d, isNew): Promise<ValidationErrors | void> {
+      // ruční přidání: tiskárna jiného počítače (Podle tiskárny) nebo model z katalogu doplní název ve Windows, papír a kopie
+      const before = isNew || !d.id ? null : await ctx.data.get("int.devicePrinter", String(d.id));
+      const fill = (field: string) => (isNew ? !d.printerName : before?.[field] !== d[field]);
+      if (d.copyFromId && fill("copyFromId")) {
+        const src = await ctx.data.get("int.devicePrinter", String(d.copyFromId));
+        if (src) Object.assign(d, { printerName: src.printerName, paper: src.paper, copies: src.copies ?? 1, modelId: src.modelId ?? d.modelId ?? null, driverName: src.driverName ?? null });
+      } else if (d.modelId && fill("modelId")) {
+        const m = await ctx.data.get("int.printerModel", String(d.modelId));
+        if (m) Object.assign(d, { printerName: d.printerName || m.match, paper: m.paper, copies: m.copies ?? 1, ...(isNew ? { enabled: m.usage !== "none" } : {}) });
+      }
+      if (!d.printerName) return { printerName: "@SYS:Required" };
       if (!d.label && d.printerName) d.label = String(d.printerName).slice(0, 120);
       const n = Number(d.copies ?? 1);
       if (!Number.isFinite(n) || n < 1 || n > 20) return { copies: "@INT:CopiesRange" };

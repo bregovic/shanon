@@ -86,6 +86,10 @@ nebo vypnete. Nová tiskárna se zapne sama, jen když je výchozí ve Windows, 
 a použitím. Stejná tiskárna na dalším počítači to převezme sama. Do katalogu jde vložit odkaz na **ovladač výrobce** — diagnostika
 ho nabídne u USB tiskárny, která na počítači ovladač nemá. Ovladače se do Shanonu nenahrávají.
 
+**Ruční přidání tiskárny** k zařízení (detail zařízení → řádky Tiskárny): v poli **Podle tiskárny** vyberte tiskárnu
+jiného počítače, nebo v poli **Model** model z katalogu – název ve Windows, papír a kopie se doplní samy (název jde přepsat).
+Až se stanice ozve, tiskárnu, kterou Windows na počítači nemají, označí jako chybějící.
+
 **Sdílená tiskárna** v katalogu (cesta `\\server\tiskárna`): diagnostika ji nabídne na každém počítači, který ji ještě nemá,
 a **Připojit** ji přes stanici (verze 1.3, aktualizuje se sama) připojí ve Windows – ovladač si Windows vezme ze serveru
 tiskárny, práva správce nejsou potřeba. Pak ji zaškrtněte mezi používanými. Výsledek posledního připojení je u zařízení.
