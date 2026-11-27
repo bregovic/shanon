@@ -506,7 +506,7 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
       netPrinters: nets.map((c) => ({
         id: String(c.id),
         name: String(c.name ?? c.code ?? ""),
-        host: String(c.printerHost),
+        host: String(c.printerHost).trim().replace(/\.+$/, ""),
         register: c.registerId ? String(regs.find((g) => g.id === c.registerId)?.name ?? "") || null : null,
         drawer: !!c.openDrawer,
       })),

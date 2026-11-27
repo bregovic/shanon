@@ -158,7 +158,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
               baudRate: Number(data.conns.printer.baudRate ?? 9600),
               openDrawer: !!data.conns.printer.openDrawer,
               autoPrint: !!data.conns.printer.autoPrint,
-              host: data.conns.printer.printerHost ? String(data.conns.printer.printerHost) : undefined,
+              host: data.conns.printer.printerHost ? String(data.conns.printer.printerHost).trim().replace(/\.+$/, "") : undefined,
             }
           : null
       }

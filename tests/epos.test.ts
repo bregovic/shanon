@@ -1,6 +1,6 @@
 /** Síťová tiskárna Epson (ePOS-Print): ESC/POS v hex uvnitř SOAP, výsledek z odpovědi tiskárny. */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { eposCheck, eposPrint, eposUrl } from "@/lib/epos";
+import { eposCheck, eposHost, eposPrint, eposUrl } from "@/lib/epos";
 
 const reply = (success: boolean, code = "") =>
   `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><response success="${success}" code="${code}" status="251658262" xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"/></soapenv:Body></soapenv:Envelope>`;
@@ -16,6 +16,11 @@ describe("ePOS-Print", () => {
     expect(url).toBe(eposUrl("192.168.1.32"));
     expect(url).toMatch(/^https:\/\/192\.168\.1\.32\/cgi-bin\/epos\/service\.cgi\?devid=local_printer/);
     expect(String(init.body)).toContain("<command>1b700019fa</command>");
+  });
+
+  it("IP tiskárny bez tečky na konci, adresy a lomítka", () => {
+    expect(["192.168.1.32.", " https://192.168.1.32/ ", "192.168.1.32:8043"].map(eposHost)).toEqual(["192.168.1.32", "192.168.1.32", "192.168.1.32:8043"]);
+    expect(eposUrl("192.168.1.32.")).toMatch(/^https:\/\/192\.168\.1\.32\/cgi-bin/);
   });
 
   it("chyba tiskárny (otevřený kryt) a nedostupná tiskárna", async () => {

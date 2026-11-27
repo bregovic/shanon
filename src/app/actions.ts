@@ -817,7 +817,7 @@ export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ j
         const pr = await receiptPrint(api, s.ctx.companyId, id);
         // opakovaný tisk: bez otevření zásuvky
         const bytes = receiptEscPos(pr, L, fmt, { width: c.paperWidth === "58" ? 32 : 48, codePage: c.codePage === "ascii" ? "ascii" : "cp852", drawer: false, locale });
-        const host = String(c.printerHost);
+        const host = String(c.printerHost).trim().replace(/\.+$/, "");
         byHost.set(host, [...(byHost.get(host) ?? []), bytes]);
       }
       return [...byHost].map(([host, parts]) => {

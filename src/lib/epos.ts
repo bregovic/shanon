@@ -19,9 +19,18 @@ function envelope(body: string): string {
   return `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><epos-print xmlns="${NS}">${body}</epos-print></s:Body></s:Envelope>`;
 }
 
+/** IP tiskárny bez okolních znaků („https://192.168.1.32/“, „192.168.1.32.“ → 192.168.1.32) */
+export function eposHost(host: string): string {
+  return String(host ?? "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/.*$/, "")
+    .replace(/\.+$/, "");
+}
+
 /** adresa služby ePOS tiskárny (IP nebo název, volitelně :port) */
 export function eposUrl(host: string, timeoutMs = 10000): string {
-  return `https://${host.trim()}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=${timeoutMs}`;
+  return `https://${eposHost(host)}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=${timeoutMs}`;
 }
 
 async function post(host: string, body: string): Promise<EposResult> {

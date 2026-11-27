@@ -577,6 +577,8 @@ export const intHandlers: Record<string, ObjectHandlers> = {
   "int.connection": {
     beforeSave(_ctx, d) {
       const e: Record<string, string> = {};
+      // IP síťové tiskárny bez tečky na konci („192.168.1.32.“ ze zkopírovaného textu)
+      if (d.printerHost) d.printerHost = String(d.printerHost).trim().replace(/\.+$/, "") || null;
       // druh s jediným ovladačem (EET, API) ho dostane sám
       const allowed = DRIVERS[String(d.kind)] ?? [];
       if (!allowed.includes(String(d.driver)) && allowed.length === 1)
