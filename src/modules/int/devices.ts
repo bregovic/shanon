@@ -74,6 +74,8 @@ export const device = defineObject({
     /** kdo na počítači pracuje: tisk tohoto uživatele bez zástupce Shanon Pokladna jde na tento počítač (jediný) */
     userId: { edt: Edts.User, label: "@INT:DeviceUser", help: "@INT:DeviceUserHelp" },
     hostName: { edt: Str("DeviceHost", "@INT:DeviceHost", 120), readOnly: true },
+    /** USB tiskárny bez tiskárny ve Windows (chybí ovladač) – názvy z posledního hlášení stanice, oddělené | */
+    usbNoDriver: { edt: Str("DeviceUsbNoDriver", "@INT:DeviceUsbNoDriver", 500), readOnly: true },
     agentVersion: { edt: Str("DeviceVersion", "@INT:DeviceVersion", 40), readOnly: true },
     /** založeno z Nastavení („Nainstalovat na tento počítač“) — kód a název se při spárování vezmou z názvu počítače */
     autoName: { edt: Edts.NoYes, label: "@INT:DeviceAutoName", readOnly: true },
@@ -114,6 +116,11 @@ export const devicePrinter = defineObject({
     /** zobrazovaný název „KASA1 · XP-58“ (lze přejmenovat, např. „Účtenky u pultu“) */
     label: { edt: Edts.Name, label: "@INT:Printer", mandatory: true },
     printerName: { edt: Str("StationPrinter", "@INT:PrinterName", 200), mandatory: true },
+    /** používat na tomto počítači: jen používané se nabízí v pravidlech tisku a u pokladny (ostatní = jen nalezené) */
+    enabled: { edt: Edts.NoYes, label: "@INT:PrinterEnabled", help: "@INT:PrinterEnabledHelp", default: true },
+    /** ovladač Windows (rozpoznání modelu pro katalog) */
+    driverName: { edt: Str("StationDriver", "@INT:PrinterDriver", 200), readOnly: true },
+    modelId: { edt: refEdt("int.printerModel", "@INT:PrinterModel"), optionalRef: true },
     paper: { edt: enumEdt(DevicePaper), mandatory: true, default: "a4" },
     copies: { edt: Edts.Int, label: "@INT:Copies", default: 1 },
     isDefault: { edt: Edts.NoYes, label: "@INT:PrinterDefault", readOnly: true },
@@ -125,13 +132,57 @@ export const devicePrinter = defineObject({
     stateAt: { edt: Edts.DateTime, label: "@INT:PrinterStateAt", readOnly: true },
   },
   titleField: "label",
-  list: ["label", "printerName", "paper", "copies", "isDefault", "present", "state", "queued", "stateAt"],
-  // ve výběru tiskárny (Správa tisku, pokladna) jen tiskárny, které Windows právě hlásí
-  lookupWhere: { present: true },
-  form: [{ label: "@SYS:General", fields: ["deviceId", "label", "printerName", "paper", "copies", "isDefault", "present"] }],
+  list: ["label", "enabled", "printerName", "paper", "copies", "isDefault", "present", "state", "queued", "stateAt", "modelId"],
+  // ve výběru tiskárny (Správa tisku, pokladna) jen používané tiskárny, které Windows právě hlásí
+  lookupWhere: { present: true, enabled: true },
+  form: [{ label: "@SYS:General", fields: ["deviceId", "label", "enabled", "printerName", "driverName", "modelId", "paper", "copies", "isDefault", "present"] }],
   unique: [["deviceId", "printerName"]],
   defaultSort: { field: "label", dir: "asc" },
-  actions: [{ id: "test", label: "@INT:PrinterTest" }],
+  actions: [
+    { id: "test", label: "@INT:PrinterTest" },
+    // uložit model do katalogu firmy (nastavení se přenese na další počítače s touto tiskárnou)
+    { id: "toCatalog", label: "@INT:PrinterToCatalog" },
+  ],
+});
+
+/** k čemu model v katalogu slouží: tiskárna na účtenky / na doklady (A4) / jen nalezená */
+export const PrinterUsage = defineEnum({
+  id: "IntPrinterUsage",
+  label: "@INT:PrinterUsage",
+  values: [
+    { value: "receipts", label: "@INT:PUReceipts" },
+    { value: "documents", label: "@INT:PUDocuments" },
+    { value: "none", label: "@INT:PUNone" },
+  ],
+});
+
+/**
+ * Firemní katalog tiskáren: model rozpoznaný podle názvu ovladače / tiskárny / USB zařízení, odkaz na oficiální
+ * ovladač výrobce a nastavení, které dostane každá tiskárna toho modelu na dalších počítačích (papír, kopie,
+ * používat, na co). Ovladače se nikam nenahrávají – jen odkaz výrobce.
+ */
+export const printerModel = defineObject({
+  id: "int.printerModel",
+  table: "int_printer_model",
+  label: "@INT:PrinterModel",
+  labelPlural: "@INT:PrinterModels",
+  scope: "company",
+  shareable: true,
+  fields: {
+    name: { edt: Edts.Name, mandatory: true },
+    /** text, podle kterého se model pozná (část názvu ovladače nebo tiskárny, mezery a pomlčky se nepočítají) */
+    match: { edt: Str("PrinterModelMatch", "@INT:PrinterModelMatch", 120), mandatory: true, help: "@INT:PrinterModelMatchHelp" },
+    driverUrl: { edt: Str("PrinterDriverUrl", "@INT:PrinterDriverUrl", 500), help: "@INT:PrinterDriverUrlHelp" },
+    paper: { edt: enumEdt(DevicePaper), mandatory: true, default: "a4" },
+    copies: { edt: Edts.Int, label: "@INT:Copies", default: 1 },
+    usage: { edt: enumEdt(PrinterUsage), mandatory: true, default: "documents" },
+    notes: { edt: Edts.Notes, label: "@SYS:Notes" },
+  },
+  titleField: "name",
+  list: ["name", "match", "usage", "paper", "copies", "driverUrl"],
+  form: [{ label: "@SYS:General", fields: ["name", "match", "usage", "paper", "copies", "driverUrl", "notes"] }],
+  unique: [["match"]],
+  defaultSort: { field: "name", dir: "asc" },
 });
 
 /**

@@ -3,7 +3,7 @@
  * `Authorization: Bearer shs.…` (src/server/station.ts).
  *
  *   POST /api/station/pair              { code, host, version } → { token, deviceId, name } (kód z instalátoru)
- *   POST /api/station/hello             { host, version, printers: [{ name, default }] }
+ *   POST /api/station/hello             { host, version, printers: [{ name, default, state, queued, driver }], usb: [název] }
  *   GET  /api/station/jobs?wait=25      úlohy k tisku (čeká, dokud nějaká nepřijde)
  *   GET  /api/station/jobs/<id>/pdf     PDF úlohy, nastavení tisku v hlavičce X-Print-Settings
  *   GET  /api/station/installer/<kód>             Shanon-instalace.exe (párovací kód v adrese = odkaz z Nastavení / Zařízení)
@@ -14,7 +14,7 @@
 import { UserError } from "@/core/module";
 import { fillLabel, resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
-import { jobPdf, pairStation, reportJob, stationAuth, stationHello, stationInstallerFile, takeJobs, helloWanted, stationAgentFile, stationAgentVersion } from "@/server/station";
+import { type HelloPrinter, jobPdf, pairStation, reportJob, stationAuth, stationHello, stationInstallerFile, takeJobs, helloWanted, stationAgentFile, stationAgentVersion } from "@/server/station";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
     if (!st) return json({ error: "Stanice není spárovaná nebo je vypnutá." }, 401);
     if (path[0] === "hello" && path.length === 1) {
       const b = await body(req);
-      await stationHello(st, { host: b.host ? String(b.host) : undefined, version: b.version ? String(b.version) : undefined, printers: Array.isArray(b.printers) ? (b.printers as { name: string; default?: boolean; state?: string; queued?: number }[]) : [] });
+      await stationHello(st, {
+        host: b.host ? String(b.host) : undefined,
+        version: b.version ? String(b.version) : undefined,
+        printers: Array.isArray(b.printers) ? (b.printers as HelloPrinter[]) : [],
+        // stanice 1.2+: USB tiskárny bez ovladače (starší pole neposílá → beze změny)
+        usb: Array.isArray(b.usb) ? (b.usb as unknown[]).map(String) : undefined,
+      });
       return json({ ok: true });
     }
     if (path[0] === "jobs" && path.length === 2 && UUID.test(path[1])) {

@@ -75,6 +75,17 @@ export function devicePaperRoll(paper: unknown): PaperKind | null {
 }
 
 /** odhad papíru podle názvu tiskárny (XP-58, POS-80, TM-T20 …) */
+/** porovnání názvů modelů: bez mezer, pomlček, teček a podtržítek, velkými písmeny („EPSON TM-T20IV“ ~ „EPSONTMT20IV“) */
+export const normModel = (s: unknown) => String(s ?? "").toUpperCase().replace(/[\s\-_.]/g, "");
+
+/** model z katalogu firmy, jehož „Rozpoznat podle“ je obsažen v některém z názvů (nejdelší shoda vyhrává) */
+export function matchModel<T extends Record<string, unknown>>(models: T[], ...names: unknown[]): T | undefined {
+  const ns = names.map(normModel).filter(Boolean);
+  return models
+    .filter((m) => normModel(m.match) && ns.some((n) => n.includes(normModel(m.match))))
+    .sort((a, b) => normModel(b.match).length - normModel(a.match).length)[0];
+}
+
 export function guessPaper(name: string): "a4" | "80" | "58" {
   const n = name.toLowerCase();
   if (/58/.test(n)) return "58";

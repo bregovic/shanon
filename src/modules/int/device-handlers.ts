@@ -60,6 +60,19 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
       if (!Number.isFinite(n) || n < 1 || n > 20) return { copies: "@INT:CopiesRange" };
     },
     actions: {
+      /** model tiskárny do katalogu firmy: další počítače s touto tiskárnou převezmou papír, kopie a použití */
+      async toCatalog(ctx, pr) {
+        // podle názvu tiskárny (ten nese model, „EPSON TM-T20IV Receipt“); ovladač bývá společný pro celou řadu
+        const match = String(pr.printerName || pr.driverName || "").replace(/\s*\((kopie|copy) \d+\)$/i, "").slice(0, 120);
+        if (!match) throw new UserError("@SYS:InvalidValue");
+        const usage = pr.enabled === false ? "none" : pr.paper === "a4" || pr.paper === "a6" ? "documents" : "receipts";
+        const [old] = await ctx.data.find("int.printerModel", { match }, { take: 1 });
+        const m = old
+          ? await ctx.data.update("int.printerModel", String(old.id), { paper: pr.paper, copies: pr.copies ?? 1, usage })
+          : await ctx.data.create("int.printerModel", { name: match, match, paper: pr.paper, copies: pr.copies ?? 1, usage });
+        await ctx.data.update("int.devicePrinter", String(pr.id), { modelId: m.id });
+        return { message: ctx.t("@INT:PrinterInCatalog", { name: String(m.name) }) };
+      },
       /** zkušební stránka do fronty stanice → otevře úlohu (stav tisku) */
       async test(ctx, pr) {
         const job = await ctx.data.create("int.printJob", { deviceId: pr.deviceId, printerId: pr.id, reference: ctx.t("@INT:StationTestTitle"), copies: 1, status: "queued" });

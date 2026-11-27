@@ -13,7 +13,7 @@
 # aktualizuje (/api/station/agent) a spustí znovu.
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.0'
+$Version = '1.2.0'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 # SHANON_STATION_DIR = jiná složka (zkouška stanice bez instalace)
 $AppDir = if ($env:SHANON_STATION_DIR) { $env:SHANON_STATION_DIR } else { Join-Path $env:LOCALAPPDATA 'ShanonPokladna' }
@@ -153,9 +153,13 @@ function Send-Hello($Cfg) {
   $queue = @(Get-CimInstance Win32_PrintJob -ErrorAction SilentlyContinue)
   $printers = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | ForEach-Object {
     $n = $_.Name
-    @{ name = $n; default = [bool]$_.Default; state = (Get-PrinterState $_); queued = @($queue | Where-Object { $_.Name -like "$n,*" }).Count }
+    @{ name = $n; default = [bool]$_.Default; state = (Get-PrinterState $_); queued = @($queue | Where-Object { $_.Name -like "$n,*" }).Count; driver = [string]$_.DriverName }
   })
-  [void](Invoke-Json 'POST' "$($Cfg.url)/api/station/hello" @{ host = $env:COMPUTERNAME; version = $Version; printers = $printers } $Cfg.headers)
+  # USB tiskárny bez tiskárny ve Windows (chybí ovladač): tisková třída USBPRINT, nebo USB zařízení bez ovladače (kód 28) s názvem tiskárny
+  $usb = @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
+    ($_.PNPDeviceID -like 'USBPRINT\*') -or ($_.PNPDeviceID -like 'USB\*' -and $_.ConfigManagerErrorCode -eq 28 -and $_.Name -match 'print|tisk|tm-|pos|receipt|thermal|epson|star|xprinter|citizen|bixolon|zebra')
+  } | ForEach-Object { [string]$_.Name } | Where-Object { $_ } | Select-Object -Unique -First 10)
+  [void](Invoke-Json 'POST' "$($Cfg.url)/api/station/hello" @{ host = $env:COMPUTERNAME; version = $Version; printers = $printers; usb = $usb } $Cfg.headers)
 }
 
 function Print-Job($Cfg, $Job) {

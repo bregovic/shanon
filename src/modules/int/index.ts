@@ -7,7 +7,7 @@
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
 import { retireTestScale } from "./test-env";
-import { DevicePaper, PrintJobStatus, PrinterState, PrintRuleDoc, device, devicePrinter, printJob, printRule } from "./devices";
+import { DevicePaper, PrintJobStatus, PrinterState, PrinterUsage, PrintRuleDoc, device, devicePrinter, printJob, printRule, printerModel } from "./devices";
 import { FORM_CS, FORM_EN, FormFieldKind, FormFieldWidth, FormMapping, form, formField } from "./forms";
 import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
@@ -724,13 +724,13 @@ export default defineModule({
   icon: "PlugConnected",
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
-  enums: [PortalPurpose, PortalBackground, PortalCorners, PortalLogoBadge, PortalLogoSize, PortalAlign, FormFieldKind, FormMapping, FormFieldWidth, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, PrinterState, DevicePaper, PrintRuleDoc],
-  objects: [connection, log, portal, portalUpload, portalContact, form, formField, document, documentLine, mail, device, devicePrinter, printRule, printJob],
+  enums: [PortalPurpose, PortalBackground, PortalCorners, PortalLogoBadge, PortalLogoSize, PortalAlign, FormFieldKind, FormMapping, FormFieldWidth, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, PrinterState, PrinterUsage, DevicePaper, PrintRuleDoc],
+  objects: [connection, log, portal, portalUpload, portalContact, form, formField, document, documentLine, mail, device, devicePrinter, printRule, printJob, printerModel],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
   menu: [
     { label: "@INT:Module", items: [{ object: "int.connection" }, { object: "int.log" }] },
-    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }, { href: "/int/diagnostika", label: "@SYS:StationDiag" }] },
+    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }, { object: "int.printerModel" }, { href: "/int/diagnostika", label: "@SYS:StationDiag" }] },
     { label: "@INT:Documents", items: [{ object: "int.document" }, { object: "int.portal" }, { object: "int.form" }, { object: "int.portalContact" }] },
     { label: "@INT:Mails", items: [{ object: "int.mail" }] },
     { label: "@INT:Documents", kind: "functions", items: [{ href: "/int/doc-import", label: "@INT:DocImport" }] },
@@ -746,6 +746,22 @@ export default defineModule({
       DeviceHost: "Počítač",
       DeviceUser: "Uživatel počítače",
       DeviceDiag: "Diagnostika zařízení a tiskáren",
+      PrinterEnabled: "Používat",
+      PrinterEnabledHelp: "Jen používané tiskárny se nabízejí v pravidlech tisku a u pokladny. Ostatní stanice jen našla.",
+      PrinterDriver: "Ovladač",
+      PrinterModel: "Model tiskárny",
+      PrinterModels: "Katalog tiskáren",
+      PrinterToCatalog: "Uložit do katalogu",
+      PrinterUsage: "Použití",
+      PUReceipts: "Účtenky",
+      PUDocuments: "Doklady (A4)",
+      PUNone: "Nepoužívat",
+      PrinterModelMatch: "Rozpoznat podle",
+      PrinterModelMatchHelp: "Část názvu ovladače nebo tiskárny, např. TM-T20IV (mezery a pomlčky se nepočítají).",
+      PrinterDriverUrl: "Ovladač ke stažení",
+      PrinterDriverUrlHelp: "Odkaz na oficiální ovladač výrobce – diagnostika ho nabídne na počítači, kde tiskárna ovladač nemá.",
+      DeviceUsbNoDriver: "USB tiskárny bez ovladače",
+      PrinterInCatalog: "Model {name} je v katalogu.",
       DeviceDeleteOnline: "Stanice na tomto zařízení právě běží – smazáním by přestala tisknout. Pokud ho opravdu nechcete, nejdřív ho Odpojte.",
       PJCancelled: "Zrušeno",
       PrinterState: "Stav tiskárny",
@@ -1436,6 +1452,22 @@ export default defineModule({
       DeviceHost: "Computer",
       DeviceUser: "Computer user",
       DeviceDiag: "Device and printer diagnostics",
+      PrinterEnabled: "Use",
+      PrinterEnabledHelp: "Only printers in use are offered in print rules and at the register. The station only found the others.",
+      PrinterDriver: "Driver",
+      PrinterModel: "Printer model",
+      PrinterModels: "Printer catalogue",
+      PrinterToCatalog: "Save to catalogue",
+      PrinterUsage: "Usage",
+      PUReceipts: "Receipts",
+      PUDocuments: "Documents (A4)",
+      PUNone: "Do not use",
+      PrinterModelMatch: "Recognise by",
+      PrinterModelMatchHelp: "Part of the driver or printer name, e.g. TM-T20IV (spaces and hyphens are ignored).",
+      PrinterDriverUrl: "Driver download",
+      PrinterDriverUrlHelp: "Link to the manufacturer's official driver – diagnostics offers it on a computer where the printer has no driver.",
+      DeviceUsbNoDriver: "USB printers without driver",
+      PrinterInCatalog: "Model {name} is in the catalogue.",
       DeviceDeleteOnline: "The station on this device is running – deleting it would stop printing. If you really do not want it, Unpair it first.",
       PJCancelled: "Cancelled",
       PrinterState: "Printer state",

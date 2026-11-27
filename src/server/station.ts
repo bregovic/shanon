@@ -24,7 +24,8 @@ import { inTenant, type Ctx } from "./data";
 import { findPrintable, printJob } from "./print";
 import { renderPdf } from "./print-pdf";
 import { onStationWake, wakeStation } from "./station-wake";
-import { defaultPrintRules, devicePaperRoll, guessPaper, resolvePrintTarget } from "@/modules/int/print-rules";
+import { can } from "@/core/security";
+import { defaultPrintRules, devicePaperRoll, guessPaper, matchModel, normModel, resolvePrintTarget } from "@/modules/int/print-rules";
 import { labelTable } from "@/registry";
 import { resolveLabel } from "@/core/labels";
 
@@ -129,11 +130,30 @@ const VIRTUAL = /fax|onenote|xps|pdf|send to|odeslat do|snagit|anydesk|teamviewe
 /** Stanice hlásí počítač, verzi a tiskárny Windows — nové tiskárny se zapíší k zařízení (papír odhadem z názvu). */
 const STATES = new Set(["ready", "printing", "offline", "noPaper", "lowPaper", "jammed", "doorOpen", "toner", "error", "unknown"]);
 
-export async function stationHello(st: Station, info: { host?: string; version?: string; printers?: { name: string; default?: boolean; state?: string; queued?: number }[] }) {
+export interface HelloPrinter {
+  name: string;
+  default?: boolean;
+  state?: string;
+  queued?: number;
+  driver?: string;
+}
+
+export async function stationHello(st: Station, info: { host?: string; version?: string; printers?: HelloPrinter[]; usb?: string[] }) {
   const found = (info.printers ?? [])
     .filter((p) => p && typeof p.name === "string" && p.name.trim() && !VIRTUAL.test(p.name))
     .slice(0, 50)
-    .map((p) => ({ name: p.name.trim().slice(0, 200), isDefault: !!p.default, state: STATES.has(String(p.state)) ? String(p.state) : null, queued: Number.isFinite(Number(p.queued)) ? Math.max(0, Math.min(9999, Math.round(Number(p.queued)))) : null }));
+    .map((p) => ({
+      name: p.name.trim().slice(0, 200),
+      isDefault: !!p.default,
+      driver: typeof p.driver === "string" && p.driver.trim() ? p.driver.trim().slice(0, 200) : null,
+      state: STATES.has(String(p.state)) ? String(p.state) : null,
+      queued: Number.isFinite(Number(p.queued)) ? Math.max(0, Math.min(9999, Math.round(Number(p.queued)))) : null,
+    }));
+  // USB tiskárny, ke kterým Windows nemá tiskárnu (chybí ovladač): bez těch, které už tiskárnou jsou
+  const known = new Set(found.flatMap((f) => [normModel(f.name), normModel(f.driver)]).filter(Boolean));
+  const usb = [...new Set((info.usb ?? []).filter((u) => typeof u === "string" && u.trim()).map((u) => u.trim().slice(0, 120)))]
+    .filter((u) => ![...known].some((k) => k.includes(normModel(u)) || normModel(u).includes(k)))
+    .slice(0, 5);
   const now = new Date().toISOString();
   await inTenant(st.ctx, async (s) => {
     const api = s.sys().api();
@@ -142,23 +162,37 @@ export async function stationHello(st: Station, info: { host?: string; version?:
       agentVersion: info.version ? String(info.version).slice(0, 40) : null,
       lastSeenAt: new Date().toISOString(),
       helloWanted: false,
+      ...(info.usb ? { usbNoDriver: usb.join(" | ").slice(0, 500) || null } : {}),
     });
     const known = await api.find("int.devicePrinter", { deviceId: st.deviceId }, { take: 200 });
+    const models = await api.find("int.printerModel", {}, { take: 500 });
     for (const f of found) {
       const k = known.find((x) => x.printerName === f.name);
-      if (!k)
+      if (!k) {
+        // nová tiskárna: model z katalogu firmy převezme nastavení; jinak používat jen výchozí a účtenkovou
+        const m = matchModel(models, f.driver, f.name);
+        const paper = m ? String(m.paper) : guessPaper(`${f.name} ${f.driver ?? ""}`);
         await api.create("int.devicePrinter", {
           deviceId: st.deviceId,
           label: `${dev.code} · ${f.name}`.slice(0, 120),
           printerName: f.name,
-          paper: guessPaper(f.name),
-          copies: 1,
+          driverName: f.driver,
+          modelId: m ? m.id : null,
+          enabled: m ? m.usage !== "none" : f.isDefault || paper !== "a4",
+          paper,
+          copies: m ? Number(m.copies) || 1 : 1,
           isDefault: f.isDefault,
           present: true,
           ...(f.state ? { state: f.state, queued: f.queued, stateAt: now } : {}),
         });
-      else if (k.isDefault !== f.isDefault || !k.present || f.state)
-        await api.update("int.devicePrinter", String(k.id), { isDefault: f.isDefault, present: true, ...(f.state ? { state: f.state, queued: f.queued, stateAt: now } : {}) });
+      } else if (k.isDefault !== f.isDefault || !k.present || f.state || (f.driver && f.driver !== k.driverName))
+        await api.update("int.devicePrinter", String(k.id), {
+          isDefault: f.isDefault,
+          present: true,
+          ...(f.driver ? { driverName: f.driver } : {}),
+          ...(!k.modelId && f.driver ? { modelId: matchModel(models, f.driver, f.name)?.id ?? null } : {}),
+          ...(f.state ? { state: f.state, queued: f.queued, stateAt: now } : {}),
+        });
     }
     for (const k of known) if (k.present && !found.some((f) => f.name === k.printerName)) await api.update("int.devicePrinter", String(k.id), { present: false, isDefault: false, state: "offline", stateAt: now });
     // první hlášení tiskáren: výchozí pravidla tisku pro tento počítač
@@ -391,7 +425,7 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }
 
-const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy"];
+const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved"];
 
 export interface StationDiagnostics {
   /** texty komponenty (jazyk uživatele) */
@@ -403,7 +437,11 @@ export interface StationDiagnostics {
   /** kolik aktivních počítačů má uživatel jako Uživatel počítače */
   userDevices: number;
   device: { id: string; name: string; code: string; hostName: string; paired: boolean; online: boolean; lastSeenAt: string | null; version: string } | null;
-  printers: { id: string; label: string; printerName: string; paper: string; isDefault: boolean; present: boolean; state: string | null; stateLabel: string; queued: number | null; stateAt: string | null }[];
+  printers: { id: string; label: string; printerName: string; paper: string; isDefault: boolean; present: boolean; enabled: boolean; driver: string; model: string | null; state: string | null; stateLabel: string; queued: number | null; stateAt: string | null }[];
+  /** USB tiskárny bez ovladače (stanice 1.2+) a model z katalogu s odkazem na ovladač */
+  usbNoDriver: { name: string; model: string | null; driverUrl: string | null }[];
+  /** smí uživatel měnit tiskárny (Používat, katalog) a zakládat zařízení */
+  canEdit: boolean;
   /** verze programu stanice v Shanonu (stanice starší než tahle se aktualizuje sama, 1.0.0 jen přeinstalací) */
   agentVersion: string;
   /** kam by teď šel tisk z tohoto prohlížeče */
@@ -424,6 +462,8 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
     const lang = ctx.lang ?? "cs";
     const texts = Object.fromEntries(DIAG_KEYS.map((k) => [k, resolveLabel(labelTable, `@SYS:${k}`, lang)]));
     const printers = dev ? await api.find("int.devicePrinter", { deviceId: dev.id }, { take: 100, orderBy: { label: "asc" } }) : [];
+    const models = await api.find("int.printerModel", {}, { take: 500 });
+    const usbNames = dev?.usbNoDriver ? String(dev.usbNoDriver).split(" | ").filter(Boolean) : [];
     const target = async (docType: string) => {
       const t = await resolvePrintTarget(api, docType, { stationId: dev ? String(dev.id) : null, userId: ctx.userId }).catch(() => null);
       return t ? `${t.printer.label} · ${t.device.name}` : null;
@@ -453,11 +493,19 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
         paper: String(x.paper ?? "a4"),
         isDefault: !!x.isDefault,
         present: x.present !== false,
+        enabled: x.enabled !== false,
+        driver: String(x.driverName ?? ""),
+        model: x.modelId ? String(models.find((m) => m.id === x.modelId)?.name ?? "") || null : null,
         state: x.state ? String(x.state) : null,
         stateLabel: x.state ? resolveLabel(labelTable, `@INT:PS${String(x.state)[0].toUpperCase()}${String(x.state).slice(1)}`, ctx.lang ?? "cs") : "",
         queued: x.queued === null || x.queued === undefined ? null : Number(x.queued),
         stateAt: x.stateAt ? new Date(String(x.stateAt)).toISOString() : null,
       })),
+      usbNoDriver: usbNames.map((name) => {
+        const m = matchModel(models, name);
+        return { name, model: m ? String(m.name) : null, driverUrl: m?.driverUrl ? String(m.driverUrl) : null };
+      }),
+      canEdit: can(ctx.perms, "int.devicePrinter", "write"),
       agentVersion: stationAgentVersion(),
       receipt: await target("pos.receipt"),
       // ostatní doklady: pravidlo „*“ (vzorový doklad bez vlastního pravidla)

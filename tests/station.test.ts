@@ -10,7 +10,7 @@ import { inTenant, listRecords, saveRecord, getRecord, runAction, type Ctx } fro
 import { provisionTenant } from "@/server/provision";
 import { sell } from "@/modules/pos/sale";
 import { guessPaper, resolvePrintTarget } from "@/modules/int/print-rules";
-import { jobPdf, pairStation, printSettings, queueStationPrint, reportJob, stationAuth, stationHello, stationInstallerFile, stationSetup, takeJobs } from "@/server/station";
+import { jobPdf, pairStation, printSettings, queueStationPrint, reportJob, stationAuth, stationHello, stationInstallerFile, stationDiagnostics, stationSetup, takeJobs } from "@/server/station";
 
 const client = createPrisma();
 const run = Date.now().toString(36);
@@ -188,7 +188,7 @@ describe("tisková stanice", () => {
     expect(await takeJobs(st, 5)).toHaveLength(0); // odpoví hned, ne za 5 s
     await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true, state: "ready" }, { name: "HP LaserJet" }] });
     expect(await helloWanted(st)).toBe(false);
-    expect(stationAgentVersion()).toBe("1.1.0");
+    expect(stationAgentVersion()).toBe("1.2.0");
     // nabídka tiskáren: jen skutečné a připojené (Snagit / PDF se nehlásí, odpojená se nenabízí)
     const { refOptions } = await import("@/server/data");
     await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true }, { name: "Snagit 2022" }, { name: "Adobe PDF" }] });
@@ -208,6 +208,38 @@ describe("tisková stanice", () => {
     await deleteRecord(P, "int.device", paired.deviceId, client);
     expect(await getRecord(P, "int.device", paired.deviceId, client)).toBeNull();
     expect((await listRecords(P, "int.printRule", { filter: { fromDeviceId: paired.deviceId } }, client)).total).toBe(0);
+  });
+
+  it("používané a nalezené tiskárny, katalog modelů: nastavení se přenese na další počítač, USB bez ovladače s odkazem", async () => {
+    const pc = async (host: string) => {
+      const f = await stationSetup(P, null);
+      const pd = (await pairStation(f.href.split("/").pop()!, { host, version: "1.2.0" }))!;
+      return { id: pd.deviceId, st: (await stationAuth(`Bearer ${pd.token}`))! };
+    };
+    const a = await pc(`sklad-${run}`);
+    await stationHello(a.st, { host: "sklad", printers: [{ name: "Kancl A4", default: true, driver: "Generic A4" }, { name: "Brother QL-800", driver: "Brother QL-800" }, { name: "XP-80C", driver: "XP-80" }] });
+    const rows = (await listRecords(P, "int.devicePrinter", { filter: { deviceId: a.id } }, client)).rows;
+    const by = (n: string) => rows.find((r) => r.printerName === n)!;
+    // výchozí a účtenková se používají, ostatní jen nalezené (nenabízí se ve výběru)
+    expect([by("Kancl A4").enabled, by("XP-80C").enabled, by("Brother QL-800").enabled]).toEqual([true, true, false]);
+    expect(by("Brother QL-800").driverName).toBe("Brother QL-800");
+    const { refOptions } = await import("@/server/data");
+    expect((await refOptions(P, "int.devicePrinter", "Brother", client)).length).toBe(0);
+    // zapnout, nastavit papír a uložit do katalogu
+    await saveRecord(P, "int.devicePrinter", String(by("Brother QL-800").id), { enabled: true, paper: "58", copies: 2 }, undefined, client);
+    await runAction(P, "int.devicePrinter", String(by("Brother QL-800").id), "toCatalog", client);
+    const [model] = (await listRecords(P, "int.printerModel", { filter: { match: "Brother QL-800" } }, client)).rows;
+    expect([model.paper, model.copies, model.usage]).toEqual(["58", 2, "receipts"]);
+    await saveRecord(P, "int.printerModel", String(model.id), { driverUrl: "https://example.com/ql800" }, undefined, client);
+    // druhý počítač: stejná tiskárna (jiný název fronty) převezme nastavení z katalogu; USB bez ovladače dostane odkaz
+    const b = await pc(`expedice-${run}`);
+    await stationHello(b.st, { host: "expedice", printers: [{ name: "Brother QL-800 (kopie 1)", driver: "Brother QL-800" }], usb: ["Brother QL-800 (kopie 1)", "Brother QL800", "Nový ovladač"] });
+    const [q] = (await listRecords(P, "int.devicePrinter", { filter: { deviceId: b.id } }, client)).rows;
+    expect([q.enabled, q.paper, q.copies, q.modelId]).toEqual([true, "58", 2, model.id]);
+    await stationHello(b.st, { host: "expedice", printers: [], usb: ["Brother QL800"] });
+    const d = await stationDiagnostics(P, null, b.id);
+    expect(d.usbNoDriver).toEqual([{ name: "Brother QL800", model: "Brother QL-800", driverUrl: "https://example.com/ql800" }]);
+    expect(d.canEdit).toBe(true);
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

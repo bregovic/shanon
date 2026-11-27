@@ -1557,6 +1557,23 @@ export async function stationTestPageAction(printerId: string): Promise<ActionRe
   }
 }
 
+/** Diagnostika → Používat (tiskárna se nabízí v pravidlech a u pokladny) / Uložit do katalogu. */
+export async function stationPrinterAction(printerId: string, op: "enable" | "disable" | "toCatalog"): Promise<ActionResult<{ message?: string }>> {
+  const s = await requireSession();
+  try {
+    if (!/^[0-9a-f-]{36}$/.test(printerId)) throw new UserError("@SYS:InvalidValue");
+    if (op === "toCatalog") {
+      const r = await runAction(s.ctx, "int.devicePrinter", printerId, "toCatalog");
+      return { ok: true, data: { message: r && typeof r === "object" ? r.message : undefined } };
+    }
+    if (op !== "enable" && op !== "disable") throw new UserError("@SYS:InvalidValue");
+    await saveRecord(s.ctx, "int.devicePrinter", printerId, { enabled: op === "enable" });
+    return { ok: true, data: {} };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
 /** Diagnostika → Obnovit stav: stanice hned nahlásí tiskárny a jejich stav. */
 export async function stationRefreshAction(deviceId: string): Promise<ActionResult<null>> {
   const s = await requireSession();

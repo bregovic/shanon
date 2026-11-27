@@ -1,7 +1,7 @@
 ---
 title: Shanon pro Windows – tisk bez dialogu a správa tisku
 module: int
-objects: int.device, int.devicePrinter, int.printRule, int.printJob
+objects: int.device, int.devicePrinter, int.printRule, int.printJob, int.printerModel
 order: 40
 summary: Zástupce Shanon s ikonou na ploše a tisk účtenek a dokladů rovnou na tiskárny počítače, bez dialogu tisku.
 ---
@@ -72,3 +72,15 @@ Když vypadne internet, kasa prodává dál: platba **hotově** nebo **kartou na
 účtenka dostane číslo z offline řady kasy (`OF-…`) a vytiskne se na místě. Nahoře svítí **Neodesláno: N** — prodeje se
 odešlou samy, jakmile je připojení (EET dodatečně). Uzávěrku směny jde udělat až po odeslání. Kasu otevřenou dříve
 na tomto počítači jde otevřít i bez připojení. Odběratel, QR platba, prodej na fakturu a odložené nákupy potřebují připojení.
+
+## Diagnostika, používané tiskárny a katalog
+
+**Integrace → Diagnostika tohoto počítače** (i v detailu zařízení a v Nastavení) ukáže, zda Shanon počítač zná, zda stanice běží
+a jaké tiskárny Windows hlásí. Počítač, který Shanon nezná, přidáte tlačítkem **Přidat tento počítač** (stáhne instalaci stanice).
+
+Tiskárny jsou **používané** a **nalezené**: v pravidlech tisku a u pokladny se nabízejí jen používané. Zaškrtnutím je zapnete
+nebo vypnete. Nová tiskárna se zapne sama, jen když je výchozí ve Windows, je na účtenky nebo ji zná katalog.
+
+**Katalog tiskáren** (Integrace → Zařízení → Katalog tiskáren): u tiskárny **Uložit do katalogu** zapíše model s papírem, počtem kopií
+a použitím. Stejná tiskárna na dalším počítači to převezme sama. Do katalogu jde vložit odkaz na **ovladač výrobce** — diagnostika
+ho nabídne u USB tiskárny, která na počítači ovladač nemá. Ovladače se do Shanonu nenahrávají.
