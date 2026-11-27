@@ -70,6 +70,7 @@ import {
   posReceiptPrintAction,
   posStornoAction,
   posRewriteAction,
+  posSdpQueueAction,
   posReceiptCustomerAction,
   deleteRecordsAction,
   type ActionResult,
@@ -853,21 +854,35 @@ export function PosTerminal(p: {
   const usbPrinter = p.printer?.driver === "escposUsb";
   // Epson v místní síti (ePOS-Print): stejné ESC/POS, posílá prohlížeč přes HTTPS
   const netPrinter = p.printer?.driver === "escposNet" && !!p.printer.host;
-  const serialPrinter = p.printer?.driver === "escposSerial" || usbPrinter || netPrinter;
+  // Epson přes Shanon (Server Direct Print): data do fronty na serveru, tiskárna si je vyzvedne
+  const sdpPrinter = p.printer?.driver === "escposSdp";
+  const serialPrinter = p.printer?.driver === "escposSerial" || usbPrinter || netPrinter || sdpPrinter;
   const [portReady, setPortReady] = useState(false);
   const terminalPay = !!p.payment && p.payment.driver !== "manual";
 
   /** síťová tiskárna neodpovídá: nejčastěji nepotvrzený certifikát tiskárny v Chrome (odkaz v hlášce) */
   const netFail = (code: string, detail?: string) => setError(code === "network" ? `${L.PrinterNetDown.replace(/\{host\}/g, p.printer?.host ?? "")}${detail ? ` (${detail})` : ""}` : `${L.PrinterNetError} ${code}`);
   useEffect(() => {
-    if (netPrinter) void eposCheck(p.printer!.host!).then((r) => setPortReady(r.ok));
+    if (sdpPrinter) return; // fronta na serveru – není co připojovat
+    else if (netPrinter) void eposCheck(p.printer!.host!).then((r) => setPortReady(r.ok));
     else if (usbPrinter) void grantedUsbPrinter().then((d) => setPortReady(!!d));
     else if (serialPrinter) void grantedPort().then((port) => setPortReady(!!port));
-  }, [serialPrinter, usbPrinter, netPrinter, p.printer]);
+  }, [serialPrinter, usbPrinter, netPrinter, sdpPrinter, p.printer]);
 
   const escpos = async (r: ReceiptPrint | null, drawerOnly = false) => {
     const pr = p.printer!;
     const width0 = pr.paperWidth === "58" ? 32 : 48;
+    if (sdpPrinter) {
+      const data =
+        drawerOnly || !r
+          ? Uint8Array.from(new EscPos(width0, pr.codePage).drawer().bytes)
+          : await withLogo(receiptEscPos(r, L, fmt, { width: width0, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale }), r.company.logoId, pr.paperWidth);
+      let bin = "";
+      for (const b of data) bin += String.fromCharCode(b);
+      const q = await safe(posSdpQueueAction({ registerId: p.register.id }, btoa(bin), r?.receiptNum ?? ""));
+      if (!q.ok) setError(q.message);
+      return;
+    }
     if (netPrinter) {
       const data =
         drawerOnly || !r
@@ -1399,7 +1414,7 @@ export function PosTerminal(p: {
             {L.ConnectScale}
           </Button>
         )}
-        {serialPrinter && !portReady && (
+        {serialPrinter && !sdpPrinter && !portReady && (
           <Button icon={<Print24Regular />} onClick={connectPrinter}>
             {L.PrinterConnect}
           </Button>

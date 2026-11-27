@@ -433,7 +433,7 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }
 
-const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved", "StationDiagInstall", "StationDiagInstallHint", "StationDiagAdded", "StationDiagConnect", "StationDiagConnectBtn", "StationDiagConnectQueued", "StationDiagConnectHint", "StationDiagConnectSent", "StationDiagBrowserSeen", "StationDiagNet", "StationDiagNetHint", "StationDiagNetCheck", "StationDiagNetTest", "StationDiagNetOk", "StationDiagNetDown", "StationDiagNetError", "StationDiagNetPrinted", "StationDiagNetOpen", "StationDiagAllRegisters"];
+const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved", "StationDiagInstall", "StationDiagInstallHint", "StationDiagAdded", "StationDiagConnect", "StationDiagConnectBtn", "StationDiagConnectQueued", "StationDiagConnectHint", "StationDiagConnectSent", "StationDiagBrowserSeen", "StationDiagNet", "StationDiagNetHint", "StationDiagNetCheck", "StationDiagNetTest", "StationDiagNetOk", "StationDiagNetDown", "StationDiagNetError", "StationDiagNetPrinted", "StationDiagNetOpen", "StationDiagAllRegisters", "StationDiagSdpSeen", "StationDiagSdpNever", "StationDiagSdpQueued"];
 
 export interface StationDiagnostics {
   /** texty komponenty (jazyk uživatele) */
@@ -446,7 +446,7 @@ export interface StationDiagnostics {
   userDevices: number;
   device: { id: string; name: string; code: string; hostName: string; paired: boolean; online: boolean; lastSeenAt: string | null; version: string; browserInfo: string; connectResult: string } | null;
   /** síťové tiskárny Epson kas na tabletu (napojení ePOS) – ověření a zkušební tisk přímo z prohlížeče */
-  netPrinters: { id: string; name: string; host: string; register: string | null; drawer: boolean }[];
+  netPrinters: { id: string; name: string; host: string; register: string | null; drawer: boolean; sdp: boolean; seenAt: string | null }[];
   /** sdílené tiskárny z katalogu, které tento počítač ještě nemá (stanice je na tlačítko připojí) */
   connectable: { id: string; name: string; path: string; queued: boolean }[];
   printers: { id: string; label: string; printerName: string; paper: string; isDefault: boolean; present: boolean; enabled: boolean; driver: string; model: string | null; state: string | null; stateLabel: string; queued: number | null; stateAt: string | null }[];
@@ -475,7 +475,7 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
     const texts = Object.fromEntries(DIAG_KEYS.map((k) => [k, resolveLabel(labelTable, `@SYS:${k}`, lang)]));
     const printers = dev ? await api.find("int.devicePrinter", { deviceId: dev.id }, { take: 100, orderBy: { label: "asc" } }) : [];
     const models = await api.find("int.printerModel", {}, { take: 500 });
-    const nets = (await api.find("int.connection", { kind: "printer", driver: "escposNet", active: true }, { take: 50 }).catch(() => [] as RecordData[])).filter((c) => c.printerHost);
+    const nets = (await api.find("int.connection", { kind: "printer", driver: { in: ["escposNet", "escposSdp"] }, active: true }, { take: 50 }).catch(() => [] as RecordData[])).filter((c) => c.printerHost || c.driver === "escposSdp");
     const regIds = [...new Set(nets.map((c) => c.registerId).filter(Boolean).map(String))];
     const regs = regIds.length ? await api.find("pos.register", { id: { in: regIds } }, { take: regIds.length }).catch(() => [] as RecordData[]) : [];
     const usbNames = dev?.usbNoDriver ? String(dev.usbNoDriver).split(" | ").filter(Boolean) : [];
@@ -506,9 +506,11 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
       netPrinters: nets.map((c) => ({
         id: String(c.id),
         name: String(c.name ?? c.code ?? ""),
-        host: String(c.printerHost).trim().replace(/\.+$/, ""),
+        host: String(c.printerHost ?? "").trim().replace(/\.+$/, ""),
         register: c.registerId ? String(regs.find((g) => g.id === c.registerId)?.name ?? "") || null : null,
         drawer: !!c.openDrawer,
+        sdp: c.driver === "escposSdp",
+        seenAt: c.sdpSeenAt ? new Date(String(c.sdpSeenAt)).toISOString() : null,
       })),
       connectable: dev
         ? models

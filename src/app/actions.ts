@@ -38,6 +38,7 @@ import { setupCompany } from "@/server/setup";
 import { getT } from "@/server/i18n";
 import posModule from "@/modules/pos";
 import { receiptEscPos } from "@/lib/escpos";
+import { queueSdpJob } from "@/server/sdp";
 import { objectHref } from "@/server/ui";
 import { listNotices, markNoticesRead, type NoticeView } from "@/server/notices";
 import { previewPosting, type PostingPreview } from "@/server/posting-preview";
@@ -791,11 +792,11 @@ export async function posRewriteAction(input: SaleInput): Promise<ActionResult<R
  * Tisk účtenek ze seznamu / detailu na síťovou tiskárnu Epson pokladny (napojení Epson v síti): data ESC/POS
  * po tiskárnách, prohlížeč je pošle přes ePOS. Prázdné = pokladna síťovou tiskárnu nemá (tisk jako dosud).
  */
-export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ jobs: { host: string; parts: string[]; logoId: string | null; paper: string }[]; ok: string; down: string }>> {
+export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ jobs: { host: string; connId: string | null; parts: string[]; logoId: string | null; paper: string }[]; ok: string; down: string; queued: string }>> {
   const s = await requireSession();
   try {
     assertCan(s.ctx.perms, "pos.receipt", "read");
-    if (!s.ctx.modules.has("int")) return { ok: true, data: { jobs: [], ok: "", down: "" } };
+    if (!s.ctx.modules.has("int")) return { ok: true, data: { jobs: [], ok: "", down: "", queued: "" } };
     const list = (Array.isArray(ids) ? ids : []).map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 50);
     const lang = s.lang ?? "cs";
     const locale = lang === "en" ? "en-GB" : "cs-CZ";
@@ -813,18 +814,45 @@ export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ j
         const regId = String(r.registerId);
         if (!conns.has(regId)) conns.set(regId, (await connectionsFor(api, regId)).printer);
         const c = conns.get(regId);
-        if (!c || c.driver !== "escposNet" || !c.printerHost) continue;
+        const sdp = c?.driver === "escposSdp";
+        if (!c || (!sdp && (c.driver !== "escposNet" || !c.printerHost))) continue;
         const pr = await receiptPrint(api, s.ctx.companyId, id);
         // opakovaný tisk: bez otevření zásuvky
         const bytes = receiptEscPos(pr, L, fmt, { width: c.paperWidth === "58" ? 32 : 48, codePage: c.codePage === "ascii" ? "ascii" : "cp852", drawer: false, locale });
-        const host = String(c.printerHost).trim().replace(/\.+$/, "");
+        // Server Direct Print: klíč = napojení (tiskárna si úlohy vyzvedne), jinak IP tiskárny
+        const host = sdp ? `sdp:${c.id}` : String(c.printerHost).trim().replace(/\.+$/, "");
         const job = byHost.get(host) ?? { parts: [], logoId: (pr.company.logoId as string) ?? null, paper: String(c.paperWidth ?? "80") };
         job.parts.push(bytes);
         byHost.set(host, job);
       }
-      return [...byHost].map(([host, j]) => ({ host, parts: j.parts.map((p) => Buffer.from(p).toString("base64")), logoId: j.logoId, paper: j.paper }));
+      return [...byHost].map(([host, j]) => ({ host, connId: host.startsWith("sdp:") ? host.slice(4) : null, parts: j.parts.map((p) => Buffer.from(p).toString("base64")), logoId: j.logoId, paper: j.paper }));
     });
-    return { ok: true, data: { jobs, ok: t("@POS:NetPrinted"), down: t("@POS:PrinterNetDown") } };
+    return { ok: true, data: { jobs, ok: t("@POS:NetPrinted"), down: t("@POS:PrinterNetDown"), queued: t("@POS:SdpQueued") } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/**
+ * Tisk na Epson přes Shanon (Server Direct Print): data ESC/POS z prohlížeče (účtenka s logem) do fronty tiskárny.
+ * Cíl = napojení pokladny (`registerId`) nebo přímo napojení (`connectionId`, tisk ze seznamu / diagnostika).
+ */
+export async function posSdpQueueAction(target: { registerId?: string; connectionId?: string }, dataBase64: string, reference: string): Promise<ActionResult<{ id: string }>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "read");
+    const id = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const uuid = /^[0-9a-f-]{36}$/;
+      const conn = target?.connectionId && uuid.test(target.connectionId)
+        ? await api.get("int.connection", target.connectionId)
+        : target?.registerId && uuid.test(target.registerId)
+          ? (await connectionsFor(api, target.registerId)).printer
+          : null;
+      if (!conn) throw new UserError("@INT:SdpNoConn");
+      return String((await queueSdpJob(api, conn, String(dataBase64 ?? ""), String(reference ?? ""))).id);
+    });
+    return { ok: true, data: { id } };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

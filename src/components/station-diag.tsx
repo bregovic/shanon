@@ -16,6 +16,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import {
+  posSdpQueueAction,
   stationConnectAction,
   stationDiagnosticsAction,
   stationPrinterAction,
@@ -223,6 +224,15 @@ export function StationDiag({
       .line(new Date().toLocaleString("cs-CZ"))
       .line("Příliš žluťoučký kůň úpěl ďábelské ódy")
       .cut().bytes;
+    // Epson přes Shanon: zkušební tisk do fronty (vyjede při dalším dotazu tiskárny)
+    if (n.sdp) {
+      if (!print) return void load();
+      let bin = "";
+      for (const b of data) bin += String.fromCharCode(b);
+      const q = await posSdpQueueAction({ connectionId: n.id }, btoa(bin), "Test").catch(() => null);
+      setNetMsg((m) => ({ ...m, [n.id]: { ok: !!q?.ok, text: q?.ok ? (T.StationDiagSdpQueued ?? "") : (q?.message ?? "") } }));
+      return;
+    }
     const r = print ? await eposPrint(n.host, Uint8Array.from(data)) : await eposCheck(n.host);
     const text = r.ok ? (print ? T.StationDiagNetPrinted : T.StationDiagNetOk) : r.code === "network" ? (T.StationDiagNetDown ?? "").replace(/\{host\}/g, n.host) + (r.detail ? ` (${r.detail})` : "") : `${T.StationDiagNetError} ${r.code}`;
     setNetMsg((m) => ({ ...m, [n.id]: { ok: r.ok, text: text ?? "" } }));
@@ -456,7 +466,8 @@ export function StationDiag({
             <div key={n.id}>
               <div className={s.row}>
                 <Text size={200}>
-                  <b>{n.name}</b> · {n.host} · {n.register ?? T.StationDiagAllRegisters}
+                  <b>{n.name}</b> · {n.sdp ? (n.seenAt ? (T.StationDiagSdpSeen ?? "").replace("{at}", new Date(n.seenAt).toLocaleString()) : T.StationDiagSdpNever) : n.host} ·{" "}
+                  {n.register ?? T.StationDiagAllRegisters}
                 </Text>
                 <Button size="small" appearance="subtle" onClick={() => void netRun(n, false)}>
                   {T.StationDiagNetCheck}
@@ -464,9 +475,11 @@ export function StationDiag({
                 <Button size="small" appearance="subtle" onClick={() => void netRun(n, true)}>
                   {T.StationDiagNetTest}
                 </Button>
-                <Link href={`https://${n.host}/`} target="_blank" rel="noopener noreferrer">
-                  {T.StationDiagNetOpen}
-                </Link>
+                {!n.sdp && (
+                  <Link href={`https://${n.host}/`} target="_blank" rel="noopener noreferrer">
+                    {T.StationDiagNetOpen}
+                  </Link>
+                )}
               </div>
               {netMsg[n.id] && (
                 <Text size={200} className={netMsg[n.id].ok ? s.ok : s.bad}>

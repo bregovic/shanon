@@ -88,6 +88,22 @@ zapojená v tiskárně (zdířka se symbolem zásuvky).
 
 Když tiskárna neodpovídá, kasa to napíše – zkontrolujte, že je zapnutá a tablet je ve stejné síti, případně znovu potvrďte certifikát.
 
+## Tiskárna Epson přes Shanon (Server Direct Print)
+
+Tiskárna se sama každých pár vteřin zeptá Shanonu, jestli má co tisknout – tablet ani prohlížeč s ní nemluví
+(žádný certifikát tiskárny, žádné upozornění „Není zabezpečené“, tisknout jde z jakéhokoli zařízení). Tiskárna potřebuje internet;
+účtenka vyjede s malým zpožděním (podle intervalu).
+
+1. [Integrace → Napojení](/int/connection) → **Nový**: druh **Tiskárna**, ovladač **Epson přes Shanon (Server Direct Print)**,
+   **Pokladna**, papír 80 mm, PC852, **Otevírat pokladní zásuvku**, **Tisknout účtenku automaticky**. Po uložení je v napojení
+   **Adresa pro tiskárnu** (tlačítko Kopírovat).
+2. Na počítači ve stejné síti otevřete Web Config tiskárny (`https://<IP tiskárny>`), přihlaste se jako správce,
+   **Advanced Settings → Server Direct Print**: zapnout, URL = adresa z kroku 1, interval 3 s, uložit.
+3. Ověření: **Integrace → Zařízení → Diagnostika tohoto počítače → Tiskárny v síti** ukáže, kdy se tiskárna naposledy ozvala;
+   **Zkušební tisk** vyjede při dalším dotazu tiskárny. Úlohy a jejich stav jsou v **Tiskové úlohy v síti** (i u napojení).
+
+Adresa obsahuje tajný klíč – kdo ji zná, může na tiskárnu posílat tisk. **Nová adresa pro tiskárnu** (akce u napojení) starou zneplatní.
+
 ## Pokladní váha
 
 Váha se připojuje k počítači pokladny kabelem RS-232 nebo USB (převodník na sériový port) a čte se přímo z prohlížeče (Chrome nebo Edge).

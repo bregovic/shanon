@@ -172,6 +172,37 @@ export const PrinterUsage = defineEnum({
  * ovladač výrobce a nastavení, které dostane každá tiskárna toho modelu na dalších počítačích (papír, kopie,
  * používat, na co). Ovladače se nikam nenahrávají – jen odkaz výrobce.
  */
+/**
+ * Tisková úloha síťové tiskárny Epson přes Shanon (Server Direct Print): data ESC/POS (base64) připravená v prohlížeči
+ * (účtenka s logem); tiskárna si je vyzvedne (`src/server/sdp.ts`) a nahlásí výsledek.
+ */
+export const netPrintJob = defineObject({
+  id: "int.netPrintJob",
+  table: "int_net_print_job",
+  label: "@INT:NetPrintJob",
+  labelPlural: "@INT:NetPrintJobs",
+  scope: "company",
+  systemOnly: true,
+  fields: {
+    connectionId: { edt: refEdt("int.connection", "@INT:Connection"), mandatory: true },
+    reference: { edt: Edts.Description, label: "@INT:Reference" },
+    /** printjobid pro tiskárnu (krátký) */
+    jobKey: { edt: Str("NetPrintJobKey", "@INT:Reference", 30), readOnly: true },
+    data: { edt: Edts.Notes, label: "@INT:NetPrintData", readOnly: true },
+    status: { edt: enumEdt(PrintJobStatus), mandatory: true, default: "queued" },
+    message: { edt: Edts.Description, label: "@INT:Message" },
+    sentAt: { edt: Edts.DateTime, label: "@INT:PJSentAt" },
+    doneAt: { edt: Edts.DateTime, label: "@INT:PJDoneAt" },
+  },
+  titleField: "reference",
+  list: ["reference", "connectionId", "status", "sentAt", "doneAt", "message"],
+  form: [{ label: "@SYS:General", fields: ["reference", "connectionId", "status", "sentAt", "doneAt", "message"] }],
+  indexes: [["connectionId", "status"], ["connectionId", "jobKey"]],
+  defaultSort: { field: "createdAt", dir: "desc" },
+  userDelete: true,
+  actions: [{ id: "cancel", label: "@INT:PJCancel", bulk: true }],
+});
+
 export const printerModel = defineObject({
   id: "int.printerModel",
   table: "int_printer_model",

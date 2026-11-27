@@ -10,9 +10,11 @@
  *   GET  /api/station/installer/<kód>/setup.ps1   instalační skript, který si instalátor stáhne
  *   POST /api/station/jobs/<id>         { ok, message } výsledek tisku
  *   GET  /api/station/agent             program stanice (samoaktualizace, když úlohy hlásí novější `agent`)
+ *   POST /api/station/sdp/<token>       Epson Server Direct Print (tiskárna se ptá na tisk / hlásí výsledek, src/server/sdp.ts)
  *   POST /api/station/connect           { path, ok, message } výsledek připojení sdílené tiskárny (úlohy hlásí `connect`)
  */
 import { UserError } from "@/core/module";
+import { sdpAuth, sdpGetRequest, sdpSetResponse } from "@/server/sdp";
 import { fillLabel, resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
 import { type HelloPrinter, SHARE_PATH, connectWanted, jobPdf, pairStation, reportJob, stationAuth, stationConnectReport, stationHello, stationInstallerFile, takeJobs, helloWanted, stationAgentFile, stationAgentVersion } from "@/server/station";
@@ -46,6 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
       const r = await pairStation(String(b.code ?? ""), { host: b.host ? String(b.host) : undefined, version: b.version ? String(b.version) : undefined });
       return r ? json(r) : json({ error: "Párovací kód neplatí — stáhněte v Shanonu instalaci znovu (Integrace → Zařízení)." }, 401);
     }
+    if (path[0] === "sdp" && path.length === 2) return sdpPost(req, path[1]);
     const st = await stationAuth(req.headers.get("authorization"));
     if (!st) return json({ error: "Stanice není spárovaná nebo je vypnutá." }, 401);
     if (path[0] === "hello" && path.length === 1) {
@@ -74,6 +77,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
   } catch (e) {
     return fail(e);
   }
+}
+
+/** Epson Server Direct Print: formulář ConnectionType=GetRequest | SetResponse (ResponseFile). */
+async function sdpPost(req: Request, token: string): Promise<Response> {
+  const sdp = await sdpAuth(token);
+  if (!sdp) return new Response("", { status: 403 });
+  const ct = req.headers.get("content-type") ?? "";
+  let form: URLSearchParams | FormData;
+  try {
+    form = ct.includes("multipart/form-data") ? await req.formData() : new URLSearchParams(await req.text());
+  } catch {
+    return new Response("", { status: 400 });
+  }
+  const type = String(form.get("ConnectionType") ?? "");
+  // výsledek tisku: ResponseFile, případně jakékoli pole s PrintResponseInfo (různé verze firmwaru)
+  const values = [...form.values()].map(String);
+  const result = String(form.get("ResponseFile") ?? "") || values.find((v) => v.includes("PrintResponseInfo")) || "";
+  if (type === "SetResponse" || result) {
+    await sdpSetResponse(sdp, result);
+    return new Response("", { status: 200 });
+  }
+  const xml = await sdpGetRequest(sdp);
+  return new Response(xml, { status: 200, headers: { "Content-Type": "text/xml; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ path?: string[] }> }) {

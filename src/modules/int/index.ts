@@ -7,7 +7,7 @@
  * šifrovaně, uživateli se nevrací. Každá komunikace se zapíše do protokolu.
  */
 import { retireTestScale } from "./test-env";
-import { DevicePaper, PrintJobStatus, PrinterState, PrinterUsage, PrintRuleDoc, device, devicePrinter, printJob, printRule, printerModel } from "./devices";
+import { DevicePaper, PrintJobStatus, PrinterState, PrinterUsage, PrintRuleDoc, device, devicePrinter, netPrintJob, printJob, printRule, printerModel } from "./devices";
 import { FORM_CS, FORM_EN, FormFieldKind, FormFieldWidth, FormMapping, form, formField } from "./forms";
 import { EMAIL_PATTERN, Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type DataApi } from "@/core/module";
@@ -62,6 +62,8 @@ export const Driver = defineEnum({
     { value: "escposUsb", label: "@INT:DrvEscposUsb" },
     // síťová tiskárna Epson TM přímo z prohlížeče kasy (ePOS-Print, src/lib/epos.ts)
     { value: "escposNet", label: "@INT:DrvEscposNet" },
+    // Epson se sám ptá Shanonu na tisk (Server Direct Print, src/server/sdp.ts) – bez spojení prohlížeč → tiskárna
+    { value: "escposSdp", label: "@INT:DrvEscposSdp" },
     { value: "manual", label: "@INT:DrvManual" },
     { value: "sumup", label: "@INT:DrvSumup" },
     { value: "simulator", label: "@INT:DrvSimulator" },
@@ -216,7 +218,8 @@ const EET = { field: "kind", in: ["eet"] };
 const PRINTER = { field: "kind", in: ["printer"] };
 const SUMUP = { field: "driver", in: ["sumup"] };
 const COMGATE = { field: "driver", in: ["comgate"] };
-const SERIAL = { field: "driver", in: ["escposSerial", "escposUsb", "escposNet"] };
+const SERIAL = { field: "driver", in: ["escposSerial", "escposUsb", "escposNet", "escposSdp"] };
+const SDP = { field: "driver", in: ["escposSdp"] };
 const API = { field: "kind", in: ["api"] };
 const OCR = { field: "kind", in: ["ocr"] };
 const ISDS = { field: "kind", in: ["isds"] };
@@ -271,6 +274,10 @@ export const connection = defineObject({
     parity: { edt: enumEdt(SerialParity), default: "none", visibleWhen: { field: "driver", in: ["scaleSerial"] } },
     stopBits: { edt: Edts.Int, label: "@INT:StopBits", default: 1, visibleWhen: { field: "driver", in: ["scaleSerial"] } },
     openDrawer: { edt: Edts.NoYes, label: "@INT:OpenDrawer", visibleWhen: SERIAL },
+    /** Server Direct Print: adresa s tajným klíčem pro tiskárnu (vloží se do Web Config tiskárny), otisk klíče, poslední dotaz tiskárny */
+    sdpUrl: { edt: Str("SdpUrl", "@INT:SdpUrl", 300), readOnly: true, help: "@INT:SdpUrlHelp", share: { subject: "@INT:SdpUrl", body: "@INT:SdpUrlHelp" }, visibleWhen: SDP },
+    sdpHash: { edt: Str("SdpHash", "@INT:SdpUrl", 64), readOnly: true },
+    sdpSeenAt: { edt: Edts.DateTime, label: "@INT:SdpSeenAt", readOnly: true, visibleWhen: SDP },
     autoPrint: { edt: Edts.NoYes, label: "@INT:AutoPrint", visibleWhen: PRINTER },
     // platební terminál SumUp (Cloud API, čtečka Solo)
     merchantCode: { edt: Str("SumupMerchant", "@INT:MerchantCode", 20), visibleWhen: { field: "driver", in: ["sumup", "comgate"] } },
@@ -314,7 +321,7 @@ export const connection = defineObject({
   form: [
     { label: "@SYS:General", fields: ["code", "name", "kind", "driver", "registerId", "active", "pausedByTest", "liveOnTest"] },
     { label: "@INT:EetSettings", fields: ["environment", "unitId", "posId", "certPassword", "certSubject", "certValidTo"], visibleWhen: EET },
-    { label: "@INT:PrinterSettings", fields: ["printerHost", "paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
+    { label: "@INT:PrinterSettings", fields: ["printerHost", "sdpUrl", "sdpSeenAt", "paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
     { label: "@INT:ComgateSettings", fields: ["merchantCode", "apiKey", "testMode", "payMethods", "posQr", "pushUrl"], visibleWhen: COMGATE },
     { label: "@INT:GatewaySimSettings", fields: ["posQr"], visibleWhen: { field: "driver", in: ["gatewaySim"] } },
@@ -329,12 +336,14 @@ export const connection = defineObject({
   defaultSort: { field: "code", dir: "asc" },
   lines: [
     { object: "int.log", field: "connectionId", label: "@INT:Log", owned: false },
+    { object: "int.netPrintJob", field: "connectionId", label: "@INT:NetPrintJobs", owned: false, deletable: true },
   ],
   actions: [
     { id: "uploadCert", label: "@INT:UploadCert", upload: ".p12,.pfx", when: { field: "kind", equals: "eet" } },
     { id: "pair", label: "@INT:Pair", when: { field: "driver", equals: "sumup" } },
     { id: "token", label: "@INT:NewToken", download: true, downloadNeedsWrite: true, when: { field: "kind", equals: "api" } },
     { id: "test", label: "@INT:Test" },
+    { id: "sdpReset", label: "@INT:SdpReset", when: { field: "driver", equals: "escposSdp" } },
   ],
 });
 
@@ -729,12 +738,12 @@ export default defineModule({
   // úkoly k dokladům (doplnit údaje, zkontrolovat) jsou pracovní položky Workflow
   dependsOn: ["sys", "wf"],
   enums: [PortalPurpose, PortalBackground, PortalCorners, PortalLogoBadge, PortalLogoSize, PortalAlign, FormFieldKind, FormMapping, FormFieldWidth, DocPaymentState, ConnKind, Driver, EetEnv, PaperWidth, CodePage, LogStatus, DocStatus, DocTarget, OcrDocType, OcrConfidence, SmtpSecurity, MailStatus, DocSource, UploadStatus, ScaleProtocol, SerialParity, PrintJobStatus, PrinterState, PrinterUsage, DevicePaper, PrintRuleDoc],
-  objects: [connection, log, portal, portalUpload, portalContact, form, formField, document, documentLine, mail, device, devicePrinter, printRule, printJob, printerModel],
+  objects: [connection, log, portal, portalUpload, portalContact, form, formField, document, documentLine, mail, device, devicePrinter, printRule, printJob, printerModel, netPrintJob],
   numberSeqs: [{ code: "INTDOC", name: "@INT:Documents", format: "DOK{YY}{#####}", usedFor: "int.document" }],
   setup: intSetup,
   menu: [
     { label: "@INT:Module", items: [{ object: "int.connection" }, { object: "int.log" }] },
-    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }, { object: "int.printerModel" }] },
+    { label: "@INT:Devices", items: [{ object: "int.device" }, { object: "int.printRule" }, { object: "int.printJob" }, { object: "int.netPrintJob" }, { object: "int.printerModel" }] },
     { label: "@INT:Documents", items: [{ object: "int.document" }, { object: "int.portal" }, { object: "int.form" }, { object: "int.portalContact" }] },
     { label: "@INT:Mails", items: [{ object: "int.mail" }] },
     { label: "@INT:Documents", kind: "functions", items: [{ href: "/int/doc-import", label: "@INT:DocImport" }] },
@@ -1367,6 +1376,19 @@ export default defineModule({
       DrvEscposSerial: "ESC/POS přes USB/sériový port",
       DrvEscposUsb: "ESC/POS přes USB – tablet (Chrome)",
       DrvEscposNet: "Epson v síti (ePOS) – tablet (Chrome)",
+      DrvEscposSdp: "Epson přes Shanon (Server Direct Print)",
+      SdpUrl: "Adresa pro tiskárnu",
+      SdpUrlHelp: "Zkopírujte do tiskárny: Web Config → Advanced Settings → Server Direct Print → URL (interval 3 s). Adresa obsahuje tajný klíč – nesdílejte ji.",
+      SdpSeenAt: "Tiskárna se naposledy ozvala",
+      SdpReset: "Nová adresa pro tiskárnu",
+      SdpResetDone: "Nová adresa je připravená – vložte ji do tiskárny, stará přestala platit.",
+      SdpNoConn: "Pokladna nemá napojení Epson přes Shanon.",
+      SdpBadData: "Data tisku jsou neplatná nebo příliš velká.",
+      SdpNoResult: "Tiskárna nenahlásila výsledek.",
+      SdpPrinterError: "Chyba tiskárny",
+      NetPrintJob: "Tisková úloha v síti",
+      NetPrintJobs: "Tiskové úlohy v síti",
+      NetPrintData: "Data tisku",
       PrinterHost: "IP adresa tiskárny",
       PrinterHostHelp: "Adresa tiskárny v místní síti, např. 192.168.1.32 (vytiskne ji tiskárna při zapnutí se stisknutým Feed). Nastavte jí v routeru pevnou adresu.",
       DrvManual: "Ruční potvrzení na terminálu",
@@ -2087,6 +2109,19 @@ export default defineModule({
       DrvEscposSerial: "ESC/POS over USB/serial port",
       DrvEscposUsb: "ESC/POS over USB – tablet (Chrome)",
       DrvEscposNet: "Epson on network (ePOS) – tablet (Chrome)",
+      DrvEscposSdp: "Epson via Shanon (Server Direct Print)",
+      SdpUrl: "Address for the printer",
+      SdpUrlHelp: "Copy into the printer: Web Config → Advanced Settings → Server Direct Print → URL (interval 3 s). The address contains a secret key – do not share it.",
+      SdpSeenAt: "Printer last contacted",
+      SdpReset: "New address for the printer",
+      SdpResetDone: "A new address is ready – enter it in the printer, the old one no longer works.",
+      SdpNoConn: "The register has no Epson via Shanon connection.",
+      SdpBadData: "The print data is invalid or too large.",
+      SdpNoResult: "The printer did not report a result.",
+      SdpPrinterError: "Printer error",
+      NetPrintJob: "Network print job",
+      NetPrintJobs: "Network print jobs",
+      NetPrintData: "Print data",
       PrinterHost: "Printer IP address",
       PrinterHostHelp: "Printer address in the local network, e.g. 192.168.1.32 (printed by the printer when switched on with Feed held). Give it a fixed address in the router.",
       DrvManual: "Manual confirmation on terminal",

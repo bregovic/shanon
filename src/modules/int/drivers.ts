@@ -18,6 +18,14 @@ import {
   type RecordData,
 } from "@/core/module";
 import { revealSecret } from "@/server/secrets";
+import { newSdpToken } from "@/server/station-codes";
+import { publicUrl } from "@/server/system-mail";
+
+/** adresa pro tiskárnu (Server Direct Print) s novým klíčem + otisk */
+function sdpAddress(tenantId: string) {
+  const t = newSdpToken(tenantId);
+  return { sdpUrl: `${publicUrl()}/api/station/sdp/${t.token}`, sdpHash: t.hash };
+}
 import { newToken } from "@/server/api-token";
 import { verifyMail } from "./mail";
 import QRCode from "qrcode";
@@ -45,7 +53,7 @@ export const DRIVERS: Record<string, string[]> = {
   mail: ["system", "smtp", "mailTest"],
   isds: ["isds", "isdsTest"],
   eet: ["eet2", "eetSimulator"],
-  printer: ["browser", "escposSerial", "escposUsb", "escposNet"],
+  printer: ["browser", "escposSerial", "escposUsb", "escposNet", "escposSdp"],
   payment: ["manual", "sumup", "simulator", "comgate", "gatewaySim"],
   scale: ["scaleSerial", "scaleSim"],
   api: ["rest"],
@@ -575,8 +583,10 @@ export const intHandlers: Record<string, ObjectHandlers> = {
     ]),
   ),
   "int.connection": {
-    beforeSave(_ctx, d) {
+    beforeSave(ctx, d) {
       const e: Record<string, string> = {};
+      // Server Direct Print: adresa s klíčem pro tiskárnu se založí sama (v DB jen otisk klíče)
+      if (d.driver === "escposSdp" && !d.sdpHash) Object.assign(d, sdpAddress(ctx.tenantId));
       // IP síťové tiskárny bez tečky na konci („192.168.1.32.“ ze zkopírovaného textu)
       if (d.printerHost) d.printerHost = String(d.printerHost).trim().replace(/\.+$/, "") || null;
       // druh s jediným ovladačem (EET, API) ho dostane sám
@@ -636,6 +646,11 @@ export const intHandlers: Record<string, ObjectHandlers> = {
       },
     },
     actions: {
+      /** nová adresa pro tiskárnu (stará přestane platit) */
+      async sdpReset(ctx: EventContext, conn) {
+        await ctx.data.update("int.connection", String(conn.id), sdpAddress(ctx.tenantId));
+        return { message: ctx.t("@INT:SdpResetDone") };
+      },
       async uploadCert(ctx: EventContext, conn, file) {
         const pass = revealSecret(conn.certPassword);
         if (!file || pass === null) throw new UserError("@INT:NoCertificate");

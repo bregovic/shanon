@@ -431,6 +431,7 @@ model SysCompany {
   intPrintRule_company             IntPrintRule[]             @relation("IntPrintRule_company")
   intPrintJob_company              IntPrintJob[]              @relation("IntPrintJob_company")
   intPrinterModel_company          IntPrinterModel[]          @relation("IntPrinterModel_company")
+  intNetPrintJob_company           IntNetPrintJob[]           @relation("IntNetPrintJob_company")
   shopShop_company                 ShopShop[]                 @relation("ShopShop_company")
   shopCategory_company             ShopCategory[]             @relation("ShopCategory_company")
   shopDelivery_company             ShopDelivery[]             @relation("ShopDelivery_company")
@@ -4547,6 +4548,9 @@ model IntConnection {
   parity          String?   @default("none") @db.VarChar(40)
   stopBits        Int?      @default(1) @map("stop_bits")
   openDrawer      Boolean   @default(false) @map("open_drawer")
+  sdpUrl          String?   @map("sdp_url") @db.VarChar(300)
+  sdpHash         String?   @map("sdp_hash") @db.VarChar(64)
+  sdpSeenAt       DateTime? @map("sdp_seen_at")
   autoPrint       Boolean   @default(false) @map("auto_print")
   merchantCode    String?   @map("merchant_code") @db.VarChar(20)
   apiKey          String?   @map("api_key") @db.VarChar(4000)
@@ -4583,13 +4587,14 @@ model IntConnection {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
   updatedBy       String?   @map("updated_by") @db.Uuid
 
-  company                 SysCompany    @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
-  register                PosRegister?  @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
-  posRegister_scaleConn   PosRegister[] @relation("PosRegister_scaleConn")
-  posRegister_printerConn PosRegister[] @relation("PosRegister_printerConn")
-  intLog_connection       IntLog[]      @relation("IntLog_connection")
-  intDocument_connection  IntDocument[] @relation("IntDocument_connection")
-  intMail_connection      IntMail[]     @relation("IntMail_connection")
+  company                   SysCompany       @relation("IntConnection_company", fields: [companyId], references: [id], onDelete: Restrict)
+  register                  PosRegister?     @relation("IntConnection_register", fields: [registerId], references: [id], onDelete: Restrict)
+  posRegister_scaleConn     PosRegister[]    @relation("PosRegister_scaleConn")
+  posRegister_printerConn   PosRegister[]    @relation("PosRegister_printerConn")
+  intLog_connection         IntLog[]         @relation("IntLog_connection")
+  intDocument_connection    IntDocument[]    @relation("IntDocument_connection")
+  intMail_connection        IntMail[]        @relation("IntMail_connection")
+  intNetPrintJob_connection IntNetPrintJob[] @relation("IntNetPrintJob_connection")
 
   @@unique([tenantId, companyId, code])
   @@index([tenantId, companyId])
@@ -5112,6 +5117,36 @@ model IntPrinterModel {
   @@unique([tenantId, companyId, match])
   @@index([tenantId, companyId])
   @@map("int_printer_model")
+}
+
+/// int.netPrintJob — generováno z definice objektu
+model IntNetPrintJob {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  connectionId String    @map("connection_id") @db.Uuid
+  reference    String?   @db.VarChar(255)
+  jobKey       String?   @map("job_key") @db.VarChar(30)
+  data         String?
+  status       String    @default("queued") @db.VarChar(40)
+  message      String?   @db.VarChar(255)
+  sentAt       DateTime? @map("sent_at")
+  doneAt       DateTime? @map("done_at")
+  ext          Json      @default("{}")
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by") @db.Uuid
+
+  company    SysCompany    @relation("IntNetPrintJob_company", fields: [companyId], references: [id], onDelete: Restrict)
+  connection IntConnection @relation("IntNetPrintJob_connection", fields: [connectionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, companyId])
+  @@index([connectionId])
+  @@index([tenantId, companyId, connectionId, status])
+  @@index([tenantId, companyId, connectionId, jobKey])
+  @@map("int_net_print_job")
 }
 
 /// shop.shop — generováno z definice objektu

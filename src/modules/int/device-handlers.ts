@@ -44,6 +44,15 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
       },
     },
   },
+  "int.netPrintJob": {
+    actions: {
+      /** Zrušit: tiskárna si úlohu ještě nevyzvedla → nevytiskne ji */
+      async cancel(ctx, job) {
+        if (job.status !== "queued") throw new UserError("@INT:PJCancelDone");
+        await ctx.data.update("int.netPrintJob", String(job.id), { status: "cancelled", message: ctx.t("@INT:PJCancelledBy", { user: ctx.userName ?? "" }).slice(0, 250) });
+      },
+    },
+  },
   "int.devicePrinter": {
     /** smazání tiskárny (i se zařízením): její úlohy a pravidla pryč, pokladna ji přestane používat */
     async beforeDelete(ctx, pr) {

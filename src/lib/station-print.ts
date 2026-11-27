@@ -3,7 +3,7 @@
  * není, vrátí false a volající tiskne z prohlížeče. Počítač se stanicí si pamatuje zástupce Shanon
  * Pokladna (/stanice?d=…) v úložišti prohlížeče.
  */
-import { posNetPrintAction, stationPrintAction } from "@/app/actions";
+import { posNetPrintAction, posSdpQueueAction, stationPrintAction } from "@/app/actions";
 import { toast } from "@/components/toast";
 import { eposPrint } from "@/lib/epos";
 import { withLogo } from "@/lib/escpos-logo";
@@ -33,6 +33,19 @@ async function printViaNetwork(ids: string[]): Promise<boolean> {
     for (const p of parts) {
       bytes.set(p, o);
       o += p.length;
+    }
+    // Epson přes Shanon: do fronty tiskárny (vyzvedne si ji sama)
+    if (j.connId) {
+      let bin = "";
+      for (const b of bytes) bin += String.fromCharCode(b);
+      const q = await posSdpQueueAction({ connectionId: j.connId }, btoa(bin), "").catch(() => null);
+      if (!q?.ok) {
+        toast(q?.message ?? r.data.down, "warning");
+        return false;
+      }
+      toast(r.data.queued, "success");
+      done += j.parts.length;
+      continue;
     }
     const res = await eposPrint(j.host, bytes);
     if (!res.ok) {
