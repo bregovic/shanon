@@ -433,7 +433,7 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }
 
-const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved", "StationDiagInstall", "StationDiagInstallHint", "StationDiagAdded", "StationDiagConnect", "StationDiagConnectBtn", "StationDiagConnectQueued", "StationDiagConnectHint", "StationDiagConnectSent", "StationDiagBrowserSeen", "StationDiagNet", "StationDiagNetHint", "StationDiagNetCheck", "StationDiagNetTest", "StationDiagNetOk", "StationDiagNetDown", "StationDiagNetError", "StationDiagNetPrinted", "StationDiagNetOpen", "StationDiagAllRegisters", "StationDiagSdpSeen", "StationDiagSdpNever", "StationDiagSdpQueued"];
+const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved", "StationDiagInstall", "StationDiagInstallHint", "StationDiagAdded", "StationDiagConnect", "StationDiagConnectBtn", "StationDiagConnectQueued", "StationDiagConnectHint", "StationDiagConnectSent", "StationDiagBrowserSeen", "StationDiagNet", "StationDiagNetHint", "StationDiagNetCheck", "StationDiagNetTest", "StationDiagNetOk", "StationDiagNetDown", "StationDiagNetError", "StationDiagNetPrinted", "StationDiagNetOpen", "StationDiagAllRegisters", "StationDiagSdpSeen", "StationDiagSdpNever", "StationDiagSdpQueued", "StationThisBrowser", "StationThisBrowserHelp", "StationNone", "StationChosen"];
 
 export interface StationDiagnostics {
   /** texty komponenty (jazyk uživatele) */
@@ -445,6 +445,8 @@ export interface StationDiagnostics {
   /** kolik aktivních počítačů má uživatel jako Uživatel počítače */
   userDevices: number;
   device: { id: string; name: string; code: string; hostName: string; paired: boolean; online: boolean; lastSeenAt: string | null; version: string; browserInfo: string; connectResult: string } | null;
+  /** počítače se stanicí, přes které může tisknout tento prohlížeč (Tento prohlížeč tiskne přes počítač) */
+  stations: { id: string; label: string }[];
   /** síťové tiskárny Epson kas na tabletu (napojení ePOS) – ověření a zkušební tisk přímo z prohlížeče */
   netPrinters: { id: string; name: string; host: string; register: string | null; drawer: boolean; sdp: boolean; seenAt: string | null }[];
   /** sdílené tiskárny z katalogu, které tento počítač ještě nemá (stanice je na tlačítko připojí) */
@@ -463,6 +465,7 @@ export interface StationDiagnostics {
 
 /** Nastavení → Diagnostika tohoto počítače: pozná Shanon prohlížeč, běží stanice, jaké tiskárny, kam se tiskne. */
 export async function stationDiagnostics(ctx: Ctx, browserStationId: string | null, deviceId: string | null = null): Promise<StationDiagnostics> {
+  const stations = deviceId ? [] : (await stationChoices(ctx).catch(() => [])).map((x) => ({ id: x.id, label: x.label }));
   return inTenant(ctx, async (s) => {
     const api = s.sys().api();
     const active = await api.find("int.device", { active: true }, { take: 500 });
@@ -503,6 +506,7 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
             connectResult: String(dev.connectResult ?? ""),
           }
         : null,
+      stations,
       netPrinters: nets.map((c) => ({
         id: String(c.id),
         name: String(c.name ?? c.code ?? ""),

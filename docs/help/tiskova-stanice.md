@@ -46,13 +46,13 @@ Zástupce **Shanon** otevírá Shanon ve vlastním okně, které ví, že je na 
 prohlížeče** (Chrome, Edge) na stejném počítači jde na tiskárny stanice, když Shanon počítač pozná:
 
 - prohlížeč, ze kterého jste stáhli instalaci (Nastavení → Nainstalovat na tento počítač), si počítač zapamatuje sám;
-- v jiném prohlížeči vyberte v **Nastavení → Tento prohlížeč tiskne přes počítač**;
+- v jiném prohlížeči vyberte v **Integrace → Zařízení → Diagnostika tohoto počítače → Tento prohlížeč tiskne přes počítač**;
 - bez výběru se použije počítač, jehož **Uživatelem počítače** jste (Integrace → Zařízení; doplní se při instalaci) –
   jen když je takový jeden.
 
 ## Diagnostika tohoto počítače
 
-**Nastavení → Diagnostika tohoto počítače** ukáže, jestli Shanon tento prohlížeč pozná (a podle čeho), jestli stanice
+**Integrace → Zařízení → Diagnostika tohoto počítače** ukáže, jestli Shanon tento prohlížeč pozná (a podle čeho), jestli stanice
 na počítači běží (naposledy ozvaná, verze programu), jaké tiskárny Windows nahlásila – papír, výchozí, **stav**
 (připravená, tiskne, offline, došel papír, zaseknutý papír, otevřený kryt, toner, chyba) a úlohy ve frontě Windows –
 a kam teď půjde účtenka a ostatní doklady. **Obnovit stav tiskáren** si vyžádá stav hned, **Zkušební stránka**
@@ -75,7 +75,7 @@ na tomto počítači jde otevřít i bez připojení. Odběratel, QR platba, pro
 
 ## Diagnostika, používané tiskárny a katalog
 
-Tlačítko **Diagnostika tohoto počítače** v seznamu **Zařízení** (i akce Diagnostika v detailu zařízení a Nastavení) ukáže, zda Shanon počítač zná, zda stanice běží
+Tlačítko **Diagnostika tohoto počítače** v seznamu **Zařízení** (i akce Diagnostika v detailu zařízení) ukáže, zda Shanon počítač zná, zda stanice běží
 a jaké tiskárny Windows hlásí. Počítač, který Shanon nezná, se při otevření diagnostiky **založí sám** (prohlížeč si ho zapamatuje);
 známý počítač se aktualizuje (prohlížeč a čas diagnostiky v záznamu zařízení). Tiskárny Windows nahlásí až stanice – **Stáhnout instalaci stanice**.
 

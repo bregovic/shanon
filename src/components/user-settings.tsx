@@ -1,13 +1,12 @@
 "use client";
 
 /** Moje nastavení: údaje, jazyk, heslo, PIN do pokladny, upozornění e-mailem. */
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 const noSubscribe = () => () => {};
 import { useRouter } from "next/navigation";
 import { Button, Dropdown, Switch, Field, Input, MessageBar, MessageBarBody, Option, Text, makeStyles, tokens } from "@fluentui/react-components";
-import { changePasswordAction, saveProfileAction, setPosPinAction, stationClaimAction, stationSetupAction } from "@/app/actions";
-import { StationDiag } from "./station-diag";
+import { changePasswordAction, saveProfileAction, setPosPinAction, stationSetupAction } from "@/app/actions";
 import { STATION_KEY, stationId } from "@/lib/station-print";
 import { ActionBar, Crumbs, PageContent } from "./page";
 import { InstallAppButton } from "./install-app";
@@ -61,25 +60,7 @@ export function UserSettings(p: {
   const isWindows = useSyncExternalStore(noSubscribe, () => /Windows/i.test(navigator.userAgent), () => false);
   const [stationBusy, setStationBusy] = useState(false);
   const [stationMsg, setStationMsg] = useState("");
-  const [thisStation, setThisStation] = useState<string>("");
-  // počítač tohoto prohlížeče z úložiště (vnější zdroj, až po hydrataci)
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setThisStation(stationId() ?? ""), []);
-  const [diagOpen, setDiagOpen] = useState(false);
-  const [diagKey, setDiagKey] = useState(0);
-  /** výběr počítače pro tisk z tohoto prohlížeče (bez zástupce Shanon) */
-  const chooseStation = async (id: string) => {
-    setThisStation(id);
-    try {
-      if (id) localStorage.setItem(STATION_KEY, id);
-      else localStorage.removeItem(STATION_KEY);
-    } catch {
-      /* bez úložiště */
-    }
-    if (id) await stationClaimAction(id).catch(() => null);
-    setStationMsg(id ? L.StationChosen : "");
-    setDiagKey((k) => k + 1);
-  };
+  // Diagnostika a volba počítače pro tisk jsou v Integrace → Zařízení (Diagnostika tohoto počítače)
   /** instalátor Shanon Pokladna: zařízení tohoto počítače (ze zástupce), jinak nové → stáhnout .cmd */
   const installStation = async () => {
     setStationBusy(true);
@@ -92,7 +73,6 @@ export function UserSettings(p: {
     } catch {
       /* bez úložiště pozná počítač server podle uživatele zařízení */
     }
-    setThisStation(r.data.deviceId);
     // stažení přímo z adresy (ne přes blob): Windows si zapamatuje odkud — instalátor z toho vezme párovací kód;
     // záloha: odkaz i do schránky (instalátor se podívá i tam)
     void navigator.clipboard?.writeText(new URL(r.data.href, window.location.href).href).catch(() => undefined);
@@ -184,34 +164,7 @@ export function UserSettings(p: {
                   <InstallAppButton label={L.StationAppInstall} iosText={L.InstallAppIos} installedText={L.InstallAppDone} />
                 )}
               </div>
-              {!!p.stations?.length && (
-                <Field label={L.StationThisBrowser} hint={L.StationThisBrowserHelp}>
-                  <Dropdown
-                    value={p.stations.find((x) => x.id === thisStation)?.label ?? L.StationNone}
-                    selectedOptions={[thisStation]}
-                    onOptionSelect={(_, d) => void chooseStation(String(d.optionValue ?? ""))}
-                  >
-                    <Option value="">{L.StationNone}</Option>
-                    {p.stations.map((x) => (
-                      <Option key={x.id} value={x.id}>
-                        {x.label}
-                      </Option>
-                    ))}
-                  </Dropdown>
-                </Field>
-              )}
               {stationMsg && <Text size={200}>{stationMsg}</Text>}
-              {p.stations !== undefined && (
-                <div className={st.diag}>
-                  {diagOpen ? (
-                    <StationDiag key={diagKey} />
-                  ) : (
-                    <Button size="small" onClick={() => setDiagOpen(true)}>
-                      {L.StationDiag}
-                    </Button>
-                  )}
-                </div>
-              )}
               <div className={st.title}>{L.Notifications}</div>
               {/* jeden přepínač: oznámení e-mailem zapnutá / vypnutá (souhrn úkolů, faktury po splatnosti, chyby napojení) */}
               <Switch

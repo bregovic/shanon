@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   Checkbox,
+  Dropdown,
+  Option,
   Link,
   Spinner,
   Text,
@@ -17,6 +19,7 @@ import {
 } from "@fluentui/react-components";
 import {
   posSdpQueueAction,
+  stationClaimAction,
   stationConnectAction,
   stationDiagnosticsAction,
   stationPrinterAction,
@@ -237,6 +240,18 @@ export function StationDiag({
     const text = r.ok ? (print ? T.StationDiagNetPrinted : T.StationDiagNetOk) : r.code === "network" ? (T.StationDiagNetDown ?? "").replace(/\{host\}/g, n.host) + (r.detail ? ` (${r.detail})` : "") : `${T.StationDiagNetError} ${r.code}`;
     setNetMsg((m) => ({ ...m, [n.id]: { ok: r.ok, text: text ?? "" } }));
   };
+  /** Tento prohlížeč tiskne přes počítač (bez zástupce Shanon): zapamatovat v prohlížeči a uživatele počítače */
+  const chooseStation = async (id: string) => {
+    try {
+      if (id) localStorage.setItem(STATION_KEY, id);
+      else localStorage.removeItem(STATION_KEY);
+    } catch {
+      /* bez úložiště */
+    }
+    if (id) await stationClaimAction(id).catch(() => null);
+    await load();
+    setMsg(id ? (T.StationChosen ?? "") : "");
+  };
   const test = async (printerId: string) => {
     const r = await stationTestPageAction(printerId).catch(() => null);
     setMsg(r?.ok ? (T.StationDiagTestSent ?? "") : (r?.message ?? ""));
@@ -261,6 +276,27 @@ export function StationDiag({
         </Text>
       )}
       {d.staleBrowser && <Text size={200}>{T.StationDiagStale}</Text>}
+      {!deviceId && d.stations.length > 0 && (
+        <div className={s.list}>
+          <Text size={200} weight="semibold">
+            {T.StationThisBrowser}
+          </Text>
+          <Dropdown
+            size="small"
+            value={d.stations.find((x) => x.id === (d.source === "browser" ? d.device?.id : ""))?.label ?? T.StationNone}
+            selectedOptions={[d.source === "browser" ? (d.device?.id ?? "") : ""]}
+            onOptionSelect={(_, o) => void chooseStation(String(o.optionValue ?? ""))}
+          >
+            <Option value="">{T.StationNone ?? ""}</Option>
+            {d.stations.map((x) => (
+              <Option key={x.id} value={x.id}>
+                {x.label}
+              </Option>
+            ))}
+          </Dropdown>
+          <Text size={200}>{T.StationThisBrowserHelp}</Text>
+        </div>
+      )}
       {d.source === "none" && d.userDevices > 1 && (
         <Text size={200}>{T.StationDiagMany}</Text>
       )}

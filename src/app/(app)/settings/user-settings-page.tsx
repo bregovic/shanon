@@ -4,7 +4,6 @@ import { requireSession } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { getT } from "@/server/i18n";
 import { can } from "@/core/security";
-import { stationChoices } from "@/server/station";
 
 
 const KEYS = [
@@ -23,7 +22,6 @@ export async function userSettingsPage(section: "profile" | "settings") {
       crumbs={[{ label: t(section === "profile" ? "@SYS:UserSettings" : "@SYS:Settings") }]}
       user={{ firstName: u.firstName, lastName: u.lastName || (u.firstName ? "" : u.name), email: u.email, lang: u.lang, hasPin: !!u.posPinHash, notify: (u.notify ?? {}) as Record<string, boolean>, defaultCompanyId: u.defaultCompanyId ?? "" }}
       canDevices={s.ctx.modules.has("int") && can(s.ctx.perms, "int.device", "write")}
-      stations={s.ctx.modules.has("int") ? await stationChoices(s.ctx).catch(() => []) : []}
       companies={s.companies.map((c) => ({ id: c.id, label: `${c.code} · ${c.name}` }))}
       L={Object.fromEntries(KEYS.map((k) => [k, t(`@SYS:${k}`)]))}
     />
