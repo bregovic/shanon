@@ -42,5 +42,11 @@ describe("náměty", () => {
     expect([iss.title, iss.reportedBy]).toEqual(["Dodatečná úprava účtenky", "MUDr. Zkušební"]);
     const m = await listNotices(U, "cs");
     expect(m.items.map((x) => x.text).sort()).toEqual([`Námět ${fb.feedbackNum} (Dodatečná úprava účtenky): Převedeno na požadavek`, `Odpověď na váš námět ${fb.feedbackNum}: Dodatečná úprava účtenky`].sort());
+
+    // požadavek k vyzkoušení (UAT) → upozornění zadavateli námětu
+    await saveRecord(S, "qa.issue", String(iss.id), { status: "uat" }, undefined, client);
+    const k = await listNotices(U, "cs");
+    expect(k.items[0].text).toBe(`K vyzkoušení: Dodatečná úprava účtenky (požadavek ${iss.issueNum} z vašeho námětu ${fb.feedbackNum})`);
+    expect(k.items[0].href).toBe(`/qa/issue/${iss.id}`);
   }, 120_000);
 });

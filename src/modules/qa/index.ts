@@ -342,8 +342,23 @@ export const DEVELOPER = "Claude (vývoj)";
 
 export const qaHandlers: Record<string, ObjectHandlers> = {
   "qa.issue": {
-    beforeSave(_ctx, d) {
+    async beforeSave(ctx, d, isNew) {
       d.priorityRank = RANK[String(d.priority)] ?? 3;
+      // požadavek z námětu k vyzkoušení (UAT) / hotový → upozornění zadavateli námětu
+      if (!isNew && d.id && (d.status === "uat" || d.status === "done")) {
+        const before = await ctx.data.get("qa.issue", String(d.id));
+        if (before && before.status !== d.status)
+          for (const fb of await ctx.data.find("qa.feedback", { issueId: d.id }, { take: 20 })) {
+            if (!fb.authorUserId || fb.authorUserId === ctx.userId) continue;
+            await notify(ctx.data, {
+              kind: "info",
+              title: d.status === "uat" ? "@QA:IssueNotifyUat" : "@QA:IssueNotifyDone",
+              params: { num: String(d.issueNum), fb: String(fb.feedbackNum), title: String(d.title ?? "").slice(0, 80) },
+              href: `/qa/issue/${String(d.id)}`,
+              userId: String(fb.authorUserId),
+            });
+          }
+      }
       // vývoj bez řešitele = vývojář (Claude)
       // vývoj / vráceno z testu: řeší vývojář (Claude), pokud řešitel není jiný
       if ((d.status === "development" || d.status === "returned") && !d.assignedTo) d.assignedTo = DEVELOPER;
@@ -481,6 +496,8 @@ export default defineModule({
       FbNotifyNew: "Nový námět {num}: {title} ({author})",
       FbNotifyReply: "Odpověď na váš námět {num}: {title}",
       FbNotifyStatus: "Námět {num} ({title}): {status}",
+      IssueNotifyUat: "K vyzkoušení: {title} (požadavek {num} z vašeho námětu {fb})",
+      IssueNotifyDone: "Hotovo: {title} (požadavek {num} z vašeho námětu {fb})",
       Module: "Testování a vývoj",
       ChangelogEntry: "Záznam deníku vývoje",
       Changelog: "Deník vývoje",
@@ -593,6 +610,8 @@ export default defineModule({
       FbNotifyNew: "New suggestion {num}: {title} ({author})",
       FbNotifyReply: "Reply to your suggestion {num}: {title}",
       FbNotifyStatus: "Suggestion {num} ({title}): {status}",
+      IssueNotifyUat: "Ready to test: {title} (request {num} from your suggestion {fb})",
+      IssueNotifyDone: "Done: {title} (request {num} from your suggestion {fb})",
       Returned: "Returned to development",
       Module: "Testing and development",
       ChangelogEntry: "Development log entry",
