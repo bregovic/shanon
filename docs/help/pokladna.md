@@ -43,6 +43,24 @@ summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a 
 - **Na fakturu** (zaplatí později): vystaví se zaúčtovaná vydaná faktura s cenami s DPH a splatností odběratele — je v saldu odběratele, zaplacení se spáruje z výpisu. **Tisk faktury** otevře PDF.
 - **Odeslat e-mailem**: účtenku i fakturu jde poslat jako PDF (adresa se předvyplní z odběratele), i dodatečně ze seznamu účtenek (Tisk ▾ → Odeslat e-mailem). Na účtence je pak *Odesláno e-mailem* a *Odesláno na*. Text e-mailu = šablona v Organizaci ([Odesílání dokladů e-mailem](/help/posta)).
 
+## Oprava účtenky
+
+- **V kase** tlačítko **Účtenky** (vedle Uzávěrky) ukáže účtenky otevřené směny:
+  - **Otevřít** – účtenka se načte do nákupu. Když změníte jen odběratele, **Uložit odběratele** ho zapíše na stejnou účtenku
+    (vytisknete ji znovu). Když změníte položky a zaplatíte, původní účtenka se **stornuje** a vystaví se nová (při platbě
+    hotově kasa ukáže rozdíl proti původní).
+  - **Tisk** – účtenka znovu k tisku nebo odeslání e-mailem.
+  - **Stornovat** – opravná účtenka se zápornou částkou: zboží se vrátí na sklad a do EET jde záporná tržba. Peníze vraťte
+    zákazníkovi stejným způsobem (kartu na platebním terminálu).
+  - **Smazat** – jen u poslední účtenky směny, která nešla do EET, e-mailem ani kartou přes terminál. Číslo dostane další prodej.
+- **V seznamu [Účtenky](/pos/receipt)**:
+  - **Odběratel** jde změnit i po uzávěrce, ale jen do podání přiznání k DPH za dané období. Účtenka od 10 000 Kč
+    s českým DIČ odběratele se tím přesune do kontrolního hlášení jednotlivě (a zpět).
+  - **Způsob platby** jde změnit do uzávěrky směny (hotovost se znovu zaokrouhlí). Nejde u platby kartou přes terminál
+    a u účtenky v EET, kdyby se změnila částka.
+  - **Označit jako zaplacené** – QR platba zaplacená jinak, než že ji spáruje bankovní výpis.
+  - Částky a položky se nepřepisují – použijte **Stornovat** a prodejte znovu.
+
 ## Tiskárna účtenek na tabletu (USB)
 
 Termotiskárnu ESC/POS (např. Epson TM-m30III) připojenou kabelem USB k tabletu s Androidem kasa ovládá přímo z Chrome:

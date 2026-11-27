@@ -402,5 +402,13 @@ export const whsHandlers: Record<string, ObjectHandlers> = {
       const wh = reg?.warehouseId ? String(reg.warehouseId) : String((await defaultWarehouse(ctx.data)).id);
       await move(ctx.data, { kind: "sale", date: String(r?.createdAt ?? today()).slice(0, 10), itemId: String(l.itemId), warehouseId: wh, qty: -q(l.qty), documentNum: String(r?.receiptNum ?? ""), sourceObject: "pos.receipt", sourceId: String(l.receiptId), allowNegative: true });
     },
+    // smazaná účtenka (poslední v otevřené směně): zboží zpět na sklad
+    async beforeDelete(ctx, l) {
+      if (!on(ctx) || !(await stocked(ctx.data, l.itemId))) return;
+      const r = await ctx.data.get("pos.receipt", String(l.receiptId));
+      const reg = r?.registerId ? await ctx.data.get("pos.register", String(r.registerId)) : null;
+      const wh = reg?.warehouseId ? String(reg.warehouseId) : String((await defaultWarehouse(ctx.data)).id);
+      await move(ctx.data, { kind: "sale", date: today(), itemId: String(l.itemId), warehouseId: wh, qty: q(l.qty), documentNum: String(r?.receiptNum ?? ""), sourceObject: "pos.receipt", sourceId: String(l.receiptId), allowNegative: true });
+    },
   },
 };

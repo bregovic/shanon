@@ -4009,6 +4009,8 @@ model PosReceipt {
   cashGiven     Decimal?  @map("cash_given") @db.Decimal(18, 2)
   change        Decimal?  @db.Decimal(18, 2)
   paymentRef    String?   @map("payment_ref") @db.VarChar(255)
+  stornoOfId    String?   @map("storno_of_id") @db.Uuid
+  stornoId      String?   @map("storno_id") @db.Uuid
   vs            String?   @db.VarChar(10)
   payStatus     String?   @map("pay_status") @db.VarChar(40)
   paidDate      DateTime? @map("paid_date") @db.Date
@@ -4035,14 +4037,20 @@ model PosReceipt {
   company                      SysCompany          @relation("PosReceipt_company", fields: [companyId], references: [id], onDelete: Restrict)
   register                     PosRegister         @relation("PosReceipt_register", fields: [registerId], references: [id], onDelete: Restrict)
   shift                        PosShift            @relation("PosReceipt_shift", fields: [shiftId], references: [id], onDelete: Restrict)
+  stornoOf                     PosReceipt?         @relation("PosReceipt_stornoOf", fields: [stornoOfId], references: [id], onDelete: Restrict)
+  storno                       PosReceipt?         @relation("PosReceipt_storno", fields: [stornoId], references: [id], onDelete: Restrict)
   customer                     ArCustomer?         @relation("PosReceipt_customer", fields: [customerId], references: [id], onDelete: Restrict)
   bankStatementLine_posReceipt BankStatementLine[] @relation("BankStatementLine_posReceipt")
+  posReceipt_stornoOf          PosReceipt[]        @relation("PosReceipt_stornoOf")
+  posReceipt_storno            PosReceipt[]        @relation("PosReceipt_storno")
   posReceiptLine_receipt       PosReceiptLine[]    @relation("PosReceiptLine_receipt")
   posBasket_receipt            PosBasket[]         @relation("PosBasket_receipt")
 
   @@index([tenantId, companyId])
   @@index([registerId])
   @@index([shiftId])
+  @@index([stornoOfId])
+  @@index([stornoId])
   @@index([customerId])
   @@index([tenantId, companyId, vs])
   @@index([tenantId, companyId, clientId])

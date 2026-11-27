@@ -29,7 +29,8 @@ import { importIssuedIsdoc, isdocXml } from "@/server/isdoc-import";
 import { runReport } from "@/server/report";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
-import { openShiftOf, quote, receiptPrint, sell, sellOnInvoice, shiftTotals, type ReceiptPrint, type SaleInput, type ScaleLine } from "@/modules/pos/sale";
+import { openShiftOf, quote, receiptOfClient, receiptPrint, sell, sellOnInvoice, shiftTotals, type ReceiptPrint, type SaleInput, type ScaleLine } from "@/modules/pos/sale";
+import { canDeleteReceipt, stornoReceipt } from "@/modules/pos/receipt-fix";
 import { sendDocumentNow } from "@/server/mail";
 import { disableCompanyModules, enableCompanyModules } from "@/server/modules";
 import { assertPaid, connectionsFor, eetRegisterReceipt, eetResendPending, paymentCancel, paymentStart, paymentStatus, type PaymentState } from "@/modules/int/drivers";
@@ -502,7 +503,7 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
     assertCan(s.ctx.perms, "pos.receipt", "write");
     const sale = saleInput(input);
     const withInt = s.ctx.modules.has("int");
-    const receiptId = await inTenant(s.ctx, async (sess) => {
+    const done = await inTenant(s.ctx, async (sess) => {
       const api = sess.sys().api();
       if (withInt) sale.verifiedScale = await verifiedScaleOf(api, sale.registerId);
       // platba kartou přes terminál: schválená transakce na stejnou částku
@@ -511,8 +512,16 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
         const q = await quote(api, sale);
         await assertPaid(api, conns.payment, String(sale.paymentRef ?? ""), q.paid);
       } else sale.paymentRef = null;
-      return String((await sell(api, sale)).id);
+      // oprava účtenky: původní se stornuje ve stejné transakci (opakované odeslání téhož prodeje už ne)
+      let stornoId: string | null = null;
+      if (sale.replacesId && !(await receiptOfClient(api, sale.clientId))) {
+        const orig = await api.get("pos.receipt", sale.replacesId);
+        if (!orig || orig.registerId !== sale.registerId) throw new UserError("@SYS:NotFound");
+        stornoId = String((await stornoReceipt(api, orig)).id);
+      }
+      return { id: String((await sell(api, sale)).id), stornoId };
     });
+    const receiptId = done.id;
     // EET až po uložení účtenky (síť nesmí držet transakci); pak dodatečné odeslání čekajících
     const data = await inTenant(s.ctx, async (sess) => {
       const api = sess.sys().api();
@@ -522,6 +531,9 @@ export async function posSellAction(input: SaleInput): Promise<ActionResult<Rece
         // QR platba je převod na účet — do EET nepatří (eviduje se hotovost a karta)
         const rec = (await api.get("pos.receipt", receiptId))!;
         // opakované odeslání téhož prodeje (clientId): EET už proběhla
+        // storno opravované účtenky (byla v EET) se odešle se zápornou tržbou
+        const storno = done.stornoId ? await api.get("pos.receipt", done.stornoId) : null;
+        if (conns.eet && storno?.eetStatus === "pending") await eetRegisterReceipt(api, s.ctx.companyId, conns.eet, storno, true);
         if (conns.eet && sale.payment !== "qr" && !rec.eetStatus) {
           await eetRegisterReceipt(api, s.ctx.companyId, conns.eet, rec, true);
           eetQueue = (await eetResendPending(api, s.ctx.companyId, sale.registerId, 5)).pending;
@@ -609,6 +621,7 @@ function saleInput(input: SaleInput): SaleInput {
     paymentRef: input.paymentRef ? String(input.paymentRef) : null,
     basketId: input.basketId ? String(input.basketId) : null,
     clientId: input.clientId ? String(input.clientId).slice(0, 36) : null,
+    replacesId: input.replacesId && /^[0-9a-f-]{36}$/i.test(String(input.replacesId)) ? String(input.replacesId) : null,
     lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({ itemId: String(l.itemId), qty: String(l.qty), scale: scaleLineOf(l.scale), manual: l.manual === true })),
   };
 }
@@ -669,6 +682,135 @@ export async function posCardStatusAction(registerId: string, ref: string, cance
       }
       return paymentStatus(api, conn, String(ref));
     });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Účtenka v seznamu kasy (směna): oprava, storno, opakovaný tisk. */
+export interface PosReceiptRow {
+  id: string;
+  receiptNum: string;
+  at: string;
+  paid: string;
+  payment: string;
+  payStatus: string | null;
+  customerId: string | null;
+  customerName: string;
+  buyer: { name: string; street: string; zip: string; city: string } | null;
+  /** of = storno jiné účtenky, by = stornovaná */
+  storno: "of" | "by" | null;
+  canDelete: boolean;
+  lines: { itemId: string; qty: string; scale: ScaleLine | null }[];
+}
+
+/** Účtenky otevřené směny pokladny (nejnovější nahoře). */
+export async function posShiftReceiptsAction(registerId: string): Promise<ActionResult<PosReceiptRow[]>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "read");
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const sh = await openShiftOf(api, String(registerId));
+      if (!sh) return [];
+      const rs = await api.find("pos.receipt", { shiftId: sh.id }, { take: 200, orderBy: { createdAt: "desc" } });
+      if (!rs.length) return [];
+      // hromadně: řádky, odběratelé a jejich subjekty
+      const lines = await api.find("pos.receiptLine", { receiptId: { in: rs.map((r) => r.id) } }, { take: 20000 });
+      const custIds = [...new Set(rs.map((r) => r.customerId).filter(Boolean).map(String))];
+      const custs = custIds.length && s.ctx.modules.has("ar") ? await api.find("ar.customer", { id: { in: custIds } }, { take: custIds.length }) : [];
+      const subjIds = [...new Set(custs.map((c) => c.subjectId).filter(Boolean).map(String))];
+      const subjs = subjIds.length ? await api.find("gab.subject", { id: { in: subjIds } }, { take: subjIds.length }) : [];
+      const custName = (id: unknown) => {
+        const c = custs.find((x) => x.id === id);
+        return String(subjs.find((x) => x.id === c?.subjectId)?.name ?? c?.accountNum ?? "");
+      };
+      // smazat jde jen poslední účtenku řady – stačí ověřit nejnovější
+      const newest = rs.find((r) => !r.offline);
+      const deletable = newest && can(s.ctx.perms, "pos.receipt", "delete") && (await canDeleteReceipt(api, newest)) ? String(newest.id) : null;
+      return rs.map((r): PosReceiptRow => ({
+        id: String(r.id),
+        receiptNum: String(r.receiptNum),
+        at: String(r.soldAt ?? r.createdAt ?? ""),
+        paid: String(r.amountPaid ?? "0"),
+        payment: String(r.paymentMethod),
+        payStatus: (r.payStatus as string) ?? null,
+        customerId: (r.customerId as string) ?? null,
+        customerName: r.customerId ? custName(r.customerId) : "",
+        buyer: r.buyerName || r.buyerStreet || r.buyerCity ? { name: String(r.buyerName ?? ""), street: String(r.buyerStreet ?? ""), zip: String(r.buyerZip ?? ""), city: String(r.buyerCity ?? "") } : null,
+        storno: r.stornoOfId ? "of" : r.stornoId ? "by" : null,
+        canDelete: deletable === String(r.id),
+        lines: lines
+          .filter((l) => l.receiptId === r.id)
+          .map((l) => ({
+            itemId: String(l.itemId),
+            qty: String(Number(l.qty)),
+            // vážení z ověřené váhy: stejné údaje z váhy (cena za kg se znovu ověří proti ceníku)
+            scale: l.scaleWeight
+              ? { weight: Number(l.scaleWeight).toFixed(3), unitPrice: Number(l.scaleUnitPrice).toFixed(2), total: Number(l.scaleTotal).toFixed(2), raw: String(l.scaleRaw ?? ""), weighedAt: String(l.weighedAt ?? "") }
+              : null,
+          })),
+      }));
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Účtenka k opakovanému tisku / odeslání. */
+export async function posReceiptPrintAction(id: string): Promise<ActionResult<ReceiptPrint>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "read");
+    const data = await inTenant(s.ctx, (sess) => receiptPrint(sess.sys().api(), s.ctx.companyId, String(id)));
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Stornovat účtenku z kasy: opravná účtenka v otevřené směně, EET hned (síť mimo transakci). */
+export async function posStornoAction(id: string): Promise<ActionResult<ReceiptPrint>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const st = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      const r = await api.get("pos.receipt", String(id));
+      if (!r) throw new UserError("@SYS:NotFound");
+      return stornoReceipt(api, r);
+    });
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      if (s.ctx.modules.has("int") && st.eetStatus === "pending") {
+        const conns = await connectionsFor(api, String(st.registerId));
+        if (conns.eet) await eetRegisterReceipt(api, s.ctx.companyId, conns.eet, (await api.get("pos.receipt", String(st.id)))!, true);
+      }
+      return receiptPrint(api, s.ctx.companyId, String(st.id));
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Změnit odběratele účtenky z kasy (bez nové účtenky) — pravidla obsluhy pos.receipt (receipt-fix.ts). */
+export async function posReceiptCustomerAction(id: string, customerId: string | null, buyer: { name?: string; street?: string; zip?: string; city?: string } | null): Promise<ActionResult<ReceiptPrint>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const clip = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n) || null;
+    const b = customerId ? null : buyer;
+    await saveRecord(s.ctx, "pos.receipt", String(id), {
+      customerId: customerId ? String(customerId) : null,
+      buyerName: clip(b?.name, 255),
+      buyerStreet: clip(b?.street, 255),
+      buyerZip: clip(b?.zip, 20),
+      buyerCity: clip(b?.city, 255),
+    });
+    const data = await inTenant(s.ctx, (sess) => receiptPrint(sess.sys().api(), s.ctx.companyId, String(id)));
     return { ok: true, data };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);

@@ -45,6 +45,7 @@ import {
   Payment24Regular,
   QrCode24Regular,
   Print24Regular,
+  Receipt24Regular,
   Scales24Regular,
   Search24Regular,
 } from "@fluentui/react-icons";
@@ -64,7 +65,13 @@ import {
   posMailAction,
   posShiftSummaryAction,
   posLockAction,
+  posShiftReceiptsAction,
+  posReceiptPrintAction,
+  posStornoAction,
+  posReceiptCustomerAction,
+  deleteRecordsAction,
   type ActionResult,
+  type PosReceiptRow,
 } from "@/app/actions";
 import type { BasketView } from "@/modules/pos/basket";
 import type { PrintLayout } from "@/core/print";
@@ -673,6 +680,84 @@ export function PosTerminal(p: {
   };
   const cardLoop = useRef(0);
   const [eetPending, setEetPending] = useState(p.eet?.pending ?? 0);
+  // účtenky směny (oprava, storno, tisk) a oprava otevřené účtenky v nákupu
+  const [rcpts, setRcpts] = useState<PosReceiptRow[] | null>(null);
+  const [amend, setAmend] = useState<{ id: string; num: string; paid: string; payment: string; sig: string } | null>(null);
+  const lineSig = (ls: { item?: PosItem; itemId?: string; qty: number | string }[]) =>
+    ls
+      .map((l) => `${l.item?.id ?? l.itemId}:${Number(l.qty)}`)
+      .sort()
+      .join("|");
+  const openReceipts = async () => {
+    setBusy(true);
+    const r = await safe(posShiftReceiptsAction(p.register.id));
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    setRcpts(r.data);
+  };
+  /** opakovaný tisk / odeslání účtenky */
+  const reprint = async (id: string) => {
+    setBusy(true);
+    const r = await safe(posReceiptPrintAction(id));
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    setRcpts(null);
+    setMailTo(r.data.customer?.email ?? "");
+    setMailState(null);
+    setReceipt(r.data);
+  };
+  const stornoRcpt = async (row: PosReceiptRow) => {
+    if (!window.confirm(L.StornoConfirm.replace("{num}", row.receiptNum))) return;
+    setBusy(true);
+    const r = await safe(posStornoAction(row.id));
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    setRcpts(null);
+    afterSale(r.data, row.payment === "card" ? "card" : row.payment === "qr" ? "qr" : "cash");
+  };
+  const deleteRcpt = async (row: PosReceiptRow) => {
+    if (!window.confirm(L.RcptDeleteConfirm.replace("{num}", row.receiptNum))) return;
+    setBusy(true);
+    const r = await safe(deleteRecordsAction("pos.receipt", [row.id]));
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    toast(L.RcptDeleted.replace("{num}", row.receiptNum));
+    await openReceipts();
+  };
+  /** Otevřít účtenku v nákupu: změnit odběratele (bez nové účtenky) nebo položky (storno + nová účtenka) */
+  const openAmend = async (row: PosReceiptRow) => {
+    if (lines.length || active) return setError(L.AmendBusy);
+    const ls: Line[] = row.lines.flatMap((l) => (itemById.has(l.itemId) ? [{ item: itemById.get(l.itemId)!, qty: Number(l.qty), scale: l.scale ?? null }] : []));
+    if (ls.length < row.lines.length) setError(L.AmendMissing);
+    else setError(undefined);
+    setRcpts(null);
+    loadLines(ls);
+    setCustomer(row.customerId ? { id: row.customerId, name: row.customerName, regNo: "", vatId: "", email: "" } : null);
+    setBuyer(row.buyer);
+    setBuyerDraft(row.buyer ?? NO_BUYER);
+    setAmend({ id: row.id, num: row.receiptNum, paid: row.paid, payment: row.payment, sig: lineSig(row.lines) });
+    setMobileCart(true);
+  };
+  const cancelAmend = () => {
+    setAmend(null);
+    loadLines([]);
+    setCustomer(null);
+    setBuyer(null);
+    setBuyerDraft(NO_BUYER);
+    setError(undefined);
+  };
+  /** jen jiný odběratel: stejná účtenka (bez storna), znovu k tisku */
+  const saveAmendCustomer = async () => {
+    if (!amend) return;
+    setBusy(true);
+    const r = await safe(posReceiptCustomerAction(amend.id, customer?.id ?? null, customer ? null : hasBuyer(buyer) ? buyer : null));
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    const pay = amend.payment === "card" ? "card" : amend.payment === "qr" ? "qr" : "cash";
+    setAmend(null);
+    afterSale(r.data, pay);
+  };
+  const amendSameLines = !!amend && amend.sig === lineSig(lines);
 
   // prodej bez připojení: fronta v prohlížeči pokladny (src/lib/pos-offline.ts), odešle se sama
   const offlineRaw = useSyncExternalStore(subscribeQueue, () => queueRaw(p.register.id), () => "[]");
@@ -967,7 +1052,7 @@ export function PosTerminal(p: {
 
   /** prodej jde zapsat bez připojení: hotově / kartou na samostatném terminálu, bez odběratele a boxu */
   const canOffline = (payment: "cash" | "card" | "qr"): payment is "cash" | "card" =>
-    !!p.offline && (payment === "cash" || (payment === "card" && p.offline.card)) && !customer && !hasBuyer(buyer) && !active;
+    !!p.offline && (payment === "cash" || (payment === "card" && p.offline.card)) && !customer && !hasBuyer(buyer) && !active && !amend;
 
   const finishSale = async (payment: "cash" | "card" | "qr", paymentRef: string | null) => {
     setError(undefined);
@@ -985,6 +1070,7 @@ export function PosTerminal(p: {
       buyer: customer ? null : hasBuyer(buyer) ? buyer : null,
       lines: saleLines(),
       clientId,
+      replacesId: amend?.id ?? null,
     }));
     setBusy(false);
     if (!res.ok) {
@@ -1003,6 +1089,7 @@ export function PosTerminal(p: {
   /** po zaplacení: vyčistit nákup, ukázat účtenku, vytisknout / otevřít zásuvku */
   const afterSale = (r: ReceiptPrint, payment: "cash" | "card" | "qr") => {
     setPayDlg(null);
+    setAmend(null);
     setCard(null);
     setGiven("");
     setMailTo(customer?.email ?? "");
@@ -1269,6 +1356,11 @@ export function PosTerminal(p: {
           </Button>
         )}
         {shift && !boxesMode && (
+          <Button icon={<Receipt24Regular />} onClick={() => void openReceipts()} disabled={busy}>
+            {L.Receipts}
+          </Button>
+        )}
+        {shift && !boxesMode && (
           <Button icon={<LockClosed24Regular />} onClick={showSummary} disabled={busy || lines.length > 0}>
             {L.CloseShift}
           </Button>
@@ -1290,6 +1382,57 @@ export function PosTerminal(p: {
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}
+
+      {/* účtenky směny: otevřít (oprava), tisk, storno, smazat poslední */}
+      <Dialog open={!!rcpts} onOpenChange={(_, d) => !d.open && setRcpts(null)}>
+        <DialogSurface style={{ maxWidth: "min(720px, 96vw)" }}>
+          <DialogBody>
+            <DialogTitle>{L.ShiftReceipts}</DialogTitle>
+            <DialogContent>
+              {error && (
+                <MessageBar intent="error">
+                  <MessageBarBody>{error}</MessageBarBody>
+                </MessageBar>
+              )}
+              {!rcpts?.length && <Text block>{L.RcptNone}</Text>}
+              {rcpts?.map((r) => (
+                <div key={r.id} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${tokens.colorNeutralStroke2}` }}>
+                  <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+                    <div>
+                      <b>{r.receiptNum}</b> · {r.at ? new Date(r.at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }) : ""} ·{" "}
+                      <span style={Number(r.paid) < 0 ? { color: tokens.colorPaletteRedForeground1 } : undefined}>{fmt(r.paid)}</span> ·{" "}
+                      {r.payment === "card" ? L.Card : r.payment === "qr" ? L.QrPayment : L.Cash}
+                      {r.storno && <span style={{ color: tokens.colorNeutralForeground3 }}> · {r.storno === "of" ? L.RcptStornoOf : L.RcptStornoBy}</span>}
+                    </div>
+                    {(r.customerName || r.buyer?.name) && <div style={{ color: tokens.colorNeutralForeground3 }}>{r.customerName || r.buyer?.name}</div>}
+                  </div>
+                  <Button size="small" icon={<Print24Regular />} disabled={busy} onClick={() => void reprint(r.id)}>
+                    {L.Print}
+                  </Button>
+                  {!r.storno && (
+                    <>
+                      <Button size="small" disabled={busy} onClick={() => void openAmend(r)}>
+                        {L.RcptOpen}
+                      </Button>
+                      <Button size="small" disabled={busy} onClick={() => void stornoRcpt(r)}>
+                        {L.Storno}
+                      </Button>
+                    </>
+                  )}
+                  {r.canDelete && (
+                    <Button size="small" icon={<Delete24Regular />} disabled={busy} onClick={() => void deleteRcpt(r)}>
+                      {L.RcptDelete}
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setRcpts(null)}>{L.Cancel}</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
 
       {/* prodeje uložené bez připojení: přehled, odeslání, zahození */}
       <Dialog open={offlineDlg} onOpenChange={(_, d) => setOfflineDlg(d.open)}>
@@ -1467,6 +1610,20 @@ export function PosTerminal(p: {
                 )}
               </div>
             )}
+            {amend && (
+              <div className={st.cartHead} style={{ flexWrap: "wrap", color: tokens.colorPaletteMarigoldForeground1 }}>
+                <span>{L.Amending.replace("{num}", amend.num)}</span>
+                <span className={st.spacer} />
+                {amendSameLines && (
+                  <Button size="small" appearance="primary" disabled={busy} onClick={() => void saveAmendCustomer()}>
+                    {L.AmendSaveCustomer}
+                  </Button>
+                )}
+                <Button size="small" appearance="subtle" disabled={busy} onClick={cancelAmend}>
+                  {L.AmendCancel}
+                </Button>
+              </div>
+            )}
             <div className={st.cartHead}>
               {active ? active.label : L.Cart}
               <span className={st.spacer} />
@@ -1533,7 +1690,7 @@ export function PosTerminal(p: {
               <Button className={st.payBtn} style={{ marginTop: 8, width: "100%" }} icon={<QrCode24Regular />} disabled={!lines.length || busy} onClick={() => void payByQr()}>
                 {L.PayQr}
               </Button>
-              {customer && (
+              {customer && !amend && (
                 <Button className={st.payBtn} style={{ marginTop: 8, width: "100%" }} icon={<DocumentText24Regular />} disabled={!lines.length || busy} onClick={() => void payOnInvoice()}>
                   {L.OnInvoice}
                 </Button>
@@ -1687,6 +1844,14 @@ export function PosTerminal(p: {
               {error && (
                 <MessageBar intent="error">
                   <MessageBarBody>{error}</MessageBarBody>
+                </MessageBar>
+              )}
+              {amend && (
+                <MessageBar intent="warning">
+                  <MessageBarBody>
+                    {L.AmendInfo.replace("{num}", amend.num).replace("{paid}", fmt(amend.paid))}
+                    {method === "cash" && amend.payment === "cash" && ` ${L.AmendDiff.replace("{diff}", fmt(Math.round((toPay - Number(amend.paid)) * 100) / 100))}`}
+                  </MessageBarBody>
                 </MessageBar>
               )}
               <div>{L.ToPay}</div>

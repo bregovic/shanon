@@ -57,6 +57,8 @@ export interface SaleInput {
   basketId?: string | null;
   /** id prodeje z kasy: opakované odeslání téhož prodeje (ztracená odpověď) vrátí stejnou účtenku */
   clientId?: string | null;
+  /** oprava účtenky z kasy (Otevřít účtenku): tato účtenka se ve stejné transakci stornuje (posSellAction) */
+  replacesId?: string | null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -466,46 +468,17 @@ export async function closeShift(data: DataApi, shift: RecordData) {
     voucherId = voucher.id;
     // účtenka s odběratelem s českým DIČ od 10 000 Kč = daňový doklad pro KH jednotlivě (A.4), zbytek souhrnně (A.5)
     for (const r of await data.find("pos.receipt", { shiftId: shift.id }, { take: 100000 })) {
-      if (!r.customerId || toCents(r.amountGross) < BigInt(1_000_000)) continue;
-      const cust = await data.get("ar.customer", String(r.customerId)).catch(() => null);
-      const subj = cust?.subjectId ? await data.get("gab.subject", String(cust.subjectId)) : null;
-      const vatId = String(subj?.vatId ?? "").replace(/\s/g, "").toUpperCase();
-      if (!/^CZ\d{8,10}$/.test(vatId)) continue;
-      const own = new Map<string, { base: bigint; tax: bigint }>();
-      for (const l of await data.find("pos.receiptLine", { receiptId: r.id }, { take: 10000 })) {
-        const codeId = String(l.taxCodeId ?? "");
-        if (!codeId) continue;
-        const x = own.get(codeId) ?? { base: zero, tax: zero };
-        x.base += toCents(l.amountNet);
-        x.tax += toCents(l.taxAmount);
-        own.set(codeId, x);
-      }
+      const a4 = await receiptA4(data, r);
+      if (!a4) continue;
+      const own = await receiptTaxParts(data, String(r.id));
       for (const [codeId, x] of own) {
         const agg = t.taxes.get(codeId);
         if (agg) {
           agg.base -= x.base;
           agg.tax -= x.tax;
         }
-        const code = await data.get("tax.taxCode", codeId);
-        await data.create("tax.trans", {
-          taxDate: String(r.date ?? date).slice(0, 10),
-          taxCodeId: codeId,
-          direction: code!.direction,
-          reportLine: code!.reportLine ?? null,
-          khSection: code!.khSection === "A4" || code!.khSection === "A5" ? "A4" : (code!.khSection ?? null),
-          base: fromCents(x.base),
-          tax: fromCents(x.tax),
-          baseCur: fromCents(x.base),
-          taxCur: fromCents(x.tax),
-          subjectId: subj?.id ?? null,
-          vatId,
-          documentNum: String(r.receiptNum),
-          voucherId,
-          sourceObject: "pos.receipt",
-          sourceId: String(r.id),
-          simplified: false,
-        });
       }
+      await createReceiptTaxTrans(data, r, a4, own, voucherId, date);
     }
     for (const [codeId, x] of t.taxes) {
       if (!codeId || (x.base === zero && x.tax === zero)) continue;
@@ -538,6 +511,59 @@ export async function closeShift(data: DataApi, shift: RecordData) {
     expectedCash: fromCents(toCents(shift.openingCash) + t.cash),
     voucherId,
   });
+}
+
+/**
+ * Účtenka jde do KH jednotlivě (A.4): známý odběratel s českým DIČ a částka od 10 000 Kč
+ * (storno = záporná částka stejné velikosti jako stornovaná účtenka).
+ */
+export async function receiptA4(data: DataApi, r: RecordData): Promise<{ subjectId: string; vatId: string } | null> {
+  if (!r.customerId) return null;
+  const g = toCents(r.amountGross);
+  if ((g < zero ? -g : g) < BigInt(1_000_000)) return null;
+  const cust = await data.get("ar.customer", String(r.customerId)).catch(() => null);
+  const subj = cust?.subjectId ? await data.get("gab.subject", String(cust.subjectId)) : null;
+  const vatId = String(subj?.vatId ?? "").replace(/\s/g, "").toUpperCase();
+  return subj && /^CZ\d{8,10}$/.test(vatId) ? { subjectId: String(subj.id), vatId } : null;
+}
+
+/** Základ a daň účtenky po daňových kódech (z řádků). */
+export async function receiptTaxParts(data: DataApi, receiptId: string): Promise<Map<string, { base: bigint; tax: bigint }>> {
+  const own = new Map<string, { base: bigint; tax: bigint }>();
+  for (const l of await data.find("pos.receiptLine", { receiptId }, { take: 10000 })) {
+    const codeId = String(l.taxCodeId ?? "");
+    if (!codeId) continue;
+    const x = own.get(codeId) ?? { base: zero, tax: zero };
+    x.base += toCents(l.amountNet);
+    x.tax += toCents(l.taxAmount);
+    own.set(codeId, x);
+  }
+  return own;
+}
+
+/** Daňové transakce účtenky pro KH jednotlivě (A.4). */
+export async function createReceiptTaxTrans(data: DataApi, r: RecordData, a4: { subjectId: string; vatId: string }, parts: Map<string, { base: bigint; tax: bigint }>, voucherId: unknown, fallbackDate: string) {
+  for (const [codeId, x] of parts) {
+    const code = await data.get("tax.taxCode", codeId);
+    await data.create("tax.trans", {
+      taxDate: String(r.date ?? fallbackDate).slice(0, 10),
+      taxCodeId: codeId,
+      direction: code!.direction,
+      reportLine: code!.reportLine ?? null,
+      khSection: code!.khSection === "A4" || code!.khSection === "A5" ? "A4" : (code!.khSection ?? null),
+      base: fromCents(x.base),
+      tax: fromCents(x.tax),
+      baseCur: fromCents(x.base),
+      taxCur: fromCents(x.tax),
+      subjectId: a4.subjectId,
+      vatId: a4.vatId,
+      documentNum: String(r.receiptNum),
+      voucherId,
+      sourceObject: "pos.receipt",
+      sourceId: String(r.id),
+      simplified: false,
+    });
+  }
 }
 
 export const posHandlers: Record<string, ObjectHandlers> = {
