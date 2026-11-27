@@ -27,6 +27,6 @@ describe("ePOS-Print", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(reply(false, "EPTR_COVER_OPEN"))));
     expect(await eposCheck("192.168.1.32")).toEqual({ ok: false, code: "EPTR_COVER_OPEN" });
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
-    expect(await eposCheck("192.168.1.32")).toEqual({ ok: false, code: "network" });
+    expect(await eposCheck("192.168.1.32")).toEqual({ ok: false, code: "network", detail: "Failed to fetch" });
   });
 });

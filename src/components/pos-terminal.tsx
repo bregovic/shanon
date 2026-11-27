@@ -831,7 +831,7 @@ export function PosTerminal(p: {
   const terminalPay = !!p.payment && p.payment.driver !== "manual";
 
   /** síťová tiskárna neodpovídá: nejčastěji nepotvrzený certifikát tiskárny v Chrome (odkaz v hlášce) */
-  const netFail = (code: string) => setError(code === "network" ? L.PrinterNetDown.replace(/\{host\}/g, p.printer?.host ?? "") : `${L.PrinterNetError} ${code}`);
+  const netFail = (code: string, detail?: string) => setError(code === "network" ? `${L.PrinterNetDown.replace(/\{host\}/g, p.printer?.host ?? "")}${detail ? ` (${detail})` : ""}` : `${L.PrinterNetError} ${code}`);
   useEffect(() => {
     if (netPrinter) void eposCheck(p.printer!.host!).then((r) => setPortReady(r.ok));
     else if (usbPrinter) void grantedUsbPrinter().then((d) => setPortReady(!!d));
@@ -848,7 +848,7 @@ export function PosTerminal(p: {
           : receiptEscPos(r, L, fmt, { width: width0, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale });
       const res = await eposPrint(pr.host!, data);
       setPortReady(res.ok || res.code !== "network");
-      if (!res.ok) netFail(res.code);
+      if (!res.ok) netFail(res.code, res.detail);
       return;
     }
     const usbDev = usbPrinter ? await grantedUsbPrinter() : null;
@@ -908,7 +908,7 @@ export function PosTerminal(p: {
       const r = await eposCheck(p.printer!.host!);
       setPortReady(r.ok);
       if (!r.ok) {
-        netFail(r.code);
+        netFail(r.code, r.detail);
         // certifikát tiskárny: otevřít její stránku, potvrdit (Pokračovat) a vrátit se do kasy
         if (r.code === "network") window.open(`https://${p.printer!.host}/`, "_blank", "noopener");
       } else setError(undefined);

@@ -224,7 +224,7 @@ export function StationDiag({
       .line("Příliš žluťoučký kůň úpěl ďábelské ódy")
       .cut().bytes;
     const r = print ? await eposPrint(n.host, Uint8Array.from(data)) : await eposCheck(n.host);
-    const text = r.ok ? (print ? T.StationDiagNetPrinted : T.StationDiagNetOk) : r.code === "network" ? (T.StationDiagNetDown ?? "").replace(/\{host\}/g, n.host) : `${T.StationDiagNetError} ${r.code}`;
+    const text = r.ok ? (print ? T.StationDiagNetPrinted : T.StationDiagNetOk) : r.code === "network" ? (T.StationDiagNetDown ?? "").replace(/\{host\}/g, n.host) + (r.detail ? ` (${r.detail})` : "") : `${T.StationDiagNetError} ${r.code}`;
     setNetMsg((m) => ({ ...m, [n.id]: { ok: r.ok, text: text ?? "" } }));
   };
   const test = async (printerId: string) => {

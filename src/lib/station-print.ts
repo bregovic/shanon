@@ -29,7 +29,7 @@ async function printViaNetwork(ids: string[]): Promise<boolean> {
     const bytes = Uint8Array.from(atob(j.data), (c) => c.charCodeAt(0));
     const res = await eposPrint(j.host, bytes);
     if (!res.ok) {
-      toast(res.code === "network" ? r.data.down.replace(/\{host\}/g, j.host) : `${j.host}: ${res.code}`, "warning");
+      toast(res.code === "network" ? r.data.down.replace(/\{host\}/g, j.host) + (res.detail ? ` (${res.detail})` : "") : `${j.host}: ${res.code}`, "warning");
       return false;
     }
     done += j.count;

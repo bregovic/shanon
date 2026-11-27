@@ -11,6 +11,8 @@ export interface EposResult {
   ok: boolean;
   /** kód tiskárny (EPTR_COVER_OPEN, EPTR_REC_EMPTY…) nebo „network“ = tiskárna neodpovídá / nepotvrzený certifikát */
   code: string;
+  /** text chyby prohlížeče u „network“ */
+  detail?: string;
 }
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
@@ -40,11 +42,10 @@ async function post(host: string, body: string): Promise<EposResult> {
       method: "POST",
       headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' },
       body: envelope(body),
-      // Chrome: požadavek do místní sítě (tiskárna) ze stránky na internetu
-      ...({ targetAddressSpace: "local" } as RequestInit),
     });
-  } catch {
-    return { ok: false, code: "network" };
+  } catch (e) {
+    // důvod od prohlížeče (nepotvrzený certifikát, zablokovaný přístup do místní sítě, jiná síť) – do hlášky
+    return { ok: false, code: "network", detail: String((e as Error)?.message ?? e).slice(0, 200) };
   }
   const xml = await res.text().catch(() => "");
   const ok = /<response[^>]*success="true"/.test(xml);
