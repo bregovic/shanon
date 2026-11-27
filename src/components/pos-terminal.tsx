@@ -18,6 +18,7 @@ import {
   DialogSurface,
   DialogTitle,
   Input,
+  type InputProps,
   MessageBar,
   MessageBarBody,
   Spinner,
@@ -161,6 +162,31 @@ interface Buyer {
   city: string;
 }
 const NO_BUYER: Buyer = { name: "", street: "", zip: "", city: "" };
+
+/**
+ * Pole kasy na tabletu: okno (platba, účtenka, odběratel) dá kurzor do prvního pole a Android by otevřel klávesnici.
+ * Na dotyku je pole jen ke čtení, dokud do něj prodavač neťukne; s myší a klávesnicí beze změny.
+ */
+function TapInput({ inputMode, ...props }: InputProps) {
+  const [touch] = useState(() => touchOnly());
+  const [armed, setArmed] = useState(false);
+  const locked = touch && !armed;
+  return (
+    <Input
+      {...props}
+      readOnly={props.readOnly || locked}
+      inputMode={inputMode}
+      onPointerDown={(e) => {
+        setArmed(true);
+        props.onPointerDown?.(e);
+      }}
+      onBlur={(e) => {
+        setArmed(false);
+        props.onBlur?.(e);
+      }}
+    />
+  );
+}
 const hasBuyer = (b: Buyer | null) => !!b && Object.values(b).some((v) => v.trim());
 
 interface CustomerPick {
@@ -175,7 +201,7 @@ interface CustomerPick {
 function MailRow({ st, L, value, onChange, busy, state, onSend }: { st: ReturnType<typeof useStyles>; L: Record<string, string>; value: string; onChange: (v: string) => void; busy: boolean; state: { ok: boolean; text: string } | null; onSend: () => void }) {
   return (
     <div className={st.mailRow}>
-      <Input type="email" value={value} placeholder={L.Email} onChange={(_, d) => onChange(d.value)} style={{ flex: 1, minWidth: 0 }} aria-label={L.Email} />
+      <TapInput type="email" value={value} placeholder={L.Email} onChange={(_, d) => onChange(d.value)} style={{ flex: 1, minWidth: 0 }} aria-label={L.Email} />
       <Button icon={<Mail24Regular />} disabled={busy || !value.trim()} onClick={onSend}>
         {L.SendEmail}
       </Button>
@@ -1516,7 +1542,7 @@ export function PosTerminal(p: {
       {!shift && p.template !== "boxes" ? (
         <div className={st.openBox}>
           <p>{L.ShiftClosedInfo}</p>
-          <Input value={opening} onChange={(_, d) => setOpening(d.value)} inputMode="decimal" contentAfter="Kč" aria-label={L.OpeningCash} placeholder={L.OpeningCash} size="large" />
+          <TapInput value={opening} onChange={(_, d) => setOpening(d.value)} inputMode="decimal" contentAfter="Kč" aria-label={L.OpeningCash} placeholder={L.OpeningCash} size="large" />
           <Numpad st={st} set={setOpening} />
           <Button appearance="primary" size="large" disabled={busy} onClick={openShift}>
             {L.OpenShift}
@@ -1788,7 +1814,7 @@ export function PosTerminal(p: {
                   </span>
                 </div>
               )}
-              <Input
+              <TapInput
                 value={weigh?.value ?? ""}
                 onChange={(_, d) => setWeigh((w) => (w ? { ...w, value: d.value } : w))}
                 onKeyDown={(e) => e.key === "Enter" && confirmQty()}
@@ -1905,7 +1931,7 @@ export function PosTerminal(p: {
               <div className={st.big}>{fmt(toPay)}</div>
               {method === "cash" && (
                 <>
-                  <Input value={given} onChange={(_, d) => setGiven(d.value)} inputMode="decimal" size="large" aria-label={L.Received} placeholder={L.Received} contentAfter="Kč" />
+                  <TapInput value={given} onChange={(_, d) => setGiven(d.value)} inputMode="decimal" size="large" aria-label={L.Received} placeholder={L.Received} contentAfter="Kč" />
                   <div className={st.quick}>
                     {[toPay, 100, 200, 500, 1000, 2000, 5000]
                       .filter((v, i) => i === 0 || v > toPay)
@@ -2019,7 +2045,7 @@ export function PosTerminal(p: {
           <DialogBody>
             <DialogTitle>{L.ChooseCustomer}</DialogTitle>
             <DialogContent>
-              <Input autoFocus value={custQ} placeholder={L.SearchCustomer} onChange={(_, d) => void findCustomers(d.value)} style={{ width: "100%" }} />
+              <TapInput value={custQ} placeholder={L.SearchCustomer} onChange={(_, d) => void findCustomers(d.value)} style={{ width: "100%" }} />
               <div className={st.custList}>
                 {!custRows.length && <p className={st.empty}>{L.NoCustomers}</p>}
                 {custRows.map((c) => (
@@ -2035,10 +2061,10 @@ export function PosTerminal(p: {
                   <strong>{L.Buyer}</strong>
                   <div style={{ fontSize: 12, opacity: 0.75 }}>{L.BuyerHint}</div>
                 </div>
-                <Input style={{ gridColumn: "1 / -1" }} placeholder={L.BuyerName} aria-label={L.BuyerName} value={buyerDraft.name} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, name: d.value })} />
-                <Input style={{ gridColumn: "1 / -1" }} placeholder={L.BuyerStreet} aria-label={L.BuyerStreet} value={buyerDraft.street} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, street: d.value })} />
-                <Input placeholder={L.BuyerZip} aria-label={L.BuyerZip} value={buyerDraft.zip} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, zip: d.value })} />
-                <Input placeholder={L.BuyerCity} aria-label={L.BuyerCity} value={buyerDraft.city} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, city: d.value })} />
+                <TapInput style={{ gridColumn: "1 / -1" }} placeholder={L.BuyerName} aria-label={L.BuyerName} value={buyerDraft.name} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, name: d.value })} />
+                <TapInput style={{ gridColumn: "1 / -1" }} placeholder={L.BuyerStreet} aria-label={L.BuyerStreet} value={buyerDraft.street} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, street: d.value })} />
+                <TapInput placeholder={L.BuyerZip} aria-label={L.BuyerZip} value={buyerDraft.zip} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, zip: d.value })} />
+                <TapInput placeholder={L.BuyerCity} aria-label={L.BuyerCity} value={buyerDraft.city} onChange={(_, d) => setBuyerDraft({ ...buyerDraft, city: d.value })} />
               </div>
             </DialogContent>
             <DialogActions>
