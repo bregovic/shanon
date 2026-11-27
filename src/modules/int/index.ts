@@ -314,7 +314,7 @@ export const connection = defineObject({
   form: [
     { label: "@SYS:General", fields: ["code", "name", "kind", "driver", "registerId", "active", "pausedByTest", "liveOnTest"] },
     { label: "@INT:EetSettings", fields: ["environment", "unitId", "posId", "certPassword", "certSubject", "certValidTo"], visibleWhen: EET },
-    { label: "@INT:PrinterSettings", fields: ["paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
+    { label: "@INT:PrinterSettings", fields: ["printerHost", "paperWidth", "codePage", "baudRate", "openDrawer", "autoPrint"], visibleWhen: PRINTER },
     { label: "@INT:PaymentSettings", fields: ["merchantCode", "apiKey", "affiliateAppId", "affiliateKey", "pairingCode", "readerId"], visibleWhen: SUMUP },
     { label: "@INT:ComgateSettings", fields: ["merchantCode", "apiKey", "testMode", "payMethods", "posQr", "pushUrl"], visibleWhen: COMGATE },
     { label: "@INT:GatewaySimSettings", fields: ["posQr"], visibleWhen: { field: "driver", in: ["gatewaySim"] } },
