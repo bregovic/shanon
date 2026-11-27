@@ -63,7 +63,7 @@ export interface Ctx {
   /** aktivní finanční dimenze (pořadí → název) — popisky a viditelnost polí dim1…dim6 */
   dims?: { slot: number; name: string }[];
   /** uživatelé s přístupem k aktuální firmě (výběr v polích typu uživatel) */
-  users?: { id: string; name: string }[];
+  users?: { id: string; name: string; role?: string }[];
 }
 
 export interface ListParams {
@@ -303,6 +303,7 @@ export class Session {
       companyId: this.ctx.companyId,
       userId: this.ctx.userId,
       userName: this.ctx.userName,
+      users: this.ctx.users,
       objectId,
       data: this.api(),
       t: (ref, params) => fillLabel(resolveLabel(labelTable, ref, this.ctx.lang ?? "cs"), params),

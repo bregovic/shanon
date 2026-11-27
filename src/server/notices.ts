@@ -36,6 +36,8 @@ export async function listNotices(ctx: Ctx, lang: Lang): Promise<{ items: Notice
       } catch {
         params = {};
       }
+      // parametr s labelem (stav, druh) se přeloží do jazyka uživatele
+      params = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, /^@[A-Z0-9]+:\w+$/.test(String(v)) ? t(String(v)) : String(v)]));
       return { id: String(n.id), kind: String(n.kind), text: t(String(n.title), params), message: (n.message as string) ?? null, href: (n.href as string) ?? null, at: String(n.createdAt), read: read.has(String(n.id)) };
     });
     return { items, unread: items.filter((i) => !i.read).length };

@@ -5703,25 +5703,26 @@ model QaChangelog {
 
 /// qa.feedback — generováno z definice objektu
 model QaFeedback {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  tenantId    String    @map("tenant_id") @db.Uuid
-  feedbackNum String    @map("feedback_num") @db.VarChar(20)
-  kind        String    @default("idea") @db.VarChar(40)
-  title       String    @db.VarChar(255)
-  text        String?
-  featureId   String?   @map("feature_id") @db.Uuid
-  page        String?   @db.VarChar(300)
-  status      String    @default("new") @db.VarChar(40)
-  author      String?   @db.VarChar(120)
-  postedAt    DateTime? @map("posted_at") @db.Date
-  issueId     String?   @map("issue_id") @db.Uuid
-  reply       String?
-  ext         Json      @default("{}")
-  version     Int       @default(1)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  createdBy   String?   @map("created_by") @db.Uuid
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy   String?   @map("updated_by") @db.Uuid
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  feedbackNum  String    @map("feedback_num") @db.VarChar(20)
+  kind         String    @default("idea") @db.VarChar(40)
+  title        String    @db.VarChar(255)
+  text         String?
+  featureId    String?   @map("feature_id") @db.Uuid
+  page         String?   @db.VarChar(300)
+  status       String    @default("new") @db.VarChar(40)
+  authorUserId String?   @map("author_user_id") @db.VarChar(36)
+  author       String?   @db.VarChar(120)
+  postedAt     DateTime? @map("posted_at") @db.Date
+  issueId      String?   @map("issue_id") @db.Uuid
+  reply        String?
+  ext          Json      @default("{}")
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by") @db.Uuid
 
   feature QaFeature? @relation("QaFeedback_feature", fields: [featureId], references: [id], onDelete: Restrict)
   issue   QaIssue?   @relation("QaFeedback_issue", fields: [issueId], references: [id], onDelete: Restrict)

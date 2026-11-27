@@ -138,6 +138,8 @@ export interface EventContext {
   userId: string;
   /** jméno přihlášeného uživatele (autor příspěvků, poznámek) */
   userName?: string;
+  /** uživatelé s přístupem k firmě (jméno k poli typu uživatel, upozornění správcům) */
+  users?: { id: string; name: string; role?: string }[];
   objectId: string;
   data: DataApi;
   /** překlad labelu do jazyka uživatele (texty do souborů, varování) */

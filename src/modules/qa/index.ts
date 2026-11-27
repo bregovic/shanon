@@ -6,6 +6,7 @@
 import { Edts, defineEdt, defineEnum, enumEdt, refEdt } from "@/core/edt";
 import { defineModule, type ObjectHandlers } from "@/core/module";
 import { defineObject } from "@/core/object";
+import { notify } from "@/modules/sys/notify";
 
 export const FeatureStatus = defineEnum({
   id: "QaFeatureStatus",
@@ -312,7 +313,9 @@ export const feedback = defineObject({
     featureId: { edt: refEdt("qa.feature", "@QA:Feature") },
     page: { edt: Text("QaFbPage", "@QA:FbPage", 300), help: "@QA:FbPageHelp" },
     status: { edt: enumEdt(FeedbackStatus), mandatory: true, default: "new" },
-    author: { edt: Text("QaFbAuthor", "@QA:Author", 120), readOnly: true },
+    /** kdo námět zadal (lze zadat za jiného uživatele) — dostává upozornění na odpověď */
+    authorUserId: { edt: Edts.User, label: "@QA:FbAuthorUser", help: "@QA:FbAuthorUserHelp" },
+    author: { edt: Text("QaFbAuthor", "@QA:Author", 120), help: "@QA:FbAuthorHelp" },
     postedAt: { edt: Edts.TransDate, label: "@QA:PostedAt", readOnly: true },
     issueId: { edt: refEdt("qa.issue", "@QA:Issue"), readOnly: true },
     reply: { edt: Edts.Notes, label: "@QA:FbReply" },
@@ -320,14 +323,17 @@ export const feedback = defineObject({
   titleField: "feedbackNum",
   list: ["feedbackNum", "kind", "title", "featureId", "author", "postedAt", "status", "issueId"],
   form: [
-    { label: "@SYS:General", fields: ["feedbackNum", "kind", "title", "text", "featureId", "page"] },
-    { label: "@QA:FbHandling", fields: ["status", "author", "postedAt", "issueId", "reply"] },
+    { label: "@SYS:General", fields: ["feedbackNum", "kind", "title", "text", "featureId", "page", "authorUserId", "author"] },
+    { label: "@QA:FbHandling", fields: ["status", "postedAt", "issueId", "reply"] },
   ],
   unique: [["feedbackNum"]],
   numberSeq: { field: "feedbackNum", seq: "QAFEEDBACK" },
   defaultSort: { field: "feedbackNum", dir: "desc" },
   actions: [{ id: "createIssue", label: "@QA:FbCreateIssue", when: { field: "issueId", equals: null } }],
 });
+
+/** stav námětu → label (text upozornění zadavateli) */
+const STATUS_LABEL: Record<string, string> = { new: "New", read: "FbRead", planned: "FbPlanned", done: "Done", rejected: "Rejected" };
 
 /** Testovaný scénář dostane datum, pokud ho tester nevyplnil. */
 const RANK: Record<string, number> = { critical: 1, high: 2, medium: 3, low: 4 };
@@ -371,10 +377,40 @@ export const qaHandlers: Record<string, ObjectHandlers> = {
     },
   },
   "qa.feedback": {
-    beforeSave(ctx, d, isNew) {
+    async beforeSave(ctx, d, isNew) {
+      const nameOf = (id: unknown) => ctx.users?.find((u) => u.id === id)?.name ?? null;
+      const before = isNew || !d.id ? null : await ctx.data.get("qa.feedback", String(d.id));
       if (isNew) {
-        d.author = ctx.userName ?? null;
+        // zadavatel = přihlášený, nebo vybraný uživatel (námět za někoho jiného)
+        if (!d.authorUserId && !d.author) d.authorUserId = ctx.userId;
         d.postedAt = new Date().toISOString().slice(0, 10);
+      }
+      // jméno podle vybraného uživatele (ručně psané jméno zůstane, když se uživatel nemění)
+      if (d.authorUserId && (isNew ? !d.author : before?.authorUserId !== d.authorUserId)) d.author = nameOf(d.authorUserId) ?? d.author ?? null;
+      if (isNew && !d.author) d.author = ctx.userName ?? null;
+      // odpověď / změna stavu → upozornění zadavateli (ne tomu, kdo odpovídá)
+      if (before && d.authorUserId && d.authorUserId !== ctx.userId && (before.reply !== d.reply || before.status !== d.status)) {
+        await notify(ctx.data, {
+          kind: "info",
+          title: d.reply && before.reply !== d.reply ? "@QA:FbNotifyReply" : "@QA:FbNotifyStatus",
+          params: { num: String(d.feedbackNum), title: String(d.title ?? "").slice(0, 80), status: `@QA:${STATUS_LABEL[String(d.status)] ?? "New"}` },
+          href: `/qa/feedback/${String(d.id)}`,
+          userId: String(d.authorUserId),
+        });
+      }
+    },
+    // nový námět → upozornění správcům (superuživatelům), kromě toho, kdo ho zapsal
+    async afterSave(ctx, d, isNew) {
+      if (!isNew) return;
+      for (const u of ctx.users ?? []) {
+        if (u.role !== "admin" || u.id === ctx.userId) continue;
+        await notify(ctx.data, {
+          kind: "info",
+          title: "@QA:FbNotifyNew",
+          params: { num: String(d.feedbackNum), title: String(d.title ?? "").slice(0, 80), author: String(d.author ?? "") },
+          href: `/qa/feedback/${String(d.id)}`,
+          userId: u.id,
+        });
       }
     },
     actions: {
@@ -439,6 +475,12 @@ export default defineModule({
       FbHandling: "Vyřízení",
       FbReply: "Odpověď",
       FbCreateIssue: "Vytvořit požadavek",
+      FbAuthorUser: "Zadavatel",
+      FbAuthorUserHelp: "Kdo námět zadal – lze vybrat jiného uživatele (zapisujete za něj). Dostává upozornění na odpověď.",
+      FbAuthorHelp: "Jméno zadavatele; když není uživatelem Shanonu, napište ho sem.",
+      FbNotifyNew: "Nový námět {num}: {title} ({author})",
+      FbNotifyReply: "Odpověď na váš námět {num}: {title}",
+      FbNotifyStatus: "Námět {num} ({title}): {status}",
       Module: "Testování a vývoj",
       ChangelogEntry: "Záznam deníku vývoje",
       Changelog: "Deník vývoje",
@@ -545,6 +587,12 @@ export default defineModule({
       FbHandling: "Handling",
       FbReply: "Reply",
       FbCreateIssue: "Create request",
+      FbAuthorUser: "Submitted by",
+      FbAuthorUserHelp: "Who submitted the suggestion – you can pick another user (entering it on their behalf). They get notified about the reply.",
+      FbAuthorHelp: "Submitter name; if they are not a Shanon user, type it here.",
+      FbNotifyNew: "New suggestion {num}: {title} ({author})",
+      FbNotifyReply: "Reply to your suggestion {num}: {title}",
+      FbNotifyStatus: "Suggestion {num} ({title}): {status}",
       Returned: "Returned to development",
       Module: "Testing and development",
       ChangelogEntry: "Development log entry",

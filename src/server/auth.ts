@@ -158,7 +158,7 @@ export const getSession = cache(async (): Promise<AppSession | null> => {
   const users = companyId
     ? await prisma.sysUser.findMany({
         where: { tenantId: tenant.id, active: true, OR: [{ role: "admin" }, { companies: { some: { companyId } } }] },
-        select: { id: true, name: true },
+        select: { id: true, name: true, role: true },
         orderBy: { name: "asc" },
       })
     : [];
