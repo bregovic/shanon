@@ -6,6 +6,7 @@
 import { posNetPrintAction, stationPrintAction } from "@/app/actions";
 import { toast } from "@/components/toast";
 import { eposPrint } from "@/lib/epos";
+import { withLogo } from "@/lib/escpos-logo";
 
 export const STATION_KEY = "shanon.station";
 
@@ -26,13 +27,19 @@ async function printViaNetwork(ids: string[]): Promise<boolean> {
   if (!r?.ok || !r.data.jobs.length) return false;
   let done = 0;
   for (const j of r.data.jobs) {
-    const bytes = Uint8Array.from(atob(j.data), (c) => c.charCodeAt(0));
+    const parts = await Promise.all(j.parts.map((d) => withLogo(Uint8Array.from(atob(d), (c) => c.charCodeAt(0)), j.logoId, j.paper)));
+    const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let o = 0;
+    for (const p of parts) {
+      bytes.set(p, o);
+      o += p.length;
+    }
     const res = await eposPrint(j.host, bytes);
     if (!res.ok) {
       toast(res.code === "network" ? r.data.down.replace(/\{host\}/g, j.host) + (res.detail ? ` (${res.detail})` : "") : `${j.host}: ${res.code}`, "warning");
       return false;
     }
-    done += j.count;
+    done += j.parts.length;
   }
   toast(r.data.ok.replace("{n}", String(done)), "success");
   return true;

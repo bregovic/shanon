@@ -791,7 +791,7 @@ export async function posRewriteAction(input: SaleInput): Promise<ActionResult<R
  * Tisk účtenek ze seznamu / detailu na síťovou tiskárnu Epson pokladny (napojení Epson v síti): data ESC/POS
  * po tiskárnách, prohlížeč je pošle přes ePOS. Prázdné = pokladna síťovou tiskárnu nemá (tisk jako dosud).
  */
-export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ jobs: { host: string; data: string; count: number }[]; ok: string; down: string }>> {
+export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ jobs: { host: string; parts: string[]; logoId: string | null; paper: string }[]; ok: string; down: string }>> {
   const s = await requireSession();
   try {
     assertCan(s.ctx.perms, "pos.receipt", "read");
@@ -805,7 +805,7 @@ export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ j
     const L = Object.fromEntries(Object.keys(posModule.labels.cs).map((k) => [k, t(`@POS:${k}`)]));
     const jobs = await inTenant(s.ctx, async (sess) => {
       const api = sess.sys().api();
-      const byHost = new Map<string, Uint8Array[]>();
+      const byHost = new Map<string, { parts: Uint8Array[]; logoId: string | null; paper: string }>();
       const conns = new Map<string, RecordData | undefined>();
       for (const id of list) {
         const r = await api.get("pos.receipt", id);
@@ -818,17 +818,11 @@ export async function posNetPrintAction(ids: string[]): Promise<ActionResult<{ j
         // opakovaný tisk: bez otevření zásuvky
         const bytes = receiptEscPos(pr, L, fmt, { width: c.paperWidth === "58" ? 32 : 48, codePage: c.codePage === "ascii" ? "ascii" : "cp852", drawer: false, locale });
         const host = String(c.printerHost).trim().replace(/\.+$/, "");
-        byHost.set(host, [...(byHost.get(host) ?? []), bytes]);
+        const job = byHost.get(host) ?? { parts: [], logoId: (pr.company.logoId as string) ?? null, paper: String(c.paperWidth ?? "80") };
+        job.parts.push(bytes);
+        byHost.set(host, job);
       }
-      return [...byHost].map(([host, parts]) => {
-        const all = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-        let o = 0;
-        for (const p of parts) {
-          all.set(p, o);
-          o += p.length;
-        }
-        return { host, data: Buffer.from(all).toString("base64"), count: parts.length };
-      });
+      return [...byHost].map(([host, j]) => ({ host, parts: j.parts.map((p) => Buffer.from(p).toString("base64")), logoId: j.logoId, paper: j.paper }));
     });
     return { ok: true, data: { jobs, ok: t("@POS:NetPrinted"), down: t("@POS:PrinterNetDown") } };
   } catch (e) {

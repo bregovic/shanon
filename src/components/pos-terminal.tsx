@@ -97,6 +97,7 @@ import {
 } from "@/lib/pos-offline";
 import { receiptData } from "@/lib/receipt-data";
 import { eposCheck, eposPrint } from "@/lib/epos";
+import { withLogo } from "@/lib/escpos-logo";
 import {
   EscPos,
   grantedPort,
@@ -871,7 +872,7 @@ export function PosTerminal(p: {
       const data =
         drawerOnly || !r
           ? Uint8Array.from(new EscPos(width0, pr.codePage).drawer().bytes)
-          : receiptEscPos(r, L, fmt, { width: width0, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale });
+          : await withLogo(receiptEscPos(r, L, fmt, { width: width0, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale }), r.company.logoId, pr.paperWidth);
       const res = await eposPrint(pr.host!, data);
       setPortReady(res.ok || res.code !== "network");
       if (!res.ok) netFail(res.code, res.detail);
@@ -887,7 +888,7 @@ export function PosTerminal(p: {
     const bytes =
       drawerOnly || !r
         ? Uint8Array.from(new EscPos(width, pr.codePage).drawer().bytes)
-        : receiptEscPos(r, L, fmt, { width, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale });
+        : await withLogo(receiptEscPos(r, L, fmt, { width, codePage: pr.codePage, drawer: pr.openDrawer && r.payment === "cash", locale }), r.company.logoId, pr.paperWidth);
     await (usbDev ? writeToUsb(usbDev, bytes) : writeToPort(port!, bytes, pr.baudRate || 9600)).catch((e) => setError(String(e)));
   };
   // tisk z prohlížeče: stejná tisková stránka jako ze seznamu účtenek (šablona, papír) — skrytým rámem
