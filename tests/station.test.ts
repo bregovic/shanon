@@ -265,6 +265,9 @@ describe("tisková stanice", () => {
     d2 = await stationDiagnostics(P, null, b.id);
     expect(d2.connectable).toEqual([]);
     expect(d2.device!.connectResult).toMatch(/\\\\server\\Kancl: OK$/);
+    // síťová tiskárna kasy na tabletu (Epson ePOS) – diagnostika ji nabídne k ověření z prohlížeče
+    await saveRecord(P, "int.connection", null, { code: `NET-${run}`.slice(0, 20), name: "Epson v síti", kind: "printer", driver: "escposNet", printerHost: "192.168.1.32", openDrawer: true }, undefined, client);
+    expect((await stationDiagnostics(P, null)).netPrinters).toEqual([expect.objectContaining({ name: "Epson v síti", host: "192.168.1.32", register: null, drawer: true })]);
 
     // ruční přidání tiskárny k zařízení: Podle tiskárny jiného počítače / Model z katalogu doplní název ve Windows a papír
     const src = (await listRecords(P, "int.devicePrinter", { filter: { deviceId: b.id } }, client)).rows.find((x) => x.printerName === "Brother QL-800 (kopie 1)")!;

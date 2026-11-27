@@ -25,6 +25,8 @@ import {
 } from "@/app/actions";
 import type { StationDiagnostics } from "@/server/station";
 import { STATION_KEY, stationId } from "@/lib/station-print";
+import { EscPos } from "@/lib/escpos";
+import { eposCheck, eposPrint } from "@/lib/epos";
 import {
   findUsbPrinter,
   listUsbPrinters,
@@ -209,6 +211,22 @@ export function StationDiag({
     // jednou po prvním načtení
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d, deviceId]);
+  // síťová tiskárna Epson (kasa na tabletu): ověřit / zkušební tisk přímo z tohoto prohlížeče
+  const [netMsg, setNetMsg] = useState<Record<string, { ok: boolean; text: string }>>({});
+  const netRun = async (n: StationDiagnostics["netPrinters"][number], print: boolean) => {
+    const data = new EscPos(48, "cp852")
+      .align("center")
+      .bold(true)
+      .line("Shanon – zkušební tisk")
+      .bold(false)
+      .line(n.name)
+      .line(new Date().toLocaleString("cs-CZ"))
+      .line("Příliš žluťoučký kůň úpěl ďábelské ódy")
+      .cut().bytes;
+    const r = print ? await eposPrint(n.host, Uint8Array.from(data)) : await eposCheck(n.host);
+    const text = r.ok ? (print ? T.StationDiagNetPrinted : T.StationDiagNetOk) : r.code === "network" ? (T.StationDiagNetDown ?? "").replace(/\{host\}/g, n.host) : `${T.StationDiagNetError} ${r.code}`;
+    setNetMsg((m) => ({ ...m, [n.id]: { ok: r.ok, text: text ?? "" } }));
+  };
   const test = async (printerId: string) => {
     const r = await stationTestPageAction(printerId).catch(() => null);
     setMsg(r?.ok ? (T.StationDiagTestSent ?? "") : (r?.message ?? ""));
@@ -429,6 +447,35 @@ export function StationDiag({
             </div>
           )}
         </>
+      )}
+      {d.netPrinters.length > 0 && (
+        <div className={s.list}>
+          <Text weight="semibold">{T.StationDiagNet}</Text>
+          <Text size={200}>{T.StationDiagNetHint}</Text>
+          {d.netPrinters.map((n) => (
+            <div key={n.id}>
+              <div className={s.row}>
+                <Text size={200}>
+                  <b>{n.name}</b> · {n.host} · {n.register ?? T.StationDiagAllRegisters}
+                </Text>
+                <Button size="small" appearance="subtle" onClick={() => void netRun(n, false)}>
+                  {T.StationDiagNetCheck}
+                </Button>
+                <Button size="small" appearance="subtle" onClick={() => void netRun(n, true)}>
+                  {T.StationDiagNetTest}
+                </Button>
+                <Link href={`https://${n.host}/`} target="_blank" rel="noopener noreferrer">
+                  {T.StationDiagNetOpen}
+                </Link>
+              </div>
+              {netMsg[n.id] && (
+                <Text size={200} className={netMsg[n.id].ok ? s.ok : s.bad}>
+                  {netMsg[n.id].text}
+                </Text>
+              )}
+            </div>
+          ))}
+        </div>
       )}
       <Text size={200}>
         {T.StationDiagReceipt}: {d.receipt ?? T.StationDiagBrowserPrint}
