@@ -18,7 +18,7 @@ export default async function PortalPage({ params }: { params: Promise<{ tenant:
   if (disp)
     return (
       <PortalTheme design={{ ...disp.design, footer: "" }}>
-        <CustomerDisplay endpoint={`/api/portal/${tenant}/${token}/display`} logo={disp.design.logo} title={disp.title} intro={disp.intro} texts={disp.texts} />
+        <CustomerDisplay endpoint={`/api/portal/${tenant}/${token}/display`} logo={disp.design.logo} title={disp.title} intro={disp.intro} companyName={disp.companyName} texts={disp.texts} />
       </PortalTheme>
     );
   const agr = await agreementPortalInfo(tenant, token);

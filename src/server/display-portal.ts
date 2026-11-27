@@ -14,7 +14,7 @@ export interface DisplayPortalInfo {
   texts: Record<string, string>;
 }
 
-const KEYS = ["DisplayTotal", "DisplayThanks", "DisplayPaid", "DisplayChange", "DisplayScanToPay", "DisplayCustomer", "DisplayNoRegister"];
+const KEYS = ["DisplayTotal", "DisplayThanks", "DisplayPaid", "DisplayChange", "DisplayScanToPay", "DisplayCustomer", "DisplayNoRegister", "DisplayFullscreen"];
 
 export async function displayPortalInfo(tenantId: string, token: string, client: PrismaClient = prisma): Promise<DisplayPortalInfo | null> {
   const l = await loadPortal(tenantId, token, client);

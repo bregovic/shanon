@@ -20,6 +20,9 @@ export interface DisplayState {
   qr: string | null;
   paid: string | null;
   change: string | null;
+  /** po zaplacení: číslo a čas účtenky (stvrzenka na obrazovce) */
+  receiptNum?: string | null;
+  at?: string | null;
 }
 
 interface Entry {

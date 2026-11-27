@@ -804,7 +804,18 @@ export function PosTerminal(p: {
       }));
       const who = customer?.name ?? (hasBuyer(buyer) ? buyer!.name : "") ?? "";
       const state = receipt
-        ? { phase: "done" as const, lines: [], total: String(receipt.gross), customer: receipt.customer?.name ?? "", qr: receipt.qr ?? null, paid: String(receipt.paid), change: receipt.change ?? null }
+        ? {
+            phase: "done" as const,
+            // stvrzenka na obrazovce: položky z vystavené účtenky
+            lines: receipt.lines.map((l) => ({ name: l.description, qty: `${[l.qty.replace(".", ","), l.unit.toLowerCase()].filter(Boolean).join(" ")} × ${String(l.unitPrice).replace(".", ",")}`, amount: String(l.amount) })),
+            total: String(receipt.gross),
+            customer: receipt.customer?.name ?? "",
+            qr: receipt.qr ?? null,
+            paid: String(receipt.paid),
+            change: receipt.change ?? null,
+            receiptNum: receipt.receiptNum,
+            at: receipt.issuedAt,
+          }
         : { phase: (payDlg || card ? "pay" : lines.length ? "cart" : "idle") as "pay" | "cart" | "idle", lines: shown, total: (shown.reduce((n, x) => n + Math.round(Number(x.amount) * 100), 0) / 100).toFixed(2), customer: who, qr: null, paid: null, change: null };
       void safe(posDisplayAction(p.register.id, state));
     }, 250);

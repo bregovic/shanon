@@ -876,6 +876,8 @@ export async function posDisplayAction(registerId: string, state: DisplayState):
       qr: state?.qr ? txt(state.qr, 600) : null,
       paid: state?.paid ? num(state.paid) : null,
       change: state?.change ? num(state.change) : null,
+      receiptNum: state?.receiptNum ? txt(state.receiptNum, 40) : null,
+      at: state?.at && !Number.isNaN(Date.parse(String(state.at))) ? new Date(String(state.at)).toISOString() : null,
     });
     return { ok: true, data: null };
   } catch (e) {
