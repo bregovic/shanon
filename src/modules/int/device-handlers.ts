@@ -6,6 +6,7 @@
 import { UserError, type ObjectHandlers } from "@/core/module";
 import { newPairCode } from "@/server/station-codes";
 import { wakeStation } from "@/server/station-wake";
+import { SHARE_PATH } from "./print-rules";
 
 export const deviceHandlers: Record<string, ObjectHandlers> = {
   "int.device": {
@@ -79,6 +80,12 @@ export const deviceHandlers: Record<string, ObjectHandlers> = {
         wakeStation(String(pr.deviceId), 800);
         return { open: { object: "int.printJob", id: String(job.id) } };
       },
+    },
+  },
+  // sdílená tiskárna z katalogu jde stanici do příkazu – jen tvar \\server\tiskárna
+  "int.printerModel": {
+    beforeSave(_ctx, d) {
+      if (d.connectPath && !SHARE_PATH.test(String(d.connectPath))) return { connectPath: "@INT:PrinterConnectPathBad" };
     },
   },
   "int.printRule": {

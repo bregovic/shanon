@@ -5,7 +5,7 @@
  * se stavem z Windows, kam jde účtenka a ostatní doklady; Obnovit stav, Zkušební stránka. Texty dodá server.
  * Použití: Nastavení (tento počítač), detail zařízení (akce Diagnostika), seznam Zařízení (tlačítko Diagnostika tohoto počítače).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   Checkbox,
@@ -16,6 +16,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import {
+  stationConnectAction,
   stationDiagnosticsAction,
   stationPrinterAction,
   stationRefreshAction,
@@ -56,6 +57,32 @@ const useStyles = makeStyles({
 
 const BAD = new Set(["offline", "noPaper", "jammed", "doorOpen", "error"]);
 
+/** prohlížeč a systém pro záznam počítače („Chrome 131 · Windows“) */
+function browserLabel(): string {
+  const ua = navigator.userAgent;
+  const known: [string, RegExp][] = [
+    ["Edge", /Edg\/(\d+)/],
+    ["Opera", /OPR\/(\d+)/],
+    ["Chrome", /Chrome\/(\d+)/],
+    ["Firefox", /Firefox\/(\d+)/],
+    ["Safari", /Version\/(\d+).*Safari/],
+  ];
+  const hit = known.map(([n, re]) => [n, re.exec(ua)?.[1]] as const).find(([, v]) => v);
+  const os = /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS" : /Mac OS/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
+  return [hit ? `${hit[0]} ${hit[1]}` : "", os].filter(Boolean).join(" · ");
+}
+
+/** jde si zapamatovat počítač v prohlížeči? (bez úložiště by se při každém otevření zakládal nový) */
+function storageOk(): boolean {
+  try {
+    localStorage.setItem("shanon.test", "1");
+    localStorage.removeItem("shanon.test");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** `deviceId` = diagnostika vybraného zařízení; bez něj počítač tohoto prohlížeče. `auto` = načíst hned. */
 export function StationDiag({
   deviceId,
@@ -83,6 +110,13 @@ export function StationDiag({
     if (auto) void load();
   }, [auto, load]);
   const T = d?.texts ?? {};
+  /** Připojit sdílenou tiskárnu z katalogu (stanice ji připojí ve Windows a nahlásí) */
+  const connect = async (devId: string, modelId: string) => {
+    const r = await stationConnectAction(devId, modelId).catch(() => null);
+    if (!r?.ok) return setMsg(r?.message ?? "");
+    setMsg(T.StationDiagConnectSent ?? "");
+    setTimeout(() => void load(), 6000);
+  };
   const refresh = async (id: string) => {
     setMsg(T.StationDiagRefreshing ?? "");
     await stationRefreshAction(id).catch(() => null);
@@ -131,9 +165,9 @@ export function StationDiag({
     await load();
   };
   /** Přidat tento počítač: jen zařízení v Shanonu (prohlížeč si ho zapamatuje), nic se nestahuje */
-  const addPc = async () => {
+  const addPc = async (browser = browserLabel()) => {
     setBusy(true);
-    const r = await stationSetupAction(stationId(), false).catch(() => null);
+    const r = await stationSetupAction(stationId(), false, browser).catch(() => null);
     setBusy(false);
     if (!r?.ok) return setMsg(r?.message ?? "");
     try {
@@ -155,6 +189,26 @@ export function StationDiag({
     window.location.assign(r.data.href);
     setMsg(T.StationDiagAddPcHint ?? "");
   };
+  // diagnostika tohoto počítače: záznam se založí (Shanon počítač nezná) nebo aktualizuje (prohlížeč, čas) sám
+  const autoDone = useRef(false);
+  useEffect(() => {
+    if (deviceId || !d || !d.canEdit || autoDone.current) return;
+    autoDone.current = true;
+    const browser = browserLabel();
+    if (d.device) {
+      void stationSetupAction(d.device.id, false, browser).then((r) => {
+        if (!r?.ok) return;
+        try {
+          localStorage.setItem(STATION_KEY, r.data.deviceId);
+        } catch {
+          /* bez úložiště ho pozná server podle uživatele počítače */
+        }
+      });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- založení záznamu na serveru (vnější systém)
+    } else if (d.source === "none" && storageOk()) void addPc(browser);
+    // jednou po prvním načtení
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, deviceId]);
   const test = async (printerId: string) => {
     const r = await stationTestPageAction(printerId).catch(() => null);
     setMsg(r?.ok ? (T.StationDiagTestSent ?? "") : (r?.message ?? ""));
@@ -318,6 +372,28 @@ export function StationDiag({
               </div>
             ))}
           </div>
+          {d.connectable.length > 0 && (
+            <div className={s.list}>
+              <Text size={200} weight="semibold">
+                {T.StationDiagConnect}
+              </Text>
+              <Text size={200}>{T.StationDiagConnectHint}</Text>
+              {d.connectable.map((m) => (
+                <div key={m.id} className={s.row}>
+                  <Text size={200}>
+                    {m.name} · {m.path}
+                    {m.queued ? ` · ${T.StationDiagConnectQueued}` : ""}
+                  </Text>
+                  {d.canEdit && (
+                    <Button size="small" appearance="subtle" disabled={!d.device!.paired || m.queued} onClick={() => void connect(d.device!.id, m.id)}>
+                      {T.StationDiagConnectBtn}
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {d.device.connectResult && <Text size={200}>{d.device.connectResult}</Text>}
           {d.device.paired && (
             <div>
               <Button size="small" onClick={() => void refresh(d.device!.id)}>
@@ -346,7 +422,7 @@ export function StationDiag({
                 size="small"
                 appearance="primary"
                 disabled={busy}
-                onClick={() => void addPc()}
+                onClick={() => void addPc(browserLabel())}
               >
                 {T.StationDiagAddPc}
               </Button>

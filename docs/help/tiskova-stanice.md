@@ -76,7 +76,8 @@ na tomto počítači jde otevřít i bez připojení. Odběratel, QR platba, pro
 ## Diagnostika, používané tiskárny a katalog
 
 Tlačítko **Diagnostika tohoto počítače** v seznamu **Zařízení** (i akce Diagnostika v detailu zařízení a Nastavení) ukáže, zda Shanon počítač zná, zda stanice běží
-a jaké tiskárny Windows hlásí. Počítač, který Shanon nezná, přidáte tlačítkem **Přidat tento počítač** (jen ho založí); tiskárny Windows nahlásí až stanice – **Stáhnout instalaci stanice**.
+a jaké tiskárny Windows hlásí. Počítač, který Shanon nezná, se při otevření diagnostiky **založí sám** (prohlížeč si ho zapamatuje);
+známý počítač se aktualizuje (prohlížeč a čas diagnostiky v záznamu zařízení). Tiskárny Windows nahlásí až stanice – **Stáhnout instalaci stanice**.
 
 Tiskárny jsou **používané** a **nalezené**: v pravidlech tisku a u pokladny se nabízejí jen používané. Zaškrtnutím je zapnete
 nebo vypnete. Nová tiskárna se zapne sama, jen když je výchozí ve Windows, je na účtenky nebo ji zná katalog.
@@ -84,3 +85,7 @@ nebo vypnete. Nová tiskárna se zapne sama, jen když je výchozí ve Windows, 
 **Katalog tiskáren** (Integrace → Zařízení → Katalog tiskáren): u tiskárny **Uložit do katalogu** zapíše model s papírem, počtem kopií
 a použitím. Stejná tiskárna na dalším počítači to převezme sama. Do katalogu jde vložit odkaz na **ovladač výrobce** — diagnostika
 ho nabídne u USB tiskárny, která na počítači ovladač nemá. Ovladače se do Shanonu nenahrávají.
+
+**Sdílená tiskárna** v katalogu (cesta `\\server\tiskárna`): diagnostika ji nabídne na každém počítači, který ji ještě nemá,
+a **Připojit** ji přes stanici (verze 1.3, aktualizuje se sama) připojí ve Windows – ovladač si Windows vezme ze serveru
+tiskárny, práva správce nejsou potřeba. Pak ji zaškrtněte mezi používanými. Výsledek posledního připojení je u zařízení.

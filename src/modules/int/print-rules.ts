@@ -92,3 +92,6 @@ export function guessPaper(name: string): "a4" | "80" | "58" {
   if (/(^|[^0-9])80([^0-9]|$)|pos|receipt|thermal|tm-t|xp-|rp-|epson tm|star tsp|bixolon|účtenk/.test(n)) return "80";
   return "a4";
 }
+
+/** sdílená tiskárna Windows \\server\tiskárna (bez znaků, které by šly do příkazu stanice) */
+export const SHARE_PATH = /^\\\\[A-Za-z0-9._-]{1,63}\\[^\\/:*?"<>|\r\n]{1,120}$/;

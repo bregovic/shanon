@@ -77,6 +77,12 @@ export const device = defineObject({
     /** USB tiskárny bez tiskárny ve Windows (chybí ovladač) – názvy z posledního hlášení stanice, oddělené | */
     usbNoDriver: { edt: Str("DeviceUsbNoDriver", "@INT:DeviceUsbNoDriver", 500), readOnly: true },
     agentVersion: { edt: Str("DeviceVersion", "@INT:DeviceVersion", 40), readOnly: true },
+    /** prohlížeč, ze kterého se naposledy otevřela diagnostika tohoto počítače (založí / aktualizuje záznam sama) */
+    browserInfo: { edt: Str("DeviceBrowserInfo", "@INT:DeviceBrowserInfo", 200), readOnly: true },
+    browserSeenAt: { edt: Edts.DateTime, label: "@INT:DeviceBrowserSeenAt", readOnly: true },
+    /** sdílené tiskárny (\\server\tiskárna) k připojení stanicí – JSON seznam; výsledek posledního připojení */
+    connectQueue: { edt: Str("DeviceConnectQueue", "@INT:DeviceConnectQueue", 2000), readOnly: true },
+    connectResult: { edt: Str("DeviceConnectResult", "@INT:DeviceConnectResult", 500), readOnly: true },
     /** založeno z Nastavení („Nainstalovat na tento počítač“) — kód a název se při spárování vezmou z názvu počítače */
     autoName: { edt: Edts.NoYes, label: "@INT:DeviceAutoName", readOnly: true },
     // klíč stanice a jednorázový párovací kód — jen otisky
@@ -90,7 +96,7 @@ export const device = defineObject({
   listDialog: { kind: "stationDiag", label: "@SYS:StationDiag" },
   form: [
     { label: "@SYS:General", fields: ["code", "name", "userId", "registerId", "active"] },
-    { label: "@INT:State", fields: ["paired", "lastSeenAt", "hostName", "agentVersion"] },
+    { label: "@INT:State", fields: ["paired", "lastSeenAt", "hostName", "agentVersion", "browserInfo", "browserSeenAt", "connectResult"] },
   ],
   unique: [["code"]],
   defaultSort: { field: "code", dir: "asc" },
@@ -175,14 +181,16 @@ export const printerModel = defineObject({
     /** text, podle kterého se model pozná (část názvu ovladače nebo tiskárny, mezery a pomlčky se nepočítají) */
     match: { edt: Str("PrinterModelMatch", "@INT:PrinterModelMatch", 120), mandatory: true, help: "@INT:PrinterModelMatchHelp" },
     driverUrl: { edt: Str("PrinterDriverUrl", "@INT:PrinterDriverUrl", 500), help: "@INT:PrinterDriverUrlHelp" },
+    /** sdílená tiskárna ve Windows (\\server\tiskárna): diagnostika ji nabídne a stanice připojí (ovladač dá server tiskárny) */
+    connectPath: { edt: Str("PrinterConnectPath", "@INT:PrinterConnectPath", 260), help: "@INT:PrinterConnectPathHelp" },
     paper: { edt: enumEdt(DevicePaper), mandatory: true, default: "a4" },
     copies: { edt: Edts.Int, label: "@INT:Copies", default: 1 },
     usage: { edt: enumEdt(PrinterUsage), mandatory: true, default: "documents" },
     notes: { edt: Edts.Notes, label: "@SYS:Notes" },
   },
   titleField: "name",
-  list: ["name", "match", "usage", "paper", "copies", "driverUrl"],
-  form: [{ label: "@SYS:General", fields: ["name", "match", "usage", "paper", "copies", "driverUrl", "notes"] }],
+  list: ["name", "match", "usage", "paper", "copies", "driverUrl", "connectPath"],
+  form: [{ label: "@SYS:General", fields: ["name", "match", "usage", "paper", "copies", "driverUrl", "connectPath", "notes"] }],
   unique: [["match"]],
   defaultSort: { field: "name", dir: "asc" },
 });

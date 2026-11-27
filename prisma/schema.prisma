@@ -4936,30 +4936,34 @@ model IntMail {
 
 /// int.device — generováno z definice objektu
 model IntDevice {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
-  companyId    String    @map("company_id") @db.Uuid
-  code         String    @db.VarChar(20)
-  name         String    @db.VarChar(120)
-  registerId   String?   @map("register_id") @db.Uuid
-  active       Boolean   @default(true)
-  paired       Boolean   @default(false)
-  lastSeenAt   DateTime? @map("last_seen_at")
-  helloWanted  Boolean   @default(false) @map("hello_wanted")
-  userId       String?   @map("user_id") @db.VarChar(36)
-  hostName     String?   @map("host_name") @db.VarChar(120)
-  usbNoDriver  String?   @map("usb_no_driver") @db.VarChar(500)
-  agentVersion String?   @map("agent_version") @db.VarChar(40)
-  autoName     Boolean   @default(false) @map("auto_name")
-  tokenHash    String?   @map("token_hash") @db.VarChar(64)
-  pairHash     String?   @map("pair_hash") @db.VarChar(64)
-  pairExpires  DateTime? @map("pair_expires")
-  ext          Json      @default("{}")
-  version      Int       @default(1)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  createdBy    String?   @map("created_by") @db.Uuid
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
-  updatedBy    String?   @map("updated_by") @db.Uuid
+  id            String    @id @default(uuid(7)) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  code          String    @db.VarChar(20)
+  name          String    @db.VarChar(120)
+  registerId    String?   @map("register_id") @db.Uuid
+  active        Boolean   @default(true)
+  paired        Boolean   @default(false)
+  lastSeenAt    DateTime? @map("last_seen_at")
+  helloWanted   Boolean   @default(false) @map("hello_wanted")
+  userId        String?   @map("user_id") @db.VarChar(36)
+  hostName      String?   @map("host_name") @db.VarChar(120)
+  usbNoDriver   String?   @map("usb_no_driver") @db.VarChar(500)
+  agentVersion  String?   @map("agent_version") @db.VarChar(40)
+  browserInfo   String?   @map("browser_info") @db.VarChar(200)
+  browserSeenAt DateTime? @map("browser_seen_at")
+  connectQueue  String?   @map("connect_queue") @db.VarChar(2000)
+  connectResult String?   @map("connect_result") @db.VarChar(500)
+  autoName      Boolean   @default(false) @map("auto_name")
+  tokenHash     String?   @map("token_hash") @db.VarChar(64)
+  pairHash      String?   @map("pair_hash") @db.VarChar(64)
+  pairExpires   DateTime? @map("pair_expires")
+  ext           Json      @default("{}")
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     String?   @map("created_by") @db.Uuid
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedBy     String?   @map("updated_by") @db.Uuid
 
   company                 SysCompany         @relation("IntDevice_company", fields: [companyId], references: [id], onDelete: Restrict)
   register                PosRegister?       @relation("IntDevice_register", fields: [registerId], references: [id], onDelete: Restrict)
@@ -5079,22 +5083,23 @@ model IntPrintJob {
 
 /// int.printerModel — generováno z definice objektu
 model IntPrinterModel {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  name      String   @db.VarChar(120)
-  match     String   @db.VarChar(120)
-  driverUrl String?  @map("driver_url") @db.VarChar(500)
-  paper     String   @default("a4") @db.VarChar(40)
-  copies    Int?     @default(1)
-  usage     String   @default("documents") @db.VarChar(40)
-  notes     String?
-  ext       Json     @default("{}")
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  createdBy String?  @map("created_by") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by") @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String   @db.VarChar(120)
+  match       String   @db.VarChar(120)
+  driverUrl   String?  @map("driver_url") @db.VarChar(500)
+  connectPath String?  @map("connect_path") @db.VarChar(260)
+  paper       String   @default("a4") @db.VarChar(40)
+  copies      Int?     @default(1)
+  usage       String   @default("documents") @db.VarChar(40)
+  notes       String?
+  ext         Json     @default("{}")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.Uuid
 
   company                SysCompany         @relation("IntPrinterModel_company", fields: [companyId], references: [id], onDelete: Restrict)
   intDevicePrinter_model IntDevicePrinter[] @relation("IntDevicePrinter_model")

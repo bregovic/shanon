@@ -13,7 +13,7 @@
 # aktualizuje (/api/station/agent) a spustí znovu.
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.2.0'
+$Version = '1.3.0'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 # SHANON_STATION_DIR = jiná složka (zkouška stanice bez instalace)
 $AppDir = if ($env:SHANON_STATION_DIR) { $env:SHANON_STATION_DIR } else { Join-Path $env:LOCALAPPDATA 'ShanonPokladna' }
@@ -162,6 +162,22 @@ function Send-Hello($Cfg) {
   [void](Invoke-Json 'POST' "$($Cfg.url)/api/station/hello" @{ host = $env:COMPUTERNAME; version = $Version; printers = $printers; usb = $usb } $Cfg.headers)
 }
 
+# sdílená tiskárna z katalogu firmy (\\server\tiskárna): připojit ve Windows (ovladač dá server tiskárny), výsledek do Shanonu
+function Connect-SharedPrinter($Cfg, [string]$Path) {
+  $ok = $true
+  $msg = ''
+  try {
+    if ($Path -notmatch '^\\\\[A-Za-z0-9._-]+\\[^\\/:*?"<>|]+$') { throw 'neplatná cesta' }
+    if (-not (Get-Printer -Name $Path -ErrorAction SilentlyContinue)) { Add-Printer -ConnectionName $Path -ErrorAction Stop }
+    Write-Log "Připojena tiskárna $Path"
+  } catch {
+    $ok = $false
+    $msg = $_.Exception.Message
+    Write-Log "Připojení tiskárny $($Path): $msg"
+  }
+  try { [void](Invoke-Json 'POST' "$($Cfg.url)/api/station/connect" @{ path = $Path; ok = $ok; message = $msg } $Cfg.headers) } catch { }
+}
+
 function Print-Job($Cfg, $Job) {
   $file = Join-Path $env:TEMP ("shanon-" + $Job.id + ".pdf")
   try {
@@ -194,7 +210,10 @@ function Start-Station {
       if ((Get-Date) -ge $nextHello) { Send-Hello $cfg; $nextHello = (Get-Date).AddMinutes(10) }
       $r = Invoke-Json 'GET' "$($cfg.url)/api/station/jobs?wait=25" $null $cfg.headers 45
       # Shanon chce stav tiskáren hned (Diagnostika → Obnovit stav)
-      if ($r.hello) { Send-Hello $cfg; $nextHello = (Get-Date).AddMinutes(10) }
+      # Diagnostika → Připojit: sdílené tiskárny z katalogu firmy, pak hned nové hlášení tiskáren
+      $wanted = @($r.connect | Where-Object { $_ })
+      foreach ($p in $wanted) { Connect-SharedPrinter $cfg ([string]$p) }
+      if ($r.hello -or $wanted.Count) { Send-Hello $cfg; $nextHello = (Get-Date).AddMinutes(10) }
       # novější program stanice v Shanonu → stáhnout, nahradit a spustit znovu
       if ($r.agent -and ([version]$r.agent -gt [version]$Version)) { $update = Update-Agent $cfg ([string]$r.agent) }
       foreach ($job in @($r.jobs)) {

@@ -10,11 +10,12 @@
  *   GET  /api/station/installer/<kód>/setup.ps1   instalační skript, který si instalátor stáhne
  *   POST /api/station/jobs/<id>         { ok, message } výsledek tisku
  *   GET  /api/station/agent             program stanice (samoaktualizace, když úlohy hlásí novější `agent`)
+ *   POST /api/station/connect           { path, ok, message } výsledek připojení sdílené tiskárny (úlohy hlásí `connect`)
  */
 import { UserError } from "@/core/module";
 import { fillLabel, resolveLabel } from "@/core/labels";
 import { labelTable } from "@/registry";
-import { type HelloPrinter, jobPdf, pairStation, reportJob, stationAuth, stationHello, stationInstallerFile, takeJobs, helloWanted, stationAgentFile, stationAgentVersion } from "@/server/station";
+import { type HelloPrinter, SHARE_PATH, connectWanted, jobPdf, pairStation, reportJob, stationAuth, stationConnectReport, stationHello, stationInstallerFile, takeJobs, helloWanted, stationAgentFile, stationAgentVersion } from "@/server/station";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
       });
       return json({ ok: true });
     }
+    if (path[0] === "connect" && path.length === 1) {
+      const b = await body(req);
+      const p = String(b.path ?? "");
+      if (SHARE_PATH.test(p)) await stationConnectReport(st, p, b.ok === true, b.message ? String(b.message) : undefined);
+      return json({ ok: true });
+    }
     if (path[0] === "jobs" && path.length === 2 && UUID.test(path[1])) {
       const b = await body(req);
       await reportJob(st, path[1], b.ok === true, b.message ? String(b.message) : undefined);
@@ -93,7 +100,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ path?: s
       const wait = Number(new URL(req.url).searchParams.get("wait") ?? 0) || 0;
       const jobs = await takeJobs(st, wait);
       // agent = verze programu v Shanonu (starší stanice se aktualizuje), hello = poslat hned tiskárny a stav
-      return json({ jobs, agent: stationAgentVersion(), hello: await helloWanted(st) });
+      // connect = sdílené tiskárny k připojení (stanice 1.3+)
+      return json({ jobs, agent: stationAgentVersion(), hello: await helloWanted(st), connect: await connectWanted(st) });
     }
     if (path[0] === "agent" && path.length === 1) {
       return new Response(new Uint8Array(stationAgentFile()), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });

@@ -188,7 +188,7 @@ describe("tisková stanice", () => {
     expect(await takeJobs(st, 5)).toHaveLength(0); // odpoví hned, ne za 5 s
     await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true, state: "ready" }, { name: "HP LaserJet" }] });
     expect(await helloWanted(st)).toBe(false);
-    expect(stationAgentVersion()).toBe("1.2.0");
+    expect(stationAgentVersion()).toBe("1.3.0");
     // nabídka tiskáren: jen skutečné a připojené (Snagit / PDF se nehlásí, odpojená se nenabízí)
     const { refOptions } = await import("@/server/data");
     await stationHello(st, { host: "recepce", version: "1.1.0", printers: [{ name: "EPSON TM-T20III", default: true }, { name: "Snagit 2022" }, { name: "Adobe PDF" }] });
@@ -245,6 +245,26 @@ describe("tisková stanice", () => {
     expect(only.href).toBe("");
     const od = (await getRecord(P, "int.device", only.deviceId, client))!;
     expect([od.paired, od.active]).toEqual([false, true]);
+    // diagnostika z prohlížeče aktualizuje záznam počítače
+    await stationSetup(P, only.deviceId, { pair: false, browser: "Chrome 131 · Windows" });
+    const od2 = (await getRecord(P, "int.device", only.deviceId, client))!;
+    expect([od2.browserInfo, !!od2.browserSeenAt]).toEqual(["Chrome 131 · Windows", true]);
+
+    // sdílená tiskárna z katalogu: diagnostika ji nabídne, stanice ji připojí a nahlásí
+    const { stationConnect, connectWanted, stationConnectReport } = await import("@/server/station");
+    await expect(saveRecord(P, "int.printerModel", null, { name: "Kancl", match: "Kancl sdilena", connectPath: "C:\\x & del" }, undefined, client)).rejects.toBeTruthy();
+    const share = await saveRecord(P, "int.printerModel", null, { name: "Kancl", match: "Kancl sdilena", connectPath: "\\\\server\\Kancl" }, undefined, client);
+    let d2 = await stationDiagnostics(P, null, b.id);
+    expect(d2.connectable).toEqual([{ id: share.id, name: "Kancl", path: "\\\\server\\Kancl", queued: false }]);
+    await stationConnect(P, b.id, String(share.id));
+    expect(await connectWanted(b.st)).toEqual(["\\\\server\\Kancl"]);
+    expect(await takeJobs(b.st, 5)).toHaveLength(0); // odpoví hned (je co připojit)
+    await stationConnectReport(b.st, "\\\\server\\Kancl", true);
+    expect(await connectWanted(b.st)).toEqual([]);
+    await stationHello(b.st, { host: "expedice", printers: [{ name: "\\\\server\\Kancl", driver: "HP Universal" }] });
+    d2 = await stationDiagnostics(P, null, b.id);
+    expect(d2.connectable).toEqual([]);
+    expect(d2.device!.connectResult).toMatch(/\\\\server\\Kancl: OK$/);
   });
 
   it("nastavení tisku podle papíru a odhad papíru z názvu", () => {

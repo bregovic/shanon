@@ -5,7 +5,7 @@ import type { SettleCriteria } from "@/modules/gl/settlement";
 import { isEmail } from "@/core/edt";
 import { headers } from "next/headers";
 import { printJob, recentDocs } from "@/server/print";
-import { queueStationPrint, stationClaim, stationDiagnostics, stationRefresh, stationSetup, type StationDiagnostics } from "@/server/station";
+import { queueStationPrint, stationClaim, stationConnect, stationDiagnostics, stationRefresh, stationSetup, type StationDiagnostics } from "@/server/station";
 import { createCompanyFromRegistry } from "@/server/company-lookup";
 import { createFromRegistry, lookupRegistry, type RegistryHit } from "@/modules/gab/registry-lookup";
 import { disableTestEnv, enableTestEnv, testEnvState, type TestEnvState } from "@/modules/int/test-env";
@@ -1635,11 +1635,11 @@ export async function stationPrintAction(docType: string, ids: string[], station
 }
 
 /** Nastavení → Nainstalovat na tento počítač: instalátor Shanon Pokladna (`stationId` = zařízení ze zástupce, jinak nové). */
-export async function stationSetupAction(stationId?: string | null, pair = true): Promise<ActionResult<{ href: string; deviceId: string }>> {
+export async function stationSetupAction(stationId?: string | null, pair = true, browser?: string): Promise<ActionResult<{ href: string; deviceId: string }>> {
   const s = await requireSession();
   try {
     if (!s.ctx.modules.has("int") || !can(s.ctx.perms, "int.device", "write")) throw new UserError("@SYS:NoAccess");
-    return { ok: true, data: await stationSetup(s.ctx, stationId && /^[0-9a-f-]{36}$/.test(stationId) ? stationId : null, { pair: pair !== false }) };
+    return { ok: true, data: await stationSetup(s.ctx, stationId && /^[0-9a-f-]{36}$/.test(stationId) ? stationId : null, { pair: pair !== false, browser: typeof browser === "string" ? browser : undefined }) };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }
@@ -1743,6 +1743,19 @@ export async function stationPrinterAction(printerId: string, op: "enable" | "di
 }
 
 /** Diagnostika → Obnovit stav: stanice hned nahlásí tiskárny a jejich stav. */
+/** Diagnostika → Připojit sdílenou tiskárnu z katalogu (stanice ji připojí ve Windows). */
+export async function stationConnectAction(deviceId: string, modelId: string): Promise<ActionResult<null>> {
+  const s = await requireSession();
+  try {
+    if (!/^[0-9a-f-]{36}$/.test(deviceId) || !/^[0-9a-f-]{36}$/.test(modelId) || !s.ctx.modules.has("int")) throw new UserError("@SYS:InvalidValue");
+    if (!can(s.ctx.perms, "int.devicePrinter", "write")) throw new UserError("@SYS:NoAccess");
+    await stationConnect(s.ctx, deviceId, modelId);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
 export async function stationRefreshAction(deviceId: string): Promise<ActionResult<null>> {
   const s = await requireSession();
   try {

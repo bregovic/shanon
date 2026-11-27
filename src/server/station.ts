@@ -25,7 +25,9 @@ import { findPrintable, printJob } from "./print";
 import { renderPdf } from "./print-pdf";
 import { onStationWake, wakeStation } from "./station-wake";
 import { can } from "@/core/security";
-import { defaultPrintRules, devicePaperRoll, guessPaper, matchModel, normModel, resolvePrintTarget } from "@/modules/int/print-rules";
+import { SHARE_PATH, defaultPrintRules, devicePaperRoll, guessPaper, matchModel, normModel, resolvePrintTarget } from "@/modules/int/print-rules";
+
+export { SHARE_PATH };
 import { labelTable } from "@/registry";
 import { resolveLabel } from "@/core/labels";
 
@@ -231,7 +233,7 @@ export async function takeJobs(st: Station, waitSec: number) {
     const jobs = await pendingJobs(st);
     const left = until - Date.now();
     // Shanon chce hlášení tiskáren (Diagnostika → Obnovit stav): odpovědět hned, stanice ho pošle
-    if (jobs.length || left <= 0 || (await helloWanted(st))) return jobs;
+    if (jobs.length || left <= 0 || (await helloWanted(st)) || (await connectWanted(st)).length) return jobs;
     await new Promise<void>((resolve) => {
       const off = onStationWake(st.deviceId, () => {
         clearTimeout(t);
@@ -367,7 +369,7 @@ export async function queueStationPrint(ctx: Ctx, docType: string, ids: string[]
  * Nastavení → „Nainstalovat na tento počítač“: instalátor pro zařízení tohoto počítače (zná ho zástupce
  * Shanon Pokladna), jinak nové zařízení pojmenované při spárování podle názvu počítače. Právo = zápis zařízení.
  */
-export async function stationSetup(ctx: Ctx, deviceId: string | null, opts: { pair?: boolean } = {}): Promise<{ href: string; deviceId: string }> {
+export async function stationSetup(ctx: Ctx, deviceId: string | null, opts: { pair?: boolean; browser?: string } = {}): Promise<{ href: string; deviceId: string }> {
   const { code, dev } = await inTenant(ctx, async (s) => {
     const api = s.sys().api();
     let dev = deviceId ? await api.get("int.device", deviceId).catch(() => null) : null;
@@ -379,7 +381,11 @@ export async function stationSetup(ctx: Ctx, deviceId: string | null, opts: { pa
       dev = await api.create("int.device", { code: `PC${n}`, name: resolveLabel(labelTable, "@INT:DeviceSetupName", ctx.lang ?? "cs"), autoName: true, active: true, userId: ctx.userId });
     } else if (!dev.userId) await api.update("int.device", String(dev.id), { userId: ctx.userId });
     // jen založit (Diagnostika → Přidat tento počítač): instalace se stáhne až na vlastní tlačítko
-    if (opts.pair === false) return { code: "", dev };
+    if (opts.pair === false) {
+      // diagnostika z prohlížeče: záznam počítače se aktualizuje (prohlížeč, čas)
+      if (opts.browser !== undefined) await api.update("int.device", String(dev.id), { browserInfo: opts.browser.slice(0, 200) || null, browserSeenAt: new Date().toISOString() });
+      return { code: "", dev };
+    }
     const pc = newPairCode(ctx.tenantId);
     await api.update("int.device", String(dev.id), { pairHash: pc.hash, pairExpires: pc.expires.toISOString() });
     return { code: pc.code, dev };
@@ -427,7 +433,7 @@ export async function stationInstallerFile(code: string, part: "exe" | "script")
   return part === "exe" ? stationSetupExe() : stationSetupScript({ url: publicUrl(), code });
 }
 
-const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved", "StationDiagInstall", "StationDiagInstallHint", "StationDiagAdded"];
+const DIAG_KEYS = ["StationDiag", "StationDiagBrowser", "StationDiagUser", "StationDiagNone", "StationDiagStale", "StationDiagMany", "StationDiagUnpaired", "StationDiagOnline", "StationDiagOffline", "StationDiagNoPrinters", "StationDiagDefault", "StationDiagMissing", "StationDiagTest", "StationDiagTestSent", "StationDiagReceipt", "StationDiagDocs", "StationDiagBrowserPrint", "StationDiagRefresh", "StationDiagRefreshing", "StationDiagQueue", "StationDiagReinstall", "StationDiagUpdating", "StationDiagNoAgent", "StationDiagUsb", "StationDiagUsbNone", "StationDiagUsbHint", "StationDiagUsbFind", "StationDiagUsbEmpty", "StationDiagUsbTest", "StationDiagUsbPrinted", "StationDiagUsbBusy", "StationDiagUse", "StationDiagFound", "StationDiagToCatalog", "StationDiagInCatalog", "StationDiagNoDriver", "StationDiagDriverLink", "StationDiagDriverNoLink", "StationDiagAddPc", "StationDiagAddPcHint", "StationDiagSaved", "StationDiagInstall", "StationDiagInstallHint", "StationDiagAdded", "StationDiagConnect", "StationDiagConnectBtn", "StationDiagConnectQueued", "StationDiagConnectHint", "StationDiagConnectSent", "StationDiagBrowserSeen"];
 
 export interface StationDiagnostics {
   /** texty komponenty (jazyk uživatele) */
@@ -438,7 +444,9 @@ export interface StationDiagnostics {
   staleBrowser: boolean;
   /** kolik aktivních počítačů má uživatel jako Uživatel počítače */
   userDevices: number;
-  device: { id: string; name: string; code: string; hostName: string; paired: boolean; online: boolean; lastSeenAt: string | null; version: string } | null;
+  device: { id: string; name: string; code: string; hostName: string; paired: boolean; online: boolean; lastSeenAt: string | null; version: string; browserInfo: string; connectResult: string } | null;
+  /** sdílené tiskárny z katalogu, které tento počítač ještě nemá (stanice je na tlačítko připojí) */
+  connectable: { id: string; name: string; path: string; queued: boolean }[];
   printers: { id: string; label: string; printerName: string; paper: string; isDefault: boolean; present: boolean; enabled: boolean; driver: string; model: string | null; state: string | null; stateLabel: string; queued: number | null; stateAt: string | null }[];
   /** USB tiskárny bez ovladače (stanice 1.2+) a model z katalogu s odkazem na ovladač */
   usbNoDriver: { name: string; model: string | null; driverUrl: string | null }[];
@@ -486,8 +494,15 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
             online: !!seen && Date.now() - seen < ONLINE_MS,
             lastSeenAt: dev.lastSeenAt ? new Date(String(dev.lastSeenAt)).toISOString() : null,
             version: String(dev.agentVersion ?? ""),
+            browserInfo: String(dev.browserInfo ?? ""),
+            connectResult: String(dev.connectResult ?? ""),
           }
         : null,
+      connectable: dev
+        ? models
+            .filter((m) => m.connectPath && !printers.some((x) => x.present !== false && (x.modelId === m.id || normModel(x.printerName) === normModel(m.connectPath))))
+            .map((m) => ({ id: String(m.id), name: String(m.name), path: String(m.connectPath), queued: connectList(dev).includes(String(m.connectPath)) }))
+        : [],
       printers: printers.map((x) => ({
         id: String(x.id),
         label: String(x.label ?? x.printerName),
@@ -513,6 +528,48 @@ export async function stationDiagnostics(ctx: Ctx, browserStationId: string | nu
       // ostatní doklady: pravidlo „*“ (vzorový doklad bez vlastního pravidla)
       documents: await target("ar.invoice"),
     };
+  });
+}
+
+/** fronta sdílených tiskáren k připojení (JSON seznam cest) */
+function connectList(dev: RecordData | null | undefined): string[] {
+  try {
+    const v = JSON.parse(String(dev?.connectQueue ?? "[]"));
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+
+/** Diagnostika → Připojit: sdílená tiskárna z katalogu do fronty stanice (stanice 1.3+ ji připojí ve Windows). */
+export async function stationConnect(ctx: Ctx, deviceId: string, modelId: string): Promise<void> {
+  await inTenant(ctx, async (s) => {
+    const api = s.sys().api();
+    const dev = await api.get("int.device", deviceId);
+    const m = await api.get("int.printerModel", modelId);
+    if (!dev || !m) throw new UserError("@SYS:NotFound");
+    const path = String(m.connectPath ?? "");
+    if (!SHARE_PATH.test(path)) throw new UserError("@INT:PrinterConnectPathBad");
+    const list = connectList(dev);
+    if (!list.includes(path)) await api.update("int.device", deviceId, { connectQueue: JSON.stringify([...list, path].slice(-10)) });
+  });
+  wakeStation(deviceId, 200);
+}
+
+/** Sdílené tiskárny, které má stanice připojit (odpověď na dotaz úloh nese `connect`). */
+export async function connectWanted(st: Station): Promise<string[]> {
+  return inTenant(st.ctx, async (s) => connectList(await s.sys().api().get("int.device", st.deviceId)));
+}
+
+/** Stanice nahlásila výsledek připojení: z fronty pryč, výsledek k zařízení, nové hlášení tiskáren. */
+export async function stationConnectReport(st: Station, path: string, ok: boolean, message?: string): Promise<void> {
+  await inTenant(st.ctx, async (s) => {
+    const api = s.sys().api();
+    const dev = await api.get("int.device", st.deviceId);
+    if (!dev) return;
+    const text = `${new Date().toISOString().slice(0, 16).replace("T", " ")} ${path}: ${ok ? "OK" : String(message ?? "").slice(0, 300)}`;
+    await api.update("int.device", st.deviceId, { connectQueue: JSON.stringify(connectList(dev).filter((p) => p !== path)), connectResult: text.slice(0, 500), helloWanted: true });
   });
 }
 
