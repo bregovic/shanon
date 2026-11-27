@@ -71,6 +71,7 @@ import {
   posStornoAction,
   posRewriteAction,
   posSdpQueueAction,
+  posDisplayAction,
   posReceiptCustomerAction,
   deleteRecordsAction,
   type ActionResult,
@@ -434,6 +435,8 @@ export function PosTerminal(p: {
   printer: { driver: string; paperWidth: string; codePage: CodePage; baudRate: number; openDrawer: boolean; autoPrint: boolean; host?: string } | null;
   payment: { driver: string } | null;
   eet: { pending: number } | null;
+  /** pokladna má zákaznickou obrazovku (portál) – posílat stav nákupu */
+  display?: boolean;
   /** testovací server: kódy ručně povolených ostrých napojení (upozornění nahoře) */
   liveOnTest?: string[];
   /** prodej bez připojení: hlavička účtenky, plátce DPH, patička; karta jen na samostatném terminálu */
@@ -788,6 +791,25 @@ export function PosTerminal(p: {
     afterSale(r.data, pay);
   };
   const amendSameLines = !!amend && amend.sig === lineSig(lines);
+  // zákaznická obrazovka: co se markuje, platba, zaplaceno (s odstupem, ať se neposílá každé ťuknutí)
+  const displayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!p.display) return;
+    if (displayTimer.current) clearTimeout(displayTimer.current);
+    displayTimer.current = setTimeout(() => {
+      const shown = lines.map((l) => ({
+        name: l.item.name,
+        qty: l.scale ? `${l.scale.weight.replace(".", ",")} kg × ${l.scale.unitPrice.replace(".", ",")}` : l.item.weighed ? `${num.format(l.qty)} ${l.item.unit.toLowerCase()} × ${l.item.price}` : `${l.qty} × ${l.item.price}`,
+        amount: l.scale ? l.scale.total : (Math.round(Number(l.item.price) * l.qty * 100) / 100).toFixed(2),
+      }));
+      const who = customer?.name ?? (hasBuyer(buyer) ? buyer!.name : "") ?? "";
+      const state = receipt
+        ? { phase: "done" as const, lines: [], total: String(receipt.gross), customer: receipt.customer?.name ?? "", qr: receipt.qr ?? null, paid: String(receipt.paid), change: receipt.change ?? null }
+        : { phase: (payDlg || card ? "pay" : lines.length ? "cart" : "idle") as "pay" | "cart" | "idle", lines: shown, total: (shown.reduce((n, x) => n + Math.round(Number(x.amount) * 100), 0) / 100).toFixed(2), customer: who, qr: null, paid: null, change: null };
+      void safe(posDisplayAction(p.register.id, state));
+    }, 250);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, customer, buyer, payDlg, card, receipt, p.display]);
   /** jiné položky na stejném čísle (bez storna) — jen účtenka, která nikam neodešla */
   const rewriteAmend = async () => {
     if (!amend || !lines.length) return;

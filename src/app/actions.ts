@@ -39,6 +39,7 @@ import { getT } from "@/server/i18n";
 import posModule from "@/modules/pos";
 import { receiptEscPos } from "@/lib/escpos";
 import { queueSdpJob } from "@/server/sdp";
+import { publishDisplay, type DisplayState } from "@/server/pos-display";
 import { objectHref } from "@/server/ui";
 import { listNotices, markNoticesRead, type NoticeView } from "@/server/notices";
 import { previewPosting, type PostingPreview } from "@/server/posting-preview";
@@ -853,6 +854,30 @@ export async function posSdpQueueAction(target: { registerId?: string; connectio
       return String((await queueSdpJob(api, conn, String(dataBase64 ?? ""), String(reference ?? ""))).id);
     });
     return { ok: true, data: { id } };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Zákaznická obrazovka: kasa posílá, co se markuje (jen do paměti serveru, src/server/pos-display.ts). */
+export async function posDisplayAction(registerId: string, state: DisplayState): Promise<ActionResult<null>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    if (!/^[0-9a-f-]{36}$/.test(String(registerId))) throw new UserError("@SYS:InvalidValue");
+    const txt = (v: unknown, n: number) => String(v ?? "").slice(0, n);
+    const num = (v: unknown) => (/^-?\d{1,9}(\.\d{1,3})?$/.test(String(v ?? "")) ? String(v) : "0");
+    const phase = ["idle", "cart", "pay", "done"].includes(String(state?.phase)) ? state.phase : "idle";
+    publishDisplay(s.ctx.tenantId, String(registerId), {
+      phase,
+      lines: (Array.isArray(state?.lines) ? state.lines : []).slice(-200).map((l) => ({ name: txt(l?.name, 120), qty: txt(l?.qty, 40), amount: num(l?.amount) })),
+      total: num(state?.total),
+      customer: txt(state?.customer, 120),
+      qr: state?.qr ? txt(state.qr, 600) : null,
+      paid: state?.paid ? num(state.paid) : null,
+      change: state?.change ? num(state.change) : null,
+    });
+    return { ok: true, data: null };
   } catch (e) {
     return fail(e, s.lang, s.ctx.tenantId);
   }

@@ -158,3 +158,16 @@ položce se uloží hmotnost, cena za kg, cena, váha, výrobní číslo a surov
 fakturu s váženým zbožím z ověřené váhy zatím nejde. Rámce Dialog 06 jsou zatím předběžné — před ostrým provozem je
 ověřit podle specifikace výrobce váhy a zkouškou na skutečné váze.
 
+
+## Zákaznická obrazovka
+
+Mobil nebo tablet otočený k zákazníkovi ukazuje, co se markuje: položky s cenou, celkový součet, odběratele,
+u QR platby velký QR kód k zaplacení a po zaplacení poděkování s částkou a vrácenými penězi. Bez nákupu je na ní logo,
+nadpis a text (třeba dnešní nabídka).
+
+1. [Integrace → Portály](/int/portal) → **Nový**: **Účel portálu** = *Zákaznická obrazovka (pokladna)*, vyberte **Pokladnu**.
+   Nadpis a text stránky = úvodní obrazovka, vzhled (logo, barvy, pozadí) jako u ostatních portálů.
+2. Odkaz portálu (Kopírovat, nebo QR) otevřete na zařízení u zákazníka – bez přihlášení. Obrazovka se jen dívá, nic se na ní neovládá.
+3. Kasu otevřete znovu, ať o obrazovce ví.
+
+Kdo zná odkaz, vidí nákup na té pokladně – **Nový odkaz** u portálu starý zneplatní.

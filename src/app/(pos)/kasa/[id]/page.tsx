@@ -112,7 +112,9 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
     };
     // testovací server s ručně povoleným ostrým napojením (EET, platby): kasa to musí hlásit
     const liveOnTest = Object.values(conns).filter((c) => liveOnTestActive(c)).map((c) => String(c!.code));
-    return { items, groups, units, rates, offline, shift, conns, station, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes, liveOnTest };
+    // zákaznická obrazovka (portál) této pokladny: kasa posílá, co se markuje
+    const display = s.ctx.modules.has("int") ? (await api.find("int.portal", { purpose: "display", registerId: id, active: true }, { take: 1 }).catch(() => [])).length > 0 : false;
+    return { display, items, groups, units, rates, offline, shift, conns, station, eetPending, promo, categories, top, rounding, baskets, receiptLayout, boxPick, boxes, liveOnTest };
   });
   const used = new Set(data.items.map((i) => String(i.groupId)));
   // texty terminálu = všechny labely modulu POS
@@ -192,6 +194,7 @@ export default async function TerminalPage({ params }: { params: Promise<{ id: s
       }
       eet={data.conns.eet ? { pending: data.eetPending } : null}
       liveOnTest={data.liveOnTest}
+      display={data.display}
       offline={data.offline}
       customers={s.ctx.modules.has("ar")}
       mail={s.ctx.modules.has("int")}

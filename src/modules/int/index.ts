@@ -562,6 +562,8 @@ export const PortalPurpose = defineEnum({
   values: [
     { value: "documents", label: "@INT:PortalPurposeDocs" },
     { value: "agreement", label: "@INT:PortalPurposeAgreement" },
+    // obrazovka pro zákazníka u pokladny: co se markuje, součet, QR k zaplacení (src/server/pos-display.ts)
+    { value: "display", label: "@INT:PortalPurposeDisplay" },
   ],
 });
 
@@ -581,6 +583,8 @@ export const portal = defineObject({
     /** formulář s údaji člena (Integrace → Formuláře) */
     formId: { edt: refEdt("int.form", "@INT:PortalForm"), help: "@INT:PortalFormHelp" },
     mailAgreement: { edt: Edts.NoYes, label: "@INT:PortalMailAgreement", default: true, help: "@INT:PortalMailAgreementHelp" },
+    /** zákaznická obrazovka: pokladna, jejíž nákup se ukazuje */
+    registerId: { edt: refEdt("pos.register", "@INT:Register"), optionalRef: true, help: "@INT:PortalRegisterHelp" },
     /** tajná část odkazu (vygeneruje se; Nový odkaz zneplatní starý) */
     token: { edt: Str("IntPortalToken", "@INT:PortalToken", 64), readOnly: true },
     /** druhá část jednoduché adresy /<zkratka organizace>/<slug> (výchozí „doklady“) */
@@ -623,6 +627,7 @@ export const portal = defineObject({
     { label: "@INT:PortalPage", fields: ["title", "intro"] },
     { label: "@INT:PortalDesign", fields: ["logo", "logoBadge", "logoSize", "logoAlign", "accentColor", "accent2Color", "background", "backgroundImage", "corners", "showCompany", "footer"] },
     { label: "@INT:PortalAgreement", fields: ["formId", "agreementTerms", "agreementGroupId", "mailAgreement"], visibleWhen: { field: "purpose", in: ["agreement"] } },
+    { label: "@INT:PortalDisplay", fields: ["registerId"], visibleWhen: { field: "purpose", in: ["display"] } },
     { label: "@INT:PortalKinds", fields: ["allowInvoice", "allowAdvance", "allowOrder", "allowOther", "requireRegNo", "autoExtract"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalApp", fields: ["appVendors", "appEmployees"], visibleWhen: { field: "purpose", in: ["documents"] } },
     { label: "@INT:PortalLimits", fields: ["maxFileMb", "maxFiles", "ipHourLimit", "dailyLimit"] },
@@ -1088,6 +1093,16 @@ export default defineModule({
       PortalPurpose: "Účel portálu",
       PortalPurposeDocs: "Nahrání dokladů",
       PortalPurposeAgreement: "Smlouva (členství, předplatné)",
+      PortalPurposeDisplay: "Zákaznická obrazovka (pokladna)",
+      PortalDisplay: "Zákaznická obrazovka",
+      PortalRegisterHelp: "Pokladna, jejíž nákup obrazovka ukazuje. Odkaz otevřete na mobilu nebo tabletu otočeném k zákazníkovi; bez nákupu se ukáže nadpis a text stránky.",
+      DisplayTotal: "Celkem",
+      DisplayThanks: "Děkujeme za nákup",
+      DisplayPaid: "Zaplaceno",
+      DisplayChange: "Vráceno",
+      DisplayScanToPay: "Naskenujte QR kód v bankovní aplikaci",
+      DisplayCustomer: "Odběratel",
+      DisplayNoRegister: "Obrazovka nemá vybranou pokladnu.",
       PortalDesign: "Vzhled stránky",
       PortalLogoBadge: "Podklad loga",
       PortalLogoBadgeHelp: "Žádný = logo přímo na pozadí (průhledné PNG). Světlý / tmavý podklad pomůže, když logo na fotce zaniká.",
@@ -1821,6 +1836,16 @@ export default defineModule({
       PortalPurpose: "Portal purpose",
       PortalPurposeDocs: "Document upload",
       PortalPurposeAgreement: "Agreement (membership, subscription)",
+      PortalPurposeDisplay: "Customer display (register)",
+      PortalDisplay: "Customer display",
+      PortalRegisterHelp: "The register whose sale the display shows. Open the link on a phone or tablet facing the customer; without a sale it shows the page title and text.",
+      DisplayTotal: "Total",
+      DisplayThanks: "Thank you",
+      DisplayPaid: "Paid",
+      DisplayChange: "Change",
+      DisplayScanToPay: "Scan the QR code in your banking app",
+      DisplayCustomer: "Customer",
+      DisplayNoRegister: "The display has no register selected.",
       PortalDesign: "Page design",
       PortalLogoBadge: "Logo background",
       PortalLogoBadgeHelp: "None = logo straight on the background (transparent PNG). A light / dark badge helps when the logo disappears on a photo.",

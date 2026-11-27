@@ -3940,6 +3940,7 @@ model PosRegister {
   posReceipt_register    PosReceipt[]      @relation("PosReceipt_register")
   posBasket_register     PosBasket[]       @relation("PosBasket_register")
   intConnection_register IntConnection[]   @relation("IntConnection_register")
+  intPortal_register     IntPortal[]       @relation("IntPortal_register")
   intDevice_register     IntDevice[]       @relation("IntDevice_register")
   intPrintRule_register  IntPrintRule[]    @relation("IntPrintRule_register")
 
@@ -4644,6 +4645,7 @@ model IntPortal {
   agreementGroupId String?  @map("agreement_group_id") @db.Uuid
   formId           String?  @map("form_id") @db.Uuid
   mailAgreement    Boolean  @default(true) @map("mail_agreement")
+  registerId       String?  @map("register_id") @db.Uuid
   token            String?  @db.VarChar(64)
   slug             String?  @default("doklady") @db.VarChar(40)
   publicUrl        String?  @map("public_url") @db.VarChar(200)
@@ -4683,12 +4685,14 @@ model IntPortal {
   company                SysCompany        @relation("IntPortal_company", fields: [companyId], references: [id], onDelete: Restrict)
   agreementGroup         ArGroup?          @relation("IntPortal_agreementGroup", fields: [agreementGroupId], references: [id], onDelete: Restrict)
   form                   IntForm?          @relation("IntPortal_form", fields: [formId], references: [id], onDelete: Restrict)
+  register               PosRegister?      @relation("IntPortal_register", fields: [registerId], references: [id], onDelete: Restrict)
   intPortalUpload_portal IntPortalUpload[] @relation("IntPortalUpload_portal")
   intDocument_portal     IntDocument[]     @relation("IntDocument_portal")
 
   @@index([tenantId, companyId])
   @@index([agreementGroupId])
   @@index([formId])
+  @@index([registerId])
   @@map("int_portal")
 }
 
