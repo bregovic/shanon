@@ -30,7 +30,7 @@ import { runReport } from "@/server/report";
 import { can } from "@/core/security";
 import { fromCents, toCents } from "@/core/money";
 import { openShiftOf, quote, receiptOfClient, receiptPrint, sell, sellOnInvoice, shiftTotals, type ReceiptPrint, type SaleInput, type ScaleLine } from "@/modules/pos/sale";
-import { canDeleteReceipt, stornoReceipt } from "@/modules/pos/receipt-fix";
+import { canDeleteReceipt, rewriteReceipt, stornoReceipt } from "@/modules/pos/receipt-fix";
 import { sendDocumentNow } from "@/server/mail";
 import { disableCompanyModules, enableCompanyModules } from "@/server/modules";
 import { assertPaid, connectionsFor, eetRegisterReceipt, eetResendPending, paymentCancel, paymentStart, paymentStatus, type PaymentState } from "@/modules/int/drivers";
@@ -702,6 +702,8 @@ export interface PosReceiptRow {
   /** of = storno jiné účtenky, by = stornovaná */
   storno: "of" | "by" | null;
   canDelete: boolean;
+  /** jde přepsat na stejném čísle (Otevřít → Přepsat účtenku) */
+  canRewrite: boolean;
   lines: { itemId: string; qty: string; scale: ScaleLine | null }[];
 }
 
@@ -729,6 +731,7 @@ export async function posShiftReceiptsAction(registerId: string): Promise<Action
       // smazat jde jen poslední účtenku řady – stačí ověřit nejnovější
       const newest = rs.find((r) => !r.offline);
       const deletable = newest && can(s.ctx.perms, "pos.receipt", "delete") && (await canDeleteReceipt(api, newest)) ? String(newest.id) : null;
+      const shiftOpen = sh.status === "open";
       return rs.map((r): PosReceiptRow => ({
         id: String(r.id),
         receiptNum: String(r.receiptNum),
@@ -741,6 +744,8 @@ export async function posShiftReceiptsAction(registerId: string): Promise<Action
         buyer: r.buyerName || r.buyerStreet || r.buyerCity ? { name: String(r.buyerName ?? ""), street: String(r.buyerStreet ?? ""), zip: String(r.buyerZip ?? ""), city: String(r.buyerCity ?? "") } : null,
         storno: r.stornoOfId ? "of" : r.stornoId ? "by" : null,
         canDelete: deletable === String(r.id),
+        // stejná pravidla jako canRewriteReceipt (směna je otevřená – bez dotazu za účtenku)
+        canRewrite: shiftOpen && !r.stornoOfId && !r.stornoId && !r.eetStatus && !r.emailedAt && !r.paymentRef && !r.offline && r.payStatus !== "paid",
         lines: lines
           .filter((l) => l.receiptId === r.id)
           .map((l) => ({
@@ -752,6 +757,27 @@ export async function posShiftReceiptsAction(registerId: string): Promise<Action
               : null,
           })),
       }));
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, s.lang, s.ctx.tenantId);
+  }
+}
+
+/** Přepsat účtenku na stejném čísle (kasa → Otevřít → Přepsat účtenku): řádky a částky podle nákupu. */
+export async function posRewriteAction(input: SaleInput): Promise<ActionResult<ReceiptPrint>> {
+  const s = await requireSession();
+  try {
+    assertCan(s.ctx.perms, "pos.receipt", "write");
+    const sale = saleInput(input);
+    if (!sale.replacesId) throw new UserError("@SYS:InvalidValue");
+    const data = await inTenant(s.ctx, async (sess) => {
+      const api = sess.sys().api();
+      if (s.ctx.modules.has("int")) sale.verifiedScale = await verifiedScaleOf(api, sale.registerId);
+      const r = await api.get("pos.receipt", sale.replacesId!);
+      if (!r) throw new UserError("@SYS:NotFound");
+      await rewriteReceipt(api, r, sale);
+      return receiptPrint(api, s.ctx.companyId, String(r.id));
     });
     return { ok: true, data };
   } catch (e) {

@@ -267,9 +267,17 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
     await data.update("pos.receipt", String(receipt.id), { vs });
     receipt.vs = vs;
   }
+  await createReceiptLines(data, String(receipt.id), lines);
+  // zaplacený odložený nákup se uzavře (box je volný)
+  if (input.basketId) await closeBasket(data, input.basketId, "paid", String(receipt.id));
+  return receipt;
+}
+
+/** Řádky účtenky z výpočtu `quote` (prodej i přepsání účtenky). */
+export async function createReceiptLines(data: DataApi, receiptId: string, lines: Awaited<ReturnType<typeof quote>>["lines"]) {
   for (const l of lines) {
     await data.create("pos.receiptLine", {
-      receiptId: receipt.id,
+      receiptId,
       itemId: l.itemId,
       description: l.description,
       qty: l.qty,
@@ -285,9 +293,6 @@ export async function sell(data: DataApi, input: SaleInput): Promise<RecordData>
       ...("scale" in l && l.scale ? l.scale : {}),
     });
   }
-  // zaplacený odložený nákup se uzavře (box je volný)
-  if (input.basketId) await closeBasket(data, input.basketId, "paid", String(receipt.id));
-  return receipt;
 }
 
 /** Prodej uložený v kase bez připojení (ceny, které zákazník zaplatil, a číslo z offline řady kasy). */

@@ -48,7 +48,9 @@ summary: Otevření směny, prodej na dotykové kase, odložené nákupy, PIN a 
 - **V kase** tlačítko **Účtenky** (vedle Uzávěrky) ukáže účtenky otevřené směny:
   - **Otevřít** – účtenka se načte do nákupu. Když změníte jen odběratele, **Uložit odběratele** ho zapíše na stejnou účtenku
     (vytisknete ji znovu). Když změníte položky a zaplatíte, původní účtenka se **stornuje** a vystaví se nová (při platbě
-    hotově kasa ukáže rozdíl proti původní).
+    hotově kasa ukáže rozdíl proti původní). **Přepsat účtenku** zapíše změněné položky na **stejné číslo** bez storna –
+    jen do uzávěrky a u účtenky, která nešla do EET, e-mailem ani kartou přes terminál (způsob platby zůstává; zákazníkovi
+    vytiskněte novou účtenku a původní si vezměte zpět). Na účtence je pak vidět, kdy byla přepsaná.
   - **Tisk** – účtenka znovu k tisku nebo odeslání e-mailem.
   - **Stornovat** – opravná účtenka se zápornou částkou: zboží se vrátí na sklad a do EET jde záporná tržba. Peníze vraťte
     zákazníkovi stejným způsobem (kartu na platebním terminálu).

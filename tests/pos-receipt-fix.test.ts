@@ -72,6 +72,22 @@ describe("oprava účtenky", () => {
     expect(next.receiptNum).toBe(r.receiptNum);
   }, 120_000);
 
+  it("přepsat účtenku na stejném čísle: jiné položky a částky, sklad srovnaný", async () => {
+    const { rewriteReceipt } = await import("@/modules/pos/receipt-fix");
+    const r = await api((a) => sell(a, { registerId: regId, payment: "cash", lines: [{ itemId: ids.item, qty: "1" }] }));
+    const stock0 = await onhand(ids.item);
+    const w = await api(async (a) => rewriteReceipt(a, (await a.get("pos.receipt", String(r.id)))!, { registerId: regId, payment: "cash", customerId: ids.cust, lines: [{ itemId: ids.item, qty: "3" }, { itemId: ids.small, qty: "1" }] }));
+    // 3 × 1 210 + 99,60 = 3 729,60 → hotově 3 730
+    expect([w.receiptNum, w.amountGross, w.amountPaid, w.rounding, w.customerId, !!w.rewrittenAt]).toEqual([r.receiptNum, "3729.60", "3730.00", "0.40", ids.cust, true]);
+    const lines = (await listRecords(P, "pos.receiptLine", { filter: { receiptId: String(r.id) } }, client)).rows;
+    expect(lines.map((l) => l.qty).sort()).toEqual(["1.0000", "3.0000"]);
+    expect(await onhand(ids.item)).toBe(stock0 - 2);
+    // stornovaná / storno účtenka přepsat nejde
+    const out = await runAction(P, "pos.receipt", String(r.id), "storno", client);
+    const st = (await getRecord(P, "pos.receipt", (out as { open: { id: string } }).open.id, client))!;
+    await expect(api((a) => rewriteReceipt(a, st, { registerId: regId, payment: "cash", lines: [{ itemId: ids.item, qty: "1" }] }))).rejects.toMatchObject({ label: "@POS:RewriteRule" });
+  }, 120_000);
+
   it("odběratel po uzávěrce: účtenka přejde do KH jednotlivě (A.4) a zpět do souhrnu", async () => {
     const r = await api((a) => sell(a, { registerId: regId, payment: "cash", lines: [{ itemId: ids.item, qty: "10" }] }));
     const [shift] = (await listRecords(P, "pos.shift", { filter: { status: "open" } }, client)).rows;

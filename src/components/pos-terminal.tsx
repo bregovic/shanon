@@ -68,6 +68,7 @@ import {
   posShiftReceiptsAction,
   posReceiptPrintAction,
   posStornoAction,
+  posRewriteAction,
   posReceiptCustomerAction,
   deleteRecordsAction,
   type ActionResult,
@@ -682,7 +683,7 @@ export function PosTerminal(p: {
   const [eetPending, setEetPending] = useState(p.eet?.pending ?? 0);
   // účtenky směny (oprava, storno, tisk) a oprava otevřené účtenky v nákupu
   const [rcpts, setRcpts] = useState<PosReceiptRow[] | null>(null);
-  const [amend, setAmend] = useState<{ id: string; num: string; paid: string; payment: string; sig: string } | null>(null);
+  const [amend, setAmend] = useState<{ id: string; num: string; paid: string; payment: string; sig: string; canRewrite: boolean } | null>(null);
   const lineSig = (ls: { item?: PosItem; itemId?: string; qty: number | string }[]) =>
     ls
       .map((l) => `${l.item?.id ?? l.itemId}:${Number(l.qty)}`)
@@ -735,7 +736,7 @@ export function PosTerminal(p: {
     setCustomer(row.customerId ? { id: row.customerId, name: row.customerName, regNo: "", vatId: "", email: "" } : null);
     setBuyer(row.buyer);
     setBuyerDraft(row.buyer ?? NO_BUYER);
-    setAmend({ id: row.id, num: row.receiptNum, paid: row.paid, payment: row.payment, sig: lineSig(row.lines) });
+    setAmend({ id: row.id, num: row.receiptNum, paid: row.paid, payment: row.payment, sig: lineSig(row.lines), canRewrite: row.canRewrite });
     setMobileCart(true);
   };
   const cancelAmend = () => {
@@ -758,6 +759,20 @@ export function PosTerminal(p: {
     afterSale(r.data, pay);
   };
   const amendSameLines = !!amend && amend.sig === lineSig(lines);
+  /** jiné položky na stejném čísle (bez storna) — jen účtenka, která nikam neodešla */
+  const rewriteAmend = async () => {
+    if (!amend || !lines.length) return;
+    if (scalePending(vState)) return setError(L.ScalePending);
+    if (!window.confirm(L.RcptRewriteConfirm.replace("{num}", amend.num))) return;
+    setBusy(true);
+    const r = await safe(posRewriteAction({ registerId: p.register.id, payment: "cash", replacesId: amend.id, customerId: customer?.id ?? null, buyer: customer ? null : hasBuyer(buyer) ? buyer : null, lines: saleLines() }));
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    const pay = amend.payment === "card" ? "card" : amend.payment === "qr" ? "qr" : "cash";
+    toast(L.RcptRewritten.replace("{num}", amend.num));
+    setAmend(null);
+    afterSale(r.data, pay);
+  };
 
   // prodej bez připojení: fronta v prohlížeči pokladny (src/lib/pos-offline.ts), odešle se sama
   const offlineRaw = useSyncExternalStore(subscribeQueue, () => queueRaw(p.register.id), () => "[]");
@@ -1617,6 +1632,11 @@ export function PosTerminal(p: {
                 {amendSameLines && (
                   <Button size="small" appearance="primary" disabled={busy} onClick={() => void saveAmendCustomer()}>
                     {L.AmendSaveCustomer}
+                  </Button>
+                )}
+                {!amendSameLines && amend.canRewrite && (
+                  <Button size="small" appearance="primary" disabled={busy || !lines.length} onClick={() => void rewriteAmend()}>
+                    {L.RcptRewrite}
                   </Button>
                 )}
                 <Button size="small" appearance="subtle" disabled={busy} onClick={cancelAmend}>

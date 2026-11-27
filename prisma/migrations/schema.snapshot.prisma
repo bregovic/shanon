@@ -4027,6 +4027,7 @@ model PosReceipt {
   clientId      String?   @map("client_id") @db.VarChar(36)
   offline       Boolean   @default(false)
   soldAt        DateTime? @map("sold_at")
+  rewrittenAt   DateTime? @map("rewritten_at")
   ext           Json      @default("{}")
   version       Int       @default(1)
   createdAt     DateTime  @default(now()) @map("created_at")

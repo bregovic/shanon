@@ -14,7 +14,7 @@ import { fromCents, roundCents, toCents } from "@/core/money";
 import { UserError, type DataApi, type ObjectHandlers, type RecordData } from "@/core/module";
 import { accountingCurrencyId, currencyRounding } from "@/modules/gl/posting";
 import { filedPeriodOf } from "@/modules/tax/vat-return";
-import { createReceiptTaxTrans, openShiftOf, qrBankAccount, receiptA4, receiptTaxParts } from "./sale";
+import { createReceiptLines, createReceiptTaxTrans, openShiftOf, qrBankAccount, quote, receiptA4, receiptTaxParts, type SaleInput } from "./sale";
 
 const zero = BigInt(0);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -65,6 +65,44 @@ export async function stornoReceipt(data: DataApi, r: RecordData): Promise<Recor
     });
   await data.update("pos.receipt", String(r.id), { stornoId: st.id, ...(qrAwaiting ? { payStatus: "cancelled" } : {}) });
   return (await data.get("pos.receipt", String(st.id)))!;
+}
+
+/** Smí se účtenka přepsat na stejném čísle (otevřená směna, nešla do EET, e-mailem ani kartou přes terminál)? */
+export async function canRewriteReceipt(data: DataApi, r: RecordData): Promise<boolean> {
+  if (r.stornoOfId || r.stornoId || r.eetStatus || r.emailedAt || r.paymentRef || r.offline || r.payStatus === "paid") return false;
+  const shift = await data.get("pos.shift", String(r.shiftId));
+  return shift?.status === "open";
+}
+
+/**
+ * Přepsat účtenku na stejném čísle: nové řádky a částky (ceny z ceníku jako při prodeji), odběratel z kasy,
+ * způsob platby zůstává. Sklad se srovná (staré řádky vrátí zboží, nové ho vydají), čas přepsání na účtence.
+ */
+export async function rewriteReceipt(data: DataApi, r: RecordData, input: SaleInput): Promise<RecordData> {
+  if (!(await canRewriteReceipt(data, r))) throw new UserError("@POS:RewriteRule");
+  if (String(input.registerId) !== String(r.registerId)) throw new UserError("@SYS:NotFound");
+  const payment = r.paymentMethod === "card" ? "card" : r.paymentMethod === "qr" ? "qr" : "cash";
+  const { lines, gross, net, paid } = await quote(data, { ...input, payment });
+  for (const l of await data.find("pos.receiptLine", { receiptId: r.id }, { take: 10000 })) await data.remove("pos.receiptLine", String(l.id));
+  await createReceiptLines(data, String(r.id), lines);
+  const b = input.customerId ? null : input.buyer;
+  const clip = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n) || null;
+  await data.update("pos.receipt", String(r.id), {
+    amountNet: fromCents(net),
+    taxAmount: fromCents(gross - net),
+    amountGross: fromCents(gross),
+    rounding: fromCents(paid - gross),
+    amountPaid: fromCents(paid),
+    cashGiven: null,
+    change: null,
+    customerId: input.customerId ?? null,
+    buyerName: clip(b?.name, 255),
+    buyerStreet: clip(b?.street, 255),
+    buyerZip: clip(b?.zip, 20),
+    buyerCity: clip(b?.city, 255),
+    rewrittenAt: new Date().toISOString(),
+  });
+  return (await data.get("pos.receipt", String(r.id)))!;
 }
 
 /** Smí se účtenka smazat (poslední v otevřené směně, nikam neodešla)? */
